@@ -22,10 +22,5 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
 
         builder.HasIndex(x => x.Login).IsUnique();
-
-        builder.HasOne(x => x.DefaultBranch)
-            .WithMany(b => b.DefaultForUsers)
-            .HasForeignKey(x => x.DefaultBranchId)
-            .OnDelete(DeleteBehavior.Restrict);
     }
 }

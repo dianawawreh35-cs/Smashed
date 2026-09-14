@@ -13,6 +13,5 @@ public class Branch
 
     public bool IsActive { get; set; } = true;
 
-    public ICollection<User> DefaultForUsers { get; } = new List<User>();
     public ICollection<Communication> Communications { get; } = new List<Communication>();
 }

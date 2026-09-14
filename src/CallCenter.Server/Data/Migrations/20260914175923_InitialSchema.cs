@@ -93,7 +93,6 @@ namespace CallCenter.Server.Data.Migrations
                     inbound_sip_secret = table.Column<string>(type: "text", nullable: true),
                     outbound_extension = table.Column<string>(type: "text", nullable: true),
                     outbound_sip_secret = table.Column<string>(type: "text", nullable: true),
-                    default_branch_id = table.Column<Guid>(type: "uuid", nullable: true),
                     is_active = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()"),
                     last_login_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
@@ -102,12 +101,6 @@ namespace CallCenter.Server.Data.Migrations
                 {
                     table.PrimaryKey("pk_users", x => x.id);
                     table.CheckConstraint("ck_users_role", "role IN ('Agent','Supervisor')");
-                    table.ForeignKey(
-                        name: "fk_users_branches_default_branch_id",
-                        column: x => x.default_branch_id,
-                        principalTable: "branches",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -767,31 +760,15 @@ namespace CallCenter.Server.Data.Migrations
                 column: "updated_by");
 
             migrationBuilder.CreateIndex(
-                name: "ix_users_default_branch_id",
-                table: "users",
-                column: "default_branch_id");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_users_login",
                 table: "users",
                 column: "login",
                 unique: true);
-
-            // Full-text search over a contact's name and address (A-61, S-02).
-            // An expression index cannot be declared on the EF model, so it is
-            // written here by hand. 'simple' rather than a language dictionary:
-            // the data is Arabic and English names, where stemming would hurt.
-            migrationBuilder.Sql("""
-                CREATE INDEX ix_contacts_name ON contacts
-                USING gin (to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(address,'')));
-                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP INDEX IF EXISTS ix_contacts_name;");
-
             migrationBuilder.DropTable(
                 name: "agent_sessions");
 
@@ -832,6 +809,9 @@ namespace CallCenter.Server.Data.Migrations
                 name: "communications");
 
             migrationBuilder.DropTable(
+                name: "branches");
+
+            migrationBuilder.DropTable(
                 name: "channels");
 
             migrationBuilder.DropTable(
@@ -839,9 +819,6 @@ namespace CallCenter.Server.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "users");
-
-            migrationBuilder.DropTable(
-                name: "branches");
         }
     }
 }

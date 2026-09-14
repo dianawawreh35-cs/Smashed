@@ -34,9 +34,6 @@ public class User
     /// <summary>Encrypted at rest.</summary>
     public string? OutboundSipSecret { get; set; }
 
-    public Guid? DefaultBranchId { get; set; }
-    public Branch? DefaultBranch { get; set; }
-
     public bool IsActive { get; set; } = true;
 
     public DateTimeOffset CreatedAt { get; set; }

@@ -38,7 +38,6 @@ CREATE TABLE users (
   inbound_sip_secret    text,                                -- encrypted at rest (app-level key)
   outbound_extension    text,                                -- e.g. '201'
   outbound_sip_secret   text,                                -- encrypted at rest
-  default_branch_id     uuid REFERENCES branches(id),
   is_active             boolean NOT NULL DEFAULT true,
   created_at            timestamptz NOT NULL DEFAULT now(),
   last_login_at         timestamptz

@@ -13,7 +13,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CallCenter.Server.Data.Migrations
 {
     [DbContext(typeof(CallCenterDbContext))]
-    [Migration("20260914174414_InitialSchema")]
+    [Migration("20260914175923_InitialSchema")]
     partial class InitialSchema
     {
         /// <inheritdoc />
@@ -1010,10 +1010,6 @@ namespace CallCenter.Server.Data.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid?>("DefaultBranchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("default_branch_id");
-
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1062,9 +1058,6 @@ namespace CallCenter.Server.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_users");
-
-                    b.HasIndex("DefaultBranchId")
-                        .HasDatabaseName("ix_users_default_branch_id");
 
                     b.HasIndex("Login")
                         .IsUnique()
@@ -1338,22 +1331,9 @@ namespace CallCenter.Server.Data.Migrations
                     b.Navigation("UpdatedByUser");
                 });
 
-            modelBuilder.Entity("CallCenter.Server.Data.Entities.User", b =>
-                {
-                    b.HasOne("CallCenter.Server.Data.Entities.Branch", "DefaultBranch")
-                        .WithMany("DefaultForUsers")
-                        .HasForeignKey("DefaultBranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_users_branches_default_branch_id");
-
-                    b.Navigation("DefaultBranch");
-                });
-
             modelBuilder.Entity("CallCenter.Server.Data.Entities.Branch", b =>
                 {
                     b.Navigation("Communications");
-
-                    b.Navigation("DefaultForUsers");
                 });
 
             modelBuilder.Entity("CallCenter.Server.Data.Entities.Channel", b =>

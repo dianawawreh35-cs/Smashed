@@ -55,9 +55,9 @@ coverage/
 .nyc_output/
 
 ## ---------- Docker / deploy runtime data ----------
-deploy/data/postgres/
-deploy/data/recordings/
-deploy/data/backups/
+# Everything under deploy/data is runtime state - database files, recordings,
+# backups. None of it belongs in the repository.
+deploy/data/*
 !deploy/data/.gitkeep
 
 ## ---------- Environment files ----------

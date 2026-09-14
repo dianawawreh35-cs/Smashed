@@ -115,7 +115,7 @@ cd /opt/callcenter
 ```
 From your laptop, copy the deployment files from your repo:
 ```bash
-scp docker-compose.yml .env.example backup.sh admin@192.168.1.50:/opt/callcenter/
+scp docker-compose.yml .env.example backup.sh update.sh admin@192.168.1.50:/opt/callcenter/
 ```
 Back on the server:
 ```bash
@@ -303,13 +303,37 @@ Point a local API at it and confirm calls and contacts are there.
 
 **What it does:** swaps the API container for the new version in seconds. Database and recordings are untouched; migrations bring the schema up to date; agent apps update themselves at next launch. Phones never stop because they don't depend on the server.
 
+Use `update.sh` rather than doing this by hand — it backs up first, verifies the
+new version answers `/health`, and rolls back automatically if it does not.
+
+**On your development machine** — build and save with the version as the tag:
 ```bash
+docker build -f src/CallCenter.Server/Dockerfile -t callcenter-api:v1.2 .
+docker save callcenter-api:v1.2 -o callcenter-api-v1.2.tar
 scp callcenter-api-v1.2.tar admin@192.168.1.50:/opt/callcenter/
-ssh admin@192.168.1.50
-cd /opt/callcenter && docker load -i callcenter-api-v1.2.tar && docker compose up -d
-docker compose logs -f api
 ```
-Before any update: run `./backup.sh` first.
+
+**On the server:**
+```bash
+ssh admin@192.168.1.50
+cd /opt/callcenter
+./update.sh v1.2
+```
+
+It runs `backup.sh`, tags the running image `callcenter-api:previous`, loads the
+new one, restarts the API, and waits up to 90 seconds for `/health`. If the new
+version never becomes healthy it prints the last 40 log lines, retags
+`:previous` back to `:latest`, restarts, and confirms the old version is serving
+again — so a bad build costs seconds, not an evening.
+
+To go back deliberately after a successful but unwanted update:
+```bash
+./update.sh --rollback
+```
+
+Copy `update.sh` alongside the other files in step 5 (`chmod +x update.sh`).
+The tag on the saved image **must** match the version you pass — the script
+refuses if `callcenter-api-v1.2.tar` does not contain `callcenter-api:v1.2`.
 
 ---
 

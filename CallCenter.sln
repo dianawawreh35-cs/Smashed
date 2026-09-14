@@ -1,0 +1,66 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{748A187B-8705-4ADD-8FC4-8CE52B1AA2F2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallCenter.Shared", "src\CallCenter.Shared\CallCenter.Shared.csproj", "{89CF3DB7-BA63-4132-B8E4-F58A74C49DCE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallCenter.Server", "src\CallCenter.Server\CallCenter.Server.csproj", "{FE9F33A6-76AE-49CE-AFAE-32759AEF2723}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallCenter.AgentApp", "src\CallCenter.AgentApp\CallCenter.AgentApp.csproj", "{B7CCF6A6-4C9E-4230-B2AE-DA0519DCD890}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{8FD9F477-4CE1-49F5-8C88-1BBAC8232B8D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallCenter.Shared.Tests", "tests\CallCenter.Shared.Tests\CallCenter.Shared.Tests.csproj", "{623A37A2-CEB7-4497-B2CA-0D1286200904}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallCenter.Server.Tests", "tests\CallCenter.Server.Tests\CallCenter.Server.Tests.csproj", "{5E9D39FE-71C0-4D08-8046-1F3C38F11FF9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{45FDF33E-FBE4-4B3F-B2A7-A1B5C37E0609}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CallCenter.PbxSim", "tools\pbx-sim\CallCenter.PbxSim.csproj", "{8B24C8A5-4AFC-4866-B977-56C8A3062C68}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{89CF3DB7-BA63-4132-B8E4-F58A74C49DCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{89CF3DB7-BA63-4132-B8E4-F58A74C49DCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{89CF3DB7-BA63-4132-B8E4-F58A74C49DCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{89CF3DB7-BA63-4132-B8E4-F58A74C49DCE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE9F33A6-76AE-49CE-AFAE-32759AEF2723}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE9F33A6-76AE-49CE-AFAE-32759AEF2723}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE9F33A6-76AE-49CE-AFAE-32759AEF2723}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE9F33A6-76AE-49CE-AFAE-32759AEF2723}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7CCF6A6-4C9E-4230-B2AE-DA0519DCD890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7CCF6A6-4C9E-4230-B2AE-DA0519DCD890}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7CCF6A6-4C9E-4230-B2AE-DA0519DCD890}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7CCF6A6-4C9E-4230-B2AE-DA0519DCD890}.Release|Any CPU.Build.0 = Release|Any CPU
+		{623A37A2-CEB7-4497-B2CA-0D1286200904}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{623A37A2-CEB7-4497-B2CA-0D1286200904}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{623A37A2-CEB7-4497-B2CA-0D1286200904}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{623A37A2-CEB7-4497-B2CA-0D1286200904}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E9D39FE-71C0-4D08-8046-1F3C38F11FF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E9D39FE-71C0-4D08-8046-1F3C38F11FF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E9D39FE-71C0-4D08-8046-1F3C38F11FF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E9D39FE-71C0-4D08-8046-1F3C38F11FF9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B24C8A5-4AFC-4866-B977-56C8A3062C68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B24C8A5-4AFC-4866-B977-56C8A3062C68}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B24C8A5-4AFC-4866-B977-56C8A3062C68}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B24C8A5-4AFC-4866-B977-56C8A3062C68}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{89CF3DB7-BA63-4132-B8E4-F58A74C49DCE} = {748A187B-8705-4ADD-8FC4-8CE52B1AA2F2}
+		{FE9F33A6-76AE-49CE-AFAE-32759AEF2723} = {748A187B-8705-4ADD-8FC4-8CE52B1AA2F2}
+		{B7CCF6A6-4C9E-4230-B2AE-DA0519DCD890} = {748A187B-8705-4ADD-8FC4-8CE52B1AA2F2}
+		{623A37A2-CEB7-4497-B2CA-0D1286200904} = {8FD9F477-4CE1-49F5-8C88-1BBAC8232B8D}
+		{5E9D39FE-71C0-4D08-8046-1F3C38F11FF9} = {8FD9F477-4CE1-49F5-8C88-1BBAC8232B8D}
+		{8B24C8A5-4AFC-4866-B977-56C8A3062C68} = {45FDF33E-FBE4-4B3F-B2A7-A1B5C37E0609}
+	EndGlobalSection
+EndGlobal

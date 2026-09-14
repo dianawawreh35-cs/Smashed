@@ -1,0 +1,30 @@
+{
+  "app": {
+    "title": "مركز الاتصال",
+    "subtitle": "سماشد برجر",
+    "loading": "جارٍ التحميل…",
+    "language": "اللغة"
+  },
+  "nav": {
+    "dashboard": "لوحة المتابعة",
+    "communications": "الاتصالات",
+    "contacts": "جهات الاتصال",
+    "reports": "التقارير",
+    "settings": "الإعدادات",
+    "logout": "تسجيل الخروج"
+  },
+  "login": {
+    "heading": "تسجيل الدخول",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "submit": "دخول"
+  },
+  "dashboard": {
+    "heading": "لوحة المتابعة",
+    "placeholder": "لم تُضف المؤشرات بعد."
+  },
+  "common": {
+    "notConnected": "غير متصل",
+    "connected": "متصل"
+  }
+}

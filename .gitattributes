@@ -1,0 +1,37 @@
+# Normalise line endings in the repository to LF.
+# The server runs on Ubuntu and the Docker build runs on Linux, so shell
+# scripts and Dockerfiles must never be checked out with CRLF.
+* text=auto eol=lf
+
+# Must be LF - executed on Linux
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+
+# Must be CRLF - Windows-only scripts
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Keep backup.sh executable when checked out on Linux
+deploy/backup.sh text eol=lf
+
+# Binary - never touch
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.docx binary
+*.xlsx binary
+*.wav  binary
+*.gsm  binary
+*.ttf  binary
+*.woff  binary
+*.woff2 binary
+
+# Generated - collapse in diffs and exclude from language stats
+package-lock.json linguist-generated=true -diff
+**/Migrations/*.cs linguist-generated=true

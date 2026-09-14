@@ -1,0 +1,12 @@
+<Application x:Class="CallCenter.AgentApp.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <ResourceDictionary>
+      <!-- Arabic-first UI: the shell sets FlowDirection to RightToLeft. -->
+      <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
+      <SolidColorBrush x:Key="StatusBarBrush" Color="#1F2937" />
+      <SolidColorBrush x:Key="StatusBarTextBrush" Color="#F9FAFB" />
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

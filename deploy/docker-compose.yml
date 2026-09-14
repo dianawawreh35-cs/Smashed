@@ -1,0 +1,51 @@
+# Production stack for the Restaurant Call Center System.
+#
+#   cp .env.example .env      # then fill in the secrets
+#   docker compose up -d
+#
+# The API runs with network_mode: host so the SIP/RTP media path and the
+# Asterisk Manager Interface connection reach the PBX without NAT.
+
+services:
+  db:
+    image: postgres:16
+    container_name: callcenter-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: callcenter
+      POSTGRES_USER: callcenter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      TZ: ${TZ:-Asia/Hebron}
+      PGTZ: ${TZ:-Asia/Hebron}
+    ports:
+      # Bound to loopback only - never expose PostgreSQL on the LAN.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U callcenter -d callcenter"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    image: callcenter-api:latest
+    container_name: callcenter-api
+    restart: unless-stopped
+    # Host networking: required for SIP/RTP and AMI against the PBX.
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      ConnectionStrings__Default: "Host=127.0.0.1;Port=5432;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}"
+      Recordings__Path: /data/recordings
+      TZ: ${TZ:-Asia/Hebron}
+    volumes:
+      - ./data/recordings:/data/recordings
+      - ./data/logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy

@@ -1,0 +1,30 @@
+{
+  "app": {
+    "title": "Call Center",
+    "subtitle": "Smashed Burger",
+    "loading": "Loading…",
+    "language": "Language"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "communications": "Communications",
+    "contacts": "Contacts",
+    "reports": "Reports",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "login": {
+    "heading": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in"
+  },
+  "dashboard": {
+    "heading": "Dashboard",
+    "placeholder": "No metrics wired up yet."
+  },
+  "common": {
+    "notConnected": "Not connected",
+    "connected": "Connected"
+  }
+}

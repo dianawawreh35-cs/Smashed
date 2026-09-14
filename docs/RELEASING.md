@@ -121,13 +121,15 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u dianawawreh35-cs --password-stdin
 
 ## What is not automated, and why
 
-**The server does not pull from GitHub.** It has no internet dependency (SRS
-N-01) and sits behind the restaurant's router, where GitHub cannot reach it.
-Images are carried over deliberately.
-
 **Nothing deploys on push.** A live call centre should not change because
 someone saved a file. The gap between *release* and *deploy* is the point: it is
 where you decide the moment.
+
+**GitHub cannot reach the server** — it sits behind the restaurant's router on a
+private address. So even with `--pull`, the server only ever fetches when you
+tell it to; nothing can be pushed to it from outside. Daily operation needs no
+internet at all (SRS N-01); `--pull` needs it only at the moment of an update,
+which is why Option A exists.
 
 When a server exists and there is reason to automate further, the options are a
 self-hosted GitHub runner on the mini PC (it dials out, so no inbound access is

@@ -1,0 +1,134 @@
+# Publishes a versioned API image to the GitHub Container Registry.
+#
+# Triggered by pushing a version tag:
+#
+#   git tag v1.2
+#   git push --tags
+#
+# The image is then permanently available as
+#   ghcr.io/<owner>/callcenter-api:v1.2
+# and inherits this repository's visibility, so it is private.
+#
+# This workflow only publishes. It does not deploy — getting the image onto the
+# restaurant's server stays a deliberate, manual step (see
+# docs/DEPLOY-server-runbook.md, "Updating later").
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, e.g. v1.2-test'
+        required: true
+
+env:
+  IMAGE_NAME: callcenter-api
+
+jobs:
+  # Never publish an image whose tests did not pass. Only the net8.0 projects
+  # run here; the WPF agent app cannot build on Linux and is covered by ci.yml.
+  verify:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Shared tests
+        run: dotnet test tests/CallCenter.Shared.Tests --configuration Release
+
+      - name: Server tests
+        run: dotnet test tests/CallCenter.Server.Tests --configuration Release
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/CallCenter.Web/package-lock.json
+
+      - name: Web tests
+        working-directory: src/CallCenter.Web
+        run: npm ci && npm test
+
+  publish:
+    name: Build and publish image
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "version=$VERSION"                                   >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$OWNER/${{ env.IMAGE_NAME }}"          >> "$GITHUB_OUTPUT"
+          echo "Publishing $VERSION"
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/CallCenter.Server/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.version.outputs.image }}:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+
+      - name: How to use it
+        run: |
+          IMAGE="${{ steps.version.outputs.image }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          {
+            echo "### Published \`$VERSION\`"
+            echo ""
+            echo "The image is private. Log in once on the machine that pulls it:"
+            echo ""
+            echo '```bash'
+            echo "echo \$GITHUB_TOKEN | docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+            echo '```'
+            echo ""
+            echo "**To deploy it, on your development machine:**"
+            echo ""
+            echo '```bash'
+            echo "docker pull $IMAGE:$VERSION"
+            echo "docker tag  $IMAGE:$VERSION callcenter-api:$VERSION"
+            echo "docker save callcenter-api:$VERSION -o callcenter-api-$VERSION.tar"
+            echo "scp callcenter-api-$VERSION.tar admin@192.168.1.50:/opt/callcenter/"
+            echo '```'
+            echo ""
+            echo "**Then on the server:**"
+            echo ""
+            echo '```bash'
+            echo "cd /opt/callcenter && ./update.sh $VERSION"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

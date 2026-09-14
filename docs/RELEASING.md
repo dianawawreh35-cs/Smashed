@@ -75,7 +75,9 @@ permanent version number.
 **This is the only step that affects people taking orders.** Do it when the
 call centre is quiet, never mid-service.
 
-On your development machine:
+Two routes — pick whichever suits the restaurant's network.
+
+**A. Carry it over** (no internet needed on site). On your machine:
 
 ```bash
 docker pull ghcr.io/dianawawreh35-cs/callcenter-api:v1.2
@@ -84,12 +86,20 @@ docker save callcenter-api:v1.2 -o callcenter-api-v1.2.tar
 scp callcenter-api-v1.2.tar admin@192.168.1.50:/opt/callcenter/
 ```
 
-On the server:
+Then on the server:
 
 ```bash
 ssh admin@192.168.1.50
 cd /opt/callcenter
 ./update.sh v1.2
+```
+
+**B. Let the server fetch it** (needs internet on site, and the login below):
+
+```bash
+ssh admin@192.168.1.50
+cd /opt/callcenter
+./update.sh v1.2 --pull
 ```
 
 [`update.sh`](../deploy/update.sh) backs up first, keeps the running version as

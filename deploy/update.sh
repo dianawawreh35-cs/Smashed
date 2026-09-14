@@ -3,17 +3,23 @@
 # Update the Restaurant Call Center System to a new version, safely.
 # Runs on the server (see docs/DEPLOY-server-runbook.md, "Updating later").
 #
-#   ./update.sh v1.2            update to v1.2
+#   ./update.sh v1.2            update to v1.2 from a .tar copied here
+#   ./update.sh v1.2 --pull     update to v1.2 by pulling from the registry
 #   ./update.sh v1.2 --no-backup  skip the pre-update backup (not recommended)
 #   ./update.sh --rollback      go straight back to the previous version
 #
-# Expects /opt/callcenter/callcenter-api-<version>.tar to already be here,
-# copied from the development machine:
+# Two ways to get the image, pick whichever suits the site's network:
 #
-#   # on your PC
-#   docker build -f src/CallCenter.Server/Dockerfile -t callcenter-api:v1.2 .
-#   docker save callcenter-api:v1.2 -o callcenter-api-v1.2.tar
-#   scp callcenter-api-v1.2.tar admin@<server>:/opt/callcenter/
+#   A. carried here (default) - no internet needed on the server.
+#      Expects /opt/callcenter/callcenter-api-<version>.tar, from your PC:
+#        docker pull ghcr.io/<owner>/callcenter-api:v1.2
+#        docker tag  ghcr.io/<owner>/callcenter-api:v1.2 callcenter-api:v1.2
+#        docker save callcenter-api:v1.2 -o callcenter-api-v1.2.tar
+#        scp callcenter-api-v1.2.tar admin@<server>:/opt/callcenter/
+#
+#   B. --pull - the server fetches it itself. Needs internet here, and a
+#      one-time login because the image is private:
+#        echo $GITHUB_TOKEN | docker login ghcr.io -u <user> --password-stdin
 #
 # What it does:
 #   1. backs up the database and recordings
@@ -28,6 +34,7 @@ set -Eeuo pipefail
 
 APP_DIR="${APP_DIR:-/opt/callcenter}"
 IMAGE="${IMAGE:-callcenter-api}"
+REGISTRY="${REGISTRY:-ghcr.io/dianawawreh35-cs}"   # only used by --pull
 HEALTH_URL="${HEALTH_URL:-http://localhost:5000/health}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-90}"   # seconds to wait for the API to come up
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
@@ -44,11 +51,13 @@ usage() {
 VERSION=""
 DO_BACKUP=true
 ROLLBACK=false
+PULL=false
 
 for arg in "$@"; do
     case "$arg" in
         --rollback)   ROLLBACK=true ;;
         --no-backup)  DO_BACKUP=false ;;
+        --pull)       PULL=true ;;
         -h|--help)    usage 0 ;;
         -*)           fail "unknown option: $arg" ;;
         *)            VERSION="$arg" ;;
@@ -73,11 +82,16 @@ fi
 [ -n "$VERSION" ] || usage 1
 
 TARBALL="$APP_DIR/$IMAGE-$VERSION.tar"
-[ -f "$TARBALL" ] || fail "image file not found: $TARBALL
-Copy it from your development machine first:
-  scp $IMAGE-$VERSION.tar admin@\$(hostname -I | awk '{print \$1}'):$APP_DIR/"
 
-log "Updating to $VERSION"
+if [ "$PULL" = false ] && [ ! -f "$TARBALL" ]; then
+    fail "image file not found: $TARBALL
+Either copy it from your development machine:
+  scp $IMAGE-$VERSION.tar admin@\$(hostname -I | awk '{print \$1}'):$APP_DIR/
+or pull it from the registry instead:
+  ./update.sh $VERSION --pull"
+fi
+
+log "Updating to $VERSION ($([ "$PULL" = true ] && echo "pulling from $REGISTRY" || echo "from $(basename "$TARBALL")"))"
 
 # ---------------------------------------------------------------- 1. backup
 if [ "$DO_BACKUP" = true ]; then
@@ -98,12 +112,20 @@ else
     HAVE_PREVIOUS=false
 fi
 
-# ------------------------------------------------------ 3. load the new one
-log "Loading $TARBALL"
-docker load -i "$TARBALL" >/dev/null || fail "docker load failed"
+# ------------------------------------------------------ 3. get the new one
+if [ "$PULL" = true ]; then
+    log "Pulling $REGISTRY/$IMAGE:$VERSION"
+    docker pull "$REGISTRY/$IMAGE:$VERSION" || fail "docker pull failed.
+If this is an authentication error, the image is private - log in once:
+  echo \$GITHUB_TOKEN | docker login ghcr.io -u <your-github-user> --password-stdin"
+    docker tag "$REGISTRY/$IMAGE:$VERSION" "$IMAGE:$VERSION"
+else
+    log "Loading $TARBALL"
+    docker load -i "$TARBALL" >/dev/null || fail "docker load failed"
+fi
 
 docker image inspect "$IMAGE:$VERSION" >/dev/null 2>&1 \
-    || fail "$TARBALL did not contain $IMAGE:$VERSION - was it saved with that tag?"
+    || fail "$IMAGE:$VERSION is not present after the $([ "$PULL" = true ] && echo pull || echo load) - was the image tagged with that version?"
 
 docker tag "$IMAGE:$VERSION" "$IMAGE:latest"
 

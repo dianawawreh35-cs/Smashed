@@ -179,20 +179,47 @@ Because `api` uses host networking, Postgres must publish its port to the host �
 
 **What it does:** `docker load` brings your built API image onto the machine from a file you copied (no internet needed). `docker compose up -d` reads the recipe and starts the database and API in the background with restart-on-failure, so after a power cut everything comes back by itself. On first start the API applies database migrations, creating all tables.
 
-**Work**
-On your laptop, after building:
+Images are built and published by CI, not by hand — see
+[RELEASING.md](RELEASING.md). Tagging a version publishes
+`ghcr.io/dianawawreh35-cs/callcenter-api:<version>`, which is what you install.
+
+**Option A — carry the images (works with no internet on site).** On your laptop:
 ```bash
-docker save callcenter-api:latest -o callcenter-api.tar
-scp callcenter-api.tar admin@192.168.1.50:/opt/callcenter/
+docker pull ghcr.io/dianawawreh35-cs/callcenter-api:v1.0
+docker tag  ghcr.io/dianawawreh35-cs/callcenter-api:v1.0 callcenter-api:v1.0
+docker save callcenter-api:v1.0 -o callcenter-api-v1.0.tar
+
+# the database image too - otherwise the server downloads it on first start
+docker pull postgres:16
+docker save postgres:16 -o postgres16.tar
+
+scp callcenter-api-v1.0.tar postgres16.tar admin@192.168.1.50:/opt/callcenter/
 ```
 On the server:
 ```bash
 cd /opt/callcenter
-docker load -i callcenter-api.tar
+docker load -i postgres16.tar
+docker load -i callcenter-api-v1.0.tar
+docker tag callcenter-api:v1.0 callcenter-api:latest
 docker compose up -d
 docker compose logs -f api
 ```
-Wait for lines like `Migrations applied` and `Now listening on: http://0.0.0.0:5000`. Ctrl+C to stop following the log (containers keep running).
+
+**Option B — let the server fetch them (needs internet on site).** Log in once,
+because the API image is private:
+```bash
+echo <your-github-token> | docker login ghcr.io -u dianawawreh35-cs --password-stdin
+./update.sh v1.0 --pull
+```
+That pulls the image, starts it, waits for `/health`, and rolls back if it does
+not come up. `postgres:16` is fetched from Docker Hub automatically.
+
+> Even with internet on site, Option A is worth preferring for the **first**
+> install: it removes any dependency on the restaurant's connection working on
+> the day, and guarantees the exact `postgres:16` build you tested rather than
+> whatever the tag points at that week.
+
+Either way, wait for lines like `Migrations applied` and `Now listening on: http://0.0.0.0:5000`. Ctrl+C to stop following the log (containers keep running).
 
 ---
 
@@ -306,18 +333,29 @@ Point a local API at it and confirm calls and contacts are there.
 Use `update.sh` rather than doing this by hand — it backs up first, verifies the
 new version answers `/health`, and rolls back automatically if it does not.
 
-**On your development machine** — build and save with the version as the tag:
+The image comes from CI — `git tag v1.2 && git push --tags` publishes it (see
+[RELEASING.md](RELEASING.md)). You never build a release by hand.
+
+**Option A — carry it over.** On your development machine:
 ```bash
-docker build -f src/CallCenter.Server/Dockerfile -t callcenter-api:v1.2 .
+docker pull ghcr.io/dianawawreh35-cs/callcenter-api:v1.2
+docker tag  ghcr.io/dianawawreh35-cs/callcenter-api:v1.2 callcenter-api:v1.2
 docker save callcenter-api:v1.2 -o callcenter-api-v1.2.tar
 scp callcenter-api-v1.2.tar admin@192.168.1.50:/opt/callcenter/
 ```
-
-**On the server:**
+Then on the server:
 ```bash
 ssh admin@192.168.1.50
 cd /opt/callcenter
 ./update.sh v1.2
+```
+
+**Option B — the server pulls it.** Nothing to copy; needs internet on site and
+the one-time `docker login` above:
+```bash
+ssh admin@192.168.1.50
+cd /opt/callcenter
+./update.sh v1.2 --pull
 ```
 
 It runs `backup.sh`, tags the running image `callcenter-api:previous`, loads the

@@ -72,4 +72,5 @@ docs/                      requirements, schema, runbook, decisions, prompt hist
 - [docs/SCHEMA.md](docs/SCHEMA.md) — database tables, columns and CHECK constraints
 - [docs/DEPLOY-server-runbook.md](docs/DEPLOY-server-runbook.md) — production install, backup and recovery
 - [docs/DECISIONS.md](docs/DECISIONS.md) — stack choices and the reasoning behind them
+- [docs/RELEASING.md](docs/RELEASING.md) — push vs release vs deploy, and how each works
 - [docs/THIRD-PARTY-LICENSES.md](docs/THIRD-PARTY-LICENSES.md) — every dependency and its licence

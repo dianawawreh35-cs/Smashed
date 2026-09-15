@@ -174,9 +174,14 @@ reboot).
   from the server; A-82/N-11 require updates to be served the same way. The API
   needs a downloads endpoint and the build needs an installer — neither is
   scaffolded.
-- **Port 5001.** The runbook opens 5000 *and* 5001 in the firewall; the app only
-  listens on 5000. Decide whether 5001 is HTTPS and configure it, or drop the
-  rule.
+- **Ports 80 and 5001.** Resolved: the 5001 rule is dropped, since nothing ever
+  listened there. The API now also binds port 80 so the supervisor reaches the
+  dashboard by typing the server address with no port number; the SPA's
+  catch-all route already redirects `/` to `/dashboard`. 5000 stays bound for
+  the container healthcheck. This is plain HTTP on the LAN, which is acceptable
+  while the system is not reachable from outside the restaurant. Exposing it to
+  the internet would need a domain name and TLS on 443 behind a reverse proxy,
+  and the authentication guards that App.tsx still marks as placeholders.
 
 ### Open items
 

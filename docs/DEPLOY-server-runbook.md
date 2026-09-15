@@ -74,10 +74,10 @@ sudo apt update && sudo apt upgrade -y
 sudo timedatectl set-timezone Asia/Hebron
 sudo apt install -y ufw curl unzip
 
-# SSH for you; 5000/5001 for the API + supervisor web app
+# SSH for you; 80 is the supervisor web app, 5000 the API and healthcheck
 sudo ufw allow from 192.168.1.0/24 to any port 22 proto tcp
+sudo ufw allow from 192.168.1.0/24 to any port 80 proto tcp
 sudo ufw allow from 192.168.1.0/24 to any port 5000 proto tcp
-sudo ufw allow from 192.168.1.0/24 to any port 5001 proto tcp
 # Callback extension (SIP signalling + audio) — only if you use that feature
 sudo ufw allow from 192.168.1.0/24 to any port 5060 proto udp
 sudo ufw allow from 192.168.1.0/24 to any port 10000:10100 proto udp
@@ -85,6 +85,11 @@ sudo ufw enable
 sudo ufw status
 ```
 The RTP range 10000–10100 must match what you configure in the API's SIP settings.
+
+Port 80 is what lets the supervisor open the dashboard by typing the server
+address on its own, with no port number after it. Nothing listens on 5001, so
+it is no longer opened. None of these ports are forwarded on the router: the
+system is reachable from the restaurant LAN only.
 
 ---
 
@@ -219,7 +224,7 @@ not come up. `postgres:16` is fetched from Docker Hub automatically.
 > the day, and guarantees the exact `postgres:16` build you tested rather than
 > whatever the tag points at that week.
 
-Either way, wait for lines like `Migrations applied` and `Now listening on: http://0.0.0.0:5000`. Ctrl+C to stop following the log (containers keep running).
+Either way, wait for lines like `Migrations applied` and `Now listening on: http://0.0.0.0:80`. Ctrl+C to stop following the log (containers keep running).
 
 ---
 
@@ -250,7 +255,7 @@ optional (it defaults to Branch 1-4) and is ignored if branches already exist.
 **Change the password immediately after logging in** - it was typed on the
 command line and is in this machine's shell history.
 
-From a laptop browser: `http://192.168.1.50:5000` → log in → **change the password** → check Settings shows the branches, types and channels.
+From a laptop browser: `http://192.168.1.50` → log in → **change the password** → check Settings shows the branches, types and channels.
 
 ---
 
@@ -324,7 +329,7 @@ Point a local API at it and confirm calls and contacts are there.
 
 **Work**
 1. Supervisor app → Users → add 5 agents: name, login, inbound extension + SIP password, outbound extension + SIP password, default branch.
-2. On each of the 4 laptops: browse to `http://192.168.1.50:5000/downloads/AgentApp-Setup.exe`, install, first-run: server address `192.168.1.50:5000`, choose microphone/speaker, log in as an agent.
+2. On each of the 4 laptops: browse to `http://192.168.1.50/downloads/AgentApp-Setup.exe`, install, first-run: server address `192.168.1.50`, choose microphone/speaker, log in as an agent.
 3. Windows Firewall prompt → **Allow** on private networks. If missed: Windows Security → Firewall → Allow an app → tick the Agent App.
 4. Test on each laptop: internal call between two agents (pop-up, audio both ways, recording plays back, classification form opens), then a real call from a mobile through the trunk.
 5. Log out and log in as a different agent on the same laptop; confirm the other agent's extensions register and only their calls show.

@@ -39,7 +39,9 @@ services:
       - .env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://0.0.0.0:5000
+      # Port 80 so the supervisor can reach the app by typing the server IP
+      # alone, with no port number. 5000 stays for the container healthcheck.
+      ASPNETCORE_URLS: http://0.0.0.0:80;http://0.0.0.0:5000
       ConnectionStrings__Default: "Host=127.0.0.1;Port=5432;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}"
       Recordings__Path: /data/recordings
       TZ: ${TZ:-Asia/Hebron}

@@ -153,13 +153,23 @@ reboot).
 
 ### Discrepancies to resolve
 
-- **Assembly name.** The runbook (step 7) seeds with
-  `dotnet CallCenter.Api.dll`; this repository builds `CallCenter.Server.dll`.
-  Either rename the server project to `CallCenter.Api` or correct the runbook.
-  The runbook goes to the client, so the two must agree before handover.
-- **The seed command does not exist yet.** Step 7 calls
-  `... seed --admin-user --admin-password --branches`. That CLI entry point has
-  to be built, and it must produce the §7 seed data in `SCHEMA.md`.
+- ~~**Assembly name.**~~ **Resolved: the project stays `CallCenter.Server`, and
+  the runbook was corrected to match.** Renaming would touch the csproj,
+  namespaces, the solution, the Dockerfile, CI, the published image and the
+  deployment scripts; the runbook was one word. `Server` is also the SRS's own
+  term for this component (§2.1, "Server (mini PC, LAN)"), of which the API is
+  one of three jobs.
+- ~~**The seed command does not exist yet.**~~ **Resolved:**
+  `dotnet CallCenter.Server.dll seed` creates the §7 data and the first
+  supervisor. Every step is idempotent, and it refuses to create a supervisor
+  once any user exists — it is an installation command, not a way to mint an
+  account on a running system.
+- ~~**Migrations are not applied on startup.**~~ **Resolved:**
+  `DatabaseInitialiser` applies pending migrations before the host serves, which
+  is what step 6 of the runbook has always claimed. `Database:MigrateOnStartup=false`
+  turns it off for a site that would rather run them by hand. Fine for one
+  server; if a second API instance is ever added, two could migrate at once and
+  this should move behind a PostgreSQL advisory lock.
 - **`/downloads/AgentApp-Setup.exe`.** Runbook step 10 installs the agent app
   from the server; A-82/N-11 require updates to be served the same way. The API
   needs a downloads endpoint and the build needs an installer — neither is

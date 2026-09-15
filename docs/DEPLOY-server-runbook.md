@@ -229,10 +229,27 @@ Either way, wait for lines like `Migrations applied` and `Now listening on: http
 
 **Work**
 ```bash
-docker compose exec api dotnet CallCenter.Api.dll seed \
+docker compose exec api dotnet CallCenter.Server.dll seed \
   --admin-user supervisor --admin-password 'TempPass!2026' \
   --branches "Branch 1,Branch 2,Branch 3,Branch 4"
 ```
+It prints what it created:
+```
+  branches   4 created
+  channels   5 created
+  types      6 created
+  form v1    created
+  settings   7 created
+  supervisor supervisor created
+```
+Safe to run twice - anything already there is left alone, and it refuses to
+create a second supervisor once the users table has rows. `--branches` is
+optional (it defaults to Branch 1-4) and is ignored if branches already exist.
+`dotnet CallCenter.Server.dll seed --help` lists every option.
+
+**Change the password immediately after logging in** - it was typed on the
+command line and is in this machine's shell history.
+
 From a laptop browser: `http://192.168.1.50:5000` → log in → **change the password** → check Settings shows the branches, types and channels.
 
 ---

@@ -1,4 +1,5 @@
 using CallCenter.Server.Data;
+using CallCenter.Server.Data.Seed;
 using CallCenter.Server.Hubs;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -59,7 +60,20 @@ try
         .AllowAnyMethod()
         .AllowCredentials()));
 
+    builder.Services.AddScoped<DatabaseSeeder>();
+
     var app = builder.Build();
+
+    // `dotnet CallCenter.Server.dll seed ...` - runbook step 7. Seeds and exits
+    // rather than starting the web host.
+    if (SeedCommand.IsRequested(args))
+    {
+        return await SeedCommand.RunAsync(app, args);
+    }
+
+    // Bring the schema up to date before serving. This is what makes the
+    // runbook's "on first start the API applies database migrations" true.
+    await DatabaseInitialiser.MigrateAsync(app.Services);
 
     app.UseSerilogRequestLogging();
 
@@ -91,7 +105,8 @@ try
     app.MapFallbackToFile("index.html");
 
     Log.Information("Call Center API starting in {Environment}", app.Environment.EnvironmentName);
-    app.Run();
+    await app.RunAsync();
+    return 0;
 }
 catch (Exception ex) when (ex is not HostAbortedException)
 {

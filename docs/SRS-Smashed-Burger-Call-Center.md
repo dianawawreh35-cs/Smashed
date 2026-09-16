@@ -243,6 +243,7 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | S-44 | Backup now / view last backup status. | Should |
 | S-45 | Mark a contact (or a bare phone number) as VIP or Blocked, with a reason and date; remove the flag at any time; list of all blocked and VIP numbers. Agents can see the flags but cannot change them. Every change is logged. | Must |
 | S-46 | Export the blocked list in a format the provider can load into Issabel's blacklist, so the numbers can optionally be blocked at the PBX level as well (see note in section 6). | Should |
+| S-47 | System settings: view and change the values the system reads at runtime — the PBX host the Agent Apps register to (SRS 2.3), the call-back extension, the idle-logout time (A-05), how long an agent may edit their own classification (A-42), the service-level threshold (R-21) and the recording retention period (S-43). Changes take effect without a redeployment: the Agent App picks up a new PBX host at the next sign-in, so a change by the provider does not need a visit to each laptop. Every change is logged with who and when. The AMI connection settings belong with section 4.5 and are deferred with it. | Must |
 
 ### 4.5 Capture of calls that never reach an agent (queue / ring-group)
 

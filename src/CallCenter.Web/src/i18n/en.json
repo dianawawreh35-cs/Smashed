@@ -11,7 +11,8 @@
     "contacts": "Contacts",
     "reports": "Reports",
     "settings": "Settings",
-    "logout": "Log out"
+    "logout": "Log out",
+    "users": "Users"
   },
   "login": {
     "heading": "Sign in",
@@ -35,5 +36,92 @@
   "common": {
     "notConnected": "Not connected",
     "connected": "Connected"
+  },
+  "users": {
+    "heading": "Users and extensions",
+    "addHeading": "Add a user",
+    "name": "Name",
+    "login": "Username",
+    "role": "Role",
+    "password": "Password",
+    "newPassword": "New password",
+    "passwordHint": "At least 8 characters. Hand it to the person directly - it cannot be shown again.",
+    "add": "Add",
+    "save": "Save",
+    "status": "Status",
+    "active": "Active",
+    "disabled": "Disabled",
+    "enable": "Enable",
+    "disable": "Disable",
+    "resetPassword": "Reset password",
+    "extensions": "Extensions",
+    "setExtensions": "Set extensions",
+    "noExtensions": "Not set",
+    "noSecret": "(no SIP password)",
+    "secretSet": "Stored - leave blank to keep",
+    "customerExtension": "Customer extension",
+    "customerSecret": "Customer SIP password",
+    "internalExtension": "Internal extension",
+    "internalSecret": "Internal SIP password",
+    "extensionsHint": "Both extensions make and receive calls; they differ by who is on the other end - customers, versus agents and branches.",
+    "roles": {
+      "Agent": "Agent",
+      "Supervisor": "Supervisor"
+    },
+    "errors": {
+      "login_taken": "That username is already in use.",
+      "user_not_found": "That account no longer exists.",
+      "unknown_role": "Role must be Agent or Supervisor.",
+      "not_an_agent": "Only agents have extensions.",
+      "last_supervisor": "This is the only active supervisor; disabling it would lock everyone out.",
+      "cannot_disable_self": "You cannot disable your own account.",
+      "invalid_request": "The change could not be applied. Check the fields.",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "The server reported an error. Please try again."
+    }
+  },
+  "settings": {
+    "heading": "System settings",
+    "intro": "Values the system reads while running. They take effect without a redeployment; the Agent App picks up the PBX host at the next sign-in.",
+    "save": "Save settings",
+    "saved": "Settings saved.",
+    "rejected": "Nothing was saved - check the fields marked in red.",
+    "yes": "Yes",
+    "no": "No",
+    "lastChangedBy": "Last changed by {{name}}",
+    "choices": {
+      "SameDay": "Same day only",
+      "Always": "Always"
+    },
+    "keys": {
+      "pbx.host": {
+        "label": "PBX host (SIP)",
+        "hint": "The address the Agent Apps register to over the VPN. Leave blank if it is not known yet."
+      },
+      "callback.extension": {
+        "label": "Call-back extension",
+        "hint": "An extension the server uses for calls that never reached an agent."
+      },
+      "pbx.ami.enabled": {
+        "label": "Enable AMI",
+        "hint": "Deferred with section 4.5 - has no effect yet."
+      },
+      "agent.idle_logout_minutes": {
+        "label": "Automatic logout (minutes)",
+        "hint": "Laptops are shared between shifts, so the previous agent must not stay signed in."
+      },
+      "agent.edit_window": {
+        "label": "Classification edit window",
+        "hint": "How long an agent may edit the classification of their own calls."
+      },
+      "sla.answer_seconds": {
+        "label": "Service level threshold (seconds)",
+        "hint": "The percentage of calls answered within this time."
+      },
+      "recording.retention_days": {
+        "label": "Recording retention (days)",
+        "hint": "Recordings are deleted after this; the call record and classification remain."
+      }
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from './LanguageSwitcher'
 import { useAuth } from '../auth/context'
@@ -22,6 +22,18 @@ export default function AppLayout() {
             <h1 className="text-lg font-semibold">{t('app.title')}</h1>
             <p className="text-xs text-slate-500">{t('app.subtitle')}</p>
           </div>
+
+          <nav className="flex items-center gap-4 text-sm">
+            <Link to="/dashboard" className="text-slate-600 hover:text-slate-900">
+              {t('nav.dashboard')}
+            </Link>
+            <Link to="/users" className="text-slate-600 hover:text-slate-900">
+              {t('nav.users')}
+            </Link>
+            <Link to="/settings" className="text-slate-600 hover:text-slate-900">
+              {t('nav.settings')}
+            </Link>
+          </nav>
 
           <div className="flex items-center gap-3">
             {/* Who is signed in, so a shared browser never leaves it in doubt. */}

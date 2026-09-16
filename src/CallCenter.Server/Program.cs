@@ -1,6 +1,8 @@
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Seed;
 using CallCenter.Server.Features.Auth;
+using CallCenter.Server.Features.Settings;
+using CallCenter.Server.Features.Users;
 using CallCenter.Server.Hubs;
 using CallCenter.Shared;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -49,6 +51,8 @@ try
     builder.Services.AddSingleton<TokenService>();
     builder.Services.AddSingleton<ISipSecretProtector, SipSecretProtector>();
     builder.Services.AddScoped<AuthService>();
+    builder.Services.AddScoped<UsersService>();
+    builder.Services.AddScoped<SettingsService>();
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
               ?? throw new InvalidOperationException(

@@ -17,7 +17,16 @@
     "heading": "Sign in",
     "username": "Username",
     "password": "Password",
-    "submit": "Sign in"
+    "submit": "Sign in",
+    "signingIn": "Signing in…",
+    "errors": {
+      "empty_fields": "Enter your username and password.",
+      "invalid_credentials": "The username or password is not correct.",
+      "account_disabled": "This account has been disabled. Ask an administrator to re-enable it.",
+      "not_a_supervisor": "This is an agent account. Please use the desktop Agent App.",
+      "server_unreachable": "The server could not be reached. Check the network.",
+      "server_error": "The server reported an error. Please try again."
+    }
   },
   "dashboard": {
     "heading": "Dashboard",

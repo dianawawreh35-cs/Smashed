@@ -1,0 +1,32 @@
+{
+  "app": {
+    "title": "مركز الاتصال",
+    "subtitle": "سماشد برجر",
+    "language": "اللغة"
+  },
+  "login": {
+    "heading": "تسجيل الدخول",
+    "username": "اسم المستخدم",
+    "password": "كلمة المرور",
+    "submit": "دخول",
+    "connecting": "جارٍ الاتصال بالخادم…",
+    "errors": {
+      "empty_fields": "أدخل اسم المستخدم وكلمة المرور.",
+      "invalid_credentials": "اسم المستخدم أو كلمة المرور غير صحيحة.",
+      "account_disabled": "هذا الحساب موقوف. راجع المشرف لإعادة تفعيله.",
+      "server_unreachable": "تعذّر الوصول إلى الخادم. تحقّق من الشبكة.",
+      "server_error": "حدث خطأ في الخادم. حاول مرة أخرى."
+    }
+  },
+  "home": {
+    "signOut": "تسجيل الخروج",
+    "customerExtension": "تحويلة الزبائن:",
+    "internalExtension": "التحويلة الداخلية:",
+    "noExtensions": "لم يتم إعداد التحويلات — راجع المشرف"
+  },
+  "status": {
+    "notSignedIn": "لم يتم تسجيل الدخول",
+    "signedIn": "متصل",
+    "noExtensions": "متصل — لم يتم إعداد التحويلات"
+  }
+}

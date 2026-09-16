@@ -1,8 +1,13 @@
 using System.IO;
 using System.Windows;
+using CallCenter.AgentApp.Services;
+using CallCenter.AgentApp.Services.Localization;
+using CallCenter.AgentApp.ViewModels;
+using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 namespace CallCenter.AgentApp;
@@ -75,13 +80,64 @@ public partial class App : Application
     /// </summary>
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
+        services.Configure<ServerOptions>(context.Configuration.GetSection(ServerOptions.SectionName));
+
+        // One session object for the process: every view model asks it who is
+        // signed in, rather than passing the answer around.
+        services.AddSingleton<AgentSession>();
+        services.AddSingleton<AgentSettingsStore>();
+        services.AddSingleton<Localizer>();
+        services.AddSingleton<SignInService>();
+
+        services.AddHttpClient<ApiClient>(ApiClient.HttpClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<ServerOptions>>().Value;
+
+            // The trailing slash matters: without it, a BaseUrl with a path
+            // would swallow its last segment when a relative path is appended.
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + '/');
+            client.Timeout = options.Timeout;
+        });
+
+        services.AddTransient<LoginViewModel>();
+        services.AddTransient<HomeViewModel>();
+
         services.AddSingleton<MainWindow>();
+    }
+
+    /// <summary>
+    /// Best-effort sign-out during shutdown. Failures are swallowed: the app is
+    /// closing either way, and the idle timer closes a session left open.
+    /// </summary>
+    private async Task SignOutOnExitAsync()
+    {
+        try
+        {
+            var session = _host!.Services.GetRequiredService<AgentSession>();
+            if (!session.IsSignedIn)
+            {
+                return;
+            }
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+            await _host.Services.GetRequiredService<SignInService>()
+                .SignOutAsync(LogoutReasons.AppClosed, timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not close the session during shutdown");
+        }
     }
 
     protected override async void OnExit(ExitEventArgs e)
     {
         if (_host is not null)
         {
+            // Close the server-side session so a laptop that is simply shut down
+            // does not look signed in until the idle timer catches it (A-05).
+            await SignOutOnExitAsync();
+
             await _host.StopAsync(TimeSpan.FromSeconds(5));
             _host.Dispose();
         }

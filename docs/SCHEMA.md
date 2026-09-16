@@ -34,10 +34,12 @@ CREATE TABLE users (
   password_hash         text NOT NULL,                       -- BCrypt/Argon2
   display_name          text NOT NULL,
   role                  text NOT NULL CHECK (role IN ('Agent','Supervisor')),
-  inbound_extension     text,                                -- e.g. '101'
-  inbound_sip_secret    text,                                -- encrypted at rest (app-level key)
-  outbound_extension    text,                                -- e.g. '201'
-  outbound_sip_secret   text,                                -- encrypted at rest
+  -- The two extensions of SRS 2.3. Both make and receive calls; they differ by
+  -- who is on the other end, not by direction.
+  customer_extension    text,                                -- customers, e.g. '101'
+  customer_sip_secret   text,                                -- encrypted at rest (app-level key)
+  internal_extension    text,                                -- agents and branches, e.g. '201'
+  internal_sip_secret   text,                                -- encrypted at rest
   is_active             boolean NOT NULL DEFAULT true,
   created_at            timestamptz NOT NULL DEFAULT now(),
   last_login_at         timestamptz

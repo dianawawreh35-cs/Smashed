@@ -4,10 +4,14 @@ DTO records shared between the ASP.NET Core API (`CallCenter.Server`), the WPF
 Agent App (`CallCenter.AgentApp`) and — via hand-written TypeScript types — the
 supervisor SPA (`CallCenter.Web`).
 
-**Nothing lives here yet.** Contracts are added alongside the feature that first
-needs them, starting with the entity work in the next prompt. Keep them as
+Contracts are added alongside the feature that first needs them. Keep them as
 `record` types with init-only properties, no EF Core or SIPSorcery references,
 and no behaviour beyond validation attributes.
+
+**Here now:** [`Auth/`](Auth/) — `LoginRequest`, `LoginResponse`, `CurrentUserDto`,
+`AgentExtensionsDto`, `LogoutRequest` and the `LogoutReasons` constants.
+`AgentExtensionsDto` is the one DTO that carries secrets: it is returned by
+`POST /api/auth/login` to an agent and nowhere else (N-05).
 
 ## Planned DTOs
 
@@ -16,7 +20,7 @@ Grouped by the `Features/` folder that will own them, and by the tables in
 
 | Feature | Tables | Planned records |
 | --- | --- | --- |
-| Auth | `users`, `agent_sessions` | `LoginRequest`, `LoginResponse`, `CurrentUserDto`, `AgentExtensionsDto` (inbound/outbound extension + secret, agent only), `LogoutRequest` |
+| Auth | `users`, `agent_sessions` | `LoginRequest`, `LoginResponse`, `CurrentUserDto`, `AgentExtensionsDto` (customer/internal extension + secret, agent only), `LogoutRequest` |
 | Users | `users`, `branches` | `UserDto`, `CreateUserRequest`, `UpdateUserRequest`, `AgentSessionDto`, `AgentPresenceDto` |
 | Contacts | `contacts`, `contact_phones` | `ContactDto`, `ContactSummaryDto`, `ContactPhoneDto`, `ContactSearchRequest`, `UpsertContactRequest`, `MergeContactsRequest`, `SetContactFlagRequest`, `BlockedNumbersDto` (cache pushed to the Agent App) |
 | Communications | `communications`, `recordings` | `CommunicationDto`, `CommunicationDetailDto`, `CommunicationListRequest`, `LogCommunicationRequest`, `RecordingDto` |

@@ -1,0 +1,32 @@
+{
+  "app": {
+    "title": "Call Center",
+    "subtitle": "Smashed Burger",
+    "language": "Language"
+  },
+  "login": {
+    "heading": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "connecting": "Contacting the server…",
+    "errors": {
+      "empty_fields": "Enter your username and password.",
+      "invalid_credentials": "The username or password is not correct.",
+      "account_disabled": "This account has been disabled. Ask your supervisor to re-enable it.",
+      "server_unreachable": "The server could not be reached. Check the network.",
+      "server_error": "The server reported an error. Please try again."
+    }
+  },
+  "home": {
+    "signOut": "Log out",
+    "customerExtension": "Customers:",
+    "internalExtension": "Internal:",
+    "noExtensions": "No extensions configured — ask your supervisor"
+  },
+  "status": {
+    "notSignedIn": "Not signed in",
+    "signedIn": "Signed in",
+    "noExtensions": "Signed in — no extensions configured"
+  }
+}

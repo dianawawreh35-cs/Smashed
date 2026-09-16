@@ -43,6 +43,11 @@ services:
       # alone, with no port number. 5000 stays for the container healthcheck.
       ASPNETCORE_URLS: http://0.0.0.0:80;http://0.0.0.0:5000
       ConnectionStrings__Default: "Host=127.0.0.1;Port=5432;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}"
+      # Signs the tokens the Agent App and the supervisor app hold. Changing it
+      # signs everyone out.
+      Jwt__SigningKey: ${JWT_SECRET}
+      # Encrypts the agents' SIP secrets in the users table.
+      Security__SipSecretKey: ${SIP_SECRET_KEY}
       Recordings__Path: /data/recordings
       TZ: ${TZ:-Asia/Hebron}
     volumes:

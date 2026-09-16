@@ -1,7 +1,12 @@
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Seed;
+using CallCenter.Server.Features.Auth;
 using CallCenter.Server.Hubs;
+using CallCenter.Shared;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Serilog;
 
 // Bootstrap logger: captures anything that fails before configuration is read.
@@ -19,8 +24,6 @@ try
         .Enrich.FromLogContext());
 
     // ---- Database -------------------------------------------------------
-    // The context is empty for now; entities and migrations arrive with the
-    // schema work in the next prompt (docs/SCHEMA.md).
     var connectionString = builder.Configuration.GetConnectionString("Default")
                            ?? "Host=localhost;Port=5432;Database=callcenter;Username=callcenter;Password=callcenter";
 
@@ -34,17 +37,93 @@ try
         }
     });
 
+    // ---- Authentication --------------------------------------------------
+    // Bearer tokens for both clients. The signing key and the SIP secret key are
+    // deployment secrets set in the server environment (runbook step 5).
+    builder.Services.AddOptions<JwtOptions>()
+        .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddSingleton<TokenService>();
+    builder.Services.AddSingleton<ISipSecretProtector, SipSecretProtector>();
+    builder.Services.AddScoped<AuthService>();
+
+    var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+              ?? throw new InvalidOperationException(
+                  "The 'Jwt' configuration section is missing. See docs/DEPLOY-server-runbook.md step 5.");
+
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = jwt.Issuer,
+                ValidateAudience = true,
+                ValidAudience = jwt.Audience,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = TokenService.CreateSigningKey(jwt.SigningKey),
+                ValidateLifetime = true,
+                // No grace period: a laptop with a badly set clock should fail
+                // loudly at login rather than drift into odd behaviour later.
+                ClockSkew = TimeSpan.FromSeconds(30),
+            };
+
+            // SignalR cannot set an Authorization header on the WebSocket
+            // handshake, so the Agent App passes the token in the query string.
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var token = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(token) &&
+                        context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    {
+                        context.Token = token;
+                    }
+
+                    return Task.CompletedTask;
+                },
+            };
+        });
+
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy(AuthPolicies.SignedIn, policy => policy.RequireAuthenticatedUser())
+        .AddPolicy(AuthPolicies.SupervisorOnly, policy => policy.RequireRole(UserRoles.Supervisor))
+        .AddPolicy(AuthPolicies.AgentOnly, policy => policy.RequireRole(UserRoles.Agent));
+
     // ---- Web ------------------------------------------------------------
     builder.Services.AddControllers();
     builder.Services.AddSignalR();
     builder.Services.AddProblemDetails();
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(options => options.SwaggerDoc("v1", new()
+    builder.Services.AddSwaggerGen(options =>
     {
-        Title = "Restaurant Call Center API",
-        Version = "v1",
-        Description = "API for the Smashed Burger call centre. See docs/SRS-Smashed-Burger-Call-Center.md.",
-    }));
+        options.SwaggerDoc("v1", new()
+        {
+            Title = "Restaurant Call Center API",
+            Version = "v1",
+            Description = "API for the Smashed Burger call centre. See docs/SRS-Smashed-Burger-Call-Center.md.",
+        });
+
+        // "Authorize" in the Swagger UI, so protected endpoints can be tried out.
+        options.AddSecurityDefinition("Bearer", new()
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "Paste the accessToken returned by POST /api/auth/login.",
+        });
+
+        options.AddSecurityRequirement(new()
+        {
+            [new() { Reference = new() { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }] = []
+        });
+    });
 
     builder.Services.AddHealthChecks();
 
@@ -94,6 +173,7 @@ try
     app.UseStaticFiles();
 
     app.UseRouting();
+    app.UseAuthentication();
     app.UseAuthorization();
 
     app.MapHealthChecks("/health").AllowAnonymous();

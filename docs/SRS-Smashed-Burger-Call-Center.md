@@ -68,7 +68,16 @@ The call center takes orders, cancellations, complaints and inquiries by phone t
 
 ### 2.3 Extensions
 
-Each agent has two PBX extensions: one used for inbound calls (rings in the queue/ring group) and one used for outbound calls. The Agent App registers both at login and uses the correct one automatically: incoming calls arrive on the inbound extension; clicking a number or dialling uses the outbound extension. Both are tied to the same agent account, so all calls appear in one log.
+Each agent has two PBX extensions. **Both can make and receive calls** — they are not split by direction. They are split by *who is on the other end*:
+
+| Extension | Used for | Examples |
+|---|---|---|
+| **Customer extension** | Everything involving a customer, in both directions. It is the one that rings in the queue/ring group, and the one used to call a customer back. | An order coming in; calling a customer about a late delivery |
+| **Internal extension** | Communication inside the business, in both directions: other agents and the four branches. | Asking a branch whether an item is in stock; an agent calling a colleague |
+
+The Agent App registers both at login and picks the right one automatically: a call to a number belonging to a branch or another agent goes out on the internal extension, and everything else on the customer extension. Both are tied to the same agent account, so all calls — customer and internal, incoming and outgoing — appear in one log.
+
+Keeping customer traffic on its own extension is what makes the queue, the wait-time reports and the service-level report (R-20, R-21) measure customer calls only, rather than being diluted by internal chatter.
 
 ### 2.4 Assumptions and constraints
 
@@ -109,7 +118,7 @@ Each agent has two PBX extensions: one used for inbound calls (rings in the queu
 
 | ID | Requirement | Priority |
 |---|---|---|
-| A-20 | Dial from a dial box, from any phone number shown in the app (click-to-call) or from a contact. Uses the outbound extension. | Must |
+| A-20 | Dial from a dial box, from any phone number shown in the app (click-to-call) or from a contact. The app chooses the extension by who is being called (see 2.3): the internal extension for a branch or another agent, the customer extension for everyone else. | Must |
 | A-21 | Outbound calls are recorded and classified exactly like inbound calls. | Must |
 | A-22 | Redial last number; call back from a missed-call entry with one click. | Should |
 
@@ -226,7 +235,7 @@ All filterable by time period; also by agent, branch, channel where applicable.
 |---|---|---|
 | S-40 | Edit the classification form used by agents: add/remove/rename types; add custom fields (text, number, dropdown, checkbox); set required fields; the change applies to new classifications without reinstalling the Agent App. | Must |
 | S-41 | Manage channels list (WhatsApp, Facebook, Instagram, Wheels, …) and branches (4 at start; add/rename/disable). | Must |
-| S-42 | Manage agents: create/disable accounts, assign inbound and outbound extensions with SIP credentials, reset passwords. | Must |
+| S-42 | Manage agents: create/disable accounts, assign the customer and internal extensions with their SIP credentials (see 2.3), reset passwords. | Must |
 | S-43 | Recording retention period (default 90 days) and storage usage view. | Must |
 | S-44 | Backup now / view last backup status. | Should |
 | S-45 | Mark a contact (or a bare phone number) as VIP or Blocked, with a reason and date; remove the flag at any time; list of all blocked and VIP numbers. Agents can see the flags but cannot change them. Every change is logged. | Must |
@@ -328,7 +337,8 @@ If the client's S20 does not expose AMI or database access (to be confirmed by t
 
 ## 10. Open Questions for the Client [TBC]
 
-- PBX: does the S20 show the AMI tab under Settings > System > Security? Is inbound routing a queue or a ring group? (Determines which method in 4.5 applies.)
+- PBX: does the S20 show the AMI tab under Settings > System > Security? Is incoming customer routing a queue or a ring group? (Determines which method in 4.5 applies.)
+- PBX: confirm which of each agent's two extensions is the customer one and which is the internal one, and that internal dialling to the four branches works from the internal extension (SRS 2.3).
 - Exact list of channels (WhatsApp, Facebook, Instagram, Wheels, others?) and of classification types to start with.
 - Should supervisors be able to see live agent status and listen to live calls? (Not included by default.)
 
@@ -362,7 +372,7 @@ If the client's S20 does not expose AMI or database access (to be confirmed by t
 ### 12.3 What the client provides
 
 - All hardware: server (mini PC with SSD), agent laptops, headsets, network, UPS if desired, and any replacement of failed hardware.
-- PBX (Yeastar S20) configuration and its maintenance: two working extensions per agent with SIP credentials, one spare extension for testing, caller ID delivered on inbound calls, routing of inbound calls to the inbound extensions and outbound routes on the outbound extensions, recording announcement if wanted. The PBX is configured by the client or the client's PBX provider, not by the developer.
+- PBX (Yeastar S20) configuration and its maintenance: two working extensions per agent with SIP credentials (the customer and internal extensions of 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' customer extensions, outbound routes available on both extensions, and internal dialling between the agents' internal extensions and the branches. Recording announcement if wanted. The PBX is configured by the client or the client's PBX provider, not by the developer.
 - For capture of calls that never reach an agent (4.5): AMI enabled on the S20 (Settings > System > Security > AMI) with a username/password for the system and the server's IP in the permitted list — or, if the PBX does not offer AMI, CDR storage/export to a network folder on the server and, optionally, the call-back extension and its queue failover setting. The client confirms before installation which of these the PBX provides.
 - LAN access between laptops, server and PBX; administrator rights on the laptops for installation.
 - Customer list for the initial import (Excel/CSV), if available.

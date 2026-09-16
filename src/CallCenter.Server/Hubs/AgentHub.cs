@@ -1,3 +1,5 @@
+using CallCenter.Server.Features.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace CallCenter.Server.Hubs;
@@ -10,6 +12,7 @@ namespace CallCenter.Server.Hubs;
 /// Stub for now - methods and the strongly typed client interface are added
 /// with the PBX/telephony features. Mapped at <c>/hubs/agent</c>.
 /// </remarks>
+[Authorize(AuthPolicies.SignedIn)]
 public class AgentHub(ILogger<AgentHub> logger) : Hub
 {
     private readonly ILogger<AgentHub> _logger = logger;

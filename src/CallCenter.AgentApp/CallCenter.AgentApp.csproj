@@ -26,6 +26,7 @@
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="SIPSorcery" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="SIPSorceryMedia.Windows" />
   </ItemGroup>
 
@@ -35,6 +36,11 @@
 
   <ItemGroup>
     <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- The interface labels, one file per language (A-80). Read at startup
+         from i18n\ next to the executable, so a wording fix needs no rebuild. -->
+    <None Update="i18n\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

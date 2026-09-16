@@ -33,7 +33,8 @@ services:
     image: callcenter-api:latest
     container_name: callcenter-api
     restart: unless-stopped
-    # Host networking: required for SIP/RTP and AMI against the PBX.
+    # Host networking: required for SIP/RTP and AMI against the PBX, and so the
+    # container uses the host's VPN route to the provider.
     network_mode: host
     env_file:
       - .env

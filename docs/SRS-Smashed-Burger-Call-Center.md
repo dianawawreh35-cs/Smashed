@@ -25,7 +25,7 @@ This document describes what the Restaurant Call Center System must do. It is th
 
 ### 1.2 Background
 
-The call center takes orders, cancellations, complaints and inquiries by phone through a Yeastar S20 PBX, and increasingly through messaging and delivery apps (WhatsApp, Facebook, Instagram, food-ordering apps such as Wheels). Today, agents use softphones, callers are looked up manually, calls are not classified, and there is no record of app-based communication or reporting for the supervisor.
+The call center takes orders, cancellations, complaints and inquiries by phone through an Issabel PBX hosted by an external telephony provider and reached over a VPN, and increasingly through messaging and delivery apps (WhatsApp, Facebook, Instagram, food-ordering apps such as Wheels). Today, agents use softphones, callers are looked up manually, calls are not classified, and there is no record of app-based communication or reporting for the supervisor.
 
 ### 1.3 Goals
 
@@ -53,10 +53,11 @@ The call center takes orders, cancellations, complaints and inquiries by phone t
 
 ### 2.1 Components
 
-- **Agent App (Windows desktop):** registers to the Yeastar S20 as the agent's SIP extensions, handles inbound and outbound calls, records calls, shows the incoming-call pop-up, holds the agent's call log, the shared contacts and the App Orders tab.
-- **Server (mini PC, LAN):** PostgreSQL database, recordings storage, REST API used by the Agent Apps, nightly backups.
+- **Agent App (Windows desktop):** registers to the Issabel PBX across the VPN as the agent's SIP extensions, handles inbound and outbound calls, records calls, shows the incoming-call pop-up, holds the agent's call log, the shared contacts and the App Orders tab.
+- **Server (mini PC, restaurant LAN):** PostgreSQL database, recordings storage, REST API used by the Agent Apps, nightly backups. It also needs its own VPN connection to the PBX for the call capture in 4.5 — see the note in 2.4.
 - **Supervisor Web App:** browser application served by the server for search, reports, statistics, recordings access and configuration of the classification form.
-- **Yeastar S20 PBX (existing):** unchanged. Used as a standard SIP server; no PBX add-ons or licences required.
+- **Issabel PBX (hosted by the telephony provider):** not operated by the restaurant and not modified by this project. Issabel is an Asterisk distribution, so it offers standard SIP, and AMI and CDR for the server-side capture in 4.5 — but each of those has to be enabled and permitted by the provider (see 12.3).
+- **VPN to the provider:** what the extensions register across. Every agent laptop runs a VPN client, and the server needs one too.
 
 ### 2.2 Users and roles
 
@@ -81,10 +82,12 @@ Keeping customer traffic on its own extension is what makes the queue, the wait-
 
 ### 2.4 Assumptions and constraints
 
-- Five agents work on four Windows 10/11 laptops with headsets; some agents share a laptop across shifts. Laptops and server are on the same LAN as the S20.
+- Five agents work on four Windows 10/11 laptops with headsets; some agents share a laptop across shifts. Laptops and server are on the same restaurant LAN; the PBX is not — it is reached over the VPN.
 - The restaurant operates four branches; every call and app communication is assigned to a branch.
-- The S20 provides standard SIP (UDP 5060) and two extensions per agent. Trunks deliver caller ID.
-- No internet connection is required for daily operation. Messaging/delivery apps are handled by agents on their own devices; their content is entered manually into the App Orders tab (no automated integration in this version).
+- The provider's Issabel gives two SIP extensions per agent (see 2.3) and delivers caller ID on incoming calls. Registration and audio travel over the VPN.
+- **Each agent laptop runs a VPN client.** The agent must be connected before the phone works; a laptop that is not connected can still use contacts, the call log and the App Orders tab, but cannot make or receive calls.
+- **The server would need a VPN connection of its own** for the capture of calls that never reach an agent (4.5), which the server does by talking to the PBX directly — a VPN on the laptops alone does not help it. That section is deferred pending the provider's answers, so the server does not need VPN access for anything being built now. If it never gets that access, section 4.5 and reports R-20 and R-21 cannot be delivered.
+- An internet connection **is** required for calls, because the PBX is reached across it (see N-01). Everything that is not telephony — contacts, call log, classification, app orders, reports — keeps working without it. Messaging/delivery apps are handled by agents on their own devices; their content is entered manually into the App Orders tab (no automated integration in this version).
 - The client is responsible for informing callers that calls are recorded (e.g., an announcement on the PBX).
 
 ---
@@ -96,7 +99,7 @@ Keeping customer traffic on its own extension is what makes the queue, the wait-
 | ID | Requirement | Priority |
 |---|---|---|
 | A-01 | Agent logs in with username and password issued by the supervisor. The app receives the agent's two extensions and SIP credentials from the server; the agent never types SIP details. | Must |
-| A-02 | The app registers both extensions on the S20 and shows their status (Registered / Failed) at all times; re-registers automatically after network drops. | Must |
+| A-02 | The app registers both extensions on the Issabel PBX across the VPN and shows their status (Registered / Failed) at all times; re-registers automatically after network or VPN drops. When the VPN is down the status makes that plain, so the agent knows the phone is unavailable rather than thinking the system is broken. | Must |
 | A-03 | Audio device selection (microphone, speaker, ring device) remembered per laptop. | Must |
 | A-05 | Shared laptops: the app is installed once per laptop and supports any agent logging in. On login it registers the logged-in agent's two extensions; on logout it unregisters them. Audio device choices are per laptop; everything else (calls, classifications, queued uploads) belongs to the logged-in agent. Agents must log out at the end of their shift (automatic logout after a configurable idle time). | Must |
 | A-04 | If the server is unreachable, the app continues to make/receive calls and record; log entries and classifications are queued locally and synchronised when the server returns. | Must |
@@ -220,8 +223,8 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | R-17 | Complaint handling: open vs closed follow-ups, time to close, complaints per 100 orders. |
 | R-18 | Data quality: unclassified communications, calls from unknown numbers (not saved as contacts), duplicate contacts. |
 | R-19 | Daily summary sent by e-mail to the supervisor (yesterday's totals by type and channel, complaints, missed calls) [Could — requires internet or local mail]. |
-| R-20 | Abandoned and overflowed calls: count, rate (÷ inbound calls), average and maximum wait time, per hour and per day; list with call-back status. Real-time with AMI, otherwise as of the last CDR import (see 4.5). |
-| R-21 | Queue service level: percentage of inbound calls answered within N seconds (N configurable), per day and per hour. Requires AMI or CDR with wait times. |
+| R-20 | *(deferred with 4.5)* Abandoned and overflowed calls: count, rate (÷ inbound calls), average and maximum wait time, per hour and per day; list with call-back status. Real-time with AMI, otherwise as of the last CDR import (see 4.5). |
+| R-21 | *(deferred with 4.5)* Queue service level: percentage of inbound calls answered within N seconds (N configurable), per day and per hour. Requires AMI or CDR with wait times. |
 
 ### 4.3 Dashboard
 
@@ -239,9 +242,18 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | S-43 | Recording retention period (default 90 days) and storage usage view. | Must |
 | S-44 | Backup now / view last backup status. | Should |
 | S-45 | Mark a contact (or a bare phone number) as VIP or Blocked, with a reason and date; remove the flag at any time; list of all blocked and VIP numbers. Agents can see the flags but cannot change them. Every change is logged. | Must |
-| S-46 | Export the blocked list in a format suitable for the S20 blocklist, so the client's PBX person can optionally block the numbers at the PBX level as well (see note in section 6). | Should |
+| S-46 | Export the blocked list in a format the provider can load into Issabel's blacklist, so the numbers can optionally be blocked at the PBX level as well (see note in section 6). | Should |
 
 ### 4.5 Capture of calls that never reach an agent (queue / ring-group)
+
+> **Deferred — decision pending (16 September 2026).** How this is done, and
+> whether it can be done at all, depends on answers the telephony provider has
+> not given yet (see 12.3). Nothing in this section is being built until they
+> are in. It is deferred, not dropped: the requirements below stand as written
+> and are the starting point once the answers arrive.
+>
+> What is blocked with it: **R-20** and **R-21**, and the server's own VPN
+> connection, which is only needed for this section.
 
 Calls that are abandoned while waiting in the queue, or that time out because all agents are busy, never ring an agent's extension and therefore cannot be seen by the Agent App. They are captured on the server side as follows.
 
@@ -249,17 +261,17 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 
 | ID | Requirement | Priority |
 |---|---|---|
-| S-50 | The server connects to the Yeastar S20 through AMI (Asterisk Manager Interface, TCP 5038) and records every inbound call that ends before reaching an agent: caller number, date/time, queue or ring group, wait time, and whether the caller hung up (abandoned) or was moved by the PBX at timeout (overflowed). Stored as communications with status Abandoned / Overflowed, matched to contacts, visible in search, contact history and reports within seconds. | Must |
+| S-50 | The server connects to the provider's Issabel through AMI (Asterisk Manager Interface, TCP 5038) across the VPN and records every inbound call that ends before reaching an agent: caller number, date/time, queue or ring group, wait time, and whether the caller hung up (abandoned) or was moved by the PBX at timeout (overflowed). Stored as communications with status Abandoned / Overflowed, matched to contacts, visible in search, contact history and reports within seconds. | Must |
 | S-51 | Each abandoned or overflowed call creates a call-back task assigned to the supervisor (or the next available agent, configurable). The task closes automatically when an outbound call to that number is made, or manually. | Should |
 | S-52 | Where the PBX offers database read access (Database Grant) instead of, or in addition to, AMI, the server may read the PBX call records directly at hang-up to obtain the same information. | Could |
 
 **Alternative — if AMI / database access is not available on the client's PBX**
 
-If the client's S20 does not expose AMI or database access (to be confirmed by the client before installation, see 12.3), the following applies instead of S-50 and the real-time requirement is waived:
+AMI is part of Asterisk and Issabel enables it by default, but the provider still has to create a user for us and permit the server's VPN address. If the provider will not do that (to be confirmed before installation, see 12.3), the following applies instead of S-50 and the real-time requirement is waived:
 
 | ID | Requirement | Priority |
 |---|---|---|
-| S-55 | CDR import: the PBX stores or exports its call detail records (CDR) to a network folder on the server (S20 Storage / CDR export). The server imports them at least daily and creates Abandoned / Overflowed records for inbound calls with no answered agent leg. Reports include these calls with the delay of the import (not real-time). | Must |
+| S-55 | CDR import: Issabel keeps its call detail records in the `cdr` table of the `asteriskcdrdb` MySQL database. The server reads them over the VPN — by read-only database access, or from an export the provider places where the server can reach it — at least daily and creates Abandoned / Overflowed records for inbound calls with no answered agent leg. Reports include these calls with the delay of the import (not real-time). | Must |
 | S-56 | Call-back extension: the client's PBX person sets the queue/ring-group timeout or failover destination to a dedicated extension registered by the server. The server answers, plays a short message ("all agents are busy, we will call you back"), hangs up, and immediately creates a communication record and a call-back task with the caller's number. This captures in real time every caller who waits until the timeout; callers who hang up before the timeout appear only through S-55. | Should |
 | S-57 | Ring-group option (client decision): if the PBX is configured as a ring group with "ring all" instead of a queue, every inbound call rings all free agents' Agent Apps; a call that nobody answers is logged by the Agent Apps as Missed with the caller number, in real time, without AMI. Hold music and position announcements are lost in this configuration. | Info |
 
@@ -271,25 +283,26 @@ If the client's S20 does not expose AMI or database access (to be confirmed by t
 
 | ID | Requirement | Priority |
 |---|---|---|
-| N-01 | Local operation: all components run on the restaurant LAN; no internet dependency for calls, pop-up, recording, classification or reports. | Must |
+| N-01 | Network dependency: the database, recordings, API and supervisor app run on the restaurant LAN and keep working with no internet at all — call log, contacts, classification, app orders and reports are unaffected. Telephony is different: the PBX is reached across the internet over the VPN, so calls depend on the internet line, the VPN and the provider. Losing any of them stops calls; it stops nothing else. | Must |
 | N-02 | Performance: pop-up under 1 s; report generation under 5 s for one year of data at the expected volume (up to ~500 communications/day). | Must |
 | N-03 | Capacity: 5 agents initially, designed for up to 20 without changes; one server. | Must |
-| N-04 | Availability: the phone function of the Agent App never depends on the server being up (see A-04). | Must |
+| N-04 | Availability: the phone function of the Agent App never depends on the server being up (see A-04). It does depend on the VPN and the provider (N-01), which are outside the developer's control — the agreed uptime and support hours for them are the client's arrangement with the provider (see 12.3). | Must |
+| N-04a | The Agent App shows at all times whether the phone is usable, and says which part is missing — not connected to the VPN, not registered, or server unreachable — so an agent can tell a network problem from a broken application (see A-02). | Must |
 | N-05 | Security: role-based access; passwords hashed; recordings served only to authorised users through the API (never as shared folders); SIP credentials stored encrypted on the server and never shown to agents. | Must |
 | N-06 | Audit: all edits to classifications and contacts record user and time. | Must |
 | N-07 | Backup: nightly automatic backup of database and recordings to a second disk or client-provided location; restore procedure documented and tested at handover. | Must |
 | N-08 | Data retention: communications and contacts kept indefinitely; recordings 90 days by default (S-43). | Must |
 | N-09 | Language: Arabic (RTL) and English for both applications. | Must |
-| N-10 | Platforms: Agent App on Windows 10/11; Supervisor Web App on current Chrome/Edge; server on Linux (Ubuntu Server) or Windows on a mini PC with SSD. | Must |
+| N-10 | Platforms: Agent App on Windows 10/11; Supervisor Web App on current Chrome/Edge; server on Linux (Ubuntu Server) or Windows on a mini PC with SSD. PBX: Issabel (Asterisk), hosted and operated by the telephony provider. | Must |
 | N-11 | Maintainability: single installer for the Agent App; updates deployed from the server; configuration without code changes. | Should |
 
 ---
 
 ## 6. External Interfaces
 
-- **Yeastar S20 — calls:** standard SIP registration and calls (two extensions per agent). No PBX add-on required. Caller ID as delivered by the trunks.
-- **Blocked numbers — note:** rejection by the Agent App means the PBX still receives the call and, in a queue, may offer it to other agents or send it to the failover destination after all apps reject it. Blocking at the PBX level (S20 blocklist, client's PBX person, using the export in S-46) stops the call before it enters the queue and is recommended for persistent nuisance callers.
-- **Yeastar S20 — server side:** AMI (TCP 5038, read-only events) for calls that never reach an agent; alternatively CDR files on a network folder and/or a call-back extension (see 4.5). No Yeastar API licence required.
+- **Issabel — calls:** standard SIP registration and calls across the VPN (two extensions per agent). No PBX add-on or licence required. Caller ID as delivered by the provider's trunks.
+- **Blocked numbers — note:** rejection by the Agent App means the PBX still receives the call and, in a queue, may offer it to other agents or send it to the failover destination after all apps reject it. Blocking at the PBX level (Issabel's blacklist, applied by the provider using the export in S-46) stops the call before it enters the queue and is recommended for persistent nuisance callers.
+- **Issabel — server side:** AMI (TCP 5038, read-only events) for calls that never reach an agent; alternatively read-only access to the `asteriskcdrdb` database or a CDR export, and/or a call-back extension (see 4.5). All of it reaches the PBX over the VPN, so the server needs its own VPN connection. No licensed Issabel add-on is required — the Contact Center (Asternic) module would provide the same figures ready-made, but this project does not depend on it.
 - **Messaging and delivery apps:** manual entry in this version. Automated WhatsApp Business API, Instagram/Facebook and delivery-app integrations are possible future phases (they require internet access, business verification and per-message fees).
 - **POS:** not integrated in this version; order value is entered by the agent. A future phase may import customers or order totals from the POS if it offers an export or API.
 
@@ -337,7 +350,13 @@ If the client's S20 does not expose AMI or database access (to be confirmed by t
 
 ## 10. Open Questions for the Client [TBC]
 
-- PBX: does the S20 show the AMI tab under Settings > System > Security? Is incoming customer routing a queue or a ring group? (Determines which method in 4.5 applies.)
+- **PBX provider — to confirm before installation.** These answers decide whether 4.5 and reports R-20/R-21 can be delivered at all:
+  1. Can the **server** have its own VPN connection to the PBX, not just the agent laptops?
+  2. Is **AMI** available (TCP 5038), with a user for us and our server's VPN address in the permitted list?
+  3. Can we have **read-only access to the `asteriskcdrdb` database**, or a regular CDR export we can reach?
+  4. Is incoming customer routing a **queue or a ring group**? (Determines which method in 4.5 applies.)
+  5. What are the agreed **VPN uptime and support hours**, and who is called when the tunnel drops?
+  6. Can the provider add a **recording announcement** before ringing agents, if the client wants one?
 - PBX: confirm which of each agent's two extensions is the customer one and which is the internal one, and that internal dialling to the four branches works from the internal extension (SRS 2.3).
 - Exact list of channels (WhatsApp, Facebook, Instagram, Wheels, others?) and of classification types to start with.
 - Should supervisors be able to see live agent status and listen to live calls? (Not included by default.)
@@ -350,7 +369,7 @@ If the client's S20 does not expose AMI or database access (to be confirmed by t
 - **Delivery notes on the contact:** a dedicated "delivery instructions" field (gate code, landmark) separate from general notes.
 - **Same-as-last-order:** show the last order's notes in the pop-up so the agent can offer "the usual".
 - **Call outcome for outbound:** add No answer / Busy / Wrong number outcomes to outbound classification for clean call-back reporting.
-- **Recording notice:** add a short "this call may be recorded" announcement on the S20 before ringing agents.
+- **Recording notice:** ask the provider to add a short "this call may be recorded" announcement on Issabel before ringing agents.
 - **Spare hardware:** keep a second SSD with a recent backup; the server can be rebuilt in an hour.
 
 ---
@@ -372,9 +391,10 @@ If the client's S20 does not expose AMI or database access (to be confirmed by t
 ### 12.3 What the client provides
 
 - All hardware: server (mini PC with SSD), agent laptops, headsets, network, UPS if desired, and any replacement of failed hardware.
-- PBX (Yeastar S20) configuration and its maintenance: two working extensions per agent with SIP credentials (the customer and internal extensions of 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' customer extensions, outbound routes available on both extensions, and internal dialling between the agents' internal extensions and the branches. Recording announcement if wanted. The PBX is configured by the client or the client's PBX provider, not by the developer.
-- For capture of calls that never reach an agent (4.5): AMI enabled on the S20 (Settings > System > Security > AMI) with a username/password for the system and the server's IP in the permitted list — or, if the PBX does not offer AMI, CDR storage/export to a network folder on the server and, optionally, the call-back extension and its queue failover setting. The client confirms before installation which of these the PBX provides.
-- LAN access between laptops, server and PBX; administrator rights on the laptops for installation.
+- PBX (Issabel, operated by the telephony provider) configuration and its maintenance: two working extensions per agent with SIP credentials (the customer and internal extensions of 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' customer extensions, outbound routes available on both extensions, and internal dialling between the agents' internal extensions and the branches. Recording announcement if wanted. The PBX is configured by the telephony provider, not by the developer; the client owns that relationship and any charges under it.
+- **The VPN**: an account and client configuration for every agent laptop, and a separate connection for the server. Supplying, licensing and supporting the VPN is the client's and the provider's responsibility, not the developer's.
+- For capture of calls that never reach an agent (4.5): an AMI user on Issabel (Manager Settings in the Issabel GUI, or `manager.conf`) with the server's VPN address in the permitted list — or, failing that, read-only access to the `asteriskcdrdb` database or a CDR export the server can reach, and optionally the call-back extension and its queue failover setting. The client confirms with the provider before installation which of these is available.
+- LAN access between the laptops and the server, VPN access from both to the PBX, and administrator rights on the laptops for installing the app and the VPN client.
 - Customer list for the initial import (Excel/CSV), if available.
 - Decisions on all [TBC] items before installation.
 

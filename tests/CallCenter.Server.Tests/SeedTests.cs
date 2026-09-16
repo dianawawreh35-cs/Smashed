@@ -68,7 +68,7 @@ public class SeedDataTests
             "agent.edit_window",
             "sla.answer_seconds",
             "callback.extension",
-            "pbx.ip",
+            "pbx.host",
             "pbx.ami.enabled",
         ]);
     }
@@ -88,7 +88,7 @@ public class SeedDataTests
     public void Site_specific_settings_start_blank()
     {
         // Filled in during installation once the client's PBX person confirms them.
-        foreach (var key in new[] { "callback.extension", "pbx.ip" })
+        foreach (var key in new[] { "callback.extension", "pbx.host" })
         {
             SeedData.Settings.Single(s => s.Key == key).Value.Should().BeEmpty();
         }

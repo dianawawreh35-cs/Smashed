@@ -9,7 +9,7 @@ namespace CallCenter.Server.Data.Entities;
 /// <remarks>
 /// Seeded keys: <c>recording.retention_days</c>, <c>agent.idle_logout_minutes</c>,
 /// <c>agent.edit_window</c>, <c>sla.answer_seconds</c>, <c>callback.extension</c>,
-/// <c>pbx.ip</c>, <c>pbx.ami.enabled</c>.
+/// <c>pbx.host</c>, <c>pbx.ami.enabled</c>.
 /// </remarks>
 public class Setting
 {

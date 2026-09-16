@@ -7,10 +7,16 @@ Example addresses used below — replace with the real ones:
 |---|---|
 | Server IP | `192.168.1.100` |
 | Router / gateway | `192.168.1.1` |
-| Yeastar S20 IP | `192.168.1.10` |
+| PBX address on the VPN | `10.8.0.1` |
+| Server address on the VPN | `10.8.0.20` |
 | LAN | `192.168.1.0/24` |
 
-Estimated time: about 1 hour, plus waiting for the client's PBX person in step 8.
+Estimated time: about 1 hour, plus waiting for the telephony provider in step 8.
+
+> **The PBX is not on your network.** It is an Issabel system run by an external
+> telephony provider and reached over a VPN. Each agent laptop runs a VPN client.
+> The server would need its own VPN connection for step 8 — but step 8 is
+> deferred, so nothing in this runbook needs it today.
 
 ---
 
@@ -31,7 +37,7 @@ ip a
 
 ## Step 2 — Fixed IP address
 
-**What it does:** the router normally gives out a random address that can change after a reboot. The agent apps and the S20 must always find the server at the same address, so you hard-code one. Netplan is Ubuntu's network configuration.
+**What it does:** the router normally gives out a random address that can change after a reboot. The agent apps must always find the server at the same address, so you hard-code one. Netplan is Ubuntu's network configuration.
 
 **Work**
 ```bash
@@ -135,9 +141,9 @@ SIP_SECRET_KEY=<long random, 32+ chars>
 SERVER_IP=192.168.1.100
 PBX_IP=192.168.1.10
 AMI_USER=callcenter
-AMI_PASSWORD=<as set on the S20>
+AMI_PASSWORD=<as set by the provider>
 CALLBACK_EXT=199
-CALLBACK_EXT_PASSWORD=<as set on the S20>
+CALLBACK_EXT_PASSWORD=<as set by the provider>
 RTP_PORT_MIN=10000
 RTP_PORT_MAX=10100
 RECORDING_RETENTION_DAYS=90
@@ -265,15 +271,29 @@ From a laptop browser: `http://192.168.1.100` → log in → **change the passwo
 
 ---
 
-## Step 8 — Connect the PBX (client's PBX person)
+## Step 8 — Connect the PBX (telephony provider) — *deferred*
 
-**What it does:** enabling AMI on the S20 opens the event feed your server listens to for calls that never reach an agent; the permitted IP limits who may connect to only your server. The callback extension is an ordinary extension your server registers as a phone, so the S20 can send timed-out queue calls to it. The status page proves the whole chain.
+> **Skip this step for now.** It serves section 4.5 of the SRS, which is on hold
+> until the telephony provider answers the questions in SRS 12.3. Calls,
+> pop-ups, recording and classification do not depend on it — only the
+> abandoned-call reports R-20 and R-21 do. Come back to it when the answers
+> arrive.
 
-**Work — on the S20 (client side)**
-1. Settings > System > Security > **AMI**: Enable; Username `callcenter`; Password = `AMI_PASSWORD` from `.env`; Permitted IP `192.168.1.100` / `255.255.255.255`. Save & Apply.
+**What it does:** an AMI user on Issabel opens the event feed your server listens to for calls that never reach an agent; the permitted address limits who may connect to only your server. The callback extension is an ordinary extension your server registers as a phone, so the PBX can send timed-out queue calls to it. The status page proves the whole chain.
+
+**Prerequisite — the server's VPN connection**
+The PBX is only reachable over the VPN, so set this up first and confirm it before asking the provider for anything else:
+```bash
+ping -c 3 10.8.0.1                 # the PBX on the VPN
+nc -vz 10.8.0.1 5038               # AMI port reachable
+```
+Make the VPN start on boot, so a power cut does not leave the server silently cut off from the PBX.
+
+**Work — the provider does this (Issabel side)**
+1. Create an **AMI user**: Issabel GUI → Manager Settings (or `/etc/asterisk/manager.conf`); Username `callcenter`; Password = `AMI_PASSWORD` from `.env`; **permit** = the server's VPN address (`10.8.0.20/255.255.255.255`). Reload Asterisk.
 2. Create extension `199` "Callback" with the password from `.env`.
 3. Queue / ring group: set **Failover / timeout destination** → extension 199 (if the callback method is used).
-4. Confirm inbound routing type (queue or ring group) and that caller ID reaches extensions today.
+4. Confirm incoming routing type (queue or ring group) and that caller ID reaches extensions today.
 
 **Work — verify on the server**
 Supervisor app → Settings → PBX status: `AMI: connected`, `Callback extension: registered`.
@@ -282,7 +302,7 @@ docker compose logs api | grep -i ami | tail
 ```
 Test: call the restaurant number from a mobile, let it ring until the queue times out. It should appear in the dashboard as **Abandoned/Overflowed** within seconds.
 
-If the S20 has no AMI tab, skip 1 and configure the alternative: Settings > System > Storage → CDR to a network drive pointing at the server's share (set up Samba on the server), or a scheduled CDR export. The API's CDR importer watches `/data/cdr-import/`.
+If the provider will not grant AMI, skip 1 and use the alternative: read-only MySQL access to the `asteriskcdrdb` database (table `cdr`), or a scheduled CDR export dropped where the server can fetch it. The API's CDR importer watches `/data/cdr-import/`.
 
 ---
 
@@ -348,7 +368,7 @@ Point a local API at it and confirm calls and contacts are there.
 
 **Work**
 - Give the supervisor a one-page sheet: server IP, web address, how to reboot (just power on — everything auto-starts), where backups go, your contact and support hours.
-- Store in your password manager: `.env` contents, admin password, the S20 AMI credentials, the router reservation.
+- Store in your password manager: `.env` contents, admin password, the AMI credentials from the provider, the VPN accounts for the server and each laptop, the router reservation.
 - Commit `docker-compose.yml`, `.env.example`, `backup.sh` and this runbook to the repo (never the real `.env`).
 - Walk the supervisor through the dashboard for 1 hour; agents 1 hour.
 

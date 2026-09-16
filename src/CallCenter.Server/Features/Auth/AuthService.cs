@@ -171,7 +171,7 @@ public class AuthService(
         var sipServer = await GetSipServerAsync(ct);
         if (string.IsNullOrWhiteSpace(sipServer))
         {
-            logger.LogWarning("Setting 'pbx.ip' is blank; signing in without a phone.");
+            logger.LogWarning("Setting 'pbx.host' is blank; signing in without a phone.");
             return null;
         }
 
@@ -184,14 +184,14 @@ public class AuthService(
     }
 
     /// <summary>
-    /// The PBX address the app registers to: the <c>pbx.ip</c> setting the
+    /// The PBX address the app registers to: the <c>pbx.host</c> setting the
     /// supervisor fills in at installation, falling back to configuration so a
     /// developer machine can point at a test PBX without touching the database.
     /// </summary>
     private async Task<string?> GetSipServerAsync(CancellationToken ct)
     {
         var fromDatabase = await db.Settings
-            .Where(s => s.Key == "pbx.ip")
+            .Where(s => s.Key == "pbx.host")
             .Select(s => s.Value)
             .FirstOrDefaultAsync(ct);
 

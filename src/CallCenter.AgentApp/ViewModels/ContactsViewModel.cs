@@ -27,6 +27,8 @@ public partial class ContactsViewModel : ObservableObject
         _api = api;
         Localizer = localizer;
 
+        Results.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasResults));
+
         localizer.LanguageChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(StatusMessage));
@@ -74,6 +76,12 @@ public partial class ContactsViewModel : ObservableObject
     private string _notes = string.Empty;
 
     public bool HasStatus => StatusKey is not null;
+
+    /// <summary>
+    /// Whether the grid has anything in it. Drives the empty state: a grid with
+    /// no rows is a blank expanse that reads as a broken screen.
+    /// </summary>
+    public bool HasResults => Results.Count > 0;
 
     /// <summary>The status line, in the agent's language.</summary>
     public string? StatusMessage => StatusKey is null ? null : Localizer[StatusKey];

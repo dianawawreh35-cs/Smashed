@@ -65,6 +65,8 @@
       "contact_not_found": "That contact no longer exists.",
       "server_error": "Could not save. Please try again."
     },
-    "intro": "Find a customer, or add one. The list is shared by every agent."
+    "intro": "Find a customer, or add one. The list is shared by every agent.",
+    "emptyTitle": "Nothing to show",
+    "emptyHint": "Search by name or number, or add a new contact."
   }
 }

@@ -315,7 +315,8 @@
   </Style>
 
   <Style TargetType="DataGridRow">
-    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Background" Value="{StaticResource Surface}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
     <Setter Property="Cursor" Value="Hand" />
@@ -330,9 +331,17 @@
   </Style>
 
   <Style TargetType="DataGrid">
-    <Setter Property="Background" Value="Transparent" />
+    <!-- Explicit, not Transparent. WPF's default DataGrid template paints its
+         own surface underneath, so a transparent DataGrid still came out white
+         on a dark card. Every background here is stated outright for that
+         reason. -->
+    <Setter Property="Background" Value="{StaticResource Surface}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="RowBackground" Value="Transparent" />
+    <Setter Property="RowBackground" Value="{StaticResource Surface}" />
+    <Setter Property="AlternatingRowBackground" Value="{StaticResource Surface}" />
+    <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="VerticalGridLinesBrush" Value="Transparent" />
     <Setter Property="GridLinesVisibility" Value="None" />
     <Setter Property="HeadersVisibility" Value="Column" />
     <Setter Property="AutoGenerateColumns" Value="False" />

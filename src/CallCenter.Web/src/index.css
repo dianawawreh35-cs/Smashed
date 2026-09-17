@@ -8,6 +8,157 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-slate-100 text-slate-900 antialiased;
+  }
+
+  /* One visible focus ring everywhere, rather than the browser default in some
+     places and nothing in others. Supervisors work through these forms with the
+     keyboard. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-slate-100;
+  }
+
+  /* Phone numbers and extensions read as data, not prose: tabular figures keep
+     them aligned in a column and stop digits shifting as values change. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* --- Buttons ------------------------------------------------------------
+     Three weights, because a screen with everything at the same weight gives
+     the eye nowhere to land: primary for the one action that matters, ghost
+     for everything alongside it, danger for the one that cannot be undone. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2
+           text-sm font-medium transition
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-sm
+           hover:bg-brand-700 active:bg-brand-800;
+  }
+
+  .btn-ghost {
+    @apply btn border border-slate-300 bg-white text-slate-700
+           hover:border-slate-400 hover:bg-slate-50;
+  }
+
+  .btn-danger {
+    @apply btn border border-red-300 bg-white text-red-700
+           hover:border-red-400 hover:bg-red-50;
+  }
+
+  .btn-sm {
+    @apply px-2.5 py-1 text-xs;
+  }
+
+  /* --- Fields ------------------------------------------------------------ */
+  .field {
+    @apply block space-y-1.5;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium text-slate-700;
+  }
+
+  .field-hint {
+    @apply block text-xs text-slate-500;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm
+           transition placeholder:text-slate-400
+           hover:border-slate-400
+           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
+           disabled:bg-slate-100 disabled:text-slate-500;
+  }
+
+  .input-invalid {
+    @apply border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/20;
+  }
+
+  /* --- Surfaces ---------------------------------------------------------- */
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-card;
+  }
+
+  .card-body {
+    @apply p-5;
+  }
+
+  .card-header {
+    @apply flex flex-wrap items-center justify-between gap-3
+           border-b border-slate-100 px-5 py-4;
+  }
+
+  /* --- Notices ------------------------------------------------------------
+     Colour alone does not carry the meaning: each has its own wording, and the
+     border gives a second signal for anyone who cannot separate the hues. */
+  .notice {
+    @apply animate-fade-in rounded-lg border px-4 py-3 text-sm;
+  }
+
+  .notice-error {
+    @apply notice border-red-300 bg-red-50 text-red-800;
+  }
+
+  .notice-warning {
+    @apply notice border-amber-300 bg-amber-50 text-amber-900;
+  }
+
+  .notice-success {
+    @apply notice border-emerald-300 bg-emerald-50 text-emerald-800;
+  }
+
+  /* --- Badges ------------------------------------------------------------ */
+  .badge {
+    @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
+  .badge-vip {
+    @apply badge bg-amber-100 text-amber-900;
+  }
+
+  .badge-blocked {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  .badge-muted {
+    @apply badge bg-slate-100 text-slate-600;
+  }
+
+  .badge-ok {
+    @apply badge bg-emerald-100 text-emerald-800;
+  }
+
+  /* --- Tables ------------------------------------------------------------ */
+  .table {
+    @apply w-full text-sm;
+  }
+
+  .table thead th {
+    @apply bg-slate-50 px-4 py-3 text-start text-xs font-semibold uppercase
+           tracking-wide text-slate-500;
+  }
+
+  .table tbody td {
+    @apply border-t border-slate-100 px-4 py-3 align-middle;
+  }
+
+  .table tbody tr:hover td {
+    @apply bg-slate-50/70;
+  }
+
+  /* --- Navigation -------------------------------------------------------- */
+  .nav-link {
+    @apply flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium
+           text-slate-600 transition hover:bg-slate-100 hover:text-slate-900;
+  }
+
+  .nav-link-active {
+    @apply bg-brand-50 text-brand-800 hover:bg-brand-50 hover:text-brand-800;
   }
 }

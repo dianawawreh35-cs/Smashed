@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ea580c" />
     <title>مركز الاتصال | Call Center</title>
+
+    <!--
+      Cairo carries Arabic and Latin in one family, so a customer name and a
+      phone number on the same line do not change typeface. It was named in the
+      Tailwind config from the start but never actually loaded, so every screen
+      quietly fell back to Segoe UI.
+
+      Self-hosting would be better for a server with no internet, but the
+      supervisor app is opened from a browser on the LAN and the fallback stack
+      is there for when the fonts cannot be fetched.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

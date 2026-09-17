@@ -60,18 +60,18 @@ export default function SettingsPage() {
       </div>
 
       {hasProblems && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="notice-error">
           {t('settings.rejected')}
         </p>
       )}
 
       {saved && !hasProblems && (
-        <p role="status" className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <p role="status" className="notice-success">
           {t('settings.saved')}
         </p>
       )}
 
-      <div className="space-y-4 rounded border border-slate-200 bg-white p-4">
+      <div className="card card-body space-y-5">
         {settings?.map((setting) => (
           <SettingField
             key={setting.key}
@@ -86,7 +86,7 @@ export default function SettingsPage() {
       <button
         type="submit"
         disabled={save.isPending}
-        className="rounded bg-brand-600 px-4 py-2 text-white disabled:opacity-50"
+        className="btn-primary"
       >
         {t('settings.save')}
       </button>
@@ -112,14 +112,12 @@ function SettingField({
   const label = t(`settings.keys.${setting.key}.label`, { defaultValue: setting.key })
   const hint = t(`settings.keys.${setting.key}.hint`, { defaultValue: '' })
 
-  const inputClass = `w-full rounded border px-3 py-2 ${
-    problem ? 'border-red-400 bg-red-50' : 'border-slate-300'
-  }`
+  const inputClass = `input ${problem ? 'input-invalid' : ''}`
 
   return (
-    <label className="block space-y-1">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      {hint && <span className="block text-xs text-slate-500">{hint}</span>}
+    <label className="field">
+      <span className="field-label">{label}</span>
+      {hint && <span className="field-hint">{hint}</span>}
 
       {setting.kind === 'Boolean' ? (
         <select value={value || 'false'} onChange={(e) => onChange(e.target.value)} className={inputClass}>

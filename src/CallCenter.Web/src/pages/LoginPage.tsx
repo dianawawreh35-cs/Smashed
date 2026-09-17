@@ -44,23 +44,32 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-4">
-      <div className="w-full max-w-sm space-y-3">
-        <div className="flex justify-end">
+    <div className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10">
+      <div className="w-full max-w-sm space-y-4">
+        <div className="flex items-center justify-between">
+          {/* The mark, so the sign-in screen is recognisably the same product
+              as the one behind it. */}
+          <span className="flex items-center gap-2">
+            <span
+              className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 font-bold text-white"
+              aria-hidden="true"
+            >
+              S
+            </span>
+            <span className="text-sm font-semibold">{t('app.title')}</span>
+          </span>
+
           <LanguageSwitcher />
         </div>
 
-        <form
-          className="space-y-4 rounded-lg bg-white p-6 shadow-sm border border-slate-200"
-          onSubmit={onSubmit}
-        >
-          <div>
+        <form onSubmit={onSubmit} className="card card-body space-y-5">
+          <div className="space-y-1">
             <h1 className="text-xl font-semibold">{t('login.heading')}</h1>
-            <p className="text-xs text-slate-500">{t('app.subtitle')}</p>
+            <p className="text-sm text-slate-500">{t('app.subtitle')}</p>
           </div>
 
-          <label className="block space-y-1">
-            <span className="text-sm text-slate-600">{t('login.username')}</span>
+          <label className="field">
+            <span className="field-label">{t('login.username')}</span>
             <input
               type="text"
               autoComplete="username"
@@ -68,35 +77,31 @@ export default function LoginPage() {
               value={login}
               disabled={isBusy}
               onChange={(e) => setLogin(e.target.value)}
-              className="w-full rounded border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+              className={`input ${errorCode ? 'input-invalid' : ''}`}
             />
           </label>
 
-          <label className="block space-y-1">
-            <span className="text-sm text-slate-600">{t('login.password')}</span>
+          <label className="field">
+            <span className="field-label">{t('login.password')}</span>
             <input
               type="password"
               autoComplete="current-password"
               value={password}
               disabled={isBusy}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+              className={`input ${errorCode ? 'input-invalid' : ''}`}
             />
           </label>
 
           {/* Wrong password, disabled account, an agent in the wrong app, or the
               server being down: one place, so it is always looked for here. */}
           {errorCode && (
-            <p role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="notice-error">
               {t(`login.errors.${errorCode}`)}
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={isBusy || !login.trim()}
-            className="w-full rounded bg-brand-600 px-3 py-2 text-white disabled:opacity-50"
-          >
+          <button type="submit" disabled={isBusy || !login.trim()} className="btn-primary w-full">
             {isBusy ? t('login.signingIn') : t('login.submit')}
           </button>
         </form>

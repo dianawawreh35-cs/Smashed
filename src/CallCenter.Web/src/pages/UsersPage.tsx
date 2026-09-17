@@ -46,23 +46,23 @@ export default function UsersPage() {
       <h2 className="text-lg font-semibold">{t('users.heading')}</h2>
 
       {error && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="notice-error">
           {error}
         </p>
       )}
 
       <CreateUserForm onSubmit={(request) => create.mutate(request)} busy={create.isPending} />
 
-      <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600">
+      <div className="card overflow-x-auto">
+        <table className="table">
+          <thead>
             <tr>
-              <th className="px-3 py-2 text-start">{t('users.name')}</th>
-              <th className="px-3 py-2 text-start">{t('users.login')}</th>
-              <th className="px-3 py-2 text-start">{t('users.role')}</th>
-              <th className="px-3 py-2 text-start">{t('users.extension')}</th>
-              <th className="px-3 py-2 text-start">{t('users.status')}</th>
-              <th className="px-3 py-2" />
+              <th>{t('users.name')}</th>
+              <th>{t('users.login')}</th>
+              <th>{t('users.role')}</th>
+              <th>{t('users.extension')}</th>
+              <th>{t('users.status')}</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -103,35 +103,35 @@ function UserRow({
 
   return (
     <>
-      <tr className="border-t border-slate-100">
-        <td className="px-3 py-2">{user.displayName}</td>
-        <td className="px-3 py-2 text-slate-500">{user.login}</td>
-        <td className="px-3 py-2">{t(`users.roles.${user.role}`)}</td>
-        <td className="px-3 py-2">
+      <tr>
+        <td className="font-medium">{user.displayName}</td>
+        <td className="text-slate-500">{user.login}</td>
+        <td>{t(`users.roles.${user.role}`)}</td>
+        <td className="tabular">
           {user.extension ? (
             <span>
               {user.extension}
               {/* A number without a secret cannot register, so say so plainly. */}
               {!user.hasSipCredentials && (
-                <span className="ms-2 text-amber-600">{t('users.noSecret')}</span>
+                <span className="badge-vip ms-2">{t('users.noSecret')}</span>
               )}
             </span>
           ) : (
             <span className="text-slate-400">{t('users.noExtension')}</span>
           )}
         </td>
-        <td className="px-3 py-2">
+        <td>
           {user.isActive ? (
-            <span className="text-emerald-700">{t('users.active')}</span>
+            <span className="badge-ok">{t('users.active')}</span>
           ) : (
-            <span className="text-slate-400">{t('users.disabled')}</span>
+            <span className="badge-muted">{t('users.disabled')}</span>
           )}
         </td>
-        <td className="px-3 py-2 text-end whitespace-nowrap">
+        <td className="whitespace-nowrap text-end">
           {user.role === 'Agent' && (
             <button
               type="button"
-              className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+              className="btn-ghost btn-sm"
               onClick={() => setPanel(panel === 'extensions' ? 'none' : 'extensions')}
             >
               {t('users.setExtension')}
@@ -139,14 +139,14 @@ function UserRow({
           )}
           <button
             type="button"
-            className="ms-2 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+            className="btn-ghost btn-sm ms-2"
             onClick={() => setPanel(panel === 'password' ? 'none' : 'password')}
           >
             {t('users.resetPassword')}
           </button>
           <button
             type="button"
-            className="ms-2 rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+            className="btn-ghost btn-sm ms-2"
             onClick={onToggle}
           >
             {user.isActive ? t('users.disable') : t('users.enable')}
@@ -155,8 +155,8 @@ function UserRow({
       </tr>
 
       {panel !== 'none' && (
-        <tr className="border-t border-slate-100 bg-slate-50">
-          <td colSpan={6} className="px-3 py-3">
+        <tr className="bg-slate-50">
+          <td colSpan={6}>
             {panel === 'extensions' ? (
               <ExtensionForm user={user} onDone={close} onError={onError} />
             ) : (
@@ -191,18 +191,14 @@ function CreateUserForm({
   }
 
   return (
-    <form onSubmit={submit} className="rounded border border-slate-200 bg-white p-4 space-y-3">
-      <h3 className="font-medium">{t('users.addHeading')}</h3>
+    <form onSubmit={submit} className="card card-body space-y-4">
+      <h3 className="text-base font-semibold">{t('users.addHeading')}</h3>
       <div className="grid gap-3 sm:grid-cols-4">
         <Field label={t('users.name')} value={displayName} onChange={setDisplayName} />
         <Field label={t('users.login')} value={login} onChange={setLogin} />
-        <label className="block space-y-1">
-          <span className="text-sm text-slate-600">{t('users.role')}</span>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-2"
-          >
+        <label className="field">
+          <span className="field-label">{t('users.role')}</span>
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="input">
             <option value="Agent">{t('users.roles.Agent')}</option>
             <option value="Supervisor">{t('users.roles.Supervisor')}</option>
           </select>
@@ -212,7 +208,7 @@ function CreateUserForm({
       <button
         type="submit"
         disabled={busy || !login.trim() || !displayName.trim() || password.length < 8}
-        className="rounded bg-brand-600 px-3 py-2 text-white disabled:opacity-50"
+        className="btn-primary"
       >
         {t('users.add')}
       </button>
@@ -262,7 +258,7 @@ function ExtensionForm({
       <button
         type="submit"
         disabled={save.isPending || !extension.trim()}
-        className="rounded bg-brand-600 px-3 py-2 text-white disabled:opacity-50"
+        className="btn-primary"
       >
         {t('users.save')}
       </button>
@@ -302,7 +298,7 @@ function PasswordForm({
       <button
         type="submit"
         disabled={save.isPending || newPassword.length < 8}
-        className="rounded bg-brand-600 px-3 py-2 text-white disabled:opacity-50"
+        className="btn-primary"
       >
         {t('users.save')}
       </button>
@@ -325,15 +321,15 @@ function Field({
   placeholder?: string
 }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-sm text-slate-600">{label}</span>
+    <label className="field">
+      <span className="field-label">{label}</span>
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         autoComplete="off"
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded border border-slate-300 px-3 py-2"
+        className="input"
       />
     </label>
   )

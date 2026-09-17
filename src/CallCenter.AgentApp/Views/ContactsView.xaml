@@ -18,8 +18,6 @@
     <!-- One box for name, address or number: the server works out which. -->
     <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
       <TextBox Width="320"
-               Padding="8,6"
-               FontSize="14"
                Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                ToolTip="{Binding Localizer[contacts.searchHint]}">
         <TextBox.InputBindings>
@@ -29,31 +27,24 @@
 
       <Button Content="{Binding Localizer[contacts.search]}"
               Margin="8,0,0,0"
-              Padding="14,6"
-              Cursor="Hand"
               Command="{Binding SearchCommand}" />
     </StackPanel>
 
     <Button Grid.Row="0" Grid.Column="1"
             Content="{Binding Localizer[contacts.new]}"
-            Padding="14,6"
-            Cursor="Hand"
-            Background="#1D4ED8"
-            Foreground="White"
-            BorderThickness="0"
+            Style="{StaticResource PrimaryButton}"
             Command="{Binding NewCommand}" />
 
     <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
                Text="{Binding StatusMessage}"
                Margin="0,10,0,0"
-               Opacity="0.7"
+               Foreground="{StaticResource InkMuted}"
                Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
 
     <!-- Results -->
     <ListView Grid.Row="2" Grid.Column="0"
               Margin="0,12,12,0"
-              ItemsSource="{Binding Results}"
-              BorderBrush="#E5E7EB">
+              ItemsSource="{Binding Results}">
       <ListView.View>
         <GridView>
           <!-- GridViewColumn sits outside the visual tree, so its header cannot
@@ -66,8 +57,7 @@
               <DataTemplate>
                 <Button Content="{Binding DataContext.Localizer[contacts.edit],
                                   RelativeSource={RelativeSource AncestorType=ListView}}"
-                        Padding="8,2"
-                        Cursor="Hand"
+                        Style="{StaticResource SmallButton}"
                         Command="{Binding DataContext.EditCommand,
                                   RelativeSource={RelativeSource AncestorType=ListView}}"
                         CommandParameter="{Binding}" />
@@ -82,18 +72,15 @@
     <Border Grid.Row="2" Grid.Column="1"
             Width="320"
             Margin="0,12,0,0"
-            Padding="16"
             VerticalAlignment="Top"
-            Background="White"
-            BorderBrush="#E5E7EB"
-            BorderThickness="1"
-            CornerRadius="6"
+            Style="{StaticResource Card}"
             Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
       <StackPanel>
 
-        <TextBlock Text="{Binding Localizer[contacts.name]}" />
-        <TextBox Padding="6,4"
-                 Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
+        <TextBlock Text="{Binding Localizer[contacts.name]}"
+                   Style="{StaticResource FieldLabel}"
+                   Margin="0,0,0,4" />
+        <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
                  LostFocus="OnNameLostFocus" />
 
         <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
@@ -114,9 +101,7 @@
                     <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
                                       RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                             HorizontalAlignment="Left"
-                            Padding="6,1"
-                            FontSize="10"
-                            Cursor="Hand"
+                            Style="{StaticResource SmallButton}"
                             Command="{Binding DataContext.AddToExistingCommand,
                                       RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                             CommandParameter="{Binding}" />
@@ -127,34 +112,28 @@
           </StackPanel>
         </Border>
 
-        <TextBlock Text="{Binding Localizer[contacts.phone]}" Margin="0,10,0,0" />
-        <TextBox Padding="6,4" Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBlock Text="{Binding Localizer[contacts.phone]}" Style="{StaticResource FieldLabel}" />
+        <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}" />
 
-        <TextBlock Text="{Binding Localizer[contacts.address]}" Margin="0,10,0,0" />
-        <TextBox Padding="6,4" Text="{Binding Address}" />
+        <TextBlock Text="{Binding Localizer[contacts.address]}" Style="{StaticResource FieldLabel}" />
+        <TextBox Text="{Binding Address}" />
 
-        <TextBlock Text="{Binding Localizer[contacts.deliveryNotes]}" Margin="0,10,0,0" />
-        <TextBox Padding="6,4" Text="{Binding DeliveryNotes}" />
+        <TextBlock Text="{Binding Localizer[contacts.deliveryNotes]}" Style="{StaticResource FieldLabel}" />
+        <TextBox Text="{Binding DeliveryNotes}" />
 
-        <TextBlock Text="{Binding Localizer[contacts.notes]}" Margin="0,10,0,0" />
-        <TextBox Padding="6,4"
-                 Height="60"
+        <TextBlock Text="{Binding Localizer[contacts.notes]}" Style="{StaticResource FieldLabel}" />
+        <TextBox Height="60"
                  AcceptsReturn="True"
                  TextWrapping="Wrap"
+                 VerticalContentAlignment="Top"
                  Text="{Binding Notes}" />
 
         <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
           <Button Content="{Binding Localizer[contacts.save]}"
-                  Padding="14,6"
-                  Cursor="Hand"
-                  Background="#1D4ED8"
-                  Foreground="White"
-                  BorderThickness="0"
+                  Style="{StaticResource PrimaryButton}"
                   Command="{Binding SaveCommand}" />
           <Button Content="{Binding Localizer[contacts.cancel]}"
                   Margin="8,0,0,0"
-                  Padding="14,6"
-                  Cursor="Hand"
                   Command="{Binding CancelCommand}" />
         </StackPanel>
 

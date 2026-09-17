@@ -13,7 +13,7 @@
     <!-- Status bar -->
     <Border DockPanel.Dock="Bottom"
             Background="{StaticResource StatusBarBrush}"
-            Padding="12,6">
+            Padding="16,8">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto" />
@@ -24,7 +24,7 @@
 
         <StackPanel Grid.Column="0" Orientation="Horizontal">
           <Ellipse x:Name="ConnectionStatusLight"
-                   Width="10" Height="10"
+                   Width="9" Height="9"
                    Fill="#EF4444"
                    VerticalAlignment="Center"
                    Margin="0,0,8,0" />
@@ -54,7 +54,7 @@
 
     <!-- Shell content: the login screen until the agent signs in, then the
          signed-in view. Tabs are added with their features. -->
-    <ContentControl x:Name="ShellContent" />
+    <ContentControl x:Name="ShellContent" Background="{StaticResource Canvas}" />
 
   </DockPanel>
 </Window>

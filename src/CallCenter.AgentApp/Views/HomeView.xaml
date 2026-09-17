@@ -8,9 +8,9 @@
 
     <!-- Header: who is signed in, and the way out. -->
     <Border DockPanel.Dock="Top"
-            Padding="16,12"
-            Background="White"
-            BorderBrush="#E5E7EB"
+            Padding="20,14"
+            Background="{StaticResource Surface}"
+            BorderBrush="{StaticResource Border}"
             BorderThickness="0,0,0,1">
       <Grid>
         <Grid.ColumnDefinitions>
@@ -20,26 +20,26 @@
         </Grid.ColumnDefinitions>
 
         <StackPanel Grid.Column="0">
-          <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding PhoneSummary}" FontSize="12" Opacity="0.6" Margin="0,2,0,0" />
+          <TextBlock Text="{Binding DisplayName}" Style="{StaticResource TitleText}" />
+          <TextBlock Text="{Binding PhoneSummary}"
+                     FontSize="{StaticResource FontSizeSmall}"
+                     Foreground="{StaticResource InkMuted}"
+                     Margin="0,3,0,0" />
 
           <!-- Whether the PBX currently knows where to send calls (A-02). -->
-          <TextBlock Text="{Binding RegistrationSummary}" FontSize="11" Margin="0,4,0,0" />
+          <TextBlock Text="{Binding RegistrationSummary}"
+                     FontSize="{StaticResource FontSizeSmall}"
+                     Foreground="{StaticResource InkMuted}"
+                     Margin="0,3,0,0" />
         </StackPanel>
 
         <Button Grid.Column="1"
                 Content="{Binding Localizer[app.language]}"
                 Margin="0,0,8,0"
-                Padding="10,7"
-                Cursor="Hand"
-                Background="Transparent"
-                BorderBrush="#D1D5DB"
                 Command="{Binding ToggleLanguageCommand}" />
 
         <Button Grid.Column="2"
                 Content="{Binding Localizer[home.signOut]}"
-                Padding="14,7"
-                Cursor="Hand"
                 Command="{Binding SignOutCommand}"
                 IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
       </Grid>

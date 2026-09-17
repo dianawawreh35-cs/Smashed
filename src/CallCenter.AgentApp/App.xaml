@@ -4,10 +4,11 @@
              xmlns:views="clr-namespace:CallCenter.AgentApp.Views">
   <Application.Resources>
     <ResourceDictionary>
-      <!-- Arabic-first UI: the shell sets FlowDirection to RightToLeft. -->
-      <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
-      <SolidColorBrush x:Key="StatusBarBrush" Color="#1F2937" />
-      <SolidColorBrush x:Key="StatusBarTextBrush" Color="#F9FAFB" />
+      <ResourceDictionary.MergedDictionaries>
+        <!-- Colours, typography and the control styles. Keyless styles in there
+             apply by type, so views pick them up without being rewritten. -->
+        <ResourceDictionary Source="Theme.xaml" />
+      </ResourceDictionary.MergedDictionaries>
 
       <views:BoolToVisibilityConverter x:Key="BoolToVisibility" />
       <views:InverseBoolConverter x:Key="InverseBool" />

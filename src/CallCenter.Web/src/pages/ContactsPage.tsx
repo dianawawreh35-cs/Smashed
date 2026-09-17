@@ -38,11 +38,7 @@ export default function ContactsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">{t('contacts.heading')}</h2>
-        <button
-          type="button"
-          onClick={() => setEditing('new')}
-          className="rounded bg-brand-600 px-3 py-2 text-white text-sm"
-        >
+        <button type="button" onClick={() => setEditing('new')} className="btn-primary">
           {t('contacts.add')}
         </button>
       </div>
@@ -53,7 +49,7 @@ export default function ContactsPage() {
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('contacts.searchPlaceholder')}
         aria-label={t('contacts.search')}
-        className="w-full max-w-md rounded border border-slate-300 px-3 py-2"
+        className="input max-w-md"
       />
 
       {editing && (
@@ -93,39 +89,33 @@ function ContactTable({
   })
 
   return (
-    <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-slate-600">
+    <div className="card overflow-x-auto">
+      <table className="table">
+        <thead>
           <tr>
-            <th className="px-3 py-2 text-start">{t('contacts.name')}</th>
-            <th className="px-3 py-2 text-start">{t('contacts.phones')}</th>
-            <th className="px-3 py-2 text-start">{t('contacts.address')}</th>
-            <th className="px-3 py-2" />
+            <th>{t('contacts.name')}</th>
+            <th>{t('contacts.phones')}</th>
+            <th>{t('contacts.address')}</th>
+            <th />
           </tr>
         </thead>
         <tbody>
           {contacts.map((contact) => (
-            <tr key={contact.id} className="border-t border-slate-100">
-              <td className="px-3 py-2">
+            <tr key={contact.id}>
+              <td className="font-medium">
                 {contact.name ?? <span className="text-slate-400">{t('contacts.noName')}</span>}
-                {contact.isVip && (
-                  <span className="ms-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
-                    {t('contacts.vip')}
-                  </span>
-                )}
+                {contact.isVip && <span className="badge-vip ms-2">{t('contacts.vip')}</span>}
                 {contact.isBlocked && (
-                  <span className="ms-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-800">
-                    {t('contacts.blocked')}
-                  </span>
+                  <span className="badge-blocked ms-2">{t('contacts.blocked')}</span>
                 )}
               </td>
-              <td className="px-3 py-2 text-slate-600">{contact.phones.join(' · ')}</td>
-              <td className="px-3 py-2 text-slate-600">{contact.address}</td>
-              <td className="px-3 py-2 text-end">
+              <td className="tabular text-slate-600">{contact.phones.join(' · ')}</td>
+              <td className="text-slate-600">{contact.address}</td>
+              <td className="text-end">
                 <button
                   type="button"
                   onClick={() => open.mutate(contact.id)}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+                  className="btn-ghost btn-sm"
                 >
                   {t('contacts.edit')}
                 </button>
@@ -211,11 +201,13 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
   const hasNumber = phones.some((p) => p.trim())
 
   return (
-    <form onSubmit={submit} className="rounded border border-slate-200 bg-white p-4 space-y-4">
-      <h3 className="font-medium">{contact ? t('contacts.editHeading') : t('contacts.addHeading')}</h3>
+    <form onSubmit={submit} className="card card-body space-y-5">
+      <h3 className="text-base font-semibold">
+        {contact ? t('contacts.editHeading') : t('contacts.addHeading')}
+      </h3>
 
       {error && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div role="alert" className="notice-error">
           <p>{error}</p>
           {/* The server says which contact already holds the number, so the
               answer can be "open that one" rather than a dead end (A-63). */}
@@ -237,8 +229,8 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
 
       {/* A matching name is a prompt to look, not an obstacle (A-63). */}
       {sameName && sameName.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
-          <p className="text-amber-900">{t('contacts.sameNameWarning', { count: sameName.length })}</p>
+        <div className="notice-warning">
+          <p className="font-medium">{t('contacts.sameNameWarning', { count: sameName.length })}</p>
           <ul className="mt-2 space-y-1">
             {sameName.map((match) => (
               <li key={match.id} className="flex flex-wrap items-center gap-2">
@@ -251,7 +243,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
                     type="button"
                     onClick={() => addNumber.mutate(match.id)}
                     disabled={addNumber.isPending}
-                    className="rounded border border-amber-400 bg-white px-2 py-0.5 text-xs"
+                    className="btn-ghost btn-sm border-amber-400"
                   >
                     {t('contacts.addNumberToThem')}
                   </button>
@@ -273,13 +265,13 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
               onChange={(e) =>
                 setPhones(phones.map((p, i) => (i === index ? e.target.value : p)))
               }
-              className="w-full rounded border border-slate-300 px-3 py-2"
+              className="input tabular"
             />
             {phones.length > 1 && (
               <button
                 type="button"
                 onClick={() => setPhones(phones.filter((_, i) => i !== index))}
-                className="rounded border border-slate-300 px-2 text-sm"
+                className="btn-ghost btn-sm"
                 aria-label={t('contacts.removePhone')}
               >
                 ×
@@ -290,7 +282,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
         <button
           type="button"
           onClick={() => setPhones([...phones, ''])}
-          className="text-sm text-brand-600"
+          className="text-sm font-medium text-brand-700 hover:text-brand-800"
         >
           {t('contacts.addPhone')}
         </button>
@@ -303,14 +295,10 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
       </div>
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={save.isPending || !hasNumber}
-          className="rounded bg-brand-600 px-4 py-2 text-white disabled:opacity-50"
-        >
+        <button type="submit" disabled={save.isPending || !hasNumber} className="btn-primary">
           {t('contacts.save')}
         </button>
-        <button type="button" onClick={onClose} className="rounded border border-slate-300 px-4 py-2">
+        <button type="button" onClick={onClose} className="btn-ghost">
           {t('contacts.cancel')}
         </button>
       </div>
@@ -328,13 +316,9 @@ function Field({
   onChange: (value: string) => void
 }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-sm text-slate-600">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded border border-slate-300 px-3 py-2"
-      />
+    <label className="field">
+      <span className="field-label">{label}</span>
+      <input value={value} onChange={(e) => onChange(e.target.value)} className="input" />
     </label>
   )
 }

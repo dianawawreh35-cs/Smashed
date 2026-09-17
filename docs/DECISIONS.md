@@ -186,10 +186,10 @@ reboot).
   the internet would need a domain name and TLS on 443 behind a reverse proxy,
   and the authentication guards that App.tsx still marks as placeholders.
 
-### Open items
+### Open items raised on 2026-09-14 (historical — see "Open items (live)" at the end of this file)
 
-- The SIPSorcery advisory above needs a decision: accept the risk on 8.x, or
-  move the agent app to .NET 10.
+- ~~The SIPSorcery advisory above needs a decision: accept the risk on 8.x, or
+  move the agent app to .NET 10.~~ **Resolved 2026-09-17:** moved to .NET 10.
 - `contact_phones.last9` is a stored generated column (`right(normalised, 9)`).
   EF Core 8 must map it as computed/read-only (`ValueGeneratedOnAddOrUpdate`),
   and the `pgcrypto` extension plus the GIN index on
@@ -329,3 +329,86 @@ from 2.1.12.
 a README — no DbContext, no database file, no code path that opens SQLite. It
 should be pinned when the offline buffer is built, and that work must not start
 without doing so.
+
+---
+
+# How this project is tracked
+
+Three files, each with one job. Kept current as part of doing the work, not
+afterwards — a change that is not written down did not happen.
+
+| File | Holds | Updated when |
+|---|---|---|
+| [`SRS-Smashed-Burger-Call-Center.md`](SRS-Smashed-Burger-Call-Center.md) | **What the system must do.** Every requirement has an ID (A-01, S-42, N-04a) and is the contract with the client. | **Any design change.** If behaviour, scope or an assumption changes, the requirement changes with it — in the same commit. A requirement that no longer describes the system is worse than no requirement. |
+| `DECISIONS.md` (this file) | **What was decided and why**, including what was considered and rejected, and what is deferred. | Anything a reader could not work out from the code: a trade-off, a constraint, a deferral, a correction. |
+| `SCHEMA.md` | The database shape. | Any migration. |
+
+Requirement IDs go in commit messages and in code comments. `// A-02` next to a
+retry interval is what stops someone "tidying it up" a year from now.
+
+**Anything finished is recorded here or in the SRS, not left in a conversation.**
+Chat is not a record.
+
+---
+
+# Open items (live)
+
+Kept current. Resolved entries are deleted, not ticked — the decision log above
+is where history belongs.
+
+### Must fix before handover
+
+- **No password recovery for a locked-out supervisor.** There is no self-service
+  reset, and the reset screen is behind supervisor login. The seed command
+  refuses once any user exists. Today that means a lockout needs direct database
+  access. Either a `reset-password` command alongside `seed`, or a documented
+  procedure. Hit for real on 2026-09-17 when the September 14 password was not
+  recoverable.
+- **`SQLitePCLRaw.lib.e_sqlite3` 2.1.6 carries CVE-2025-6965** (high, memory
+  corruption), arriving through EF Core Sqlite in the Agent App. Nothing reaches
+  it — the offline buffer is still a README. **The offline-buffer work must not
+  start without pinning this first.** Fixed versions exist from 2.1.12.
+- **The server still targets `net8.0`**, Dockerfile included, and .NET 8 leaves
+  support in **November 2026**. The Agent App moved to .NET 10 on 2026-09-17;
+  the server is a separate, deliberate piece of work.
+- **Ask the client's IT about executable policy.** `dotnet run` was blocked on
+  the developer's own machine with *Access is denied* while `dotnet <dll>`
+  worked. The same policy would block the Agent App installer on the agents'
+  laptops. Code-signing is the usual answer. See `RELEASING.md`.
+
+### Questions for the telephony provider
+
+Section 4.5 and reports R-20/R-21 are deferred until these are answered
+(SRS §12.3). The first is the one that decides whether they are possible at all:
+
+1. Can the **server** have its own VPN connection to the PBX? The agent laptops'
+   VPN does nothing for it, and the server is what talks to AMI or the CDR.
+2. Is **AMI** available (TCP 5038) with a user for us and our server's VPN
+   address permitted?
+3. Read-only access to the **`asteriskcdrdb`** database, or a regular CDR export?
+4. Is incoming customer routing a **queue or a ring group**?
+5. What **VPN uptime and support hours** are agreed, and who is called when the
+   tunnel drops?
+
+### Known gaps in what is built
+
+- **SIP registration is written but never verified against a real PBX.** It
+  compiles and correctly reports "cannot reach the PBX" against a fake host.
+  Whether it registers is unknown until it points at a real one.
+- **Login has no database-backed test.** The suite runs without PostgreSQL by
+  design, so token validation and encryption are covered and the actual login
+  path is not.
+- **The Agent App accepts supervisor logins.** Deliberate while the phone is
+  being built — it is how sign-in was tested before user management existed. The
+  supervisor web app already refuses agents. Close this before handover.
+- **The Agent App's `appsettings.json` has a dead `Sip` section.** Nothing reads
+  `Server`, `Username` or `Password`; they arrive in the login response (A-01).
+  Actively misleading, because it looks like where the PBX is configured.
+  `RtpPortMin`/`RtpPortMax` are real and should stay.
+- **`AgentExtensionsDto` has a stale "Yeastar S20" comment** missed in the
+  Issabel sweep.
+- **`src/CallCenter.Web/tsconfig.app.tsbuildinfo` is committed.** A build
+  artifact; it belongs in `.gitignore`.
+- **No automated check that the two Agent App language files agree.** A missing
+  key degrades to Arabic and then to the raw key rather than crashing, but it
+  would be found by eye rather than by the build.

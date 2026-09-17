@@ -38,5 +38,32 @@
     "registered": "Registered",
     "failed": "Registration refused — ask your supervisor",
     "retrying": "Cannot reach the PBX — retrying"
+  },
+  "nav": {
+    "contacts": "Contacts"
+  },
+  "contacts": {
+    "search": "Search",
+    "searchHint": "Search by name, address or phone number",
+    "new": "New contact",
+    "name": "Name",
+    "phone": "Phone number",
+    "address": "Address",
+    "deliveryNotes": "Delivery notes",
+    "notes": "Notes",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Saved.",
+    "noMatches": "Nothing matched that search.",
+    "offline": "The server could not be reached - contacts are unavailable right now.",
+    "sameName": "There are already contacts with this name",
+    "addToThem": "Add this number to them",
+    "errors": {
+      "duplicate_number": "That number already belongs to another contact.",
+      "no_usable_number": "Enter a valid phone number.",
+      "contact_not_found": "That contact no longer exists.",
+      "server_error": "Could not save. Please try again."
+    }
   }
 }

@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CallCenter.Shared.Contracts.Auth;
+using CallCenter.Shared.Contracts.Contacts;
 using Microsoft.Extensions.Logging;
 
 namespace CallCenter.AgentApp.Services;
@@ -69,6 +70,79 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             () => new HttpRequestMessage(HttpMethod.Post, "api/auth/logout")
             {
                 Content = JsonContent.Create(new LogoutRequest(sessionId, reason)),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>Searches the shared contact list by name, address or number (A-61).</summary>
+    public Task<Result<IReadOnlyList<ContactSummaryDto>>> SearchContactsAsync(
+        string? query, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<ContactSummaryDto>>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get,
+                $"api/contacts?q={Uri.EscapeDataString(query ?? string.Empty)}"),
+            authenticated: true,
+            ct);
+
+    /// <summary>One contact in full (A-62).</summary>
+    public Task<Result<ContactDto>> GetContactAsync(Guid id, CancellationToken ct = default) =>
+        SendAsync<ContactDto>(
+            () => new HttpRequestMessage(HttpMethod.Get, $"api/contacts/{id}"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// The contact a number belongs to (A-10, A-13). The lookup the
+    /// incoming-call pop-up will use; a NotFound result means "New customer".
+    /// </summary>
+    public Task<Result<ContactDto>> FindContactByPhoneAsync(
+        string number, CancellationToken ct = default) =>
+        SendAsync<ContactDto>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get, $"api/contacts/by-phone?number={Uri.EscapeDataString(number)}"),
+            authenticated: true,
+            ct);
+
+    /// <summary>Contacts that already carry this name — the warning in A-63.</summary>
+    public Task<Result<IReadOnlyList<ContactSummaryDto>>> FindContactsByNameAsync(
+        string name, Guid? excluding = null, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<ContactSummaryDto>>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get,
+                $"api/contacts/by-name?name={Uri.EscapeDataString(name)}"
+                + (excluding is null ? string.Empty : $"&excluding={excluding}")),
+            authenticated: true,
+            ct);
+
+    /// <summary>Creates a contact (A-63).</summary>
+    public Task<Result<ContactDto>> CreateContactAsync(
+        UpsertContactRequest request, CancellationToken ct = default) =>
+        SendAsync<ContactDto>(
+            () => new HttpRequestMessage(HttpMethod.Post, "api/contacts")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>Replaces a contact's details and numbers (A-63).</summary>
+    public Task<Result<ContactDto>> UpdateContactAsync(
+        Guid id, UpsertContactRequest request, CancellationToken ct = default) =>
+        SendAsync<ContactDto>(
+            () => new HttpRequestMessage(HttpMethod.Put, $"api/contacts/{id}")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>Adds one number to a contact that already exists (A-63).</summary>
+    public Task<Result<ContactDto>> AddContactPhoneAsync(
+        Guid id, string number, CancellationToken ct = default) =>
+        SendAsync<ContactDto>(
+            () => new HttpRequestMessage(HttpMethod.Post, $"api/contacts/{id}/phones")
+            {
+                Content = JsonContent.Create(new AddPhoneRequest(number)),
             },
             authenticated: true,
             ct);

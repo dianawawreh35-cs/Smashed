@@ -11,6 +11,7 @@
 
       <views:BoolToVisibilityConverter x:Key="BoolToVisibility" />
       <views:InverseBoolConverter x:Key="InverseBool" />
+      <views:NotNullToVisibilityConverter x:Key="NotNullToVisibility" />
     </ResourceDictionary>
   </Application.Resources>
 </Application>

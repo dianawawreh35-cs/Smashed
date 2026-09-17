@@ -70,7 +70,7 @@ public partial class MainWindow : Window
         var viewModel = _services.GetRequiredService<HomeViewModel>();
         viewModel.SignedOut += (_, _) => ShowLogin();
 
-        ShellContent.Content = new HomeView(viewModel);
+        ShellContent.Content = new HomeView(viewModel, _services);
 
         SignedInAsText.Text = _session.User?.DisplayName ?? string.Empty;
         SignedInAsText.Visibility = Visibility.Visible;

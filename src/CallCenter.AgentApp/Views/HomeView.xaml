@@ -45,14 +45,9 @@
       </Grid>
     </Border>
 
-    <!-- Replaced by the softphone, call log, contacts and app orders tabs. -->
-    <Grid>
-      <TextBlock Text="{Binding Localizer[app.title]}"
-                 FontSize="22"
-                 Opacity="0.35"
-                 HorizontalAlignment="Center"
-                 VerticalAlignment="Center" />
-    </Grid>
+    <!-- The agent's work. The softphone, call log and app orders tabs join
+         contacts here as they are built. -->
+    <TabControl x:Name="Tabs" BorderThickness="0" Background="#F9FAFB" />
 
   </DockPanel>
 </UserControl>

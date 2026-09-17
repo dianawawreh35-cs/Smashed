@@ -103,6 +103,7 @@ public partial class App : Application
 
         services.AddTransient<LoginViewModel>();
         services.AddTransient<HomeViewModel>();
+        services.AddTransient<ContactsViewModel>();
 
         services.AddSingleton<MainWindow>();
     }

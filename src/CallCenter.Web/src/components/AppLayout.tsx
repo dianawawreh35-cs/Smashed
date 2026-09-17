@@ -27,6 +27,9 @@ export default function AppLayout() {
             <Link to="/dashboard" className="text-slate-600 hover:text-slate-900">
               {t('nav.dashboard')}
             </Link>
+            <Link to="/contacts" className="text-slate-600 hover:text-slate-900">
+              {t('nav.contacts')}
+            </Link>
             <Link to="/users" className="text-slate-600 hover:text-slate-900">
               {t('nav.users')}
             </Link>

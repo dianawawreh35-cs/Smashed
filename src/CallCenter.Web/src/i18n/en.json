@@ -124,5 +124,39 @@
         "hint": "The agents and branch extension numbers, comma separated. A call with one of these is recorded as usual but left out of the customer reports (S-48)."
       }
     }
+  },
+  "contacts": {
+    "heading": "Contacts",
+    "search": "Search",
+    "searchPlaceholder": "Search by name, address or phone number",
+    "add": "Add contact",
+    "addHeading": "New contact",
+    "editHeading": "Edit contact",
+    "name": "Name",
+    "noName": "No name",
+    "address": "Address",
+    "phones": "Phone numbers",
+    "phoneNumber": "Phone number {{index}}",
+    "addPhone": "+ Add a number",
+    "removePhone": "Remove this number",
+    "phoneHint": "Any format: 059… or +97059… — the system treats them as one number.",
+    "notes": "Notes",
+    "deliveryNotes": "Delivery notes",
+    "vip": "VIP",
+    "blocked": "Blocked",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "empty": "No contacts yet.",
+    "noMatches": "Nothing matched that search.",
+    "duplicateHolder": "{{number}} already belongs to: {{name}}",
+    "errors": {
+      "duplicate_number": "That number already belongs to another contact.",
+      "no_usable_number": "Enter at least one phone number.",
+      "contact_not_found": "That contact no longer exists.",
+      "invalid_request": "The contact could not be saved. Check the fields.",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "The server reported an error. Please try again."
+    }
   }
 }

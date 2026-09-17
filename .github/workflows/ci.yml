@@ -14,15 +14,18 @@ env:
 jobs:
   server:
     name: .NET build & test
-    # windows-latest so the WPF Agent App (net8.0-windows) builds too.
+    # windows-latest so the WPF Agent App (net10.0-windows) builds too.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up .NET 8
+      # Both: the Agent App is net10.0-windows, everything else is net8.0.
+      - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore
         run: dotnet restore CallCenter.sln

@@ -274,3 +274,58 @@ that question is worth asking early even though the work is deferred.
 Issabel itself is not the obstacle: AMI is part of Asterisk and Issabel enables
 it by default on TCP 5038, and the CDR lives in the `cdr` table of
 `asteriskcdrdb`. What is unknown is what the *provider* will grant.
+
+---
+
+## 2026-09-17 — The Agent App moves to .NET 10
+
+`SIPSorcery` 8.0.23 carries **GHSA-28gm-jrmw-xx93**: a malformed UDP packet on
+the RTP/ICE socket ends an active media session. That is the socket carrying
+call audio, so it is squarely in the path this project is about to build on.
+Fixed in 10.0.9. A second advisory, **GHSA-jwjp-4649-v8jp**, is in the WebRTC
+data channels and does not apply here.
+
+The earlier note in this file said the choice was "accept the risk on 8.x, or
+move the agent app to .NET 10". That was right, though the reason is narrower
+than it sounds: **`SIPSorcery` 10.0.16 targets `net8.0` perfectly well.** It is
+**`SIPSorceryMedia.Windows`** — the Windows microphone and speaker endpoints —
+that ships `net10.0-windows` only from 10.0.5, and there is no 9.x: the line
+jumps 8.0.14 → 10.0.5.
+
+### What moved, and what did not
+
+Only `CallCenter.AgentApp`, to `net10.0-windows10.0.17763.0`. The server, the
+shared library, both test projects and the simulator stay on `net8.0`; a net10
+app references a net8.0 library without trouble. `global.json` had to allow the
+.NET 10 SDK, and both CI workflows now install 8 and 10 — `release.yml` needs it
+even though it only tests net8.0 projects, because `global.json` applies to the
+whole repository.
+
+### Why now rather than later
+
+The deciding argument was not the advisory. **There is no SIP code yet**, and
+the 8.x and 10.x APIs differ; moving before writing the registration layer costs
+one line, and moving after it costs a rewrite. **.NET 8 also leaves support in
+November 2026**, so this was weeks away regardless.
+
+The server still targets net8.0 and its Dockerfile still uses 8.0 images. That
+move is not urgent today but should be deliberate, and before November.
+
+### Distribution
+
+The app is published **self-contained** (`--self-contained true`), about 185 MB
+with the runtime bundled, so the four laptops need no .NET runtime installed.
+See `docs/RELEASING.md`. This also avoids adding a runtime prerequisite to an
+install that may already run into executable-blocking policies.
+
+### Still open — SQLite
+
+Fixing SIPSorcery left `SQLitePCLRaw.lib.e_sqlite3` 2.1.6 visible, carrying
+**CVE-2025-6965** (high, memory corruption). It arrives transitively through
+`Microsoft.EntityFrameworkCore.Sqlite` in the Agent App. Fixed versions exist
+from 2.1.12.
+
+**Not fixed yet, deliberately:** nothing reaches it. The offline buffer is still
+a README — no DbContext, no database file, no code path that opens SQLite. It
+should be pinned when the offline buffer is built, and that work must not start
+without doing so.

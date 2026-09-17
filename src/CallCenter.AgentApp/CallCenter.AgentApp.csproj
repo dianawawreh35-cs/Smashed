@@ -2,7 +2,12 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <!-- .NET 10, not 8: SIPSorceryMedia.Windows ships only net10.0-windows from
+         10.0.5 onwards, and the 8.x line carries GHSA-28gm-jrmw-xx93 in the RTP
+         path that carries call audio. .NET 8 also leaves support in November
+         2026. The rest of the solution stays on net8.0 - a net10 app references
+         a net8.0 library without trouble. -->
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <RootNamespace>CallCenter.AgentApp</RootNamespace>
     <AssemblyName>CallCenter.AgentApp</AssemblyName>

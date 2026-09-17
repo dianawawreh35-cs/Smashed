@@ -37,10 +37,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up .NET 8
+      # Only net8.0 projects are tested here, but global.json pins the SDK for
+      # the whole repository, so the .NET 10 SDK has to be present as well.
+      - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Shared tests
         run: dotnet test tests/CallCenter.Shared.Tests --configuration Release

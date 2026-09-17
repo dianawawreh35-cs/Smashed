@@ -27,6 +27,17 @@
   "status": {
     "notSignedIn": "Not signed in",
     "signedIn": "Signed in",
-    "noExtensions": "Signed in — no extensions configured"
+    "noExtensions": "Signed in — no extensions configured",
+    "registering": "Registering extensions…",
+    "registered": "Phone ready",
+    "registrationFailed": "Extensions refused — ask your supervisor",
+    "retrying": "Cannot reach the PBX — retrying"
+  },
+  "sip": {
+    "idle": "Not registered",
+    "registering": "Registering…",
+    "registered": "Registered",
+    "failed": "Registration refused — ask your supervisor",
+    "retrying": "Cannot reach the PBX — retrying"
   }
 }

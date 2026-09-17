@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Media;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Localization;
+using CallCenter.AgentApp.Services.Sip;
 using CallCenter.AgentApp.ViewModels;
 using CallCenter.AgentApp.Views;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,17 +19,20 @@ public partial class MainWindow : Window
     private readonly IServiceProvider _services;
     private readonly AgentSession _session;
     private readonly Localizer _localizer;
+    private readonly SipRegistrationService _sip;
 
     /// <summary>The status-bar label key, kept so it can be re-read on a language change.</summary>
     private string _statusKey = "status.notSignedIn";
 
-    public MainWindow(IServiceProvider services, AgentSession session, Localizer localizer)
+    public MainWindow(
+        IServiceProvider services, AgentSession session, Localizer localizer, SipRegistrationService sip)
     {
         InitializeComponent();
 
         _services = services;
         _session = session;
         _localizer = localizer;
+        _sip = sip;
 
         // The window's own labels bind through the localizer.
         DataContext = this;
@@ -38,6 +42,9 @@ public partial class MainWindow : Window
         // The status bar is set from code rather than bound, so it has to be
         // told to re-read itself when the language changes.
         localizer.LanguageChanged += (_, _) => ConnectionStatusText.Text = localizer[_statusKey];
+
+        // Registration happens on background threads, so hop to the UI thread.
+        sip.Changed += (_, _) => Dispatcher.Invoke(RefreshPhoneStatus);
 
         ShowLogin();
     }
@@ -68,16 +75,49 @@ public partial class MainWindow : Window
         SignedInAsText.Text = _session.User?.DisplayName ?? string.Empty;
         SignedInAsText.Visibility = Visibility.Visible;
 
-        // Amber rather than green while the phone is unconfigured: the agent is
-        // signed in, but no call will arrive until the supervisor fills in the
-        // extensions (A-01, A-02).
-        if (_session.HasPhone)
+        RefreshPhoneStatus();
+    }
+
+    /// <summary>
+    /// The status bar, from the registration state (A-02). The colour says
+    /// whether calls can arrive; the text says what to do if they cannot.
+    /// </summary>
+    private void RefreshPhoneStatus()
+    {
+        if (!_session.IsSignedIn)
         {
-            SetConnectionStatus("status.signedIn", "#22C55E");
+            SetConnectionStatus("status.notSignedIn", "#EF4444");
+            return;
+        }
+
+        // Signed in, but the supervisor has not assigned extensions yet. The
+        // agent can still use contacts and app orders, so amber, not red.
+        if (!_session.HasPhone)
+        {
+            SetConnectionStatus("status.noExtensions", "#F59E0B");
+            return;
+        }
+
+        var customer = _sip.Customer?.Status ?? RegistrationStatus.Idle;
+        var internalExt = _sip.Internal?.Status ?? RegistrationStatus.Idle;
+
+        // A refusal outranks everything else: it will not fix itself, and the
+        // agent needs their supervisor rather than to keep waiting.
+        if (customer == RegistrationStatus.Failed || internalExt == RegistrationStatus.Failed)
+        {
+            SetConnectionStatus("status.registrationFailed", "#EF4444");
+        }
+        else if (customer == RegistrationStatus.Registered && internalExt == RegistrationStatus.Registered)
+        {
+            SetConnectionStatus("status.registered", "#22C55E");
+        }
+        else if (customer == RegistrationStatus.Retrying || internalExt == RegistrationStatus.Retrying)
+        {
+            SetConnectionStatus("status.retrying", "#F59E0B");
         }
         else
         {
-            SetConnectionStatus("status.noExtensions", "#F59E0B");
+            SetConnectionStatus("status.registering", "#F59E0B");
         }
     }
 

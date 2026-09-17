@@ -1,3 +1,4 @@
+using CallCenter.AgentApp.Services.Sip;
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Logging;
 
@@ -11,6 +12,7 @@ public class SignInService(
     ApiClient api,
     AgentSession session,
     AgentSettingsStore settings,
+    SipRegistrationService sip,
     ILogger<SignInService> logger)
 {
     /// <summary>
@@ -45,6 +47,13 @@ public class SignInService(
         // Remembered so the next shift on this laptop only types a password.
         settings.Update(s => s with { LastLogin = login.Trim() });
 
+        if (session.Extensions is { } extensions)
+        {
+            // The phone comes up as soon as the agent is in, rather than waiting
+            // for them to do something (A-02).
+            sip.Start(extensions);
+        }
+
         if (!session.HasPhone)
         {
             // Not a failed sign-in: the agent can still use contacts and the app
@@ -64,6 +73,10 @@ public class SignInService(
     /// </summary>
     public async Task SignOutAsync(string reason = LogoutReasons.Manual, CancellationToken ct = default)
     {
+        // Unregister first, so the PBX stops offering calls to this laptop
+        // before the agent is told they are signed out.
+        sip.Stop();
+
         if (session.SessionId is { } sessionId)
         {
             await api.LogoutAsync(sessionId, reason, ct);

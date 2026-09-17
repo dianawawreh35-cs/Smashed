@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Localization;
+using CallCenter.AgentApp.Services.Sip;
 using CallCenter.AgentApp.ViewModels;
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Configuration;
@@ -87,6 +88,7 @@ public partial class App : Application
         services.AddSingleton<AgentSession>();
         services.AddSingleton<AgentSettingsStore>();
         services.AddSingleton<Localizer>();
+        services.AddSingleton<SipRegistrationService>();
         services.AddSingleton<SignInService>();
 
         services.AddHttpClient<ApiClient>(ApiClient.HttpClientName, (provider, client) =>

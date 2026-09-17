@@ -125,6 +125,57 @@ describe('contacts page', () => {
     expect(alert).toHaveTextContent('Ahmad')
   })
 
+  it('warns when the name already exists, without blocking the save', async () => {
+    // A-63: a matching name is a prompt to look, never a refusal - two
+    // customers may genuinely share a name.
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        String(url).includes('by-name')
+          ? jsonResponse([AHMAD])
+          : jsonResponse([]),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Add contact' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ahmad' } })
+    fireEvent.change(screen.getByLabelText('Phone number 1'), { target: { value: '0599222333' } })
+
+    expect(await screen.findByText(/already 1 contact with this name/i)).toBeInTheDocument()
+
+    // The existing contact is shown with enough to recognise them by.
+    expect(screen.getByText(/0599123456/)).toBeInTheDocument()
+
+    // And saving is still allowed.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('can add the number to the contact that already has the name', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('by-name')) return Promise.resolve(jsonResponse([AHMAD]))
+      if (init?.method === 'POST') return Promise.resolve(jsonResponse({ id: 'c1' }))
+      return Promise.resolve(jsonResponse([]))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Add contact' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ahmad' } })
+    fireEvent.change(screen.getByLabelText('Phone number 1'), { target: { value: '0599222333' } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add this number to them' }))
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, init]) => String(url).includes('/phones') && init?.method === 'POST',
+      )
+      expect(post).toBeDefined()
+      expect(String(post![0])).toBe('/api/contacts/c1/phones')
+      expect(JSON.parse(post![1].body)).toEqual({ number: '0599222333' })
+    })
+  })
+
   it('will not save a contact with no number at all', async () => {
     // A contact with no number could never be matched to a caller.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([])))

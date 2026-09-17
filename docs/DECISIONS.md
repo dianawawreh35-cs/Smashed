@@ -427,6 +427,57 @@ communications), and the screens in both clients.
 
 ---
 
+## 2026-09-17 — Arabic name matching, and the duplicate-name warning
+
+A second contact with the same name used to be saved with no signal at all, so
+two records for one customer could drift apart for months. A-63 now says a
+matching name is a **warning**, never a refusal: the agent is shown the existing
+contacts and chooses — add this number to that person, or save a separate
+contact.
+
+Names are never matched automatically. "أحمد" and "محمد" are common, and
+silently joining two customers would mix their order histories with no way to
+unpick them.
+
+### Exact matching, which required fixing Arabic first
+
+Substring matching was written and then rejected: "Ahmad" would warn about a
+dozen unrelated people every time and be ignored within a week.
+
+But exact matching on the stored name would have been worse — it would almost
+never fire. **PostgreSQL considers `'أحمد' = 'احمد'` false**, confirmed against
+the database, and the same for `ILIKE` and `lower()`. The same Arabic name is
+written several ways: with or without the hamza, `ة` or `ه`, `ى` or `ي`, with or
+without diacritics.
+
+So `CallCenter.Shared.Text.NameNormalizer` folds a name to a comparison form, as
+`PhoneNormalizer` does for numbers, and `contacts.name_normalised` stores it.
+Matching compares that; **the folded form is never displayed**, because it is not
+how anyone spells their name.
+
+The two changes depend on each other: exact matching only works because of the
+folding, and the folding is only safe to rely on because matching is exact.
+
+### Search improved as a side effect
+
+Search now matches the normalised name too, so searching `احمد` finds a contact
+saved as `أحمد`. That was silently broken and would have surfaced as "search does
+not find people" long after anyone remembered why.
+
+### The backfill duplicates the rules, deliberately
+
+Existing rows are not re-saved by the application, so the migration folds them in
+SQL — `translate` for the letter forms and the diacritics, `regexp_replace` for
+spacing. That repeats the C# logic, which is a real risk, so **the SQL was run
+against the database and checked to produce the same output as the C# tests
+expect** for all nine cases.
+
+**The C# version is authoritative** from here: it runs on every save. If the
+rules ever change, the migration is history and must not be edited — write a new
+one.
+
+---
+
 # How this project is tracked
 
 Three files, each with one job. Kept current as part of doing the work, not

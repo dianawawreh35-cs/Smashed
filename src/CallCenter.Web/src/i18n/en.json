@@ -157,6 +157,9 @@
       "invalid_request": "The contact could not be saved. Check the fields.",
       "server_unreachable": "The server could not be reached.",
       "server_error": "The server reported an error. Please try again."
-    }
+    },
+    "sameNameWarning": "There is already {{count}} contact with this name:",
+    "sameNameHint": "If this is the same person, add the number to them. If it is someone else, carry on and save a separate contact.",
+    "addNumberToThem": "Add this number to them"
   }
 }

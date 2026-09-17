@@ -165,7 +165,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | A-60 | Contact fields: name, phone numbers (one or more), address, notes, flags VIP and Blocked (set by the supervisor only, see S-45), created by / date. | Must |
 | A-61 | All agents see all contacts saved by any agent. Search by name, number or address. | Must |
 | A-62 | Contact details page: information plus the full history of communications (calls and app orders) from all agents, with type and notes. Recordings on this page are playable only for the viewing agent's own calls; supervisors can play all. | Must |
-| A-63 | Create and edit contacts; duplicate detection by phone number with an option to merge. | Must |
+| A-63 | Create and edit contacts. A phone number already on another contact is refused, and the refusal names the contact that holds it so the agent can open it instead. A **matching name** is a warning, never a refusal: when a new contact is given a name an existing contact already has, the agent is shown those contacts and chooses — add this number to that person, or save a separate contact. Names are never matched automatically: common names are common, and silently merging two customers would mix their order histories with no way to unpick them. Merging two existing contacts is a separate, deliberate action. | Must |
 | A-64 | Import contacts from Excel/CSV (initial load by the supervisor). | Should |
 
 ### 3.8 App Orders tab (WhatsApp, Facebook, Instagram, delivery apps)

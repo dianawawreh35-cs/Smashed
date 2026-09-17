@@ -3,8 +3,10 @@ import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
+  addPhoneToContact,
   createContact,
   duplicateOf,
+  findContactsByName,
   getContact,
   searchContacts,
   updateContact,
@@ -154,6 +156,30 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
   const [error, setError] = useState<string | null>(null)
   const [duplicate, setDuplicate] = useState<DuplicateNumber | null>(null)
 
+  // Contacts that already carry this name (A-63). Looked up as the name is
+  // typed, so the agent is told before saving rather than afterwards. Never
+  // blocks the save - common names are common, and two customers may genuinely
+  // share one.
+  const { data: sameName } = useQuery({
+    queryKey: ['contacts', 'by-name', name, contact?.id],
+    queryFn: () => findContactsByName(name.trim(), contact?.id),
+    enabled: name.trim().length > 0,
+  })
+
+  const firstNumber = phones.map((p) => p.trim()).find(Boolean) ?? ''
+
+  const addNumber = useMutation({
+    mutationFn: (contactId: string) => addPhoneToContact(contactId, firstNumber),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      onClose()
+    },
+    onError: (e) => {
+      setDuplicate(duplicateOf(e))
+      setError(t(`contacts.errors.${errorCodeOf(e)}`))
+    },
+  })
+
   const save = useMutation({
     mutationFn: () => {
       const request = {
@@ -208,6 +234,34 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
         <Field label={t('contacts.name')} value={name} onChange={setName} />
         <Field label={t('contacts.address')} value={address} onChange={setAddress} />
       </div>
+
+      {/* A matching name is a prompt to look, not an obstacle (A-63). */}
+      {sameName && sameName.length > 0 && (
+        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+          <p className="text-amber-900">{t('contacts.sameNameWarning', { count: sameName.length })}</p>
+          <ul className="mt-2 space-y-1">
+            {sameName.map((match) => (
+              <li key={match.id} className="flex flex-wrap items-center gap-2">
+                <span className="text-slate-700">
+                  {match.name} · {match.phones.join(' · ')}
+                  {match.address ? ` · ${match.address}` : ''}
+                </span>
+                {firstNumber && (
+                  <button
+                    type="button"
+                    onClick={() => addNumber.mutate(match.id)}
+                    disabled={addNumber.isPending}
+                    className="rounded border border-amber-400 bg-white px-2 py-0.5 text-xs"
+                  >
+                    {t('contacts.addNumberToThem')}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-amber-800">{t('contacts.sameNameHint')}</p>
+        </div>
+      )}
 
       <fieldset className="space-y-2 max-w-md">
         <legend className="text-sm text-slate-600">{t('contacts.phones')}</legend>

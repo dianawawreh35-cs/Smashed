@@ -52,6 +52,38 @@ public class ContactsController(ContactsService contacts) : ControllerBase
         return contact is null ? NotFound() : Ok(contact);
     }
 
+    /// <summary>
+    /// Contacts that already carry this name (A-63). The screen calls this
+    /// before saving a new contact, so the agent can be told rather than
+    /// discovering a second Ahmad six months later.
+    /// </summary>
+    /// <remarks>
+    /// A warning, never a refusal: a matching name does not stop the save, and
+    /// nothing is ever merged automatically.
+    /// </remarks>
+    [HttpGet("by-name")]
+    [ProducesResponseType<IReadOnlyList<ContactSummaryDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ContactSummaryDto>>> ByName(
+        [FromQuery] string? name, [FromQuery] Guid? excluding, CancellationToken ct) =>
+        Ok(await contacts.FindByNameAsync(name, excluding, ct));
+
+    /// <summary>
+    /// Adds one number to an existing contact (A-63) — what the agent chooses
+    /// when the name warning turns out to be the same person.
+    /// </summary>
+    [HttpPost("{id:guid}/phones")]
+    [ProducesResponseType<ContactDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<ContactDto>> AddPhone(
+        Guid id, AddPhoneRequest request, CancellationToken ct)
+    {
+        var (contact, failure, duplicate) =
+            await contacts.AddPhoneAsync(id, request.Number, User.GetRequiredUserId(), ct);
+
+        return failure is not null ? Problem(failure.Value, duplicate) : Ok(contact);
+    }
+
     [HttpPost]
     [ProducesResponseType<ContactDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

@@ -3,6 +3,7 @@ using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
 using CallCenter.Shared.Contracts.Contacts;
 using CallCenter.Shared.Phone;
+using CallCenter.Shared.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace CallCenter.Server.Features.Contacts;
@@ -21,6 +22,12 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
 {
     /// <summary>How many results a search returns before the caller must narrow it.</summary>
     public const int SearchLimit = 50;
+
+    /// <summary>
+    /// How many same-name contacts are offered as a warning. Short on purpose:
+    /// it is a prompt to look, not a list to work through.
+    /// </summary>
+    public const int NameWarningLimit = 5;
 
     public enum Failure
     {
@@ -68,8 +75,12 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
                 // ILIKE rather than the full-text index: the index is built over
                 // to_tsvector with the default configuration, which does not stem
                 // Arabic, so it would miss the names most contacts actually have.
+                // The normalised name, not the stored one: searching for
+                // "احمد" must find a contact saved as "أحمد" (A-80).
+                var normalisedLike = $"%{NameNormalizer.Normalize(query)}%";
+
                 contacts = contacts.Where(c =>
-                    (c.Name != null && EF.Functions.ILike(c.Name, like))
+                    (c.NameNormalised != null && EF.Functions.ILike(c.NameNormalised, normalisedLike))
                     || (c.Address != null && EF.Functions.ILike(c.Address, like)));
             }
         }
@@ -86,6 +97,104 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
                 c.IsBlocked,
                 c.Phones.OrderByDescending(p => p.IsPrimary).Select(p => p.Raw).ToList()))
             .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// Contacts that already carry this name (A-63). A warning for the agent,
+    /// never a refusal — see the remarks.
+    /// </summary>
+    /// <remarks>
+    /// Names are never matched automatically. "أحمد" and "محمد" are common, and
+    /// silently joining two customers would mix their order histories with no
+    /// way to unpick them afterwards. So this only tells the agent what already
+    /// exists; they decide whether it is the same person.
+    ///
+    /// The match is <b>exact</b>, on the normalised form. Substring matching was
+    /// tried and rejected: "Ahmad" is a common name, so it would warn about a
+    /// dozen unrelated people every time and be ignored within a week. Exact
+    /// matching only works because of the normalising — PostgreSQL considers
+    /// <c>'أحمد' = 'احمد'</c> false, so comparing stored names directly would
+    /// almost never fire.
+    /// </remarks>
+    public async Task<IReadOnlyList<ContactSummaryDto>> FindByNameAsync(
+        string? name, Guid? excludingContactId = null, CancellationToken ct = default)
+    {
+        var normalised = NameNormalizer.Normalize(name);
+
+        if (normalised.Length == 0)
+        {
+            return [];
+        }
+
+        return await Active()
+            .Where(c => c.NameNormalised == normalised)
+            .Where(c => excludingContactId == null || c.Id != excludingContactId)
+            .OrderBy(c => c.Name)
+            .Take(NameWarningLimit)
+            .Select(c => new ContactSummaryDto(
+                c.Id,
+                c.Name,
+                c.Address,
+                c.IsVip,
+                c.IsBlocked,
+                c.Phones.OrderByDescending(p => p.IsPrimary).Select(p => p.Raw).ToList()))
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// Adds one number to a contact that already exists (A-63) — the other half
+    /// of the name warning, for when the agent says "yes, same person".
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not a full update: the agent answering that question has
+    /// typed a number and nothing else, and sending the whole contact back would
+    /// risk blanking an address or notes they never saw.
+    /// </remarks>
+    public async Task<(ContactDto? Contact, Failure? Failure, DuplicateNumberDto? Duplicate)> AddPhoneAsync(
+        Guid id, string number, Guid actingUserId, CancellationToken ct = default)
+    {
+        var contact = await Active().Include(c => c.Phones).FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (contact is null)
+        {
+            return (null, Failure.NotFound, null);
+        }
+
+        var normalised = PhoneNormalizer.Normalize(number);
+        if (string.IsNullOrEmpty(normalised))
+        {
+            return (null, Failure.NoUsableNumber, null);
+        }
+
+        // Already on this contact: nothing to do, and not an error - the agent
+        // asked for an outcome that is already true.
+        if (contact.Phones.Any(p => p.Normalised == normalised))
+        {
+            return (ToDto(contact, await CreatorNameAsync(contact, ct)), null, null);
+        }
+
+        if (await FindDuplicateAsync([normalised], id, ct) is { } duplicate)
+        {
+            return (null, Failure.DuplicateNumber, duplicate);
+        }
+
+        var before = Snapshot(contact);
+
+        contact.Phones.Add(new ContactPhone
+        {
+            Raw = number.Trim(),
+            Normalised = normalised,
+            IsPrimary = contact.Phones.Count == 0,
+        });
+
+        contact.UpdatedBy = actingUserId;
+        contact.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        await AuditAsync(actingUserId, "add-phone", contact, before, ct);
+
+        logger.LogInformation("Number added to contact {ContactId}", contact.Id);
+
+        return (ToDto(contact, await CreatorNameAsync(contact, ct)), null, null);
     }
 
     /// <summary>One contact in full (A-62).</summary>
@@ -154,6 +263,7 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
         var contact = new Contact
         {
             Name = Trimmed(request.Name),
+            NameNormalised = NormalisedName(request.Name),
             Address = Trimmed(request.Address),
             Notes = Trimmed(request.Notes),
             DeliveryNotes = Trimmed(request.DeliveryNotes),
@@ -207,6 +317,7 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
         var before = Snapshot(contact);
 
         contact.Name = Trimmed(request.Name);
+        contact.NameNormalised = NormalisedName(request.Name);
         contact.Address = Trimmed(request.Address);
         contact.Notes = Trimmed(request.Notes);
         contact.DeliveryNotes = Trimmed(request.DeliveryNotes);
@@ -301,6 +412,17 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
 
     private static string? Trimmed(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>
+    /// The comparison form of a name, or null when there is no name. Null rather
+    /// than an empty string on purpose: a bare number saved for flagging (S-45)
+    /// must not match every other nameless contact.
+    /// </summary>
+    private static string? NormalisedName(string? name)
+    {
+        var normalised = NameNormalizer.Normalize(name);
+        return normalised.Length == 0 ? null : normalised;
+    }
 
     private async Task<string?> CreatorNameAsync(Contact contact, CancellationToken ct) =>
         contact.CreatedBy is null

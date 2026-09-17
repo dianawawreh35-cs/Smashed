@@ -58,6 +58,19 @@ export const searchContacts = (query: string) =>
 
 export const getContact = (id: string) => api.get<Contact>(`/contacts/${id}`)
 
+/**
+ * Contacts that already carry this name (A-63). A warning before saving, never
+ * a refusal — the agent decides whether it is the same person.
+ */
+export const findContactsByName = (name: string, excluding?: string) =>
+  api.get<ContactSummary[]>('/contacts/by-name', {
+    query: { name, excluding },
+  })
+
+/** Adds one number to a contact that already exists (A-63). */
+export const addPhoneToContact = (id: string, number: string) =>
+  api.post<Contact>(`/contacts/${id}/phones`, { number })
+
 export const createContact = (request: UpsertContactRequest) =>
   api.post<Contact>('/contacts', request)
 

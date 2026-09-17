@@ -29,6 +29,11 @@ public class ContactConfiguration : IEntityTypeConfiguration<Contact>
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UpdatedBy).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.FlagChangedBy).OnDelete(DeleteBehavior.Restrict);
 
+        // What the duplicate-name warning compares (A-63). Indexed because it
+        // is looked up on every contact save.
+        builder.HasIndex(x => x.NameNormalised)
+            .HasDatabaseName("ix_contacts_name_normalised");
+
         // Full-text search over name + address (A-61). Created in the migration
         // as raw SQL - EF cannot express a GIN index over an expression.
     }

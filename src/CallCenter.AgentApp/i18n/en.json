@@ -20,18 +20,17 @@
   },
   "home": {
     "signOut": "Log out",
-    "customerExtension": "Customers:",
-    "internalExtension": "Internal:",
-    "noExtensions": "No extensions configured — ask your supervisor"
+    "extension": "Extension:",
+    "noExtension": "No extension configured — ask your supervisor"
   },
   "status": {
     "notSignedIn": "Not signed in",
     "signedIn": "Signed in",
-    "noExtensions": "Signed in — no extensions configured",
     "registering": "Registering extensions…",
     "registered": "Phone ready",
     "registrationFailed": "Extensions refused — ask your supervisor",
-    "retrying": "Cannot reach the PBX — retrying"
+    "retrying": "Cannot reach the PBX — retrying",
+    "noExtension": "Signed in — no extension configured"
   },
   "sip": {
     "idle": "Not registered",

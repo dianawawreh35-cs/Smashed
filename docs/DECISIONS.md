@@ -332,6 +332,56 @@ without doing so.
 
 ---
 
+## 2026-09-17 — One extension per agent, internal calls told apart by number
+
+The two-extension split of SRS 2.3 is gone. **Each agent now has one extension**
+used for every call they handle. Internal calls are identified by the other
+party's number against a list the supervisor keeps (new **S-48**), not by which
+extension carried the call.
+
+Internal calls are **recorded and kept** — agent call log, contact history,
+recording and classification all unchanged — and **left out of the
+customer-facing reports**, so internal chatter does not distort order counts,
+complaint rates, volumes or the service level. That was a deliberate choice over
+discarding them: a call misjudged as internal would otherwise be gone with no way
+to audit it.
+
+Numbers are entered as a plain comma-separated list, validated as digits only —
+letting a name through would silently match nothing.
+
+### Why it is better
+
+A new branch number is now a settings change rather than a PBX change plus a
+visit to four laptops. It also halves what the provider has to supply per agent,
+and removes a class of confusion: with two extensions, one could register while
+the other was refused, and the status bar had to reconcile them.
+
+### The migration is hand-written, and that mattered
+
+EF scaffolded it backwards: it kept `internal_extension` and dropped
+`customer_extension`. Applied as generated it would have destroyed every working
+extension number and secret, keeping whatever placeholder sat in the internal
+column — in the development database that was the literal string `-`. The
+migration now drops the internal columns and renames the customer ones, keeping
+the values that matter.
+
+It still loses the internal extensions and their secrets, which is intended but
+irreversible. **Take a backup before applying it to a database whose contents
+matter.**
+
+The same migration clears the dead `pbx.ip` settings row left behind by the
+earlier `pbx.ip` → `pbx.host` rename, which changed column names but not that
+row, and seeds `reports.internal_numbers` for existing databases.
+
+### Still to build
+
+S-48 stores the list and the settings screen edits it. **Nothing consumes it
+yet** — the reports that would exclude internal calls do not exist. The list is
+in place so that when they are built the rule is already recorded and
+configurable, rather than being invented then.
+
+---
+
 # How this project is tracked
 
 Three files, each with one job. Kept current as part of doing the work, not
@@ -405,8 +455,6 @@ Section 4.5 and reports R-20/R-21 are deferred until these are answered
   `Server`, `Username` or `Password`; they arrive in the login response (A-01).
   Actively misleading, because it looks like where the PBX is configured.
   `RtpPortMin`/`RtpPortMax` are real and should stay.
-- **`AgentExtensionsDto` has a stale "Yeastar S20" comment** missed in the
-  Issabel sweep.
 - **`src/CallCenter.Web/tsconfig.app.tsbuildinfo` is committed.** A build
   artifact; it belongs in `.gitignore`.
 - **No automated check that the two Agent App language files agree.** A missing

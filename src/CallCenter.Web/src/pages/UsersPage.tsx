@@ -7,7 +7,7 @@ import {
   errorCodeOf,
   listUsers,
   resetPassword,
-  setExtensions,
+  setExtension,
   updateUser,
 } from '../api/users'
 import type { User } from '../api/users'
@@ -15,9 +15,9 @@ import type { User } from '../api/users'
 /**
  * Accounts and extensions (S-42).
  *
- * SIP secrets are write-only: the screen can set one and replace one, and shows
- * whether one is set, but never displays it — there is no endpoint that returns
- * it (N-05).
+ * One extension per agent (SRS 2.3). Its SIP secret is write-only: the screen
+ * can set one and replace one, and shows whether one is set, but never displays
+ * it — there is no endpoint that returns it (N-05).
  */
 export default function UsersPage() {
   const { t } = useTranslation()
@@ -60,7 +60,7 @@ export default function UsersPage() {
               <th className="px-3 py-2 text-start">{t('users.name')}</th>
               <th className="px-3 py-2 text-start">{t('users.login')}</th>
               <th className="px-3 py-2 text-start">{t('users.role')}</th>
-              <th className="px-3 py-2 text-start">{t('users.extensions')}</th>
+              <th className="px-3 py-2 text-start">{t('users.extension')}</th>
               <th className="px-3 py-2 text-start">{t('users.status')}</th>
               <th className="px-3 py-2" />
             </tr>
@@ -108,16 +108,16 @@ function UserRow({
         <td className="px-3 py-2 text-slate-500">{user.login}</td>
         <td className="px-3 py-2">{t(`users.roles.${user.role}`)}</td>
         <td className="px-3 py-2">
-          {user.customerExtension ? (
+          {user.extension ? (
             <span>
-              {user.customerExtension} / {user.internalExtension}
-              {/* Numbers without secrets cannot register, so say so plainly. */}
+              {user.extension}
+              {/* A number without a secret cannot register, so say so plainly. */}
               {!user.hasSipCredentials && (
                 <span className="ms-2 text-amber-600">{t('users.noSecret')}</span>
               )}
             </span>
           ) : (
-            <span className="text-slate-400">{t('users.noExtensions')}</span>
+            <span className="text-slate-400">{t('users.noExtension')}</span>
           )}
         </td>
         <td className="px-3 py-2">
@@ -134,7 +134,7 @@ function UserRow({
               className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
               onClick={() => setPanel(panel === 'extensions' ? 'none' : 'extensions')}
             >
-              {t('users.setExtensions')}
+              {t('users.setExtension')}
             </button>
           )}
           <button
@@ -158,7 +158,7 @@ function UserRow({
         <tr className="border-t border-slate-100 bg-slate-50">
           <td colSpan={6} className="px-3 py-3">
             {panel === 'extensions' ? (
-              <ExtensionsForm user={user} onDone={close} onError={onError} />
+              <ExtensionForm user={user} onDone={close} onError={onError} />
             ) : (
               <PasswordForm user={user} onDone={close} onError={onError} />
             )}
@@ -221,7 +221,7 @@ function CreateUserForm({
   )
 }
 
-function ExtensionsForm({
+function ExtensionForm({
   user,
   onDone,
   onError,
@@ -231,14 +231,11 @@ function ExtensionsForm({
   onError: (e: unknown) => void
 }) {
   const { t } = useTranslation()
-  const [customerExtension, setCustomer] = useState(user.customerExtension ?? '')
-  const [internalExtension, setInternal] = useState(user.internalExtension ?? '')
-  const [customerSecret, setCustomerSecret] = useState('')
-  const [internalSecret, setInternalSecret] = useState('')
+  const [extension, setExt] = useState(user.extension ?? '')
+  const [secret, setSecret] = useState('')
 
   const save = useMutation({
-    mutationFn: () =>
-      setExtensions(user.id, { customerExtension, internalExtension, customerSecret, internalSecret }),
+    mutationFn: () => setExtension(user.id, { extension, secret }),
     onSuccess: onDone,
     onError,
   })
@@ -251,28 +248,20 @@ function ExtensionsForm({
       }}
       className="space-y-3"
     >
-      <p className="text-sm text-slate-600">{t('users.extensionsHint')}</p>
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Field label={t('users.customerExtension')} value={customerExtension} onChange={setCustomer} />
+      <p className="text-sm text-slate-600">{t('users.extensionHint')}</p>
+      <div className="grid gap-3 sm:grid-cols-2 max-w-lg">
+        <Field label={t('users.extension')} value={extension} onChange={setExt} />
         <Field
-          label={t('users.customerSecret')}
-          value={customerSecret}
-          onChange={setCustomerSecret}
-          type="password"
-          placeholder={user.hasSipCredentials ? t('users.secretSet') : undefined}
-        />
-        <Field label={t('users.internalExtension')} value={internalExtension} onChange={setInternal} />
-        <Field
-          label={t('users.internalSecret')}
-          value={internalSecret}
-          onChange={setInternalSecret}
+          label={t('users.secret')}
+          value={secret}
+          onChange={setSecret}
           type="password"
           placeholder={user.hasSipCredentials ? t('users.secretSet') : undefined}
         />
       </div>
       <button
         type="submit"
-        disabled={save.isPending || !customerExtension.trim() || !internalExtension.trim()}
+        disabled={save.isPending || !extension.trim()}
         className="rounded bg-brand-600 px-3 py-2 text-white disabled:opacity-50"
       >
         {t('users.save')}

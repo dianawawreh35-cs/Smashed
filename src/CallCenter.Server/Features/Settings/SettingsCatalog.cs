@@ -36,6 +36,12 @@ public static class SettingsCatalog
 
         new("pbx.ami.enabled", SettingKinds.Boolean, null, ValidateBoolean),
 
+        // S-48: the other agents' and the branches' extension numbers, comma
+        // separated. A call whose other party is on this list is internal -
+        // still recorded, but left out of the customer-facing reports. Blank is
+        // valid: it means every call counts as a customer call.
+        new("reports.internal_numbers", SettingKinds.Text, null, ValidateNumberList),
+
         // A-05: a shared laptop must not stay signed in after a shift.
         new("agent.idle_logout_minutes", SettingKinds.Integer, null, IntegerBetween(1, 480)),
 
@@ -54,6 +60,27 @@ public static class SettingsCatalog
 
     public static Definition? Find(string key) =>
         ByKey.TryGetValue(key, out var definition) ? definition : null;
+
+    /// <summary>
+    /// A comma-separated list of extension numbers. Digits only - these are
+    /// dialled numbers, and letting a name through would silently match nothing.
+    /// </summary>
+    private static string? ValidateNumberList(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var bad = value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(entry => !entry.All(char.IsDigit))
+            .ToList();
+
+        return bad.Count == 0
+            ? null
+            : $"must be numbers separated by commas; check {string.Join(", ", bad)}";
+    }
 
     private static string? ValidateBoolean(string value) =>
         bool.TryParse(value, out _) ? null : "must be true or false";

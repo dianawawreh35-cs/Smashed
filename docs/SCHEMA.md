@@ -47,7 +47,8 @@ CREATE TABLE users (
 
 CREATE TABLE settings (
   key         text PRIMARY KEY,           -- e.g. 'recording.retention_days', 'agent.idle_logout_minutes',
-  value       text NOT NULL,              --      'pbx.host', 'pbx.ami.user', 'callback.extension', 'sla.answer_seconds'
+  value       text NOT NULL,              --      'pbx.host', 'pbx.ami.user', 'callback.extension',
+  --                                         'sla.answer_seconds', 'reports.internal_numbers' (S-48)
   updated_by  uuid REFERENCES users(id),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -306,7 +307,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - channels: Phone (system), WhatsApp, Facebook, Instagram, Wheels
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)
 - form_definitions v1: the JSON above without the `reason` field
-- settings: `recording.retention_days=90`, `agent.idle_logout_minutes=30`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `callback.extension=`, `pbx.host=`, `pbx.ami.enabled=false`
+- settings: `recording.retention_days=90`, `agent.idle_logout_minutes=30`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `callback.extension=`, `pbx.host=`, `pbx.ami.enabled=false`, `reports.internal_numbers=`
 - users: one Supervisor created by the seed command
 
 ---

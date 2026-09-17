@@ -34,15 +34,11 @@ public partial class HomeViewModel : ObservableObject
     private void RefreshPhone()
     {
         OnPropertyChanged(nameof(PhoneSummary));
-        OnPropertyChanged(nameof(CustomerStatus));
-        OnPropertyChanged(nameof(InternalStatus));
+        OnPropertyChanged(nameof(RegistrationSummary));
     }
 
-    /// <summary>The customer extension's registration, in the agent's language.</summary>
-    public string CustomerStatus => Describe(_sip.Customer);
-
-    /// <summary>The internal extension's registration, in the agent's language.</summary>
-    public string InternalStatus => Describe(_sip.Internal);
+    /// <summary>The registration, in the agent's language.</summary>
+    public string RegistrationSummary => Describe(_sip.State);
 
     /// <summary>
     /// A line the agent can act on: the state, and the PBX's own words when it
@@ -75,14 +71,10 @@ public partial class HomeViewModel : ObservableObject
 
     public string DisplayName => _session.User?.DisplayName ?? string.Empty;
 
-    /// <summary>
-    /// The two extensions the app will register (A-02), once SIP is wired up.
-    /// Labelled, because which is which is not obvious from the numbers alone.
-    /// </summary>
+    /// <summary>The extension the app registers, and where (A-02).</summary>
     public string PhoneSummary => _session.Extensions is { } extensions
-        ? $"{Localizer["home.customerExtension"]} {extensions.CustomerExtension}  ·  "
-          + $"{Localizer["home.internalExtension"]} {extensions.InternalExtension}  ·  {extensions.SipServer}"
-        : Localizer["home.noExtensions"];
+        ? $"{Localizer["home.extension"]} {extensions.Extension}  ·  {extensions.SipServer}"
+        : Localizer["home.noExtension"];
 
     public bool HasPhone => _session.HasPhone;
 

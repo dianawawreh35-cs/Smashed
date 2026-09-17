@@ -24,7 +24,7 @@ public class UsersService(
         LoginTaken,
         UnknownRole,
 
-        /// <summary>Only agents register extensions, so only agents can have them.</summary>
+        /// <summary>Only agents register an extension, so only agents can have one.</summary>
         NotAnAgent,
 
         /// <summary>Would leave no active supervisor, locking everyone out of S-42.</summary>
@@ -118,12 +118,12 @@ public class UsersService(
     }
 
     /// <summary>
-    /// Assigns the two extensions and, when supplied, their SIP secrets (S-42).
+    /// Assigns the agent's extension and, when supplied, its SIP secret (S-42).
     /// A null secret keeps whatever is stored, so a number can be corrected
     /// without re-entering the password.
     /// </summary>
-    public async Task<(UserDto? User, Failure? Failure)> SetExtensionsAsync(
-        Guid id, SetExtensionsRequest request, Guid actingUserId, CancellationToken ct = default)
+    public async Task<(UserDto? User, Failure? Failure)> SetExtensionAsync(
+        Guid id, SetExtensionRequest request, Guid actingUserId, CancellationToken ct = default)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
         if (user is null)
@@ -138,25 +138,17 @@ public class UsersService(
 
         var before = Snapshot(user);
 
-        user.CustomerExtension = request.CustomerExtension.Trim();
-        user.InternalExtension = request.InternalExtension.Trim();
+        user.Extension = request.Extension.Trim();
 
-        if (!string.IsNullOrWhiteSpace(request.CustomerSecret))
+        if (!string.IsNullOrWhiteSpace(request.Secret))
         {
-            user.CustomerSipSecret = secrets.Protect(request.CustomerSecret);
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.InternalSecret))
-        {
-            user.InternalSipSecret = secrets.Protect(request.InternalSecret);
+            user.SipSecret = secrets.Protect(request.Secret);
         }
 
         await db.SaveChangesAsync(ct);
         await AuditAsync(actingUserId, "update", user, before, ct);
 
-        logger.LogInformation(
-            "Extensions set for {Login}: customer {Customer}, internal {Internal}",
-            user.Login, user.CustomerExtension, user.InternalExtension);
+        logger.LogInformation("Extension {Extension} set for {Login}", user.Extension, user.Login);
 
         return (ToDto(user), null);
     }
@@ -191,12 +183,8 @@ public class UsersService(
         user.DisplayName,
         user.Role,
         user.IsActive,
-        user.CustomerExtension,
-        user.InternalExtension,
-        user.CustomerExtension is not null
-            && user.InternalExtension is not null
-            && user.CustomerSipSecret is not null
-            && user.InternalSipSecret is not null,
+        user.Extension,
+        user.Extension is not null && user.SipSecret is not null,
         user.CreatedAt,
         user.LastLoginAt);
 
@@ -210,8 +198,7 @@ public class UsersService(
         user.DisplayName,
         user.Role,
         user.IsActive,
-        user.CustomerExtension,
-        user.InternalExtension,
+        user.Extension,
     });
 
     private async Task AuditAsync(

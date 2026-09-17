@@ -70,6 +70,7 @@ public class SeedDataTests
             "callback.extension",
             "pbx.host",
             "pbx.ami.enabled",
+            "reports.internal_numbers",
         ]);
     }
 
@@ -88,7 +89,9 @@ public class SeedDataTests
     public void Site_specific_settings_start_blank()
     {
         // Filled in during installation once the client's PBX person confirms them.
-        foreach (var key in new[] { "callback.extension", "pbx.host" })
+        // reports.internal_numbers too: blank means every call counts as a
+        // customer call, which is the right default before S-48 is filled in.
+        foreach (var key in new[] { "callback.extension", "pbx.host", "reports.internal_numbers" })
         {
             SeedData.Settings.Single(s => s.Key == key).Value.Should().BeEmpty();
         }

@@ -14,8 +14,7 @@ const AGENT = {
   displayName: 'Sara',
   role: 'Agent',
   isActive: true,
-  customerExtension: null,
-  internalExtension: null,
+  extension: null,
   hasSipCredentials: false,
   canTakeCalls: false,
   createdAt: '2026-09-16T10:00:00Z',
@@ -67,50 +66,37 @@ describe('users page', () => {
   it('never shows a stored SIP password, only that one is set', async () => {
     // N-05: there is no endpoint that returns a secret, and the screen must not
     // imply otherwise - a supervisor replaces it rather than reading it.
-    const configured = {
-      ...AGENT,
-      customerExtension: '101',
-      internalExtension: '201',
-      hasSipCredentials: true,
-      canTakeCalls: true,
-    }
+    const configured = { ...AGENT, extension: '2001', hasSipCredentials: true, canTakeCalls: true }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([configured])))
 
     renderPage()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Set extensions' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Set extension' }))
 
-    const customerSecret = screen.getByLabelText('Customer SIP password') as HTMLInputElement
-    expect(customerSecret.value).toBe('')
-    expect(customerSecret.placeholder).toMatch(/leave blank to keep/i)
+    const secret = screen.getByLabelText('SIP password') as HTMLInputElement
+    expect(secret.value).toBe('')
+    expect(secret.placeholder).toMatch(/leave blank to keep/i)
   })
 
-  it('sends both extensions together when saving', async () => {
+  it('posts the extension and its secret to the single-extension endpoint', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse([AGENT]))
-      .mockResolvedValueOnce(jsonResponse({ ...AGENT, customerExtension: '101', internalExtension: '201' }))
+      .mockResolvedValueOnce(jsonResponse({ ...AGENT, extension: '2001' }))
       .mockResolvedValue(jsonResponse([AGENT]))
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Set extensions' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Set extension' }))
 
-    fireEvent.change(screen.getByLabelText('Customer extension'), { target: { value: '101' } })
-    fireEvent.change(screen.getByLabelText('Internal extension'), { target: { value: '201' } })
-    fireEvent.change(screen.getByLabelText('Customer SIP password'), { target: { value: 'sip-1' } })
-    fireEvent.change(screen.getByLabelText('Internal SIP password'), { target: { value: 'sip-2' } })
+    fireEvent.change(screen.getByLabelText('Extension'), { target: { value: '2001' } })
+    fireEvent.change(screen.getByLabelText('SIP password'), { target: { value: 'sip-1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1))
 
     const [url, init] = fetchMock.mock.calls[1]
-    expect(url).toBe('/api/users/a1/extensions')
-    expect(JSON.parse(init.body)).toEqual({
-      customerExtension: '101',
-      internalExtension: '201',
-      customerSecret: 'sip-1',
-      internalSecret: 'sip-2',
-    })
+    expect(url).toBe('/api/users/a1/extension')
+    expect(JSON.parse(init.body)).toEqual({ extension: '2001', secret: 'sip-1' })
   })
 
   it('translates a refusal from the server', async () => {

@@ -10,9 +10,8 @@ export interface User {
   displayName: string
   role: string
   isActive: boolean
-  customerExtension: string | null
-  internalExtension: string | null
-  /** Both extensions and both secrets are set. The secrets are never returned. */
+  extension: string | null
+  /** The extension and its secret are set. The secret is never returned. */
   hasSipCredentials: boolean
   canTakeCalls: boolean
   createdAt: string
@@ -26,12 +25,10 @@ export interface CreateUserRequest {
   password: string
 }
 
-export interface SetExtensionsRequest {
-  customerExtension: string
-  internalExtension: string
-  /** Null or empty keeps the stored secret, so a number can be corrected alone. */
-  customerSecret?: string
-  internalSecret?: string
+export interface SetExtensionRequest {
+  extension: string
+  /** Null or empty keeps the stored secret, so the number can be corrected alone. */
+  secret?: string
 }
 
 export const listUsers = () => api.get<User[]>('/users')
@@ -41,8 +38,8 @@ export const createUser = (request: CreateUserRequest) => api.post<User>('/users
 export const updateUser = (id: string, displayName: string, isActive: boolean) =>
   api.put<User>(`/users/${id}`, { displayName, isActive })
 
-export const setExtensions = (id: string, request: SetExtensionsRequest) =>
-  api.put<User>(`/users/${id}/extensions`, request)
+export const setExtension = (id: string, request: SetExtensionRequest) =>
+  api.put<User>(`/users/${id}/extension`, request)
 
 export const resetPassword = (id: string, newPassword: string) =>
   api.post<void>(`/users/${id}/password`, { newPassword })

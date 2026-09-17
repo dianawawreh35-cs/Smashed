@@ -90,34 +90,33 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Signed in, but the supervisor has not assigned extensions yet. The
+        // Signed in, but the supervisor has not assigned an extension yet. The
         // agent can still use contacts and app orders, so amber, not red.
         if (!_session.HasPhone)
         {
-            SetConnectionStatus("status.noExtensions", "#F59E0B");
+            SetConnectionStatus("status.noExtension", "#F59E0B");
             return;
         }
 
-        var customer = _sip.Customer?.Status ?? RegistrationStatus.Idle;
-        var internalExt = _sip.Internal?.Status ?? RegistrationStatus.Idle;
+        switch (_sip.State?.Status ?? RegistrationStatus.Idle)
+        {
+            // A refusal will not fix itself: the agent needs their supervisor
+            // rather than to keep waiting.
+            case RegistrationStatus.Failed:
+                SetConnectionStatus("status.registrationFailed", "#EF4444");
+                break;
 
-        // A refusal outranks everything else: it will not fix itself, and the
-        // agent needs their supervisor rather than to keep waiting.
-        if (customer == RegistrationStatus.Failed || internalExt == RegistrationStatus.Failed)
-        {
-            SetConnectionStatus("status.registrationFailed", "#EF4444");
-        }
-        else if (customer == RegistrationStatus.Registered && internalExt == RegistrationStatus.Registered)
-        {
-            SetConnectionStatus("status.registered", "#22C55E");
-        }
-        else if (customer == RegistrationStatus.Retrying || internalExt == RegistrationStatus.Retrying)
-        {
-            SetConnectionStatus("status.retrying", "#F59E0B");
-        }
-        else
-        {
-            SetConnectionStatus("status.registering", "#F59E0B");
+            case RegistrationStatus.Registered:
+                SetConnectionStatus("status.registered", "#22C55E");
+                break;
+
+            case RegistrationStatus.Retrying:
+                SetConnectionStatus("status.retrying", "#F59E0B");
+                break;
+
+            default:
+                SetConnectionStatus("status.registering", "#F59E0B");
+                break;
         }
     }
 

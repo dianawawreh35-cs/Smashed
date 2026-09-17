@@ -69,16 +69,23 @@ The call center takes orders, cancellations, complaints and inquiries by phone t
 
 ### 2.3 Extensions
 
-Each agent has two PBX extensions. **Both can make and receive calls** — they are not split by direction. They are split by *who is on the other end*:
+Each agent has **one** PBX extension. It makes and receives every call the agent
+handles — customers, other agents and the four branches alike. The Agent App
+registers it at login and uses it for everything.
 
-| Extension | Used for | Examples |
-|---|---|---|
-| **Customer extension** | Everything involving a customer, in both directions. It is the one that rings in the queue/ring group, and the one used to call a customer back. | An order coming in; calling a customer about a late delivery |
-| **Internal extension** | Communication inside the business, in both directions: other agents and the four branches. | Asking a branch whether an item is in stock; an agent calling a colleague |
+**Internal calls are told apart by the number, not by the extension.** The
+supervisor keeps a list of the internal extension numbers — the other agents and
+the branches — in the supervisor app (S-48). A call whose other party is on that
+list is an internal call.
 
-The Agent App registers both at login and picks the right one automatically: a call to a number belonging to a branch or another agent goes out on the internal extension, and everything else on the customer extension. Both are tied to the same agent account, so all calls — customer and internal, incoming and outgoing — appear in one log.
+Internal calls are **recorded and kept** like any other: they appear in the
+agent's call log and in the contact history, and the recording and classification
+rules are unchanged. They are **left out of the customer-facing reports**, so
+internal chatter does not distort order counts, complaint rates, call volumes or
+the service level (R-01, R-20, R-21).
 
-Keeping customer traffic on its own extension is what makes the queue, the wait-time reports and the service-level report (R-20, R-21) measure customer calls only, rather than being diluted by internal chatter.
+Keeping the distinction in a list rather than in a second extension means a new
+branch number is a settings change, not a PBX change and a visit to four laptops.
 
 ### 2.4 Assumptions and constraints
 
@@ -98,8 +105,8 @@ Keeping customer traffic on its own extension is what makes the queue, the wait-
 
 | ID | Requirement | Priority |
 |---|---|---|
-| A-01 | Agent logs in with username and password issued by the supervisor. The app receives the agent's two extensions and SIP credentials from the server; the agent never types SIP details. | Must |
-| A-02 | The app registers both extensions on the Issabel PBX across the VPN and shows their status (Registered / Failed) at all times; re-registers automatically after network or VPN drops. When the VPN is down the status makes that plain, so the agent knows the phone is unavailable rather than thinking the system is broken. | Must |
+| A-01 | Agent logs in with username and password issued by the supervisor. The app receives the agent's extension and SIP credentials from the server; the agent never types SIP details. | Must |
+| A-02 | The app registers the agent's extension on the Issabel PBX across the VPN and shows its status (Registered / Failed) at all times; re-registers automatically after network or VPN drops. A refusal by the PBX and a PBX that cannot be reached are shown differently, because the first needs the supervisor and the second will clear itself. | Must |
 | A-03 | Audio device selection (microphone, speaker, ring device) remembered per laptop. | Must |
 | A-05 | Shared laptops: the app is installed once per laptop and supports any agent logging in. On login it registers the logged-in agent's two extensions; on logout it unregisters them. Audio device choices are per laptop; everything else (calls, classifications, queued uploads) belongs to the logged-in agent. Agents must log out at the end of their shift (automatic logout after a configurable idle time). | Must |
 | A-04 | If the server is unreachable, the app continues to make/receive calls and record; log entries and classifications are queued locally and synchronised when the server returns. | Must |
@@ -121,7 +128,7 @@ Keeping customer traffic on its own extension is what makes the queue, the wait-
 
 | ID | Requirement | Priority |
 |---|---|---|
-| A-20 | Dial from a dial box, from any phone number shown in the app (click-to-call) or from a contact. The app chooses the extension by who is being called (see 2.3): the internal extension for a branch or another agent, the customer extension for everyone else. | Must |
+| A-20 | Dial from a dial box, from any phone number shown in the app (click-to-call) or from a contact. All calls use the agent's one extension (see 2.3). | Must |
 | A-21 | Outbound calls are recorded and classified exactly like inbound calls. | Must |
 | A-22 | Redial last number; call back from a missed-call entry with one click. | Should |
 
@@ -238,11 +245,12 @@ All filterable by time period; also by agent, branch, channel where applicable.
 |---|---|---|
 | S-40 | Edit the classification form used by agents: add/remove/rename types; add custom fields (text, number, dropdown, checkbox); set required fields; the change applies to new classifications without reinstalling the Agent App. | Must |
 | S-41 | Manage channels list (WhatsApp, Facebook, Instagram, Wheels, …) and branches (4 at start; add/rename/disable). | Must |
-| S-42 | Manage agents: create/disable accounts, assign the customer and internal extensions with their SIP credentials (see 2.3), reset passwords. | Must |
+| S-42 | Manage agents: create/disable accounts, assign the agent's extension with its SIP credentials (see 2.3), reset passwords. | Must |
 | S-43 | Recording retention period (default 90 days) and storage usage view. | Must |
 | S-44 | Backup now / view last backup status. | Should |
 | S-45 | Mark a contact (or a bare phone number) as VIP or Blocked, with a reason and date; remove the flag at any time; list of all blocked and VIP numbers. Agents can see the flags but cannot change them. Every change is logged. | Must |
 | S-46 | Export the blocked list in a format the provider can load into Issabel's blacklist, so the numbers can optionally be blocked at the PBX level as well (see note in section 6). | Should |
+| S-48 | Internal numbers list: the supervisor maintains the list of internal extension numbers — the other agents and the four branches (see 2.3). A call whose other party is on the list is an internal call: still recorded, still in the agent's call log and the contact history, but excluded from the customer-facing reports so it does not distort order counts, complaint rates, volumes or the service level. Entered as plain numbers, one per entry; every change is logged with who and when. | Must |
 | S-47 | System settings: view and change the values the system reads at runtime — the PBX host the Agent Apps register to (SRS 2.3), the call-back extension, the idle-logout time (A-05), how long an agent may edit their own classification (A-42), the service-level threshold (R-21) and the recording retention period (S-43). Changes take effect without a redeployment: the Agent App picks up a new PBX host at the next sign-in, so a change by the provider does not need a visit to each laptop. Every change is logged with who and when. The AMI connection settings belong with section 4.5 and are deferred with it. | Must |
 
 ### 4.5 Capture of calls that never reach an agent (queue / ring-group)
@@ -351,7 +359,7 @@ AMI is part of Asterisk and Issabel enables it by default, but the provider stil
 
 ## 10. Open Questions for the Client [TBC]
 
-- **PBX provider — to confirm before installation.** These answers decide whether 4.5 and reports R-20/R-21 can be delivered at all:
+- **PBX provider — to confirm before installation.** The list of internal extension numbers for S-48 is also needed from the client. These answers decide whether 4.5 and reports R-20/R-21 can be delivered at all:
   1. Can the **server** have its own VPN connection to the PBX, not just the agent laptops?
   2. Is **AMI** available (TCP 5038), with a user for us and our server's VPN address in the permitted list?
   3. Can we have **read-only access to the `asteriskcdrdb` database**, or a regular CDR export we can reach?
@@ -392,7 +400,7 @@ AMI is part of Asterisk and Issabel enables it by default, but the provider stil
 ### 12.3 What the client provides
 
 - All hardware: server (mini PC with SSD), agent laptops, headsets, network, UPS if desired, and any replacement of failed hardware.
-- PBX (Issabel, operated by the telephony provider) configuration and its maintenance: two working extensions per agent with SIP credentials (the customer and internal extensions of 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' customer extensions, outbound routes available on both extensions, and internal dialling between the agents' internal extensions and the branches. Recording announcement if wanted. The PBX is configured by the telephony provider, not by the developer; the client owns that relationship and any charges under it.
+- PBX (Issabel, operated by the telephony provider) configuration and its maintenance: one working extension per agent with SIP credentials (see 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' extensions, outbound routes, and internal dialling between the agents and the branches. Recording announcement if wanted. The PBX is configured by the telephony provider, not by the developer; the client owns that relationship and any charges under it.
 - **The VPN**: an account and client configuration for every agent laptop, and a separate connection for the server. Supplying, licensing and supporting the VPN is the client's and the provider's responsibility, not the developer's.
 - For capture of calls that never reach an agent (4.5): an AMI user on Issabel (Manager Settings in the Issabel GUI, or `manager.conf`) with the server's VPN address in the permitted list — or, failing that, read-only access to the `asteriskcdrdb` database or a CDR export the server can reach, and optionally the call-back extension and its queue failover setting. The client confirms with the provider before installation which of these is available.
 - LAN access between the laptops and the server, VPN access from both to the PBX, and administrator rights on the laptops for installing the app and the VPN client.

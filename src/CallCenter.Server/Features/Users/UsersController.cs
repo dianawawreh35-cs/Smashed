@@ -50,15 +50,15 @@ public class UsersController(UsersService users) : ControllerBase
         return failure is not null ? Problem(failure.Value) : Ok(user);
     }
 
-    /// <summary>Assigns the customer and internal extensions (S-42, SRS 2.3).</summary>
-    [HttpPut("{id:guid}/extensions")]
+    /// <summary>Assigns the agent's extension (S-42, SRS 2.3).</summary>
+    [HttpPut("{id:guid}/extension")]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<UserDto>> SetExtensions(
-        Guid id, SetExtensionsRequest request, CancellationToken ct)
+    public async Task<ActionResult<UserDto>> SetExtension(
+        Guid id, SetExtensionRequest request, CancellationToken ct)
     {
-        var (user, failure) = await users.SetExtensionsAsync(id, request, User.GetRequiredUserId(), ct);
+        var (user, failure) = await users.SetExtensionAsync(id, request, User.GetRequiredUserId(), ct);
         return failure is not null ? Problem(failure.Value) : Ok(user);
     }
 
@@ -87,7 +87,7 @@ public class UsersController(UsersService users) : ControllerBase
             UsersService.Failure.UnknownRole =>
                 (StatusCodes.Status400BadRequest, "unknown_role", "Role must be Agent or Supervisor."),
             UsersService.Failure.NotAnAgent =>
-                (StatusCodes.Status409Conflict, "not_an_agent", "Only agents register extensions."),
+                (StatusCodes.Status409Conflict, "not_an_agent", "Only agents have an extension."),
             UsersService.Failure.LastSupervisor =>
                 (StatusCodes.Status409Conflict, "last_supervisor",
                     "This is the only active supervisor; disabling it would lock everyone out."),

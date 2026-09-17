@@ -140,10 +140,10 @@ public class AuthService(
     }
 
     /// <summary>
-    /// The agent's two extensions with their secrets decrypted (A-01). Null when
-    /// the account is a supervisor, when the supervisor has not filled the
-    /// extensions in yet, or when the PBX address is still blank — in each case
-    /// the app signs in and reports the phone as unconfigured.
+    /// The agent's extension with its secret decrypted (A-01). Null when the
+    /// account is a supervisor, when the supervisor has not assigned an extension
+    /// yet, or when the PBX address is still blank — in each case the app signs
+    /// in and reports the phone as unconfigured.
     /// </summary>
     private async Task<AgentExtensionsDto?> BuildExtensionsAsync(User user, CancellationToken ct)
     {
@@ -152,17 +152,15 @@ public class AuthService(
             return null;
         }
 
-        if (string.IsNullOrWhiteSpace(user.CustomerExtension) ||
-            string.IsNullOrWhiteSpace(user.InternalExtension))
+        if (string.IsNullOrWhiteSpace(user.Extension))
         {
-            logger.LogWarning("Agent {Login} has no extensions configured; signing in without a phone.", user.Login);
+            logger.LogWarning("Agent {Login} has no extension configured; signing in without a phone.", user.Login);
             return null;
         }
 
-        var customerSecret = secrets.Unprotect(user.CustomerSipSecret);
-        var internalSecret = secrets.Unprotect(user.InternalSipSecret);
+        var secret = secrets.Unprotect(user.SipSecret);
 
-        if (customerSecret is null || internalSecret is null)
+        if (secret is null)
         {
             logger.LogWarning("Agent {Login} has an unreadable SIP secret; signing in without a phone.", user.Login);
             return null;
@@ -177,10 +175,8 @@ public class AuthService(
 
         return new AgentExtensionsDto(
             sipServer,
-            user.CustomerExtension,
-            customerSecret,
-            user.InternalExtension,
-            internalSecret);
+            user.Extension,
+            secret);
     }
 
     /// <summary>

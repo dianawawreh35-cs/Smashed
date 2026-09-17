@@ -4,8 +4,7 @@ using System.Text;
 namespace CallCenter.Server.Features.Auth;
 
 /// <summary>
-/// Encrypts the SIP secrets held in <c>users.customer_sip_secret</c> and
-/// <c>users.internal_sip_secret</c> (N-05).
+/// Encrypts the SIP secret held in <c>users.sip_secret</c> (N-05).
 /// </summary>
 /// <remarks>
 /// A database dump therefore does not hand over the extensions' passwords; the

@@ -27,7 +27,7 @@ public class UsersEndpointTests(CallCenterApiFactory factory)
         { "GET", "/api/users" },
         { "POST", "/api/users" },
         { "PUT", "/api/users/11111111-1111-1111-1111-111111111111" },
-        { "PUT", "/api/users/11111111-1111-1111-1111-111111111111/extensions" },
+        { "PUT", "/api/users/11111111-1111-1111-1111-111111111111/extension" },
         { "POST", "/api/users/11111111-1111-1111-1111-111111111111/password" },
     };
 

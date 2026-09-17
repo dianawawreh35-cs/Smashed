@@ -54,16 +54,8 @@
     "enable": "Enable",
     "disable": "Disable",
     "resetPassword": "Reset password",
-    "extensions": "Extensions",
-    "setExtensions": "Set extensions",
-    "noExtensions": "Not set",
     "noSecret": "(no SIP password)",
     "secretSet": "Stored - leave blank to keep",
-    "customerExtension": "Customer extension",
-    "customerSecret": "Customer SIP password",
-    "internalExtension": "Internal extension",
-    "internalSecret": "Internal SIP password",
-    "extensionsHint": "Both extensions make and receive calls; they differ by who is on the other end - customers, versus agents and branches.",
     "roles": {
       "Agent": "Agent",
       "Supervisor": "Supervisor"
@@ -78,7 +70,12 @@
       "invalid_request": "The change could not be applied. Check the fields.",
       "server_unreachable": "The server could not be reached.",
       "server_error": "The server reported an error. Please try again."
-    }
+    },
+    "extension": "Extension",
+    "setExtension": "Set extension",
+    "noExtension": "Not set",
+    "secret": "SIP password",
+    "extensionHint": "One extension per agent, used for every call. Internal calls are told apart by the internal numbers list in Settings."
   },
   "settings": {
     "heading": "System settings",
@@ -121,6 +118,10 @@
       "recording.retention_days": {
         "label": "Recording retention (days)",
         "hint": "Recordings are deleted after this; the call record and classification remain."
+      },
+      "reports.internal_numbers": {
+        "label": "Internal numbers",
+        "hint": "The agents and branch extension numbers, comma separated. A call with one of these is recorded as usual but left out of the customer reports (S-48)."
       }
     }
   }

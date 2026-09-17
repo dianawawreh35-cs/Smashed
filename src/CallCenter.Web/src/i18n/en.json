@@ -160,6 +160,7 @@
     },
     "sameNameWarning": "There is already {{count}} contact with this name:",
     "sameNameHint": "If this is the same person, add the number to them. If it is someone else, carry on and save a separate contact.",
-    "addNumberToThem": "Add this number to them"
+    "addNumberToThem": "Add this number to them",
+    "intro": "Find a customer, or add one. The list is shared by every agent."
   }
 }

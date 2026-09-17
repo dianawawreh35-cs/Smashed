@@ -39,11 +39,11 @@ export default function UsersPage() {
     onError,
   })
 
-  if (isLoading) return <p className="text-slate-500">{t('app.loading')}</p>
+  if (isLoading) return <p className="text-slate-400">{t('app.loading')}</p>
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-semibold">{t('users.heading')}</h2>
+      <h2 className="page-title">{t('users.heading')}</h2>
 
       {error && (
         <p role="alert" className="notice-error">
@@ -104,7 +104,7 @@ function UserRow({
   return (
     <>
       <tr>
-        <td className="font-medium">{user.displayName}</td>
+        <td className="font-medium text-slate-100">{user.displayName}</td>
         <td className="text-slate-500">{user.login}</td>
         <td>{t(`users.roles.${user.role}`)}</td>
         <td className="tabular">
@@ -192,7 +192,7 @@ function CreateUserForm({
 
   return (
     <form onSubmit={submit} className="card card-body space-y-4">
-      <h3 className="text-base font-semibold">{t('users.addHeading')}</h3>
+      <h3 className="text-base font-semibold text-slate-100">{t('users.addHeading')}</h3>
       <div className="grid gap-3 sm:grid-cols-4">
         <Field label={t('users.name')} value={displayName} onChange={setDisplayName} />
         <Field label={t('users.login')} value={login} onChange={setLogin} />
@@ -212,7 +212,7 @@ function CreateUserForm({
       >
         {t('users.add')}
       </button>
-      <p className="text-xs text-slate-500">{t('users.passwordHint')}</p>
+      <p className="field-hint">{t('users.passwordHint')}</p>
     </form>
   )
 }
@@ -244,7 +244,7 @@ function ExtensionForm({
       }}
       className="space-y-3"
     >
-      <p className="text-sm text-slate-600">{t('users.extensionHint')}</p>
+      <p className="field-hint">{t('users.extensionHint')}</p>
       <div className="grid gap-3 sm:grid-cols-2 max-w-lg">
         <Field label={t('users.extension')} value={extension} onChange={setExt} />
         <Field
@@ -302,7 +302,7 @@ function PasswordForm({
       >
         {t('users.save')}
       </button>
-      <p className="text-xs text-slate-500">{t('users.passwordHint')}</p>
+      <p className="field-hint">{t('users.passwordHint')}</p>
     </form>
   )
 }

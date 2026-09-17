@@ -42,7 +42,7 @@ export default function SettingsPage() {
     },
   })
 
-  if (isLoading) return <p className="text-slate-500">{t('app.loading')}</p>
+  if (isLoading) return <p className="text-slate-400">{t('app.loading')}</p>
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -55,8 +55,8 @@ export default function SettingsPage() {
   return (
     <form onSubmit={onSubmit} className="space-y-6 max-w-3xl">
       <div>
-        <h2 className="text-lg font-semibold">{t('settings.heading')}</h2>
-        <p className="text-sm text-slate-500">{t('settings.intro')}</p>
+        <h2 className="page-title">{t('settings.heading')}</h2>
+        <p className="page-subtitle">{t('settings.intro')}</p>
       </div>
 
       {hasProblems && (
@@ -141,10 +141,10 @@ function SettingField({
         />
       )}
 
-      {problem && <span className="block text-xs text-red-700">{problem}</span>}
+      {problem && <span className="block text-xs text-red-400">{problem}</span>}
 
       {setting.updatedByDisplayName && (
-        <span className="block text-xs text-slate-400">
+        <span className="block text-xs text-slate-500">
           {t('settings.lastChangedBy', { name: setting.updatedByDisplayName })}
         </span>
       )}

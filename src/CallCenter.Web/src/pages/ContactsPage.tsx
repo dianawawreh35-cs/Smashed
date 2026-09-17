@@ -37,7 +37,10 @@ export default function ContactsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">{t('contacts.heading')}</h2>
+        <div>
+          <h2 className="page-title">{t('contacts.heading')}</h2>
+          <p className="page-subtitle">{t('contacts.intro')}</p>
+        </div>
         <button type="button" onClick={() => setEditing('new')} className="btn-primary">
           {t('contacts.add')}
         </button>
@@ -60,13 +63,16 @@ export default function ContactsPage() {
       )}
 
       {isLoading ? (
-        <p className="text-slate-500">{t('app.loading')}</p>
+        <p className="text-slate-400">{t('app.loading')}</p>
       ) : results && results.length > 0 ? (
         <ContactTable contacts={results} onEdit={setEditing} />
       ) : (
-        <p className="text-slate-500">
-          {query ? t('contacts.noMatches') : t('contacts.empty')}
-        </p>
+        /* An empty list and a failed search must not look the same. */
+        <div className="card card-body text-center">
+          <p className="text-slate-300">
+            {query ? t('contacts.noMatches') : t('contacts.empty')}
+          </p>
+        </div>
       )}
     </div>
   )
@@ -102,15 +108,15 @@ function ContactTable({
         <tbody>
           {contacts.map((contact) => (
             <tr key={contact.id}>
-              <td className="font-medium">
-                {contact.name ?? <span className="text-slate-400">{t('contacts.noName')}</span>}
+              <td className="font-medium text-slate-100">
+                {contact.name ?? <span className="text-slate-500">{t('contacts.noName')}</span>}
                 {contact.isVip && <span className="badge-vip ms-2">{t('contacts.vip')}</span>}
                 {contact.isBlocked && (
                   <span className="badge-blocked ms-2">{t('contacts.blocked')}</span>
                 )}
               </td>
-              <td className="tabular text-slate-600">{contact.phones.join(' · ')}</td>
-              <td className="text-slate-600">{contact.address}</td>
+              <td className="tabular text-slate-400">{contact.phones.join(' · ')}</td>
+              <td className="text-slate-400">{contact.address}</td>
               <td className="text-end">
                 <button
                   type="button"
@@ -202,7 +208,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
 
   return (
     <form onSubmit={submit} className="card card-body space-y-5">
-      <h3 className="text-base font-semibold">
+      <h3 className="text-base font-semibold text-slate-100">
         {contact ? t('contacts.editHeading') : t('contacts.addHeading')}
       </h3>
 
@@ -234,7 +240,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
           <ul className="mt-2 space-y-1">
             {sameName.map((match) => (
               <li key={match.id} className="flex flex-wrap items-center gap-2">
-                <span className="text-slate-700">
+                <span className="text-slate-300">
                   {match.name} · {match.phones.join(' · ')}
                   {match.address ? ` · ${match.address}` : ''}
                 </span>
@@ -251,12 +257,12 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-amber-800">{t('contacts.sameNameHint')}</p>
+          <p className="mt-2 text-xs text-amber-200/80">{t('contacts.sameNameHint')}</p>
         </div>
       )}
 
       <fieldset className="space-y-2 max-w-md">
-        <legend className="text-sm text-slate-600">{t('contacts.phones')}</legend>
+        <legend className="field-label">{t('contacts.phones')}</legend>
         {phones.map((phone, index) => (
           <div key={index} className="flex gap-2">
             <input
@@ -282,11 +288,11 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
         <button
           type="button"
           onClick={() => setPhones([...phones, ''])}
-          className="text-sm font-medium text-brand-700 hover:text-brand-800"
+          className="text-sm font-medium text-brand-500 hover:text-brand-700"
         >
           {t('contacts.addPhone')}
         </button>
-        <p className="text-xs text-slate-500">{t('contacts.phoneHint')}</p>
+        <p className="field-hint">{t('contacts.phoneHint')}</p>
       </fieldset>
 
       <div className="grid gap-3 sm:grid-cols-2 max-w-2xl">

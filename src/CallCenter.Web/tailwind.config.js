@@ -7,30 +7,37 @@ export default {
         // Cairo carries Arabic and Latin in one family, so a screen mixing a
         // customer name with a phone number does not change typeface mid-line.
         sans: ['Cairo', 'Tajawal', 'Segoe UI', 'system-ui', 'sans-serif'],
-        // Phone numbers, extensions and durations: tabular figures keep columns
-        // aligned and stop digits jumping as a call timer counts.
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        mono: ['Cascadia Mono', 'ui-monospace', 'Consolas', 'monospace'],
       },
       colors: {
-        // The restaurant's orange. Used for primary actions and almost nothing
-        // else - an interface that is orange everywhere makes nothing stand out.
+        // The same palette as the Agent App, so the two halves of the system
+        // look like one product. Dark suits a screen that is open all shift,
+        // and lets the single accent carry meaning rather than compete with a
+        // bright background.
+        ink: {
+          950: '#0F1115', // canvas
+          900: '#171A21', // surface
+          800: '#1E222B', // raised surface
+          700: '#2A2F3A', // border
+        },
+        // Named brand so existing markup keeps working; the values are the blue
+        // from the proof of concept this design follows.
         brand: {
-          50: '#fff7ed',
-          100: '#ffedd5',
-          200: '#fed7aa',
-          300: '#fdba74',
-          400: '#fb923c',
-          500: '#f97316',
-          600: '#ea580c',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
+          50: '#25355A',
+          100: '#25355A',
+          200: '#345079',
+          300: '#3F6BAE',
+          400: '#4F8CFF',
+          500: '#4F8CFF',
+          600: '#4F8CFF',
+          700: '#6BA0FF',
+          800: '#8AB4FF',
+          900: '#B9D0FF',
         },
       },
       boxShadow: {
-        // One soft elevation for cards, one for anything that floats above them.
-        card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06)',
-        raised: '0 4px 6px -1px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.06)',
+        card: '0 1px 2px 0 rgb(0 0 0 / 0.30)',
+        raised: '0 8px 24px -8px rgb(0 0 0 / 0.55)',
       },
       keyframes: {
         'fade-in': {

@@ -21,8 +21,8 @@ public partial class ContactsView : UserControl
     }
 
     /// <summary>
-    /// A GridViewColumn header is not part of the visual tree, so it cannot bind
-    /// to the view model. Set here instead, and again whenever the language
+    /// A DataGrid column header is not part of the visual tree, so it cannot
+    /// bind to the view model. Set here, and again whenever the language
     /// changes (A-80).
     /// </summary>
     private void SetColumnHeaders()

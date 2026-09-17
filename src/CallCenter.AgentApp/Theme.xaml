@@ -3,62 +3,86 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
   <!--
-    The Agent App's look, matching the supervisor web app: same orange, same
-    slate neutrals, same rounded corners.
+    The Agent App's look, following the CallPoc proof of concept: a dark shell,
+    one blue accent, and cards on a near-black canvas.
 
-    WPF's stock controls still look like Windows 7, and an agent stares at this
-    screen for an eight-hour shift. Every style here is keyless so it applies by
-    type, and existing views pick it up without being rewritten.
+    Dark suits the job. An agent has this on screen for an eight-hour shift,
+    often in a back room, and a white full-screen window for that long is
+    tiring. It also lets the one accent colour carry meaning - what is selected,
+    what is the primary action - instead of competing with a bright background.
   -->
 
-  <!-- ===== Colours =================================================== -->
-  <Color x:Key="BrandColor">#EA580C</Color>
+  <!-- ===== Palette ================================================== -->
+  <Color x:Key="BgColor">#0F1115</Color>
+  <Color x:Key="AccentColor">#4F8CFF</Color>
 
-  <SolidColorBrush x:Key="Brand" Color="#EA580C" />
-  <SolidColorBrush x:Key="BrandDark" Color="#C2410C" />
-  <SolidColorBrush x:Key="BrandLight" Color="#FFF7ED" />
+  <SolidColorBrush x:Key="Bg" Color="#0F1115" />
+  <SolidColorBrush x:Key="Surface" Color="#171A21" />
+  <SolidColorBrush x:Key="SurfaceAlt" Color="#1E222B" />
+  <SolidColorBrush x:Key="BorderSoft" Color="#2A2F3A" />
 
-  <SolidColorBrush x:Key="Surface" Color="#FFFFFF" />
-  <SolidColorBrush x:Key="Canvas" Color="#F1F5F9" />
-  <SolidColorBrush x:Key="Border" Color="#E2E8F0" />
-  <SolidColorBrush x:Key="BorderStrong" Color="#CBD5E1" />
+  <SolidColorBrush x:Key="Text" Color="#E6E8EC" />
+  <SolidColorBrush x:Key="TextMuted" Color="#8B93A7" />
+  <SolidColorBrush x:Key="TextFaint" Color="#5E667A" />
 
-  <SolidColorBrush x:Key="Ink" Color="#0F172A" />
-  <SolidColorBrush x:Key="InkMuted" Color="#64748B" />
-  <SolidColorBrush x:Key="InkFaint" Color="#94A3B8" />
+  <SolidColorBrush x:Key="Accent" Color="#4F8CFF" />
+  <SolidColorBrush x:Key="AccentHover" Color="#6BA0FF" />
+  <SolidColorBrush x:Key="AccentDim" Color="#25355A" />
 
-  <SolidColorBrush x:Key="Success" Color="#059669" />
-  <SolidColorBrush x:Key="Warning" Color="#D97706" />
-  <SolidColorBrush x:Key="Danger" Color="#DC2626" />
+  <SolidColorBrush x:Key="Success" Color="#3FB950" />
+  <SolidColorBrush x:Key="Warning" Color="#D29922" />
+  <SolidColorBrush x:Key="Danger" Color="#F85149" />
 
-  <!-- The status bar stays dark: it is chrome, not content. -->
-  <SolidColorBrush x:Key="StatusBarBrush" Color="#0F172A" />
-  <SolidColorBrush x:Key="StatusBarTextBrush" Color="#E2E8F0" />
+  <CornerRadius x:Key="CornerSmall">6</CornerRadius>
+  <CornerRadius x:Key="CornerLarge">10</CornerRadius>
 
-  <!-- ===== Typography ================================================ -->
+  <!-- ===== Typography ============================================== -->
   <!--
     Cairo carries Arabic and Latin in one family. It is a Google font and may
-    not be installed, so the fallbacks are named here rather than left to WPF -
-    Segoe UI has proper Arabic coverage on Windows 10 and 11.
+    not be installed, so Segoe UI is named after it - it has proper Arabic
+    coverage on Windows 10 and 11.
   -->
   <FontFamily x:Key="UiFont">Cairo, Tajawal, Segoe UI</FontFamily>
+  <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
+
   <sys:Double x:Key="FontSizeSmall">11</sys:Double>
   <sys:Double x:Key="FontSizeBody">13</sys:Double>
-  <sys:Double x:Key="FontSizeTitle">16</sys:Double>
+  <sys:Double x:Key="FontSizeTitle">19</sys:Double>
 
-  <!-- ===== Buttons =================================================== -->
-  <!--
-    The default: quiet, bordered, for everything that is not the one action a
-    screen is about.
-  -->
-  <Style TargetType="Button">
+  <Style TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-    <Setter Property="Foreground" Value="{StaticResource Ink}" />
-    <Setter Property="Background" Value="{StaticResource Surface}" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+  </Style>
+
+  <Style x:Key="Heading" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+    <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+  </Style>
+
+  <Style x:Key="Subtle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+  </Style>
+
+  <!-- Field captions sit above their box, small and quiet. -->
+  <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    <Setter Property="Margin" Value="0,14,0,5" />
+  </Style>
+
+  <!-- ===== Buttons ================================================= -->
+  <Style x:Key="ButtonBase" TargetType="Button">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Padding" Value="14,7" />
+    <Setter Property="Padding" Value="16,8" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
     <Setter Property="Template">
@@ -68,22 +92,20 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="6"
-                  SnapsToDevicePixels="True">
+                  CornerRadius="{StaticResource CornerSmall}">
             <ContentPresenter HorizontalAlignment="Center"
                               VerticalAlignment="Center"
                               Margin="{TemplateBinding Padding}" />
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Chrome" Property="Background" Value="#F8FAFC" />
-              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource InkFaint}" />
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.85" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Chrome" Property="Background" Value="#F1F5F9" />
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.7" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
-              <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.4" />
               <Setter Property="Cursor" Value="Arrow" />
             </Trigger>
           </ControlTemplate.Triggers>
@@ -91,58 +113,53 @@
       </Setter.Value>
     </Setter>
   </Style>
+
+  <Style TargetType="Button" BasedOn="{StaticResource ButtonBase}" />
 
   <!-- The one action a screen is about: sign in, save, answer. -->
-  <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-    <Setter Property="Background" Value="{StaticResource Brand}" />
-    <Setter Property="Foreground" Value="White" />
-    <Setter Property="BorderThickness" Value="0" />
+  <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="{StaticResource Accent}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Template">
-      <Setter.Value>
-        <ControlTemplate TargetType="Button">
-          <Border x:Name="Chrome"
-                  Background="{TemplateBinding Background}"
-                  CornerRadius="6"
-                  SnapsToDevicePixels="True">
-            <ContentPresenter HorizontalAlignment="Center"
-                              VerticalAlignment="Center"
-                              Margin="{TemplateBinding Padding}" />
-          </Border>
-          <ControlTemplate.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource BrandDark}" />
-            </Trigger>
-            <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Chrome" Property="Background" Value="#9A3412" />
-            </Trigger>
-            <Trigger Property="IsEnabled" Value="False">
-              <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
-              <Setter Property="Cursor" Value="Arrow" />
-            </Trigger>
-          </ControlTemplate.Triggers>
-        </ControlTemplate>
-      </Setter.Value>
-    </Setter>
   </Style>
 
-  <!-- Small, for a row of actions inside a list. -->
-  <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-    <Setter Property="Padding" Value="8,3" />
+  <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="{StaticResource Success}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Success}" />
+    <Setter Property="Foreground" Value="#08130A" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="{StaticResource Danger}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Danger}" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+
+  <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Padding" Value="10,4" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
   </Style>
 
-  <!-- ===== Text input ================================================ -->
+  <!-- ===== Text input ============================================== -->
   <Style TargetType="TextBox">
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-    <Setter Property="Foreground" Value="{StaticResource Ink}" />
-    <Setter Property="Background" Value="{StaticResource Surface}" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Padding" Value="8,6" />
-    <Setter Property="CaretBrush" Value="{StaticResource Ink}" />
-    <Setter Property="SelectionBrush" Value="{StaticResource Brand}" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="CaretBrush" Value="{StaticResource Text}" />
+    <Setter Property="SelectionBrush" Value="{StaticResource Accent}" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="TextBox">
@@ -150,25 +167,17 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="6"
-                  SnapsToDevicePixels="True">
+                  CornerRadius="{StaticResource CornerSmall}">
             <ScrollViewer x:Name="PART_ContentHost"
                           Margin="{TemplateBinding Padding}"
                           VerticalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource InkFaint}" />
-            </Trigger>
-            <!-- The focused field is obvious: an agent tabbing through a form
-                 mid-call should never have to hunt for the caret. -->
-            <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Brand}" />
-              <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
-              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Canvas}" />
-              <Setter Property="Foreground" Value="{StaticResource InkMuted}" />
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -179,12 +188,12 @@
   <Style TargetType="PasswordBox">
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-    <Setter Property="Foreground" Value="{StaticResource Ink}" />
-    <Setter Property="Background" Value="{StaticResource Surface}" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Padding" Value="8,6" />
-    <Setter Property="CaretBrush" Value="{StaticResource Ink}" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="CaretBrush" Value="{StaticResource Text}" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="PasswordBox">
@@ -192,22 +201,17 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="6"
-                  SnapsToDevicePixels="True">
+                  CornerRadius="{StaticResource CornerSmall}">
             <ScrollViewer x:Name="PART_ContentHost"
                           Margin="{TemplateBinding Padding}"
                           VerticalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource InkFaint}" />
-            </Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Brand}" />
-              <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
-              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Canvas}" />
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -215,129 +219,131 @@
     </Setter>
   </Style>
 
-  <!-- ===== Text ====================================================== -->
-  <Style TargetType="TextBlock">
-    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-    <Setter Property="Foreground" Value="{StaticResource Ink}" />
-    <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
-  </Style>
-
-  <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-    <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Foreground" Value="{StaticResource InkMuted}" />
-    <Setter Property="Margin" Value="0,10,0,4" />
-  </Style>
-
-  <Style x:Key="TitleText" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-    <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-  </Style>
-
-  <!-- ===== Tabs ====================================================== -->
+  <!-- ===== Left rail navigation ==================================== -->
   <Style TargetType="TabControl">
-    <Setter Property="Background" Value="{StaticResource Canvas}" />
+    <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="0" />
   </Style>
 
   <Style TargetType="TabItem">
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Foreground" Value="{StaticResource InkMuted}" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="TabItem">
-          <Border x:Name="Chrome"
-                  Background="Transparent"
-                  BorderBrush="Transparent"
-                  BorderThickness="0,0,0,2"
-                  Padding="16,10">
-            <ContentPresenter ContentSource="Header" VerticalAlignment="Center" />
-          </Border>
+          <Grid Background="Transparent" Margin="8,2">
+            <Border x:Name="Chrome"
+                    CornerRadius="{StaticResource CornerSmall}"
+                    Background="Transparent"
+                    Padding="14,10">
+              <ContentPresenter ContentSource="Header" VerticalAlignment="Center" />
+            </Border>
+            <!-- The marker sits on the start edge, so it moves to the right in
+                 Arabic with the rest of the layout. -->
+            <Border x:Name="Bar"
+                    Width="3"
+                    HorizontalAlignment="Left"
+                    CornerRadius="2"
+                    Background="Transparent"
+                    Margin="-8,6" />
+          </Grid>
           <ControlTemplate.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-              <Setter Property="Foreground" Value="{StaticResource Ink}" />
-            </Trigger>
-            <!-- An underline rather than a raised tab: it reads the same in
-                 both directions, which a shaped tab does not. -->
             <Trigger Property="IsSelected" Value="True">
-              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Brand}" />
-              <Setter Property="Foreground" Value="{StaticResource Brand}" />
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SurfaceAlt}" />
+              <Setter TargetName="Bar" Property="Background" Value="{StaticResource Accent}" />
+              <Setter Property="Foreground" Value="{StaticResource Text}" />
+              <Setter Property="FontWeight" Value="SemiBold" />
             </Trigger>
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="False" />
+                <Condition Property="IsMouseOver" Value="True" />
+              </MultiTrigger.Conditions>
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Surface}" />
+              <Setter Property="Foreground" Value="{StaticResource Text}" />
+            </MultiTrigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
   </Style>
 
-  <!-- ===== Lists ===================================================== -->
-  <Style TargetType="ListView">
-    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
-    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+  <!-- ===== Cards and pills ========================================= -->
+  <Style x:Key="Card" TargetType="Border">
     <Setter Property="Background" Value="{StaticResource Surface}" />
-    <Setter Property="BorderBrush" Value="{StaticResource Border}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
     <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource CornerLarge}" />
+    <Setter Property="Padding" Value="20" />
   </Style>
 
-  <Style TargetType="ListViewItem">
-    <Setter Property="Padding" Value="8,6" />
-    <Setter Property="Template">
-      <Setter.Value>
-        <ControlTemplate TargetType="ListViewItem">
-          <Border x:Name="Row"
-                  Background="{TemplateBinding Background}"
-                  BorderBrush="{StaticResource Border}"
-                  BorderThickness="0,0,0,1"
-                  Padding="{TemplateBinding Padding}">
-            <GridViewRowPresenter VerticalAlignment="Center" />
-          </Border>
-          <ControlTemplate.Triggers>
-            <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Row" Property="Background" Value="#F8FAFC" />
-            </Trigger>
-            <Trigger Property="IsSelected" Value="True">
-              <Setter TargetName="Row" Property="Background" Value="{StaticResource BrandLight}" />
-            </Trigger>
-          </ControlTemplate.Triggers>
-        </ControlTemplate>
-      </Setter.Value>
-    </Setter>
+  <Style x:Key="Pill" TargetType="Border">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="9,3" />
+    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
   </Style>
 
-  <Style TargetType="GridViewColumnHeader">
+  <!-- ===== DataGrid ================================================ -->
+  <Style TargetType="DataGridColumnHeader">
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Foreground" Value="{StaticResource InkMuted}" />
-    <Setter Property="Background" Value="{StaticResource Canvas}" />
-    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+
+  <Style TargetType="DataGridCell">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="12,9" />
     <Setter Property="Template">
       <Setter.Value>
-        <ControlTemplate TargetType="GridViewColumnHeader">
-          <Border Background="{TemplateBinding Background}"
-                  BorderBrush="{StaticResource Border}"
-                  BorderThickness="0,0,0,1"
-                  Padding="{TemplateBinding Padding}">
-            <!-- Start-aligned, so the header sits over its column in Arabic as
-                 well as English. -->
-            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+        <ControlTemplate TargetType="DataGridCell">
+          <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter VerticalAlignment="Center" />
           </Border>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
   </Style>
 
-  <!-- ===== Cards ===================================================== -->
-  <Style x:Key="Card" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource Surface}" />
-    <Setter Property="BorderBrush" Value="{StaticResource Border}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Padding" Value="20" />
+  <Style TargetType="DataGridRow">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{StaticResource Surface}" />
+      </Trigger>
+      <Trigger Property="IsSelected" Value="True">
+        <Setter Property="Background" Value="{StaticResource AccentDim}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style TargetType="DataGrid">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="RowBackground" Value="Transparent" />
+    <Setter Property="GridLinesVisibility" Value="None" />
+    <Setter Property="HeadersVisibility" Value="Column" />
+    <Setter Property="AutoGenerateColumns" Value="False" />
+    <Setter Property="IsReadOnly" Value="True" />
+    <Setter Property="SelectionMode" Value="Single" />
+    <Setter Property="CanUserResizeRows" Value="False" />
+    <Setter Property="RowHeight" Value="44" />
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+    <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
   </Style>
 
 </ResourceDictionary>

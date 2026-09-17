@@ -36,21 +36,21 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen lg:flex">
       <aside
-        className="border-slate-200 bg-white lg:min-h-screen lg:w-60 lg:shrink-0
+        className="border-ink-700 bg-ink-900 lg:min-h-screen lg:w-60 lg:shrink-0
                    lg:border-e border-b lg:border-b-0"
       >
         <div className="flex items-center gap-3 px-5 py-4">
           {/* The restaurant's mark. A letter rather than an image keeps the app
               working on a server with no internet and nothing to fetch. */}
           <span
-            className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600
-                       font-bold text-white"
+            className="grid h-9 w-9 place-items-center rounded-lg bg-brand-50
+                       font-bold text-brand-500"
             aria-hidden="true"
           >
             S
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold">{t('app.title')}</p>
+            <p className="text-sm font-semibold text-slate-100">{t('app.title')}</p>
             <p className="text-xs text-slate-500">{t('app.subtitle')}</p>
           </div>
         </div>
@@ -71,24 +71,24 @@ export default function AppLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end gap-3 border-b border-slate-200 bg-white px-6 py-3">
+        <header className="flex items-center justify-end gap-3 border-b border-ink-700 bg-ink-900 px-6 py-3">
           {/* Who is signed in, so a shared browser never leaves it in doubt. */}
           {user && (
             <span className="flex items-center gap-2 text-sm">
               <span
-                className="grid h-7 w-7 place-items-center rounded-full bg-slate-200
-                           text-xs font-semibold text-slate-700"
+                className="grid h-7 w-7 place-items-center rounded-full bg-brand-50
+                           text-xs font-semibold text-brand-500"
                 aria-hidden="true"
               >
                 {user.displayName.trim().charAt(0)}
               </span>
-              <span className="text-slate-700">{user.displayName}</span>
+              <span className="text-slate-300">{user.displayName}</span>
             </span>
           )}
 
           <LanguageSwitcher />
 
-          <button type="button" onClick={onSignOut} className="btn-ghost btn-sm">
+          <button type="button" onClick={onSignOut} className="btn-quiet btn-sm">
             {t('nav.logout')}
           </button>
         </header>

@@ -2,59 +2,18 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding Localizer[app.title]}"
-        Height="720" Width="1120"
-        MinHeight="480" MinWidth="800"
+        Height="740" Width="1180"
+        MinHeight="560" MinWidth="960"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
+        Background="{StaticResource Bg}"
+        TextOptions.TextFormattingMode="Ideal"
         WindowStartupLocation="CenterScreen">
 
-  <DockPanel>
-
-    <!-- Status bar -->
-    <Border DockPanel.Dock="Bottom"
-            Background="{StaticResource StatusBarBrush}"
-            Padding="16,8">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-
-        <StackPanel Grid.Column="0" Orientation="Horizontal">
-          <Ellipse x:Name="ConnectionStatusLight"
-                   Width="9" Height="9"
-                   Fill="#EF4444"
-                   VerticalAlignment="Center"
-                   Margin="0,0,8,0" />
-          <TextBlock x:Name="ConnectionStatusText"
-                     Foreground="{StaticResource StatusBarTextBrush}"
-                     VerticalAlignment="Center" />
-        </StackPanel>
-
-        <!-- Who is signed in, so a shared laptop never leaves it in doubt (A-05). -->
-        <TextBlock x:Name="SignedInAsText"
-                   Grid.Column="2"
-                   Margin="0,0,16,0"
-                   Foreground="{StaticResource StatusBarTextBrush}"
-                   Opacity="0.8"
-                   VerticalAlignment="Center"
-                   Visibility="Collapsed" />
-
-        <!-- The version stays in Latin digits whatever the language. -->
-        <TextBlock x:Name="VersionText"
-                   Grid.Column="3"
-                   FlowDirection="LeftToRight"
-                   Foreground="{StaticResource StatusBarTextBrush}"
-                   Opacity="0.6"
-                   VerticalAlignment="Center" />
-      </Grid>
-    </Border>
-
-    <!-- Shell content: the login screen until the agent signs in, then the
-         signed-in view. Tabs are added with their features. -->
-    <ContentControl x:Name="ShellContent" Background="{StaticResource Canvas}" />
-
-  </DockPanel>
+  <!--
+    The window is only a frame: the login screen until an agent signs in, then
+    the signed-in shell. The phone's status used to live in a bar along the
+    bottom; it now sits in the rail, where the agent is already looking.
+  -->
+  <ContentControl x:Name="ShellContent" />
 </Window>

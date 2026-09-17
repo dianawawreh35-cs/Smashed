@@ -6,8 +6,8 @@ export default function DashboardPage() {
 
   return (
     <section className="space-y-2">
-      <h2 className="text-xl font-semibold">{t('dashboard.heading')}</h2>
-      <p className="text-slate-500">{t('dashboard.placeholder')}</p>
+      <h2 className="page-title">{t('dashboard.heading')}</h2>
+      <p className="page-subtitle">{t('dashboard.placeholder')}</p>
     </section>
   )
 }

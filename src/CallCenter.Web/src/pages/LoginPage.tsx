@@ -44,19 +44,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-slate-100 px-4 py-10">
+    <div className="grid min-h-screen place-items-center bg-ink-950 px-4 py-10">
       <div className="w-full max-w-sm space-y-4">
         <div className="flex items-center justify-between">
           {/* The mark, so the sign-in screen is recognisably the same product
               as the one behind it. */}
           <span className="flex items-center gap-2">
             <span
-              className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 font-bold text-white"
+              className="grid h-9 w-9 place-items-center rounded-lg bg-brand-50 font-bold text-brand-500"
               aria-hidden="true"
             >
               S
             </span>
-            <span className="text-sm font-semibold">{t('app.title')}</span>
+            <span className="text-sm font-semibold text-slate-100">{t('app.title')}</span>
           </span>
 
           <LanguageSwitcher />
@@ -64,8 +64,8 @@ export default function LoginPage() {
 
         <form onSubmit={onSubmit} className="card card-body space-y-5">
           <div className="space-y-1">
-            <h1 className="text-xl font-semibold">{t('login.heading')}</h1>
-            <p className="text-sm text-slate-500">{t('app.subtitle')}</p>
+            <h1 className="text-xl font-semibold text-slate-100">{t('login.heading')}</h1>
+            <p className="text-sm text-slate-400">{t('app.subtitle')}</p>
           </div>
 
           <label className="field">

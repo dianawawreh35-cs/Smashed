@@ -3,54 +3,40 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Canvas}">
+             Background="{StaticResource Bg}">
 
   <Grid>
 
     <!-- Language toggle, reachable before signing in: an agent who cannot read
          the screen has to be able to change it (A-80). -->
     <Button Content="{Binding Localizer[app.language]}"
-            Style="{StaticResource SmallButton}"
+            Style="{StaticResource GhostButton}"
             HorizontalAlignment="Left"
             VerticalAlignment="Top"
-            Margin="16"
+            Margin="18"
             Command="{Binding ToggleLanguageCommand}" />
 
-    <Border Width="380"
-            Padding="32,28"
+    <Border Width="400"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
-            Style="{StaticResource Card}">
+            Style="{StaticResource Card}"
+            Padding="34,30">
 
       <StackPanel>
 
-        <!-- The restaurant's mark, so the app is recognisable before anyone
-             has read a word of it. -->
-        <Border Width="44" Height="44"
-                HorizontalAlignment="Center"
-                CornerRadius="10"
-                Background="{StaticResource Brand}">
-          <TextBlock Text="S"
-                     FontSize="22"
-                     FontWeight="Bold"
-                     Foreground="White"
-                     HorizontalAlignment="Center"
-                     VerticalAlignment="Center" />
-        </Border>
-
-        <TextBlock Text="{Binding Localizer[login.heading]}"
+        <TextBlock Text="{Binding Localizer[app.title]}"
                    FontSize="20"
-                   FontWeight="SemiBold"
-                   Margin="0,14,0,0"
+                   FontWeight="Bold"
                    HorizontalAlignment="Center" />
 
         <TextBlock Text="{Binding Localizer[app.subtitle]}"
-                   FontSize="{StaticResource FontSizeSmall}"
-                   Foreground="{StaticResource InkMuted}"
-                   Margin="0,2,0,22"
+                   Style="{StaticResource Subtle}"
+                   Margin="0,3,0,24"
                    HorizontalAlignment="Center" />
 
-        <TextBlock Text="{Binding Localizer[login.username]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+        <TextBlock Text="{Binding Localizer[login.username]}"
+                   Style="{StaticResource FieldLabel}"
+                   Margin="0,0,0,5" />
         <TextBox x:Name="LoginBox"
                  Text="{Binding Login, UpdateSourceTrigger=PropertyChanged}"
                  IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
@@ -62,30 +48,29 @@
 
         <!-- Wrong password, disabled account, or the server being down: one
              place, so the agent always looks in the same spot. -->
-        <Border Margin="0,16,0,0"
-                Padding="12,9"
-                Background="#FEF2F2"
-                BorderBrush="#FCA5A5"
+        <Border Margin="0,18,0,0"
+                Padding="12,10"
+                Background="#2A1416"
+                BorderBrush="{StaticResource Danger}"
                 BorderThickness="1"
-                CornerRadius="6"
+                CornerRadius="{StaticResource CornerSmall}"
                 Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
           <TextBlock Text="{Binding ErrorMessage}"
-                     Foreground="#B91C1C"
+                     Foreground="#FF9B95"
                      TextWrapping="Wrap" />
         </Border>
 
         <Button Content="{Binding Localizer[login.submit]}"
                 Style="{StaticResource PrimaryButton}"
-                Margin="0,20,0,0"
-                Padding="0,10"
+                Margin="0,22,0,0"
+                Padding="0,11"
                 IsDefault="True"
                 Command="{Binding SignInCommand}" />
 
         <TextBlock Text="{Binding Localizer[login.connecting]}"
+                   Style="{StaticResource Subtle}"
                    Margin="0,12,0,0"
                    HorizontalAlignment="Center"
-                   FontSize="{StaticResource FontSizeSmall}"
-                   Foreground="{StaticResource InkMuted}"
                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
 
       </StackPanel>

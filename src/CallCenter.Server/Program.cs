@@ -1,6 +1,7 @@
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Seed;
 using CallCenter.Server.Features.Auth;
+using CallCenter.Server.Features.Contacts;
 using CallCenter.Server.Features.Settings;
 using CallCenter.Server.Features.Users;
 using CallCenter.Server.Hubs;
@@ -52,6 +53,7 @@ try
     builder.Services.AddSingleton<ISipSecretProtector, SipSecretProtector>();
     builder.Services.AddScoped<AuthService>();
     builder.Services.AddScoped<UsersService>();
+    builder.Services.AddScoped<ContactsService>();
     builder.Services.AddScoped<SettingsService>();
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()

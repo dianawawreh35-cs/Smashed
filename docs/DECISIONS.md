@@ -382,6 +382,51 @@ configurable, rather than being invented then.
 
 ---
 
+## 2026-09-17 — Contacts: matching, and why the full-text index is unused
+
+The shared contact list (A-60 to A-63), server side.
+
+### Matching is by number, never by name
+
+Two customers may genuinely share a name, so duplicate detection looks only at
+the phone number. `contacts` has no unique index at all; `contact_phones` is
+unique on `normalised`. One contact may hold several numbers, and a call from
+any of them finds the same person.
+
+Caller lookup (A-10, A-13) tries the exact normalised number first, then falls
+back to the last nine digits, so `0599123456` finds a contact saved as
+`+970599123456`. **The fallback is guarded to tails of exactly nine digits.**
+`PhoneNormalizer.Last9` returns short numbers whole, so without that guard
+extension `2001` would fuzzy-match every other extension — every internal number
+would collide with every other.
+
+Duplicates are checked before saving rather than left to the unique index, so the
+refusal can name the contact that already holds the number and return its id. The
+screen can then offer to open it, instead of surfacing an index violation.
+
+### The full-text index is deliberately unused
+
+The schema carries a GIN index over `to_tsvector(name || address)`. Search uses
+`ILIKE` instead.
+
+`to_tsvector` was created with the default text configuration, which does not
+stem Arabic — so it would miss the names most contacts actually have, which is
+the opposite of useful. `ILIKE` behaves the same in both languages and is
+predictable. At the expected volume (hundreds of contacts, a few thousand at
+most) the difference is not measurable.
+
+If it ever does become slow, the fix is an Arabic text-search configuration and
+an index over that, not a rewrite of the query.
+
+### Not built yet
+
+Merging duplicates (A-63), the VIP and Blocked flags (S-45 — deliberately
+untouchable by any endpoint here, so an agent editing an address cannot clear a
+block), Excel/CSV import (A-64), the contact history panel (A-62, needs
+communications), and the screens in both clients.
+
+---
+
 # How this project is tracked
 
 Three files, each with one job. Kept current as part of doing the work, not

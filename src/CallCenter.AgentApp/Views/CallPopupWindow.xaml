@@ -20,6 +20,20 @@
                  Style="{StaticResource Subtle}"
                  HorizontalAlignment="Center" />
 
+      <!-- Which queue rang, above the number: it changes how the agent answers,
+           and they read it before they have said anything. -->
+      <Border Background="#1F2A37"
+              CornerRadius="{StaticResource CornerSmall}"
+              Padding="10,3"
+              Margin="0,10,0,0"
+              HorizontalAlignment="Center"
+              Visibility="{Binding HasQueue, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Text="{Binding Queue}"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource Text}" />
+      </Border>
+
       <!-- The number, large: it is the only thing identifying the caller until
            the contact lookup arrives (A-11, A-16). -->
       <TextBlock Text="{Binding Number}"
@@ -28,6 +42,14 @@
                  Foreground="{StaticResource Text}"
                  HorizontalAlignment="Center"
                  Margin="0,8,0,0" />
+
+      <!-- Whatever name the PBX sent, small, because it is not a contact and
+           will be replaced by the real lookup (A-11). -->
+      <TextBlock Text="{Binding CallerName}"
+                 Style="{StaticResource Subtle}"
+                 HorizontalAlignment="Center"
+                 Margin="0,4,0,0"
+                 Visibility="{Binding HasCallerName, Converter={StaticResource BoolToVisibility}}" />
 
       <!-- Only while connected, and empty before then, so a ring is never
            mistaken for a call that has been running for two minutes. -->

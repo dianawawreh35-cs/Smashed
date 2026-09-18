@@ -760,6 +760,85 @@ None of this has met a PBX. The build compiles and the block-list rule is
 covered, but "a call arrives and the pop-up appears" has been verified by
 nobody. It needs the developer to ring extension 2001 from a phone.
 
+## 2026-09-18 — Why the phone never rang: three bugs the proof-of-concept already knew
+
+The first real call was never offered to the app. The log showed sign-in,
+block list, socket open, `Extension 2001 registered` — and then nothing at all.
+
+The developer pointed at `Desktop\pOC`, an earlier proof-of-concept that already
+works against **this same PBX and this same extension**. All three causes were
+solved there, with comments explaining each. They had not been read.
+
+### 1. The PBX had decided the extension was unreachable
+
+Asterisk sends `OPTIONS` every few seconds to qualify a registered extension.
+SIPSorcery answers nothing outside an established dialogue, so those went
+unanswered, the PBX marked 2001 unreachable, and **stopped offering calls** —
+while registration carried on succeeding every two minutes.
+
+That is the worst shape a bug can have: every indicator green, the thing simply
+does not happen. `CallService` now answers `OPTIONS` and `NOTIFY` with 200 OK,
+advertising `Allow`, at the transport level.
+
+### 2. The Contact header did not name the extension
+
+`SIPRegistrationUserAgent` takes `sendUsernameInContactHeader`, and without it
+the Contact is `sip:<ip>:<port>` with no user part — nothing tying the
+registration to extension 2001. The PoC sets it. Now so does this.
+
+Either of these two alone is enough to produce silence, which is why both were
+fixed before testing again rather than one at a time.
+
+### 3. Busy was never going to work
+
+`SIPUserAgent` silently drops an INVITE arriving while it holds a dialogue, so
+`OnIncomingCall` never fires for a second call and the busy reply sat in code
+that could not run. The caller would have heard nothing until the PBX timed out.
+Busy is now handled in the transport handler, where the INVITE actually lands,
+and a re-INVITE for the call in progress is told apart by Call-ID.
+
+### What the app logs now, and why that was the real failure
+
+When the call did not arrive, the app had logged **nothing**. "The PBX never
+sent it" and "it arrived and we mishandled it" were indistinguishable, and they
+need opposite fixes.
+
+Every SIP message in and out is now logged, one line each, at Information. A
+single extension is not chatty enough for that to be a problem, and a call that
+does not arrive is worth more than a tidy log. The full message goes out at
+Debug.
+
+That gap was the actual mistake here. The three bugs were ordinary; not being
+able to tell them apart from a network problem is what made the session
+expensive.
+
+### Taken from the proof-of-concept, deliberately
+
+**The queue.** The dialplan sets `X-Queue-Name` on the INVITE. SIPSorcery drops
+unrecognised headers into `UnknownHeaders` as raw text, so it is read by hand.
+The queue now shows as a badge **above the number** on the pop-up — the agent
+needs it before they speak, because Delivery and Complaints are answered
+differently — and it rides on `CallState` ready to be stored with the call and
+used in classification (A-40) and per-queue reports.
+
+When no queue header arrives, the log says which custom headers *were* present.
+Otherwise a dialplan that never set it and a reader that failed to parse it look
+identical, and they need opposite fixes.
+
+**Caller ID.** A trunk call often carries the real subscriber number in
+`P-Asserted-Identity` while `From` holds whatever the caller claimed; RFC 3325
+makes the former the identity the network vouches for, so it wins. The PoC also
+knows the several words switches use for "withheld". Adopted whole — with
+`LooksLikeNumber` and `SameNumber` rewired onto `PhoneNormalizer`, so this system
+keeps one definition of a phone number rather than two.
+
+### The lesson
+
+There was a working reference implementation against this exact PBX, in a folder
+on the same desktop, and this code was written from the library documentation
+instead. **Before the next piece of telephony — outbound, transfer, recording —
+read `pOC` first.** It has met the hardware.
+
 ---
 
 # How this project is tracked
@@ -865,11 +944,18 @@ Section 4.5 and reports R-20/R-21 are deferred until these are answered
 - **Login has no database-backed test.** The suite runs without PostgreSQL by
   design, so token validation and encryption are covered and the actual login
   path is not.
-- **Nothing in the call path has met a PBX.** The pop-up, the answer, the
-  hang-up and the automatic rejection compile and are wired together, and no
-  call has ever been through them. The block-list rule is covered by tests
-  because it was deliberately put in Shared; everything downstream of an actual
-  INVITE is unverified until the developer rings extension 2001.
+- **Nothing in the call path has met a PBX.** One attempt was made and the call
+  was never offered to the app; three causes were found and fixed (see the entry
+  above), and **it has not been retried since**. The pop-up, the answer, the
+  hang-up, the queue badge and the automatic rejection are all still unverified
+  against real hardware. The block-list rule is covered by tests because it was
+  deliberately put in Shared; everything downstream of an actual INVITE is not.
+- **`docs/DEVELOPING.md` says to stop the apps before building, and the check
+  for whether they are running is easy to get wrong.** Both run as `dotnet.exe`,
+  so looking for a `CallCenter` process finds nothing while both are up. The
+  command that works is
+  `Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'"` and reading the
+  command line.
 - **The flags have no database-backed test either.** The new tests cover the
   door (an agent is 403 on every write, and gets through on the two reads the
   pop-up needs) and the three refusals that answer before any query. What the

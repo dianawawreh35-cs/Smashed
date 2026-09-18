@@ -33,6 +33,16 @@ Agent App is still running. Close both, then build.
 Worth doing first, every time — it is the single most common wasted round trip
 on this project.
 
+Checking whether they are running is easy to get wrong: both run as
+**`dotnet.exe`**, so looking for a `CallCenter` process finds nothing while both
+are up. What works:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" |
+  Where-Object { $_.CommandLine -like "*CallCenter*" } |
+  Select-Object ProcessId, CommandLine
+```
+
 ## 3. The three commands
 
 Run them in this order, each in its own terminal. PowerShell.

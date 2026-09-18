@@ -87,7 +87,15 @@ public class SipRegistrationService(
                 maxRegistrationAttemptTimeout: 60,
                 registerFailureRetryInterval: RetryIntervalSeconds,
                 maxRegisterAttempts: MaxRegisterAttempts,
-                exitOnUnequivocalFailure: true);
+                exitOnUnequivocalFailure: true,
+
+                // Without this the Contact header is "sip:<ip>:<port>" with no
+                // user part, and Asterisk has nothing to tie the registration to
+                // extension 2001. Registration still succeeds and calls are
+                // never offered — which looks exactly like a working phone that
+                // nobody rings. The proof-of-concept app against this same PBX
+                // sets it for the same reason.
+                sendUsernameInContactHeader: true);
 
             var extension = extensions.Extension;
 

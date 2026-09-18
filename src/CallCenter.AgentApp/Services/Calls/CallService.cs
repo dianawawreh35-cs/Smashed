@@ -16,6 +16,21 @@ namespace CallCenter.AgentApp.Services.Calls;
 /// arriving while one is up is refused as busy, which is what the PBX expects
 /// and what lets it move the caller on to another agent.
 ///
+/// Two things sit at the transport level rather than on the user agent, and
+/// both had to be learned the hard way:
+///
+/// <b>Keep-alives.</b> The PBX sends OPTIONS every few seconds to ask whether
+/// this extension is still there. SIPSorcery answers nothing but requests
+/// inside an established dialogue, so those go unanswered, the PBX marks the
+/// extension unreachable, and <b>inbound calls are never offered at all</b> —
+/// while registration keeps succeeding. That is a phone that looks perfectly
+/// healthy and never rings.
+///
+/// <b>Busy.</b> <see cref="SIPUserAgent"/> silently drops an INVITE that
+/// arrives while it already has a dialogue, so <c>OnIncomingCall</c> never
+/// fires for a second call and the caller would hear nothing until the PBX
+/// timed out.
+///
 /// Every event here arrives on a SIPSorcery background thread. Nothing in this
 /// class touches the UI; it raises events and the view model marshals them.
 /// </remarks>
@@ -30,6 +45,12 @@ public class CallService(
     private SIPServerUserAgent? _pending;
     private VoIPMediaSession? _media;
     private CallState _state = CallState.Idle;
+
+    /// <summary>
+    /// The Call-ID of the call in progress, so a re-INVITE for it can be told
+    /// apart from a genuine second call.
+    /// </summary>
+    private string? _callId;
 
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event EventHandler<CallState>? StateChanged;
@@ -53,6 +74,8 @@ public class CallService(
             _agent.OnIncomingCall += OnIncomingCall;
             _agent.OnCallHungup += OnRemoteHangup;
             _agent.ServerCallCancelled += (_, _) => Finish("the caller gave up");
+
+            transport.Transport.SIPTransportRequestReceived += OnTransportRequest;
         }
 
         logger.LogInformation("Listening for calls");
@@ -73,6 +96,9 @@ public class CallService(
         {
             return;
         }
+
+        transport.Transport.SIPTransportRequestReceived -= OnTransportRequest;
+        agent.OnIncomingCall -= OnIncomingCall;
 
         try
         {
@@ -166,6 +192,86 @@ public class CallService(
     }
 
     /// <summary>
+    /// Everything the PBX sends us, before the user agent sees it. Two jobs, and
+    /// everything else is left alone — see the class remarks for why both have
+    /// to be here.
+    /// </summary>
+    private async Task OnTransportRequest(
+        SIPEndPoint localEndPoint, SIPEndPoint remoteEndPoint, SIPRequest request)
+    {
+        // "Are you still there?" Answering is what keeps this extension
+        // reachable, and therefore what makes inbound calls happen at all.
+        if (request.Method is SIPMethodsEnum.OPTIONS or SIPMethodsEnum.NOTIFY)
+        {
+            await AnswerKeepAliveAsync(remoteEndPoint, request);
+            return;
+        }
+
+        if (request.Method != SIPMethodsEnum.INVITE)
+        {
+            return;
+        }
+
+        // An attended-transfer INVITE carries Replaces and belongs to the user
+        // agent, not here.
+        if (!string.IsNullOrWhiteSpace(request.Header.Replaces))
+        {
+            return;
+        }
+
+        if (State.Status is CallStatus.Idle)
+        {
+            // Nothing in progress: the user agent will raise OnIncomingCall, and
+            // the block check happens there.
+            return;
+        }
+
+        if (string.Equals(request.Header.CallId, _callId, StringComparison.Ordinal))
+        {
+            // Same dialogue - a re-INVITE, typically hold or a codec change.
+            return;
+        }
+
+        // One extension, one call. Busy lets the PBX offer the caller to
+        // somebody else rather than leaving them listening to nothing.
+        logger.LogInformation(
+            "Second call from {Remote} refused as busy: another call is in progress", remoteEndPoint);
+
+        try
+        {
+            var busy = SIPResponse.GetResponse(request, SIPResponseStatusCodesEnum.BusyHere, null);
+            new UASInviteTransaction(transport.Transport, request, null).SendFinalResponse(busy);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "A second call could not be refused cleanly");
+        }
+    }
+
+    /// <summary>
+    /// 200 OK to an OPTIONS or NOTIFY keep-alive.
+    /// </summary>
+    /// <remarks>
+    /// <c>Allow</c> is advertised rather than left out: some switches will not
+    /// offer a call to an extension that has not said what it can do.
+    /// </remarks>
+    private async Task AnswerKeepAliveAsync(SIPEndPoint remoteEndPoint, SIPRequest request)
+    {
+        try
+        {
+            var ok = SIPResponse.GetResponse(request, SIPResponseStatusCodesEnum.Ok, null);
+            ok.Header.Allow = "INVITE, ACK, CANCEL, BYE, OPTIONS, NOTIFY, INFO";
+            await transport.Transport.SendResponseAsync(ok);
+        }
+        catch (Exception ex)
+        {
+            // A missed keep-alive reply is worth a line and must never take the
+            // phone down.
+            logger.LogWarning(ex, "Could not answer {Method} from {Remote}", request.Method, remoteEndPoint);
+        }
+    }
+
+    /// <summary>
     /// An incoming INVITE. The block check is the first thing that happens here
     /// and the reason this method is not async before it: A-17 requires no
     /// pop-up and no ringing, so nothing may be shown or played until the
@@ -173,7 +279,9 @@ public class CallService(
     /// </summary>
     private void OnIncomingCall(SIPUserAgent agent, SIPRequest request)
     {
-        var caller = CallerNumberOf(request);
+        var identity = CallerId.FromInvite(request);
+        var caller = identity.Number;
+        var queue = SipCustomHeaders.QueueFrom(request);
 
         // A-17: the answer comes from the local cache, so it is immediate and
         // works with the server down.
@@ -196,23 +304,8 @@ public class CallService(
             return;
         }
 
-        if (State.Status is not CallStatus.Idle)
-        {
-            // One extension, one call. Busy lets the PBX offer the caller to
-            // somebody else rather than leaving them ringing at a full agent.
-            logger.LogInformation("Call from {Caller} refused as busy: another call is in progress", caller);
-
-            try
-            {
-                agent.AcceptCall(request).Reject(SIPResponseStatusCodesEnum.BusyHere, null, null);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "A second call could not be refused cleanly");
-            }
-
-            return;
-        }
+        // Busy is handled in OnTransportRequest: the user agent never raises
+        // this event for a second call.
 
         var uas = agent.AcceptCall(request);
 
@@ -232,9 +325,33 @@ public class CallService(
             logger.LogWarning(ex, "Could not send ringing to the caller");
         }
 
-        logger.LogInformation("Incoming call from {Caller}", caller);
+        logger.LogInformation(
+            "Incoming call from {Caller} ({Name}) via queue {Queue}, Call-ID {CallId}",
+            caller ?? "withheld", identity.DisplayName ?? "no name", queue ?? "none",
+            request.Header.CallId);
 
-        Set(new CallState(CallStatus.Ringing, caller, DateTimeOffset.Now, null));
+        // When no queue came through, say what the INVITE actually carried.
+        // Otherwise a dialplan that never set the header and a header this app
+        // failed to read look identical in the log, and they need opposite fixes.
+        if (queue is null)
+        {
+            var extra = request.Header?.UnknownHeaders;
+            logger.LogInformation(
+                "No {Header} on this INVITE. Custom headers present: {Headers}",
+                SipCustomHeaders.QueueName,
+                extra is null || extra.Count == 0 ? "(none)" : string.Join(" | ", extra));
+        }
+
+        lock (_gate)
+        {
+            // Null-conditional to match the header read above: an INVITE with no
+            // header at all would not get this far, but the two should not
+            // disagree about whether that is possible.
+            _callId = request.Header?.CallId;
+        }
+
+        Set(new CallState(
+            CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null));
     }
 
     private void OnRemoteHangup(SIPDialogue? dialogue) => Finish("the other party hung up");
@@ -261,14 +378,6 @@ public class CallService(
         logger.LogInformation("Call ended: {Why}", why);
         Finish(why);
     }
-
-    /// <summary>
-    /// The caller's number as the PBX presented it. The user part of the From
-    /// header — the display name is whatever the PBX felt like sending and is
-    /// never what matching uses (A-13).
-    /// </summary>
-    private static string? CallerNumberOf(SIPRequest request) =>
-        request.Header.From?.FromURI?.User;
 
     /// <summary>
     /// The microphone and speaker, as a media session. Created per call rather
@@ -318,6 +427,7 @@ public class CallService(
         lock (_gate)
         {
             _pending = null;
+            _callId = null;
         }
 
         CloseMedia();

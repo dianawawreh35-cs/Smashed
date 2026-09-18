@@ -48,12 +48,55 @@ public sealed class SipTransportHost(ILogger<SipTransportHost> logger) : IDispos
                 _transport = new SIPTransport();
                 _transport.AddSIPChannel(new SIPUDPChannel(new IPEndPoint(IPAddress.Any, 0)));
 
+                Trace(_transport);
+
                 logger.LogInformation("SIP transport listening on {EndPoints}",
                     string.Join(", ", _transport.GetSIPChannels().Select(c => c.ListeningEndPoint)));
 
                 return _transport;
             }
         }
+    }
+
+    /// <summary>
+    /// Logs every SIP message in and out.
+    /// </summary>
+    /// <remarks>
+    /// Added after the first attempt at a real call produced no ring and no log
+    /// line, which left no way to tell "the PBX never sent anything" apart from
+    /// "it arrived and we mishandled it". Those two have completely different
+    /// fixes — one is a network or PBX question, the other is a bug here — and
+    /// guessing between them is expensive.
+    ///
+    /// One line per message at Information: a single extension is not chatty
+    /// enough for this to be a problem, and a call that does not arrive is worth
+    /// more than a tidy log. The whole message goes out at Debug for when the
+    /// line is not enough.
+    /// </remarks>
+    private void Trace(SIPTransport transport)
+    {
+        transport.SIPRequestInTraceEvent += (local, remote, request) =>
+        {
+            logger.LogInformation(
+                "SIP IN  {Method} from {Remote} (from {From}, to {To})",
+                request.Method, remote, request.Header.From?.FromURI?.User, request.Header.To?.ToURI?.User);
+
+            logger.LogDebug("SIP IN  full message from {Remote}:\n{Message}", remote, request.ToString());
+        };
+
+        transport.SIPRequestOutTraceEvent += (local, remote, request) =>
+            logger.LogInformation("SIP OUT {Method} to {Remote}", request.Method, remote);
+
+        transport.SIPResponseInTraceEvent += (local, remote, response) =>
+            logger.LogInformation(
+                "SIP IN  {Status} {Reason} from {Remote}",
+                (int)response.Status, response.ReasonPhrase, remote);
+
+        // Something arrived that could not be parsed as SIP at all. Rare, and
+        // the sort of thing that otherwise looks exactly like silence.
+        transport.SIPBadRequestInTraceEvent += (local, remote, message, error, raw) =>
+            logger.LogWarning(
+                "SIP IN  unparseable message from {Remote}: {Error}", remote, error);
     }
 
     public void Dispose()

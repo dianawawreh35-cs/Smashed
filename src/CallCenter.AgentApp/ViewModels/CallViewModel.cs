@@ -56,6 +56,11 @@ public partial class CallViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsConnected))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(Duration))]
+    [NotifyPropertyChangedFor(nameof(Number))]
+    [NotifyPropertyChangedFor(nameof(Queue))]
+    [NotifyPropertyChangedFor(nameof(HasQueue))]
+    [NotifyPropertyChangedFor(nameof(CallerName))]
+    [NotifyPropertyChangedFor(nameof(HasCallerName))]
     private CallState _state = CallState.Idle;
 
     public bool IsRinging => State.Status is CallStatus.Ringing;
@@ -72,6 +77,23 @@ public partial class CallViewModel : ObservableObject
 
     /// <summary>Ringing, or connected — the line above the number.</summary>
     public string StatusText => Localizer[IsConnected ? "call.connected" : "call.incoming"];
+
+    /// <summary>
+    /// The queue this call came through, above the number, because it changes
+    /// how the agent answers before they have said anything.
+    /// </summary>
+    public string Queue => State.Queue ?? string.Empty;
+
+    public bool HasQueue => !string.IsNullOrWhiteSpace(State.Queue);
+
+    /// <summary>
+    /// The name the PBX sent, if any. Shown small under the number: it is
+    /// whatever the switch felt like sending, not a contact, and it will be
+    /// replaced by the real customer lookup (A-11).
+    /// </summary>
+    public string CallerName => State.CallerName ?? string.Empty;
+
+    public bool HasCallerName => !string.IsNullOrWhiteSpace(State.CallerName);
 
     /// <summary>
     /// How long the agent has been talking, as <c>m:ss</c>. Empty before the

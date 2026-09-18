@@ -502,30 +502,52 @@ Chat is not a record.
 Kept current. Resolved entries are deleted, not ticked — the decision log above
 is where history belongs.
 
-### Must fix before handover
+**Last reconciled: 2026-09-18.**
+
+## Where to pick up
+
+Contacts is the current thread. What remains of it, and what comes after:
+
+| Next | Requirement | Blocked by |
+|---|---|---|
+| VIP and Blocked flags | S-45 | nothing |
+| Merging two contacts | A-63 | nothing |
+| Excel/CSV import | A-64 | nothing |
+| Contact history panel | A-62 | communications, which do not exist yet |
+| **Calls: answer, reject, hang up, the pop-up** | A-10 to A-22 | nothing — registration is proven |
+
+**The recommendation was calls.** Registration works against the real PBX,
+contacts exist for the pop-up to look a caller up in, and everything built so
+far is scaffolding around the moment a phone rings. The flags are the sensible
+smaller alternative, and are a prerequisite for the pop-up behaving correctly
+anyway (A-16 shows a VIP badge, A-17 rejects a blocked caller).
+
+## Must fix before handover
 
 - **No password recovery for a locked-out supervisor.** There is no self-service
-  reset, and the reset screen is behind supervisor login. The seed command
-  refuses once any user exists. Today that means a lockout needs direct database
-  access. Either a `reset-password` command alongside `seed`, or a documented
-  procedure. Hit for real on 2026-09-17 when the September 14 password was not
-  recoverable.
+  reset, the reset screen is behind supervisor login, and the seed command
+  refuses once any user exists. A lockout needs direct database access. Either a
+  `reset-password` command alongside `seed`, or a documented procedure. Hit for
+  real on 2026-09-17.
 - **`SQLitePCLRaw.lib.e_sqlite3` 2.1.6 carries CVE-2025-6965** (high, memory
   corruption), arriving through EF Core Sqlite in the Agent App. Nothing reaches
   it — the offline buffer is still a README. **The offline-buffer work must not
-  start without pinning this first.** Fixed versions exist from 2.1.12.
+  start without pinning this first.** Fixed from 2.1.12.
 - **The server still targets `net8.0`**, Dockerfile included, and .NET 8 leaves
-  support in **November 2026**. The Agent App moved to .NET 10 on 2026-09-17;
-  the server is a separate, deliberate piece of work.
+  support in **November 2026**. The Agent App moved to .NET 10 on 2026-09-17.
 - **Ask the client's IT about executable policy.** `dotnet run` was blocked on
   the developer's own machine with *Access is denied* while `dotnet <dll>`
   worked. The same policy would block the Agent App installer on the agents'
   laptops. Code-signing is the usual answer. See `RELEASING.md`.
+- **Get the real brand colours.** Both apps use the blue from the CallPoc proof
+  of concept. The orange they used before was never the restaurant's — it came
+  from the initial scaffold as Tailwind's default orange under a key called
+  "brand". The SRS specifies no colours at all. One value in each app.
 
-### Questions for the telephony provider
+## Questions for the telephony provider
 
 Section 4.5 and reports R-20/R-21 are deferred until these are answered
-(SRS §12.3). The first is the one that decides whether they are possible at all:
+(SRS §12.3). The first decides whether they are possible at all:
 
 1. Can the **server** have its own VPN connection to the PBX? The agent laptops'
    VPN does nothing for it, and the server is what talks to AMI or the CDR.
@@ -536,23 +558,41 @@ Section 4.5 and reports R-20/R-21 are deferred until these are answered
 5. What **VPN uptime and support hours** are agreed, and who is called when the
    tunnel drops?
 
-### Known gaps in what is built
+## Known gaps in what is built
 
-- **SIP registration is written but never verified against a real PBX.** It
-  compiles and correctly reports "cannot reach the PBX" against a fake host.
-  Whether it registers is unknown until it points at a real one.
 - **Login has no database-backed test.** The suite runs without PostgreSQL by
   design, so token validation and encryption are covered and the actual login
   path is not.
-- **The Agent App accepts supervisor logins.** Deliberate while the phone is
+- **The Agent App accepts supervisor logins.** Deliberate while the phone was
   being built — it is how sign-in was tested before user management existed. The
   supervisor web app already refuses agents. Close this before handover.
 - **The Agent App's `appsettings.json` has a dead `Sip` section.** Nothing reads
   `Server`, `Username` or `Password`; they arrive in the login response (A-01).
-  Actively misleading, because it looks like where the PBX is configured.
+  Misleading, because it looks like where the PBX is configured.
   `RtpPortMin`/`RtpPortMax` are real and should stay.
 - **`src/CallCenter.Web/tsconfig.app.tsbuildinfo` is committed.** A build
   artifact; it belongs in `.gitignore`.
-- **No automated check that the two Agent App language files agree.** A missing
-  key degrades to Arabic and then to the raw key rather than crashing, but it
-  would be found by eye rather than by the build.
+- **The UI checks are throwaway scripts, not part of the build.** Three things
+  were verified by hand during the redesign and none of them are reproducible by
+  anyone else: that both Agent App language files carry the same keys, that
+  every `StaticResource` a view names is defined, and that every control a view
+  uses has a style in the theme. **The last of those is what would have caught
+  the white contacts list** — a `ListView` left with no style falls back to
+  WPF's default white, and nothing in the build complains. These belong in the
+  test project.
+
+## What running the apps has caught that the checks did not
+
+Worth knowing when deciding how much to trust a green build. Three defects this
+session were found only by opening the app:
+
+1. Every login answered 500 — a validation attribute on the wrong half of a
+   record. 176 tests were green, because none posted a login.
+2. The contacts list was a white block — a file rewrite that silently never
+   landed, leaving a control the new theme no longer styled.
+3. English rendered right-to-left — the document direction was set only when the
+   language switcher was touched, never at startup.
+
+The build and the test suite verify structure. Nothing here can tell whether a
+screen *looks* right, because the apps cannot be launched from the development
+session. Screenshots from the developer are doing real work.

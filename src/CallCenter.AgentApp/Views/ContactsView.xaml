@@ -74,6 +74,16 @@
         <DataGrid ItemsSource="{Binding Results}"
                   Margin="6"
                   Visibility="{Binding HasResults, Converter={StaticResource BoolToVisibility}}">
+
+          <!-- Double-click a row to open it, as well as the Edit button. On the
+               row rather than on the grid: a double-click on a column header or
+               the scrollbar is not a request to open anything. -->
+          <DataGrid.ItemContainerStyle>
+            <Style TargetType="DataGridRow">
+              <EventSetter Event="MouseDoubleClick" Handler="OnContactRowDoubleClick" />
+            </Style>
+          </DataGrid.ItemContainerStyle>
+
           <DataGrid.Columns>
             <DataGridTextColumn x:Name="NameColumn" Width="*" Binding="{Binding Name}" />
 

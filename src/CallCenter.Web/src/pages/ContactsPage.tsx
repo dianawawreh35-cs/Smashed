@@ -107,7 +107,14 @@ function ContactTable({
         </thead>
         <tbody>
           {contacts.map((contact) => (
-            <tr key={contact.id}>
+            /* Double-click the row to open it, as well as the Edit button. The
+               button stays: it is what makes the action discoverable, and a
+               double-click is unreachable from the keyboard. */
+            <tr
+              key={contact.id}
+              onDoubleClick={() => open.mutate(contact.id)}
+              className="cursor-pointer"
+            >
               <td className="font-medium text-slate-100">
                 {contact.name ?? <span className="text-slate-500">{t('contacts.noName')}</span>}
                 {contact.isVip && <span className="badge-vip ms-2">{t('contacts.vip')}</span>}

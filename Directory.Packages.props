@@ -21,6 +21,8 @@
 
   <ItemGroup Label="Security">
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.1.2" />
   </ItemGroup>
 
   <ItemGroup Label="Logging (Serilog)">
@@ -33,8 +35,13 @@
 
   <ItemGroup Label="Agent App (WPF / SIP)">
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.3.2" />
-    <PackageVersion Include="SIPSorcery" Version="8.0.23" />
-    <PackageVersion Include="SIPSorceryMedia.Windows" Version="8.0.14" />
+    <!-- 10.0.9 fixes GHSA-28gm-jrmw-xx93: a malformed UDP packet on the RTP/ICE
+         socket ends an active media session - the path carrying call audio.
+         10.0.14 fixes GHSA-jwjp-4649-v8jp in the WebRTC data channels, which
+         this project does not use. SIPSorceryMedia.Windows is net10.0-windows
+         only from 10.0.5, which is what moved the Agent App to .NET 10. -->
+    <PackageVersion Include="SIPSorcery" Version="10.0.16" />
+    <PackageVersion Include="SIPSorceryMedia.Windows" Version="10.0.16" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

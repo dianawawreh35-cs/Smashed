@@ -11,13 +11,23 @@
     "contacts": "Contacts",
     "reports": "Reports",
     "settings": "Settings",
-    "logout": "Log out"
+    "logout": "Log out",
+    "users": "Users"
   },
   "login": {
     "heading": "Sign in",
     "username": "Username",
     "password": "Password",
-    "submit": "Sign in"
+    "submit": "Sign in",
+    "signingIn": "Signing in…",
+    "errors": {
+      "empty_fields": "Enter your username and password.",
+      "invalid_credentials": "The username or password is not correct.",
+      "account_disabled": "This account has been disabled. Ask an administrator to re-enable it.",
+      "not_a_supervisor": "This is an agent account. Please use the desktop Agent App.",
+      "server_unreachable": "The server could not be reached. Check the network.",
+      "server_error": "The server reported an error. Please try again."
+    }
   },
   "dashboard": {
     "heading": "Dashboard",
@@ -26,5 +36,131 @@
   "common": {
     "notConnected": "Not connected",
     "connected": "Connected"
+  },
+  "users": {
+    "heading": "Users and extensions",
+    "addHeading": "Add a user",
+    "name": "Name",
+    "login": "Username",
+    "role": "Role",
+    "password": "Password",
+    "newPassword": "New password",
+    "passwordHint": "At least 8 characters. Hand it to the person directly - it cannot be shown again.",
+    "add": "Add",
+    "save": "Save",
+    "status": "Status",
+    "active": "Active",
+    "disabled": "Disabled",
+    "enable": "Enable",
+    "disable": "Disable",
+    "resetPassword": "Reset password",
+    "noSecret": "(no SIP password)",
+    "secretSet": "Stored - leave blank to keep",
+    "roles": {
+      "Agent": "Agent",
+      "Supervisor": "Supervisor"
+    },
+    "errors": {
+      "login_taken": "That username is already in use.",
+      "user_not_found": "That account no longer exists.",
+      "unknown_role": "Role must be Agent or Supervisor.",
+      "not_an_agent": "Only agents have extensions.",
+      "last_supervisor": "This is the only active supervisor; disabling it would lock everyone out.",
+      "cannot_disable_self": "You cannot disable your own account.",
+      "invalid_request": "The change could not be applied. Check the fields.",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "The server reported an error. Please try again."
+    },
+    "extension": "Extension",
+    "setExtension": "Set extension",
+    "noExtension": "Not set",
+    "secret": "SIP password",
+    "extensionHint": "One extension per agent, used for every call. Internal calls are told apart by the internal numbers list in Settings."
+  },
+  "settings": {
+    "heading": "System settings",
+    "intro": "Values the system reads while running. They take effect without a redeployment; the Agent App picks up the PBX host at the next sign-in.",
+    "save": "Save settings",
+    "saved": "Settings saved.",
+    "rejected": "Nothing was saved - check the fields marked in red.",
+    "yes": "Yes",
+    "no": "No",
+    "lastChangedBy": "Last changed by {{name}}",
+    "choices": {
+      "SameDay": "Same day only",
+      "Always": "Always"
+    },
+    "keys": {
+      "pbx.host": {
+        "label": "PBX host (SIP)",
+        "hint": "The address the Agent Apps register to over the VPN. Leave blank if it is not known yet."
+      },
+      "callback.extension": {
+        "label": "Call-back extension",
+        "hint": "An extension the server uses for calls that never reached an agent."
+      },
+      "pbx.ami.enabled": {
+        "label": "Enable AMI",
+        "hint": "Deferred with section 4.5 - has no effect yet."
+      },
+      "agent.idle_logout_minutes": {
+        "label": "Automatic logout (minutes)",
+        "hint": "Laptops are shared between shifts, so the previous agent must not stay signed in."
+      },
+      "agent.edit_window": {
+        "label": "Classification edit window",
+        "hint": "How long an agent may edit the classification of their own calls."
+      },
+      "sla.answer_seconds": {
+        "label": "Service level threshold (seconds)",
+        "hint": "The percentage of calls answered within this time."
+      },
+      "recording.retention_days": {
+        "label": "Recording retention (days)",
+        "hint": "Recordings are deleted after this; the call record and classification remain."
+      },
+      "reports.internal_numbers": {
+        "label": "Internal numbers",
+        "hint": "The agents and branch extension numbers, comma separated. A call with one of these is recorded as usual but left out of the customer reports (S-48)."
+      }
+    }
+  },
+  "contacts": {
+    "heading": "Contacts",
+    "search": "Search",
+    "searchPlaceholder": "Search by name, address or phone number",
+    "add": "Add contact",
+    "addHeading": "New contact",
+    "editHeading": "Edit contact",
+    "name": "Name",
+    "noName": "No name",
+    "address": "Address",
+    "phones": "Phone numbers",
+    "phoneNumber": "Phone number {{index}}",
+    "addPhone": "+ Add a number",
+    "removePhone": "Remove this number",
+    "phoneHint": "Any format: 059… or +97059… — the system treats them as one number.",
+    "notes": "Notes",
+    "deliveryNotes": "Delivery notes",
+    "vip": "VIP",
+    "blocked": "Blocked",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "empty": "No contacts yet.",
+    "noMatches": "Nothing matched that search.",
+    "duplicateHolder": "{{number}} already belongs to: {{name}}",
+    "errors": {
+      "duplicate_number": "That number already belongs to another contact.",
+      "no_usable_number": "Enter at least one phone number.",
+      "contact_not_found": "That contact no longer exists.",
+      "invalid_request": "The contact could not be saved. Check the fields.",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "The server reported an error. Please try again."
+    },
+    "sameNameWarning": "There is already {{count}} contact with this name:",
+    "sameNameHint": "If this is the same person, add the number to them. If it is someone else, carry on and save a separate contact.",
+    "addNumberToThem": "Add this number to them",
+    "intro": "Find a customer, or add one. The list is shared by every agent."
   }
 }

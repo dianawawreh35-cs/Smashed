@@ -5,7 +5,12 @@
  * (see vite.config.ts), so the default base URL is relative and the same code
  * works unchanged in production, where the SPA is served from the API's own
  * wwwroot.
+ *
+ * Authentication is a bearer token, the same one the Agent App holds: the API
+ * issues JWTs and reads them from the Authorization header, so there is no
+ * session cookie to send.
  */
+import { getToken } from '../auth/token'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
@@ -17,6 +22,21 @@ export class ApiError extends Error {
   ) {
     super(`${status} ${statusText}`)
     this.name = 'ApiError'
+  }
+
+  /**
+   * The `code` member of an RFC 7807 problem response, e.g.
+   * `invalid_credentials`. The API sends a code rather than a sentence so each
+   * client shows its own translation (A-80); the `detail` it also sends is
+   * English, for logs.
+   */
+  get code(): string | null {
+    const body = this.body
+    if (body && typeof body === 'object' && 'code' in body) {
+      const code = (body as { code: unknown }).code
+      if (typeof code === 'string' && code.length > 0) return code
+    }
+    return null
   }
 }
 
@@ -52,13 +72,16 @@ function isBodyInit(value: unknown): value is BodyInit {
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, query, headers, ...rest } = options
 
+  const token = getToken()
+
   const init: RequestInit = {
-    // Cookie-based auth: always send credentials, including to the dev proxy.
     credentials: 'include',
     ...rest,
     headers: {
       Accept: 'application/json',
       ...(body !== undefined && !isBodyInit(body) ? { 'Content-Type': 'application/json' } : {}),
+      // Explicit headers win, so a caller can send a request unauthenticated.
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
   }

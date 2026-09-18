@@ -1,16 +1,22 @@
 # Server Deployment Runbook — Restaurant Call Center System
 
-Target: mini PC (Intel i5, SSD) on the restaurant LAN. Ubuntu Server 24.04 LTS + Docker Compose.
+Target: mini PC (Intel i5, SSD) on the restaurant LAN. Ubuntu Server 26.04 LTS + Docker Compose.
 Example addresses used below — replace with the real ones:
 
 | Item | Example |
 |---|---|
-| Server IP | `192.168.1.50` |
+| Server IP | `192.168.1.100` |
 | Router / gateway | `192.168.1.1` |
-| Yeastar S20 IP | `192.168.1.10` |
+| PBX address on the VPN | `10.8.0.1` |
+| Server address on the VPN | `10.8.0.20` |
 | LAN | `192.168.1.0/24` |
 
-Estimated time: about 1 hour, plus waiting for the client's PBX person in step 8.
+Estimated time: about 1 hour, plus waiting for the telephony provider in step 8.
+
+> **The PBX is not on your network.** It is an Issabel system run by an external
+> telephony provider and reached over a VPN. Each agent laptop runs a VPN client.
+> The server would need its own VPN connection for step 8 — but step 8 is
+> deferred, so nothing in this runbook needs it today.
 
 ---
 
@@ -19,9 +25,9 @@ Estimated time: about 1 hour, plus waiting for the client's PBX person in step 8
 **What it does:** puts a clean, minimal Linux on the mini PC. No desktop, so all memory and CPU go to your system. OpenSSH lets you manage it from your laptop later; you'll never need a monitor on it again.
 
 **Work**
-1. Download Ubuntu Server 24.04 LTS ISO from ubuntu.com and write it to a USB stick (Rufus or balenaEtcher).
+1. Download Ubuntu Server 26.04 LTS ISO from ubuntu.com and write it to a USB stick (Rufus or balenaEtcher).
 2. Boot the mini PC from the USB (press F12/F2/Del at power-on to pick the boot device).
-3. Installer choices: language English → keyboard → **Ubuntu Server (minimized)** → network: leave DHCP for now → storage: **Use an entire disk** (the SSD) → profile: name `admin`, server name `callcenter`, username `admin`, strong password → **tick Install OpenSSH server** → skip all snaps → wait → reboot, remove USB.
+3. Installer choices: language English → keyboard → **Ubuntu Server (minimized)** → network: leave DHCP for now → storage: **Use an entire disk** (the SSD) → profile: server name `smashed-callcenter`, username `smashed`, strong password → **tick Install OpenSSH server** → skip all snaps → wait → reboot, remove USB.
 4. Log in at the console and note the current IP:
 ```bash
 ip a
@@ -31,7 +37,7 @@ ip a
 
 ## Step 2 — Fixed IP address
 
-**What it does:** the router normally gives out a random address that can change after a reboot. The agent apps and the S20 must always find the server at the same address, so you hard-code one. Netplan is Ubuntu's network configuration.
+**What it does:** the router normally gives out a random address that can change after a reboot. The agent apps must always find the server at the same address, so you hard-code one. Netplan is Ubuntu's network configuration.
 
 **Work**
 ```bash
@@ -44,7 +50,7 @@ network:
   ethernets:
     enp1s0:
       dhcp4: no
-      addresses: [192.168.1.50/24]
+      addresses: [192.168.1.100/24]
       routes:
         - to: default
           via: 192.168.1.1
@@ -54,13 +60,13 @@ network:
 Save (Ctrl+O, Enter, Ctrl+X), then:
 ```bash
 sudo netplan apply
-ip a          # should now show 192.168.1.50
+ip a          # should now show 192.168.1.100
 ```
 From your laptop, connect remotely and do everything else over SSH:
 ```bash
-ssh admin@192.168.1.50
+ssh smashed@192.168.1.100
 ```
-Also reserve `192.168.1.50` in the router's DHCP settings so it never gives that address to another device.
+Also reserve `192.168.1.100` in the router's DHCP settings so it never gives that address to another device.
 
 ---
 
@@ -100,7 +106,7 @@ system is reachable from the restaurant LAN only.
 **Work**
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker admin
+sudo usermod -aG docker smashed
 newgrp docker
 docker --version
 docker compose version
@@ -115,12 +121,12 @@ docker compose version
 **Work**
 ```bash
 sudo mkdir -p /opt/callcenter/data/postgres /opt/callcenter/data/recordings /opt/callcenter/backups
-sudo chown -R admin:admin /opt/callcenter
+sudo chown -R smashed:smashed /opt/callcenter
 cd /opt/callcenter
 ```
 From your laptop, copy the deployment files from your repo:
 ```bash
-scp docker-compose.yml .env.example backup.sh update.sh admin@192.168.1.50:/opt/callcenter/
+scp docker-compose.yml .env.example backup.sh update.sh smashed@192.168.1.100:/opt/callcenter/
 ```
 Back on the server:
 ```bash
@@ -131,18 +137,24 @@ Fill in:
 ```
 POSTGRES_PASSWORD=<long random>
 JWT_SECRET=<long random, 64+ chars>
-SERVER_IP=192.168.1.50
+SIP_SECRET_KEY=<long random, 32+ chars>
+SERVER_IP=192.168.1.100
 PBX_IP=192.168.1.10
 AMI_USER=callcenter
-AMI_PASSWORD=<as set on the S20>
+AMI_PASSWORD=<as set by the provider>
 CALLBACK_EXT=199
-CALLBACK_EXT_PASSWORD=<as set on the S20>
+CALLBACK_EXT_PASSWORD=<as set by the provider>
 RTP_PORT_MIN=10000
 RTP_PORT_MAX=10100
 RECORDING_RETENTION_DAYS=90
 TZ=Asia/Hebron
 ```
 Generate random values with `openssl rand -base64 48`.
+
+`JWT_SECRET` signs the tokens agents and supervisors hold; changing it signs
+everyone out. `SIP_SECRET_KEY` encrypts the agents' SIP secrets in the database,
+so a database dump does not hand over the extensions' passwords — keep both in
+the password manager. The API refuses to start if either is missing.
 
 Reference `docker-compose.yml` (adjust image name):
 ```yaml
@@ -198,7 +210,7 @@ docker save callcenter-api:v1.0 -o callcenter-api-v1.0.tar
 docker pull postgres:16
 docker save postgres:16 -o postgres16.tar
 
-scp callcenter-api-v1.0.tar postgres16.tar admin@192.168.1.50:/opt/callcenter/
+scp callcenter-api-v1.0.tar postgres16.tar smashed@192.168.1.100:/opt/callcenter/
 ```
 On the server:
 ```bash
@@ -255,19 +267,33 @@ optional (it defaults to Branch 1-4) and is ignored if branches already exist.
 **Change the password immediately after logging in** - it was typed on the
 command line and is in this machine's shell history.
 
-From a laptop browser: `http://192.168.1.50` → log in → **change the password** → check Settings shows the branches, types and channels.
+From a laptop browser: `http://192.168.1.100` → log in → **change the password** → check Settings shows the branches, types and channels.
 
 ---
 
-## Step 8 — Connect the PBX (client's PBX person)
+## Step 8 — Connect the PBX (telephony provider) — *deferred*
 
-**What it does:** enabling AMI on the S20 opens the event feed your server listens to for calls that never reach an agent; the permitted IP limits who may connect to only your server. The callback extension is an ordinary extension your server registers as a phone, so the S20 can send timed-out queue calls to it. The status page proves the whole chain.
+> **Skip this step for now.** It serves section 4.5 of the SRS, which is on hold
+> until the telephony provider answers the questions in SRS 12.3. Calls,
+> pop-ups, recording and classification do not depend on it — only the
+> abandoned-call reports R-20 and R-21 do. Come back to it when the answers
+> arrive.
 
-**Work — on the S20 (client side)**
-1. Settings > System > Security > **AMI**: Enable; Username `callcenter`; Password = `AMI_PASSWORD` from `.env`; Permitted IP `192.168.1.50` / `255.255.255.255`. Save & Apply.
+**What it does:** an AMI user on Issabel opens the event feed your server listens to for calls that never reach an agent; the permitted address limits who may connect to only your server. The callback extension is an ordinary extension your server registers as a phone, so the PBX can send timed-out queue calls to it. The status page proves the whole chain.
+
+**Prerequisite — the server's VPN connection**
+The PBX is only reachable over the VPN, so set this up first and confirm it before asking the provider for anything else:
+```bash
+ping -c 3 10.8.0.1                 # the PBX on the VPN
+nc -vz 10.8.0.1 5038               # AMI port reachable
+```
+Make the VPN start on boot, so a power cut does not leave the server silently cut off from the PBX.
+
+**Work — the provider does this (Issabel side)**
+1. Create an **AMI user**: Issabel GUI → Manager Settings (or `/etc/asterisk/manager.conf`); Username `callcenter`; Password = `AMI_PASSWORD` from `.env`; **permit** = the server's VPN address (`10.8.0.20/255.255.255.255`). Reload Asterisk.
 2. Create extension `199` "Callback" with the password from `.env`.
 3. Queue / ring group: set **Failover / timeout destination** → extension 199 (if the callback method is used).
-4. Confirm inbound routing type (queue or ring group) and that caller ID reaches extensions today.
+4. Confirm incoming routing type (queue or ring group) and that caller ID reaches extensions today.
 
 **Work — verify on the server**
 Supervisor app → Settings → PBX status: `AMI: connected`, `Callback extension: registered`.
@@ -276,7 +302,7 @@ docker compose logs api | grep -i ami | tail
 ```
 Test: call the restaurant number from a mobile, let it ring until the queue times out. It should appear in the dashboard as **Abandoned/Overflowed** within seconds.
 
-If the S20 has no AMI tab, skip 1 and configure the alternative: Settings > System > Storage → CDR to a network drive pointing at the server's share (set up Samba on the server), or a scheduled CDR export. The API's CDR importer watches `/data/cdr-import/`.
+If the provider will not grant AMI, skip 1 and use the alternative: read-only MySQL access to the `asteriskcdrdb` database (table `cdr`), or a scheduled CDR export dropped where the server can fetch it. The API's CDR importer watches `/data/cdr-import/`.
 
 ---
 
@@ -328,8 +354,8 @@ Point a local API at it and confirm calls and contacts are there.
 **What it does:** creating agents in the supervisor app stores each one's two extensions and SIP passwords centrally, so agents never type SIP details. Installing the Agent App from the server's download link means every laptop gets the same version and future updates come from the same place. The Windows Firewall prompt matters: deny it and you get registered-but-silent calls.
 
 **Work**
-1. Supervisor app → Users → add 5 agents: name, login, inbound extension + SIP password, outbound extension + SIP password, default branch.
-2. On each of the 4 laptops: browse to `http://192.168.1.50/downloads/AgentApp-Setup.exe`, install, first-run: server address `192.168.1.50`, choose microphone/speaker, log in as an agent.
+1. Supervisor app → Users → add 5 agents: name, login, customer extension + SIP password, internal extension + SIP password, default branch. (Customer = the one the queue rings and that calls customers; internal = agents and branches. SRS 2.3.)
+2. On each of the 4 laptops: browse to `http://192.168.1.100/downloads/AgentApp-Setup.exe`, install, first-run: server address `192.168.1.100`, choose microphone/speaker, log in as an agent.
 3. Windows Firewall prompt → **Allow** on private networks. If missed: Windows Security → Firewall → Allow an app → tick the Agent App.
 4. Test on each laptop: internal call between two agents (pop-up, audio both ways, recording plays back, classification form opens), then a real call from a mobile through the trunk.
 5. Log out and log in as a different agent on the same laptop; confirm the other agent's extensions register and only their calls show.
@@ -342,7 +368,7 @@ Point a local API at it and confirm calls and contacts are there.
 
 **Work**
 - Give the supervisor a one-page sheet: server IP, web address, how to reboot (just power on — everything auto-starts), where backups go, your contact and support hours.
-- Store in your password manager: `.env` contents, admin password, the S20 AMI credentials, the router reservation.
+- Store in your password manager: `.env` contents, admin password, the AMI credentials from the provider, the VPN accounts for the server and each laptop, the router reservation.
 - Commit `docker-compose.yml`, `.env.example`, `backup.sh` and this runbook to the repo (never the real `.env`).
 - Walk the supervisor through the dashboard for 1 hour; agents 1 hour.
 
@@ -363,11 +389,11 @@ The image comes from CI — `git tag v1.2 && git push --tags` publishes it (see
 docker pull ghcr.io/dianawawreh35-cs/callcenter-api:v1.2
 docker tag  ghcr.io/dianawawreh35-cs/callcenter-api:v1.2 callcenter-api:v1.2
 docker save callcenter-api:v1.2 -o callcenter-api-v1.2.tar
-scp callcenter-api-v1.2.tar admin@192.168.1.50:/opt/callcenter/
+scp callcenter-api-v1.2.tar smashed@192.168.1.100:/opt/callcenter/
 ```
 Then on the server:
 ```bash
-ssh admin@192.168.1.50
+ssh smashed@192.168.1.100
 cd /opt/callcenter
 ./update.sh v1.2
 ```
@@ -375,7 +401,7 @@ cd /opt/callcenter
 **Option B — the server pulls it.** Nothing to copy; needs internet on site and
 the one-time `docker login` above:
 ```bash
-ssh admin@192.168.1.50
+ssh smashed@192.168.1.100
 cd /opt/callcenter
 ./update.sh v1.2 --pull
 ```

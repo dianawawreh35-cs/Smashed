@@ -14,6 +14,14 @@ public class Contact
     /// <summary>Nullable: a bare number can be flagged before it has a name (S-45).</summary>
     public string? Name { get; set; }
 
+    /// <summary>
+    /// <see cref="Name"/> reduced for comparison by
+    /// <c>CallCenter.Shared.Text.NameNormalizer</c> — hamza forms folded,
+    /// diacritics stripped, case and spacing levelled. Matching compares this;
+    /// nothing ever displays it. Written by the application on every save.
+    /// </summary>
+    public string? NameNormalised { get; set; }
+
     public string? Address { get; set; }
 
     public string? Notes { get; set; }

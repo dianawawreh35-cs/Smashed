@@ -606,6 +606,10 @@ namespace CallCenter.Server.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("NameNormalised")
+                        .HasColumnType("text")
+                        .HasColumnName("name_normalised");
+
                     b.Property<string>("Notes")
                         .HasColumnType("text")
                         .HasColumnName("notes");
@@ -631,6 +635,9 @@ namespace CallCenter.Server.Data.Migrations
 
                     b.HasIndex("MergedIntoId")
                         .HasDatabaseName("ix_contacts_merged_into_id");
+
+                    b.HasIndex("NameNormalised")
+                        .HasDatabaseName("ix_contacts_name_normalised");
 
                     b.HasIndex("UpdatedBy")
                         .HasDatabaseName("ix_contacts_updated_by");
@@ -1012,13 +1019,9 @@ namespace CallCenter.Server.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("display_name");
 
-                    b.Property<string>("InboundExtension")
+                    b.Property<string>("Extension")
                         .HasColumnType("text")
-                        .HasColumnName("inbound_extension");
-
-                    b.Property<string>("InboundSipSecret")
-                        .HasColumnType("text")
-                        .HasColumnName("inbound_sip_secret");
+                        .HasColumnName("extension");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -1035,14 +1038,6 @@ namespace CallCenter.Server.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("login");
 
-                    b.Property<string>("OutboundExtension")
-                        .HasColumnType("text")
-                        .HasColumnName("outbound_extension");
-
-                    b.Property<string>("OutboundSipSecret")
-                        .HasColumnType("text")
-                        .HasColumnName("outbound_sip_secret");
-
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1052,6 +1047,10 @@ namespace CallCenter.Server.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("role");
+
+                    b.Property<string>("SipSecret")
+                        .HasColumnType("text")
+                        .HasColumnName("sip_secret");
 
                     b.HasKey("Id")
                         .HasName("pk_users");

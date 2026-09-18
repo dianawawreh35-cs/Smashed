@@ -1,0 +1,358 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+  <!--
+    The Agent App's look, following the CallPoc proof of concept: a dark shell,
+    one blue accent, and cards on a near-black canvas.
+
+    Dark suits the job. An agent has this on screen for an eight-hour shift,
+    often in a back room, and a white full-screen window for that long is
+    tiring. It also lets the one accent colour carry meaning - what is selected,
+    what is the primary action - instead of competing with a bright background.
+  -->
+
+  <!-- ===== Palette ================================================== -->
+  <Color x:Key="BgColor">#0F1115</Color>
+  <Color x:Key="AccentColor">#4F8CFF</Color>
+
+  <SolidColorBrush x:Key="Bg" Color="#0F1115" />
+  <SolidColorBrush x:Key="Surface" Color="#171A21" />
+  <SolidColorBrush x:Key="SurfaceAlt" Color="#1E222B" />
+  <SolidColorBrush x:Key="BorderSoft" Color="#2A2F3A" />
+
+  <SolidColorBrush x:Key="Text" Color="#E6E8EC" />
+  <SolidColorBrush x:Key="TextMuted" Color="#8B93A7" />
+  <SolidColorBrush x:Key="TextFaint" Color="#5E667A" />
+
+  <SolidColorBrush x:Key="Accent" Color="#4F8CFF" />
+  <SolidColorBrush x:Key="AccentHover" Color="#6BA0FF" />
+  <SolidColorBrush x:Key="AccentDim" Color="#25355A" />
+
+  <SolidColorBrush x:Key="Success" Color="#3FB950" />
+  <SolidColorBrush x:Key="Warning" Color="#D29922" />
+  <SolidColorBrush x:Key="Danger" Color="#F85149" />
+
+  <CornerRadius x:Key="CornerSmall">6</CornerRadius>
+  <CornerRadius x:Key="CornerLarge">10</CornerRadius>
+
+  <!-- ===== Typography ============================================== -->
+  <!--
+    Cairo carries Arabic and Latin in one family. It is a Google font and may
+    not be installed, so Segoe UI is named after it - it has proper Arabic
+    coverage on Windows 10 and 11.
+  -->
+  <FontFamily x:Key="UiFont">Cairo, Tajawal, Segoe UI</FontFamily>
+  <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
+
+  <sys:Double x:Key="FontSizeSmall">11</sys:Double>
+  <sys:Double x:Key="FontSizeBody">13</sys:Double>
+  <sys:Double x:Key="FontSizeTitle">19</sys:Double>
+
+  <Style TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+  </Style>
+
+  <Style x:Key="Heading" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+    <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+  </Style>
+
+  <Style x:Key="Subtle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+  </Style>
+
+  <!-- Field captions sit above their box, small and quiet. -->
+  <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    <Setter Property="Margin" Value="0,14,0,5" />
+  </Style>
+
+  <!-- ===== Buttons ================================================= -->
+  <Style x:Key="ButtonBase" TargetType="Button">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="16,8" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="SnapsToDevicePixels" Value="True" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Chrome"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{StaticResource CornerSmall}">
+            <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              Margin="{TemplateBinding Padding}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.85" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.7" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.4" />
+              <Setter Property="Cursor" Value="Arrow" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="Button" BasedOn="{StaticResource ButtonBase}" />
+
+  <!-- The one action a screen is about: sign in, save, answer. -->
+  <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="{StaticResource Accent}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="{StaticResource Success}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Success}" />
+    <Setter Property="Foreground" Value="#08130A" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="{StaticResource Danger}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Danger}" />
+    <Setter Property="Foreground" Value="#FFFFFF" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+
+  <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+  </Style>
+
+  <!-- ===== Text input ============================================== -->
+  <Style TargetType="TextBox">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="CaretBrush" Value="{StaticResource Text}" />
+    <Setter Property="SelectionBrush" Value="{StaticResource Accent}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="Chrome"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{StaticResource CornerSmall}">
+            <ScrollViewer x:Name="PART_ContentHost"
+                          Margin="{TemplateBinding Padding}"
+                          VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="PasswordBox">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="CaretBrush" Value="{StaticResource Text}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="PasswordBox">
+          <Border x:Name="Chrome"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{StaticResource CornerSmall}">
+            <ScrollViewer x:Name="PART_ContentHost"
+                          Margin="{TemplateBinding Padding}"
+                          VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ===== Left rail navigation ==================================== -->
+  <Style TargetType="TabControl">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style TargetType="TabItem">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabItem">
+          <Grid Background="Transparent" Margin="8,2">
+            <Border x:Name="Chrome"
+                    CornerRadius="{StaticResource CornerSmall}"
+                    Background="Transparent"
+                    Padding="14,10">
+              <ContentPresenter ContentSource="Header" VerticalAlignment="Center" />
+            </Border>
+            <!-- The marker sits on the start edge, so it moves to the right in
+                 Arabic with the rest of the layout. -->
+            <Border x:Name="Bar"
+                    Width="3"
+                    HorizontalAlignment="Left"
+                    CornerRadius="2"
+                    Background="Transparent"
+                    Margin="-8,6" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SurfaceAlt}" />
+              <Setter TargetName="Bar" Property="Background" Value="{StaticResource Accent}" />
+              <Setter Property="Foreground" Value="{StaticResource Text}" />
+              <Setter Property="FontWeight" Value="SemiBold" />
+            </Trigger>
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="False" />
+                <Condition Property="IsMouseOver" Value="True" />
+              </MultiTrigger.Conditions>
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Surface}" />
+              <Setter Property="Foreground" Value="{StaticResource Text}" />
+            </MultiTrigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ===== Cards and pills ========================================= -->
+  <Style x:Key="Card" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource Surface}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource CornerLarge}" />
+    <Setter Property="Padding" Value="20" />
+  </Style>
+
+  <Style x:Key="Pill" TargetType="Border">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="9,3" />
+    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+  </Style>
+
+  <!-- ===== DataGrid ================================================ -->
+  <Style TargetType="DataGridColumnHeader">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+
+  <Style TargetType="DataGridCell">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="12,9" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="DataGridCell">
+          <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="DataGridRow">
+    <Setter Property="Background" Value="{StaticResource Surface}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{StaticResource Surface}" />
+      </Trigger>
+      <Trigger Property="IsSelected" Value="True">
+        <Setter Property="Background" Value="{StaticResource AccentDim}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style TargetType="DataGrid">
+    <!-- Explicit, not Transparent. WPF's default DataGrid template paints its
+         own surface underneath, so a transparent DataGrid still came out white
+         on a dark card. Every background here is stated outright for that
+         reason. -->
+    <Setter Property="Background" Value="{StaticResource Surface}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="RowBackground" Value="{StaticResource Surface}" />
+    <Setter Property="AlternatingRowBackground" Value="{StaticResource Surface}" />
+    <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="VerticalGridLinesBrush" Value="Transparent" />
+    <Setter Property="GridLinesVisibility" Value="None" />
+    <Setter Property="HeadersVisibility" Value="Column" />
+    <Setter Property="AutoGenerateColumns" Value="False" />
+    <Setter Property="IsReadOnly" Value="True" />
+    <Setter Property="SelectionMode" Value="Single" />
+    <Setter Property="CanUserResizeRows" Value="False" />
+    <Setter Property="RowHeight" Value="44" />
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+    <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+  </Style>
+
+</ResourceDictionary>

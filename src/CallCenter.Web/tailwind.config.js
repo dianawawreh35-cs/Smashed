@@ -4,16 +4,49 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        // Cairo carries Arabic and Latin in one family, so a screen mixing a
+        // customer name with a phone number does not change typeface mid-line.
         sans: ['Cairo', 'Tajawal', 'Segoe UI', 'system-ui', 'sans-serif'],
+        mono: ['Cascadia Mono', 'ui-monospace', 'Consolas', 'monospace'],
       },
       colors: {
-        brand: {
-          50: '#fff7ed',
-          100: '#ffedd5',
-          500: '#f97316',
-          600: '#ea580c',
-          700: '#c2410c',
+        // The same palette as the Agent App, so the two halves of the system
+        // look like one product. Dark suits a screen that is open all shift,
+        // and lets the single accent carry meaning rather than compete with a
+        // bright background.
+        ink: {
+          950: '#0F1115', // canvas
+          900: '#171A21', // surface
+          800: '#1E222B', // raised surface
+          700: '#2A2F3A', // border
         },
+        // Named brand so existing markup keeps working; the values are the blue
+        // from the proof of concept this design follows.
+        brand: {
+          50: '#25355A',
+          100: '#25355A',
+          200: '#345079',
+          300: '#3F6BAE',
+          400: '#4F8CFF',
+          500: '#4F8CFF',
+          600: '#4F8CFF',
+          700: '#6BA0FF',
+          800: '#8AB4FF',
+          900: '#B9D0FF',
+        },
+      },
+      boxShadow: {
+        card: '0 1px 2px 0 rgb(0 0 0 / 0.30)',
+        raised: '0 8px 24px -8px rgb(0 0 0 / 0.55)',
+      },
+      keyframes: {
+        'fade-in': {
+          from: { opacity: '0', transform: 'translateY(-2px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 120ms ease-out',
       },
     },
   },

@@ -85,8 +85,16 @@ public static class SeedData
 
         // Filled in at installation, once the client's PBX person has confirmed them.
         ("callback.extension", ""),
-        ("pbx.ip", ""),
+
+        // The PBX is the provider's Issabel, reached over the VPN, so this is its
+        // address on the VPN rather than one on the restaurant LAN.
+        ("pbx.host", ""),
         ("pbx.ami.enabled", "false"),
+
+        // The other agents' and the branches' extension numbers (S-48). A call
+        // whose other party is on this list is internal: still recorded, but
+        // left out of the customer-facing reports. Comma separated.
+        ("reports.internal_numbers", ""),
     ];
 
     /// <summary>The role the first account is created with.</summary>

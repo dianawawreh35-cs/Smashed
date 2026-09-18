@@ -5,9 +5,181 @@
 @layer base {
   html {
     font-family: theme('fontFamily.sans');
+    color-scheme: dark;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-ink-950 text-slate-200 antialiased;
+  }
+
+  /* One visible focus ring everywhere, rather than the browser default in some
+     places and nothing in others. Supervisors work through these forms with the
+     keyboard. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-ink-950;
+  }
+
+  /* Phone numbers and extensions read as data, not prose: tabular figures keep
+     them aligned in a column and stop digits shifting as values change. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* --- Buttons ------------------------------------------------------------
+     Three weights, because a screen with everything at the same weight gives
+     the eye nowhere to land: primary for the one action that matters, ghost
+     for everything alongside it, danger for the one that cannot be undone. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2
+           text-sm font-medium transition
+           disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:opacity-85 active:opacity-70;
+  }
+
+  .btn-ghost {
+    @apply btn border border-ink-700 bg-ink-800 text-slate-200 hover:opacity-85;
+  }
+
+  .btn-quiet {
+    @apply btn border border-transparent bg-transparent text-slate-400
+           hover:bg-ink-800 hover:text-slate-200;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-500 text-white hover:opacity-85;
+  }
+
+  .btn-sm {
+    @apply px-2.5 py-1 text-xs;
+  }
+
+  /* --- Fields ------------------------------------------------------------ */
+  .field {
+    @apply block space-y-1.5;
+  }
+
+  .field-label {
+    @apply block text-xs text-slate-400;
+  }
+
+  .field-hint {
+    @apply block text-xs text-slate-500;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-2 text-sm
+           text-slate-200 transition placeholder:text-slate-600
+           focus:border-brand-500 focus:outline-none
+           disabled:opacity-50;
+  }
+
+  .input-invalid {
+    @apply border-red-500 focus:border-red-500;
+  }
+
+  /* --- Surfaces ---------------------------------------------------------- */
+  .card {
+    @apply rounded-[10px] border border-ink-700 bg-ink-900;
+  }
+
+  .card-body {
+    @apply p-5;
+  }
+
+  .card-header {
+    @apply flex flex-wrap items-center justify-between gap-3
+           border-b border-ink-700 px-5 py-4;
+  }
+
+  /* --- Page heading -------------------------------------------------------
+     Title plus a line saying what the screen is for, so a supervisor opening
+     it for the first time is not left guessing. */
+  .page-title {
+    @apply text-lg font-semibold text-slate-100;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-slate-400;
+  }
+
+  /* --- Notices ------------------------------------------------------------
+     Colour alone does not carry the meaning: each has its own wording, and the
+     border gives a second signal for anyone who cannot separate the hues. */
+  .notice {
+    @apply animate-fade-in rounded-md border px-4 py-3 text-sm;
+  }
+
+  .notice-error {
+    @apply notice border-red-500/60 bg-red-500/10 text-red-300;
+  }
+
+  .notice-warning {
+    @apply notice border-amber-500/60 bg-amber-500/10 text-amber-200;
+  }
+
+  .notice-success {
+    @apply notice border-emerald-500/60 bg-emerald-500/10 text-emerald-300;
+  }
+
+  /* --- Badges ------------------------------------------------------------ */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-vip {
+    @apply badge bg-amber-500/15 text-amber-300;
+  }
+
+  .badge-blocked {
+    @apply badge bg-red-500/15 text-red-300;
+  }
+
+  .badge-muted {
+    @apply badge bg-ink-800 text-slate-400;
+  }
+
+  .badge-ok {
+    @apply badge bg-emerald-500/15 text-emerald-300;
+  }
+
+  /* --- Tables ------------------------------------------------------------ */
+  .table {
+    @apply w-full text-sm;
+  }
+
+  .table thead th {
+    @apply border-b border-ink-700 px-4 py-3 text-start text-xs font-semibold
+           uppercase tracking-wide text-slate-400;
+  }
+
+  .table tbody td {
+    @apply border-b border-ink-700 px-4 py-3 align-middle text-slate-300;
+  }
+
+  .table tbody tr:hover td {
+    @apply bg-ink-800/60;
+  }
+
+  /* --- Navigation ---------------------------------------------------------
+     The selected section carries a bar on its start edge, so it moves to the
+     right in Arabic with the rest of the layout. */
+  .nav-link {
+    @apply relative flex items-center gap-2 rounded-md px-3.5 py-2.5 text-sm
+           text-slate-400 transition hover:bg-ink-900 hover:text-slate-200;
+  }
+
+  .nav-link-active {
+    @apply bg-ink-800 font-semibold text-slate-100
+           hover:bg-ink-800 hover:text-slate-100;
+  }
+
+  .nav-link-active::before {
+    @apply absolute inset-y-1.5 start-0 w-[3px] rounded-full bg-brand-500;
+    content: '';
   }
 }

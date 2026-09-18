@@ -143,3 +143,35 @@ before there is a machine to test against.
 | Version | Date | Contents |
 | --- | --- | --- |
 | `v0.1.0` | 2026-09-14 | Scaffold — structure, config and placeholder code. No business features. Published to verify the pipeline. |
+
+---
+
+## Building the Agent App for the laptops
+
+The Agent App is **not** part of the Docker release — that image is the server
+and the supervisor web app. The desktop app is built and copied to the four
+laptops by hand (SRS §11, N-11).
+
+```powershell
+dotnet publish src/CallCenter.AgentApp/CallCenter.AgentApp.csproj `
+  -c Release -r win-x64 --self-contained true `
+  -o publish/agent-app
+```
+
+**Self-contained on purpose.** The app targets `net10.0-windows`, and
+`--self-contained true` bundles the runtime with it — about 185 MB and roughly
+190 runtime assemblies. The alternative is installing the .NET 10 Desktop
+Runtime on every laptop first, which is one more thing to get wrong on a machine
+you may not be sitting at. For four laptops the larger folder is the cheaper
+trade.
+
+### Before the first install, check with the client's IT
+
+Executables built in a user profile are blocked on some managed Windows
+machines — this was hit during development on the developer's own laptop, where
+`dotnet run` failed with *Access is denied* while `dotnet <dll>` worked. The
+same policy would block the Agent App at install time.
+
+Ask before installation day: *is there a policy blocking unsigned executables,
+and what is the approval process for our application?* Code-signing the
+executable is the usual answer, and it is not something to discover on the day.

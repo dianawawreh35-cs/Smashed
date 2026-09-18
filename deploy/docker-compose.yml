@@ -33,7 +33,8 @@ services:
     image: callcenter-api:latest
     container_name: callcenter-api
     restart: unless-stopped
-    # Host networking: required for SIP/RTP and AMI against the PBX.
+    # Host networking: required for SIP/RTP and AMI against the PBX, and so the
+    # container uses the host's VPN route to the provider.
     network_mode: host
     env_file:
       - .env
@@ -43,6 +44,11 @@ services:
       # alone, with no port number. 5000 stays for the container healthcheck.
       ASPNETCORE_URLS: http://0.0.0.0:80;http://0.0.0.0:5000
       ConnectionStrings__Default: "Host=127.0.0.1;Port=5432;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}"
+      # Signs the tokens the Agent App and the supervisor app hold. Changing it
+      # signs everyone out.
+      Jwt__SigningKey: ${JWT_SECRET}
+      # Encrypts the agents' SIP secrets in the users table.
+      Security__SipSecretKey: ${SIP_SECRET_KEY}
       Recordings__Path: /data/recordings
       TZ: ${TZ:-Asia/Hebron}
     volumes:

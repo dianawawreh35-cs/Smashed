@@ -1,0 +1,79 @@
+<UserControl x:Class="CallCenter.AgentApp.Views.LoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="{Binding Localizer.FlowDirection}"
+             FontFamily="{StaticResource UiFont}"
+             Background="{StaticResource Bg}">
+
+  <Grid>
+
+    <!-- Language toggle, reachable before signing in: an agent who cannot read
+         the screen has to be able to change it (A-80). -->
+    <Button Content="{Binding Localizer[app.language]}"
+            Style="{StaticResource GhostButton}"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Margin="18"
+            Command="{Binding ToggleLanguageCommand}" />
+
+    <Border Width="400"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Style="{StaticResource Card}"
+            Padding="34,30">
+
+      <StackPanel>
+
+        <TextBlock Text="{Binding Localizer[app.title]}"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Center" />
+
+        <TextBlock Text="{Binding Localizer[app.subtitle]}"
+                   Style="{StaticResource Subtle}"
+                   Margin="0,3,0,24"
+                   HorizontalAlignment="Center" />
+
+        <TextBlock Text="{Binding Localizer[login.username]}"
+                   Style="{StaticResource FieldLabel}"
+                   Margin="0,0,0,5" />
+        <TextBox x:Name="LoginBox"
+                 Text="{Binding Login, UpdateSourceTrigger=PropertyChanged}"
+                 IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+
+        <TextBlock Text="{Binding Localizer[login.password]}" Style="{StaticResource FieldLabel}" />
+        <PasswordBox x:Name="PasswordBox"
+                     PasswordChanged="OnPasswordChanged"
+                     IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+
+        <!-- Wrong password, disabled account, or the server being down: one
+             place, so the agent always looks in the same spot. -->
+        <Border Margin="0,18,0,0"
+                Padding="12,10"
+                Background="#2A1416"
+                BorderBrush="{StaticResource Danger}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CornerSmall}"
+                Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
+          <TextBlock Text="{Binding ErrorMessage}"
+                     Foreground="#FF9B95"
+                     TextWrapping="Wrap" />
+        </Border>
+
+        <Button Content="{Binding Localizer[login.submit]}"
+                Style="{StaticResource PrimaryButton}"
+                Margin="0,22,0,0"
+                Padding="0,11"
+                IsDefault="True"
+                Command="{Binding SignInCommand}" />
+
+        <TextBlock Text="{Binding Localizer[login.connecting]}"
+                   Style="{StaticResource Subtle}"
+                   Margin="0,12,0,0"
+                   HorizontalAlignment="Center"
+                   Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

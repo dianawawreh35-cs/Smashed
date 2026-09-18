@@ -1,0 +1,72 @@
+{
+  "app": {
+    "title": "Call Center",
+    "subtitle": "Smashed Burger",
+    "language": "Language"
+  },
+  "login": {
+    "heading": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "connecting": "Contacting the server…",
+    "errors": {
+      "empty_fields": "Enter your username and password.",
+      "invalid_credentials": "The username or password is not correct.",
+      "account_disabled": "This account has been disabled. Ask your supervisor to re-enable it.",
+      "server_unreachable": "The server could not be reached. Check the network.",
+      "server_error": "The server reported an error. Please try again."
+    }
+  },
+  "home": {
+    "signOut": "Log out",
+    "extension": "Extension:",
+    "noExtension": "No extension configured — ask your supervisor"
+  },
+  "status": {
+    "notSignedIn": "Not signed in",
+    "signedIn": "Signed in",
+    "registering": "Registering extensions…",
+    "registered": "Phone ready",
+    "registrationFailed": "Extensions refused — ask your supervisor",
+    "retrying": "Cannot reach the PBX — retrying",
+    "noExtension": "Signed in — no extension configured"
+  },
+  "sip": {
+    "idle": "Not registered",
+    "registering": "Registering…",
+    "registered": "Registered",
+    "failed": "Registration refused — ask your supervisor",
+    "retrying": "Cannot reach the PBX — retrying"
+  },
+  "nav": {
+    "contacts": "Contacts"
+  },
+  "contacts": {
+    "search": "Search",
+    "searchHint": "Search by name, address or phone number",
+    "new": "New contact",
+    "name": "Name",
+    "phone": "Phone number",
+    "address": "Address",
+    "deliveryNotes": "Delivery notes",
+    "notes": "Notes",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Saved.",
+    "noMatches": "Nothing matched that search.",
+    "offline": "The server could not be reached - contacts are unavailable right now.",
+    "sameName": "There are already contacts with this name",
+    "addToThem": "Add this number to them",
+    "errors": {
+      "duplicate_number": "That number already belongs to another contact.",
+      "no_usable_number": "Enter a valid phone number.",
+      "contact_not_found": "That contact no longer exists.",
+      "server_error": "Could not save. Please try again."
+    },
+    "intro": "Find a customer, or add one. The list is shared by every agent.",
+    "emptyTitle": "Nothing to show",
+    "emptyHint": "Search by name or number, or add a new contact."
+  }
+}

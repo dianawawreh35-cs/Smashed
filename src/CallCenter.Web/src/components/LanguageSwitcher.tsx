@@ -11,7 +11,9 @@ export default function LanguageSwitcher() {
     <label className="flex items-center gap-2 text-sm">
       <span className="sr-only">{t('app.language')}</span>
       <select
-        className="rounded border border-slate-300 bg-white px-2 py-1"
+        className="cursor-pointer rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1.5
+                   text-sm text-slate-200 transition hover:border-slate-500
+                   focus:border-brand-500 focus:outline-none"
         value={i18n.resolvedLanguage}
         onChange={(event) => applyLanguage(event.target.value as Language)}
       >

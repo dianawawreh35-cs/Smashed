@@ -6,9 +6,10 @@ namespace CallCenter.Server.Data.Entities;
 /// An agent or supervisor. Table <c>users</c>.
 /// </summary>
 /// <remarks>
-/// Each agent has two PBX extensions (SRS 2.3): one the inbound queue rings, one
-/// used for outbound calls. Both SIP secrets are encrypted at rest with an
-/// application-level key and are never returned to the supervisor UI or shown to
+/// Each agent has one PBX extension (SRS 2.3), used for every call they handle.
+/// Internal calls are told apart by the other party's number against the list in
+/// S-48, not by a second extension. The SIP secret is encrypted at rest with an
+/// application-level key and is never returned to the supervisor UI or shown to
 /// agents (N-05).
 /// </remarks>
 public class User
@@ -24,15 +25,11 @@ public class User
     /// <summary>One of <see cref="Shared.UserRoles"/>: Agent or Supervisor.</summary>
     public string Role { get; set; } = null!;
 
-    public string? InboundExtension { get; set; }
+    /// <summary>The agent's extension. Null until the supervisor assigns one.</summary>
+    public string? Extension { get; set; }
 
     /// <summary>Encrypted at rest.</summary>
-    public string? InboundSipSecret { get; set; }
-
-    public string? OutboundExtension { get; set; }
-
-    /// <summary>Encrypted at rest.</summary>
-    public string? OutboundSipSecret { get; set; }
+    public string? SipSecret { get; set; }
 
     public bool IsActive { get; set; } = true;
 

@@ -1,0 +1,101 @@
+<UserControl x:Class="CallCenter.AgentApp.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="{Binding Localizer.FlowDirection}"
+             FontFamily="{StaticResource UiFont}"
+             Background="{StaticResource Bg}">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="230" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <!-- ===== Rail =====================================================
+         Navigation, who is signed in, and the phone's state. It sits on the
+         start edge, so it moves to the right in Arabic with everything else. -->
+    <Border Grid.Column="0"
+            Background="{StaticResource Surface}"
+            BorderBrush="{StaticResource BorderSoft}"
+            BorderThickness="0,0,1,0">
+      <DockPanel>
+
+        <!-- Who is signed in. The first thing to check on a shared laptop (A-05). -->
+        <StackPanel DockPanel.Dock="Top" Margin="20,22,20,16" Orientation="Horizontal">
+          <Border Width="34" Height="34"
+                  CornerRadius="17"
+                  Background="{StaticResource AccentDim}">
+            <TextBlock Text="{Binding Initial}"
+                       FontSize="15"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource Accent}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+          </Border>
+          <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Localizer[app.subtitle]}" Style="{StaticResource Subtle}" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Sign out and language, under the status card. -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,16" Orientation="Horizontal">
+          <Button Content="{Binding Localizer[home.signOut]}"
+                  Style="{StaticResource GhostButton}"
+                  Command="{Binding SignOutCommand}"
+                  IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+          <Button Content="{Binding Localizer[app.language]}"
+                  Style="{StaticResource GhostButton}"
+                  Margin="6,0,0,0"
+                  Command="{Binding ToggleLanguageCommand}" />
+        </StackPanel>
+
+        <!-- The phone, always visible. An agent should never have to go looking
+             for whether calls can reach them (A-02, N-04a). -->
+        <Border DockPanel.Dock="Bottom"
+                Margin="14,10,14,10"
+                Padding="14,12"
+                Background="{StaticResource SurfaceAlt}"
+                CornerRadius="{StaticResource CornerSmall}">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <Ellipse Width="9" Height="9"
+                       Fill="{Binding StatusBrush}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0" />
+              <TextBlock Text="{Binding StatusTitle}"
+                         FontWeight="SemiBold"
+                         FontSize="12"
+                         VerticalAlignment="Center"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+            <TextBlock Text="{Binding PhoneSummary}"
+                       Style="{StaticResource Subtle}"
+                       FontSize="11"
+                       Margin="17,4,0,0"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <!-- Sections. The rail grows as the call log, softphone and app orders
+             tabs are built. -->
+        <TabControl x:Name="Nav"
+                    TabStripPlacement="Left"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Margin="0,6,0,0">
+          <TabControl.Template>
+            <ControlTemplate TargetType="TabControl">
+              <StackPanel IsItemsHost="True" />
+            </ControlTemplate>
+          </TabControl.Template>
+        </TabControl>
+
+      </DockPanel>
+    </Border>
+
+    <!-- ===== Content ================================================== -->
+    <ContentControl x:Name="Pane" Grid.Column="1" />
+
+  </Grid>
+</UserControl>

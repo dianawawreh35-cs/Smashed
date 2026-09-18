@@ -1,9 +1,11 @@
 using System.IO;
 using System.Windows;
 using CallCenter.AgentApp.Services;
+using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.AgentApp.Services.Sip;
 using CallCenter.AgentApp.ViewModels;
+using CallCenter.AgentApp.Views;
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,6 +70,13 @@ public partial class App : Application
 
         Log.Information("Agent App started. Logs: {LogDirectory}", LogDirectory);
 
+        // Whatever the last shift left behind, before any sign-in: a laptop that
+        // starts with no network must still reject blocked callers (A-17).
+        _host.Services.GetRequiredService<BlockListCache>().LoadFromDisk();
+
+        // Built now, hidden, so a call only has to show it (A-10).
+        _host.Services.GetRequiredService<CallPopupWindow>();
+
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();
@@ -88,8 +97,14 @@ public partial class App : Application
         services.AddSingleton<AgentSession>();
         services.AddSingleton<AgentSettingsStore>();
         services.AddSingleton<Localizer>();
+        services.AddSingleton<SipTransportHost>();
         services.AddSingleton<SipRegistrationService>();
+        services.AddSingleton<BlockListCache>();
+        services.AddSingleton<CallService>();
         services.AddSingleton<SignInService>();
+
+        // The UI thread, so the call view model can marshal SIP events onto it.
+        services.AddSingleton(_ => Current.Dispatcher);
 
         services.AddHttpClient<ApiClient>(ApiClient.HttpClientName, (provider, client) =>
         {
@@ -100,6 +115,11 @@ public partial class App : Application
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + '/');
             client.Timeout = options.Timeout;
         });
+
+        // One per process, not transient: the pop-up exists from startup and is
+        // shown and hidden, rather than built while the phone is ringing (A-10).
+        services.AddSingleton<CallViewModel>();
+        services.AddSingleton<CallPopupWindow>();
 
         services.AddTransient<LoginViewModel>();
         services.AddTransient<HomeViewModel>();
@@ -137,6 +157,10 @@ public partial class App : Application
     {
         if (_host is not null)
         {
+            // The pop-up refuses to close while the app is running, so it has to
+            // be told the app is really going.
+            _host.Services.GetRequiredService<CallPopupWindow>().ShutDown();
+
             // Close the server-side session so a laptop that is simply shut down
             // does not look signed in until the idle timer catches it (A-05).
             await SignOutOnExitAsync();

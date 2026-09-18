@@ -659,6 +659,107 @@ reason that sounds like a safety argument — "agents must not see this" — is 
 checking against who can actually reach the screen before it is used to justify
 a shape.
 
+## 2026-09-18 — The phone rings: incoming calls, and blocking before the ring
+
+A-10 (in part), A-12 (in part) and A-17 in full. A call now arrives, a pop-up
+appears, Answer / Reject / Hang up work, and a blocked caller never gets that
+far.
+
+### The block check runs first, and that shaped the design
+
+A-17 says a blocked caller gets "no pop-up, no ringing". That is not a filter
+applied to a call in progress — it decides whether a call is ever shown. So the
+check is the first statement in the incoming-INVITE handler, before the ring,
+before the window, before anything is awaited.
+
+Which in turn means it cannot ask the server. Two reasons, and the second is the
+stronger one: A-17 requires it to work with the server unreachable, and even
+with the server up, a round trip does not belong in the second before the PBX
+gives up on this extension. So **the list is fetched at sign-in and answered
+from memory**, with a copy on disk for the next start.
+
+The matching lives in `CallCenter.Shared` as `BlockList`, not in the Agent App.
+It is the rule in this app with the sharpest consequences — a false positive
+silently drops a customer, a false negative lets through someone a supervisor
+deliberately blocked — and in Shared it can be tested without a PBX, a laptop or
+a call. Sixteen tests cover it.
+
+**A withheld or unreadable caller id is not blocked.** Rejecting what cannot be
+identified would silently drop every withheld-number call; A-17 is about numbers
+a supervisor named.
+
+**Short numbers are exempt from the last-nine-digits fallback.** Matching
+otherwise mirrors caller lookup (A-13), so a caller presenting `0599123456` is
+recognised as the number blocked as `+970599123456`. But indexing an extension
+like `2001` by its tail would block every number ending `2001`, and blocking a
+branch by accident is expensive.
+
+**A corrupt cache blocks nobody rather than everybody.** That is the safer
+failure: a nuisance caller gets through once, instead of customers being
+dropped.
+
+### Plain JSON, not the SQLite offline buffer
+
+The cache is one list of strings, replaced wholesale. It needs no database. This
+also keeps it clear of `SQLitePCLRaw.lib.e_sqlite3`, which is still pinned to a
+version carrying CVE-2025-6965 and still blocks the offline buffer proper.
+
+### One SIP socket, shared — this would otherwise have been a long evening
+
+Registration used to create and own its own `SIPTransport`. Calls cannot use a
+second one: the address the PBX learns from a REGISTER is where it sends the
+INVITE. Two transports and the phone shows as registered and never rings, with
+nothing in any log to say why.
+
+So `SipTransportHost` owns one transport for the life of the process, and both
+the registration agent and the call agent bind to it. Signing out unregisters
+but leaves the socket — unregistering is what stops calls arriving, and tearing
+the socket down would gain nothing and hand the next sign-in a different port.
+
+### The pop-up exists from startup
+
+Built once, hidden, then shown and hidden. Building a WPF window inside a SIP
+callback would put window construction on a background thread in the one second
+that matters. The window also **refuses to close**: closing is turned into
+hiding, because a pop-up the agent closed once would be gone for every later
+call and the app would look as though it had stopped taking them.
+
+Bringing it to the front is `Topmost = true; Activate(); Topmost = false`.
+Windows refuses `Activate()` from a process without the foreground, which is
+exactly the case A-10 describes — an agent whose app is behind a browser. Topmost
+is turned straight back off so the pop-up does not pin itself over everything
+for the rest of the call.
+
+### A second call is refused as busy
+
+One extension, one call (SRS 2.3). Busy rather than silence lets the PBX offer
+the caller to another agent instead of leaving them ringing at an agent who is
+already talking.
+
+### Audio is opened per call, not held
+
+The microphone is acquired when a call is answered and released when it ends. On
+a laptop shared between shifts, an app sitting on the microphone between calls
+is both rude and a question somebody will eventually ask.
+
+### What is deliberately not here
+
+- **Mute and Hold** (the rest of A-12). Answer, Reject, Hang up and the timer
+  are what make the phone usable; the other two are additions to a working call.
+- **The caller's identity** — name, address, notes, VIP badge (A-11, A-13 in the
+  pop-up, A-16). The pop-up shows the number only. Next.
+- **Logging calls** (A-14). Nothing is recorded yet: not answered calls, not
+  missed ones, and **not the blocked ones**, which A-17 also requires to appear
+  in the supervisor's reports. This is the largest gap and it needs the
+  communications table, which does not exist.
+- **Outbound** (A-20 to A-22).
+
+### Untested, and honestly so
+
+None of this has met a PBX. The build compiles and the block-list rule is
+covered, but "a call arrives and the pop-up appears" has been verified by
+nobody. It needs the developer to ring extension 2001 from a phone.
+
 ---
 
 # How this project is tracked
@@ -695,22 +796,28 @@ and what comes after:
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **Calls: answer, reject, hang up, the pop-up** | A-10 to A-22 | nothing now |
+| **Logging calls as communications** | A-14 | a new table; blocks almost everything else |
+| The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
+| Mute and Hold | A-12 | nothing |
+| Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
-| Contact history panel | A-62 | communications, which arrive with calls |
+| Contact history panel | A-62 | communications (A-14) |
 
-**The calls are next, and the flags are no longer in the way.** That was the
-whole reason for doing S-45 first: **A-17** has the Agent App reject a call from
-a blocked number automatically, with the block list cached locally so it still
-works when the server is unreachable, and **A-16** has the pop-up show a VIP
-badge. Both now have something to read.
+**A-17 is finished.** The block list is cached on the laptop and a blocked
+caller is rejected before anything rings — except that the rejection is **not
+recorded**, which A-17 also asks for ("logged with status Blocked and appears in
+the supervisor's reports"). That part waits for A-14.
 
-Two pieces of A-17 are deliberately still open, because they are call work:
-`GET /api/contacts/blocked-numbers` exists and nothing consumes it yet, and
-**the local cache does not exist** — the Agent App must write the list to disk
-and reject from the cached copy, not from a live call, or the requirement's
-"even when the server is unreachable" is not met.
+**A-14 is the thing to do next, and it unlocks the most.** Right now no call is
+recorded at all: not answered, not missed, not rejected, not blocked. Which
+means no reports (R-01 to R-21), no contact history (A-62), no classification
+(A-40) and no call-back tasks. It needs the `communications` table, an endpoint,
+and the Agent App reporting each call as it ends.
+
+**Pin `SQLitePCLRaw.lib.e_sqlite3` before A-14 if the offline buffer is part of
+it.** The block-list cache deliberately avoided SQLite, so the advisory has not
+been hit yet; a communications buffer that survives a network drop would hit it.
 
 Merging and import are independent of all of this and can be done whenever.
 
@@ -758,6 +865,11 @@ Section 4.5 and reports R-20/R-21 are deferred until these are answered
 - **Login has no database-backed test.** The suite runs without PostgreSQL by
   design, so token validation and encryption are covered and the actual login
   path is not.
+- **Nothing in the call path has met a PBX.** The pop-up, the answer, the
+  hang-up and the automatic rejection compile and are wired together, and no
+  call has ever been through them. The block-list rule is covered by tests
+  because it was deliberately put in Shared; everything downstream of an actual
+  INVITE is unverified until the developer rings extension 2001.
 - **The flags have no database-backed test either.** The new tests cover the
   door (an agent is 403 on every write, and gets through on the two reads the
   pop-up needs) and the three refusals that answer before any query. What the

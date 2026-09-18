@@ -1,0 +1,70 @@
+<Window x:Class="CallCenter.AgentApp.Views.CallPopupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding Localizer[call.incoming]}"
+        FlowDirection="{Binding Localizer.FlowDirection}"
+        FontFamily="{StaticResource UiFont}"
+        Background="{StaticResource Bg}"
+        Width="380"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen">
+
+  <Border Style="{StaticResource Card}" Margin="0" Padding="24">
+    <StackPanel>
+
+      <!-- Ringing, or connected. The state first, because the agent reads this
+           in the second before they decide. -->
+      <TextBlock Text="{Binding StatusText}"
+                 Style="{StaticResource Subtle}"
+                 HorizontalAlignment="Center" />
+
+      <!-- The number, large: it is the only thing identifying the caller until
+           the contact lookup arrives (A-11, A-16). -->
+      <TextBlock Text="{Binding Number}"
+                 FontFamily="{StaticResource MonoFont}"
+                 FontSize="26"
+                 Foreground="{StaticResource Text}"
+                 HorizontalAlignment="Center"
+                 Margin="0,8,0,0" />
+
+      <!-- Only while connected, and empty before then, so a ring is never
+           mistaken for a call that has been running for two minutes. -->
+      <TextBlock Text="{Binding Duration}"
+                 FontFamily="{StaticResource MonoFont}"
+                 FontSize="15"
+                 Foreground="{StaticResource TextMuted}"
+                 HorizontalAlignment="Center"
+                 Margin="0,6,0,0"
+                 Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}" />
+
+      <!-- Ringing: answer or refuse. -->
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Center"
+                  Margin="0,22,0,0"
+                  Visibility="{Binding IsRinging, Converter={StaticResource BoolToVisibility}}">
+        <Button Content="{Binding Localizer[call.answer]}"
+                Style="{StaticResource PrimaryButton}"
+                MinWidth="120"
+                Command="{Binding AnswerCommand}" />
+        <Button Content="{Binding Localizer[call.reject]}"
+                Style="{StaticResource DangerButton}"
+                MinWidth="120"
+                Margin="10,0,0,0"
+                Command="{Binding RejectCommand}" />
+      </StackPanel>
+
+      <!-- Connected: one way out. -->
+      <StackPanel HorizontalAlignment="Center"
+                  Margin="0,22,0,0"
+                  Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+        <Button Content="{Binding Localizer[call.hangUp]}"
+                Style="{StaticResource DangerButton}"
+                MinWidth="150"
+                Command="{Binding HangUpCommand}" />
+      </StackPanel>
+
+    </StackPanel>
+  </Border>
+</Window>

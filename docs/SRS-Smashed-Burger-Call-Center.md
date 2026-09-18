@@ -122,7 +122,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | A-14 | Missed and rejected calls are logged with status Missed / Rejected. | Must |
 | A-15 | Transfer to another extension (blind transfer). | Should |
 | A-16 | VIP callers: the pop-up shows a clear VIP badge and the contact's notes at the top so the agent adjusts immediately. | Must |
-| A-17 | Blocked callers: an incoming call from a number flagged Blocked is rejected automatically by the Agent App (no pop-up, no ringing); the call is logged with status Blocked and appears in the supervisor's reports. The block list is shared by all agents and cached locally so it works even when the server is unreachable. | Must |
+| A-17 | Blocked callers: an incoming call from a number flagged Blocked is rejected automatically by the Agent App (no pop-up, no ringing); the call is logged with status Blocked and appears in the supervisor's reports. The block list is shared by all agents and cached locally so it works even when the server is unreachable: the Agent App fetches it at sign-in, keeps a copy on the laptop, and answers from memory, so the decision costs nothing in the second before the PBX gives up on the extension. A caller id that is **withheld or unreadable is not blocked** — rejecting what cannot be identified would silently drop every withheld-number call, and this requirement is about numbers a supervisor named. | Must |
 
 ### 3.3 Outbound calls
 

@@ -1,3 +1,4 @@
+using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Sip;
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,8 @@ public class SignInService(
     AgentSession session,
     AgentSettingsStore settings,
     SipRegistrationService sip,
+    BlockListCache blockList,
+    CallService calls,
     ILogger<SignInService> logger)
 {
     /// <summary>
@@ -47,10 +50,17 @@ public class SignInService(
         // Remembered so the next shift on this laptop only types a password.
         settings.Update(s => s with { LastLogin = login.Trim() });
 
+        // Before the phone comes up, not after: a call could arrive the moment
+        // the extension registers, and it has to be checked against a list that
+        // is already loaded (A-17). A failure here is not fatal - the cached
+        // list from the last shift stays in place, which is what it is for.
+        await blockList.RefreshAsync(ct);
+
         if (session.Extensions is { } extensions)
         {
             // The phone comes up as soon as the agent is in, rather than waiting
             // for them to do something (A-02).
+            calls.Start();
             sip.Start(extensions);
         }
 
@@ -74,8 +84,11 @@ public class SignInService(
     public async Task SignOutAsync(string reason = LogoutReasons.Manual, CancellationToken ct = default)
     {
         // Unregister first, so the PBX stops offering calls to this laptop
-        // before the agent is told they are signed out.
+        // before the agent is told they are signed out. Then end anything still
+        // up: handing a live call to the next shift would be worse than
+        // dropping it.
         sip.Stop();
+        calls.Stop();
 
         if (session.SessionId is { } sessionId)
         {

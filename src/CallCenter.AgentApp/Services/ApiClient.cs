@@ -147,6 +147,19 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             authenticated: true,
             ct);
 
+    /// <summary>
+    /// Every blocked number, for the local cache the rejection reads (A-17).
+    /// </summary>
+    /// <remarks>
+    /// Normalised numbers and nothing else: the app compares a caller against
+    /// them, and no customer names need to reach an agent's laptop for that.
+    /// </remarks>
+    public Task<Result<BlockedNumbersDto>> GetBlockedNumbersAsync(CancellationToken ct = default) =>
+        SendAsync<BlockedNumbersDto>(
+            () => new HttpRequestMessage(HttpMethod.Get, "api/contacts/blocked-numbers"),
+            authenticated: true,
+            ct);
+
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>
         SendAsync<CurrentUserDto>(

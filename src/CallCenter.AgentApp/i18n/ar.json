@@ -71,5 +71,13 @@
     "vip": "مميّز",
     "blocked": "محظور",
     "flagSetBySupervisor": "يضبطها المشرف."
+  },
+  "call": {
+    "answer": "رد",
+    "connected": "متّصل",
+    "hangUp": "إنهاء",
+    "incoming": "مكالمة واردة",
+    "numberWithheld": "رقم محجوب",
+    "reject": "رفض"
   }
 }

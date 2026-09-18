@@ -71,5 +71,13 @@
     "vip": "VIP",
     "blocked": "Blocked",
     "flagSetBySupervisor": "Set by the supervisor."
+  },
+  "call": {
+    "answer": "Answer",
+    "connected": "Connected",
+    "hangUp": "Hang up",
+    "incoming": "Incoming call",
+    "numberWithheld": "Number withheld",
+    "reject": "Reject"
   }
 }

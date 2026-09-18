@@ -1,4 +1,3 @@
-using System.Net;
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Logging;
 using SIPSorcery.SIP;
@@ -23,7 +22,8 @@ namespace CallCenter.AgentApp.Services.Sip;
 /// in the login response (A-01) — the supervisor sets them in the web app, and a
 /// change reaches every laptop at the next sign-in.
 /// </remarks>
-public class SipRegistrationService(ILogger<SipRegistrationService> logger) : IDisposable
+public class SipRegistrationService(
+    SipTransportHost transport, ILogger<SipRegistrationService> logger) : IDisposable
 {
     /// <summary>
     /// How long a registration lasts before it is refreshed, in seconds. Short
@@ -48,7 +48,6 @@ public class SipRegistrationService(ILogger<SipRegistrationService> logger) : ID
 
     private readonly Lock _gate = new();
 
-    private SIPTransport? _transport;
     private SIPRegistrationUserAgent? _agent;
     private RegistrationState? _state;
 
@@ -74,16 +73,13 @@ public class SipRegistrationService(ILogger<SipRegistrationService> logger) : ID
 
         lock (_gate)
         {
-            _transport = new SIPTransport();
-
-            // Any free local port. The PBX learns where to reach us from the
-            // REGISTER itself, so nothing here has to be predictable.
-            _transport.AddSIPChannel(new SIPUDPChannel(new IPEndPoint(IPAddress.Any, 0)));
-
             _state = new RegistrationState(extensions.Extension, RegistrationStatus.Registering);
 
+            // The shared transport, not one of our own: the address the PBX
+            // learns from this REGISTER is where it will send the INVITE, and
+            // that has to be the socket the call agent is listening on.
             _agent = new SIPRegistrationUserAgent(
-                _transport,
+                transport.Transport,
                 username: extensions.Extension,
                 password: extensions.Secret,
                 server: extensions.SipServer,
@@ -135,17 +131,20 @@ public class SipRegistrationService(ILogger<SipRegistrationService> logger) : ID
     }
 
     /// <summary>
-    /// Unregisters and drops the transport, so the PBX stops offering calls to
-    /// this laptop straight away rather than waiting for the registration to
-    /// lapse.
+    /// Unregisters, so the PBX stops offering calls to this laptop straight away
+    /// rather than waiting for the registration to lapse.
     /// </summary>
+    /// <remarks>
+    /// The transport stays up: it belongs to the process, not to the session,
+    /// and unregistering is what stops calls arriving.
+    /// </remarks>
     public void Stop()
     {
         SIPRegistrationUserAgent? agent;
 
         lock (_gate)
         {
-            if (_transport is null && _agent is null)
+            if (_agent is null)
             {
                 return;
             }
@@ -163,12 +162,6 @@ public class SipRegistrationService(ILogger<SipRegistrationService> logger) : ID
         {
             // Signing out must not fail because the PBX is unreachable.
             logger.LogWarning(ex, "The registration could not be ended cleanly");
-        }
-
-        lock (_gate)
-        {
-            _transport?.Shutdown();
-            _transport = null;
         }
 
         logger.LogInformation("Registration ended");

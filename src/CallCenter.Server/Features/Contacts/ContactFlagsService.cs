@@ -51,27 +51,6 @@ public class ContactFlagsService(CallCenterDbContext db, ILogger<ContactFlagsSer
     }
 
     /// <summary>
-    /// Every flagged contact — the list S-45 asks for. VIP first, then blocked,
-    /// each by name.
-    /// </summary>
-    public async Task<IReadOnlyList<FlaggedContactDto>> ListAsync(CancellationToken ct = default) =>
-        await Active()
-            .Where(c => c.IsVip || c.IsBlocked)
-            .OrderByDescending(c => c.IsVip)
-            .ThenBy(c => c.Name)
-            .Select(c => new FlaggedContactDto(
-                c.Id,
-                c.Name,
-                c.Address,
-                c.IsVip,
-                c.IsBlocked,
-                c.FlagReason,
-                db.Users.Where(u => u.Id == c.FlagChangedBy).Select(u => u.DisplayName).FirstOrDefault(),
-                c.FlagChangedAt,
-                c.Phones.OrderByDescending(p => p.IsPrimary).Select(p => p.Raw).ToList()))
-            .ToListAsync(ct);
-
-    /// <summary>
     /// Every blocked number, normalised, for the Agent App's local cache (A-17).
     /// </summary>
     /// <remarks>

@@ -29,7 +29,6 @@ export default function AppLayout() {
   const sections = [
     { to: '/dashboard', label: t('nav.dashboard') },
     { to: '/contacts', label: t('nav.contacts') },
-    { to: '/flags', label: t('nav.flags') },
     { to: '/users', label: t('nav.users') },
     { to: '/settings', label: t('nav.settings') },
   ]

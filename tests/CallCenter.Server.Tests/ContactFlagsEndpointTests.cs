@@ -35,9 +35,15 @@ public class ContactFlagsEndpointTests(CallCenterApiFactory factory)
     };
 
     /// <summary>Reads an agent's own app depends on (A-16, A-17).</summary>
+    /// <remarks>
+    /// The list of flagged contacts is the ordinary contact search narrowed by
+    /// <c>?flag=</c>, not an endpoint of its own, so that filtering and
+    /// searching compose (S-45).
+    /// </remarks>
     public static TheoryData<string> AgentReadableEndpoints =>
     [
-        "/api/contacts/flagged",
+        "/api/contacts?flag=vip",
+        "/api/contacts?flag=blocked",
         "/api/contacts/blocked-numbers",
     ];
 

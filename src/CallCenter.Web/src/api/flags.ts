@@ -5,7 +5,7 @@
  */
 import { api } from './client'
 
-/** One row of the supervisor's VIP and blocked list. */
+/** A contact as the flag endpoints return it after a change (S-45). */
 export interface FlaggedContact {
   id: string
   name: string | null
@@ -39,8 +39,6 @@ export interface SetContactFlagsRequest {
 export interface FlagNumberRequest extends SetContactFlagsRequest {
   number: string
 }
-
-export const listFlagged = () => api.get<FlaggedContact[]>('/contacts/flagged')
 
 /**
  * Sets, changes or removes a contact's flags. Both false removes them — there

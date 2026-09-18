@@ -23,11 +23,16 @@ public class ContactsController(ContactsService contacts) : ControllerBase
     /// Searches by name, address or number (A-61). A query of digits is treated
     /// as a number; anything else matches name and address.
     /// </summary>
+    /// <param name="flag">
+    /// <c>vip</c> or <c>blocked</c> narrows the results to flagged contacts
+    /// (S-45). With an empty <paramref name="q"/> this is the list of every
+    /// flagged number.
+    /// </param>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<ContactSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ContactSummaryDto>>> Search(
-        [FromQuery] string? q, CancellationToken ct) =>
-        Ok(await contacts.SearchAsync(q, ct));
+        [FromQuery] string? q, [FromQuery] string? flag, CancellationToken ct) =>
+        Ok(await contacts.SearchAsync(q, flag, ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType<ContactDto>(StatusCodes.Status200OK)]

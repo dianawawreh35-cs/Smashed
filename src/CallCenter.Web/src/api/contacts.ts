@@ -19,8 +19,13 @@ export interface ContactSummary {
   address: string | null
   isVip: boolean
   isBlocked: boolean
+  /** Why the contact is VIP or Blocked (S-45); null when neither. */
+  flagReason: string | null
   phones: string[]
 }
+
+/** Narrows a search to the flagged contacts (S-45). */
+export type ContactFilter = 'all' | 'vip' | 'blocked'
 
 export interface Contact {
   id: string
@@ -53,8 +58,15 @@ export interface DuplicateNumber {
   existingContactName: string | null
 }
 
-export const searchContacts = (query: string) =>
-  api.get<ContactSummary[]>('/contacts', { query: { q: query || undefined } })
+/**
+ * Searches, optionally narrowed to VIP or blocked contacts. The filter is part
+ * of the search rather than a list of its own, so that the two compose and the
+ * app has one contact list rather than two that can disagree (A-61, S-45).
+ */
+export const searchContacts = (query: string, filter: ContactFilter = 'all') =>
+  api.get<ContactSummary[]>('/contacts', {
+    query: { q: query || undefined, flag: filter === 'all' ? undefined : filter },
+  })
 
 export const getContact = (id: string) => api.get<Contact>(`/contacts/${id}`)
 

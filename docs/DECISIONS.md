@@ -550,18 +550,11 @@ object the contact audit uses. It has to be deserialised again to render the
 history, and a write shape and a read shape that can drift apart is a bug
 waiting for a rename.
 
-### The screen is its own, not two checkboxes on the contact form
+### The screen was its own, and that was wrong — see the next entry
 
-Three reasons. S-45 asks for a list of every flagged number, which a
-per-contact form cannot give. A flag needs a reason, and a supervisor should
-give it deliberately rather than in passing while correcting an address. And
-the contact form is the one agents use, so the flags must not be on it at all.
-
-The form takes a **number**, not a contact picked from a list, because a number
-is what a supervisor has in front of them — from the call log, or from an agent
-who has just been shouted at. VIP and Blocked are **one radio choice**, not two
-checkboxes: a checkbox pair that cannot both be ticked is a radio group wearing
-a disguise.
+The flags were first built as a separate "VIP and blocked" screen with its own
+nav entry. That was reversed the same day; the reasoning is in the entry below,
+and the server described above did not change.
 
 ### What the Agent App got
 
@@ -598,6 +591,73 @@ build proves structure, not that a screen looks right.
 
 The README's quick start was left as it is — it is the textbook version, correct
 on a machine without the policy — with a pointer to `DEVELOPING.md` above it.
+
+## 2026-09-18 — The flags move onto the contact, and the list becomes a filter
+
+Reversed within hours of building it, on the developer's question: why is
+flagging its own tab rather than something you do to a contact?
+
+### The reason that did not survive
+
+Three reasons were given for the separate screen. The third was **"the contact
+form is the one agents use, so the flags must not be on it at all"** — and that
+is false for the screen in question. The **supervisor web app refuses agent
+accounts at sign-in** (`not_a_supervisor`, `src/CallCenter.Web/src/api/auth.ts`),
+so an agent can never open its contact list. The argument holds only for the
+Agent App's contact form, which was never getting flag controls anyway.
+
+The second reason — that a reason should be given deliberately rather than in
+passing — survives the question but does not favour a separate screen. Clicking
+**Flag** and being asked for the reason is *more* deliberate than typing a
+number into a form, not less.
+
+The first reason is real and is what the new design has to keep: S-45 asks for
+a list of every flagged number, and a per-contact action cannot produce one.
+
+### What it looks like now
+
+**Flagging is on the contact.** Each row in the contact list has a **Flag**
+button beside Edit. It opens a dialog: VIP or Blocked, the reason, and — only
+when the contact is already flagged — Remove. The flag history is underneath.
+
+**The list is a filter, not a screen.** `GET /api/contacts?flag=vip|blocked`,
+the ordinary contact search narrowed. All / VIP / Blocked sit next to the search
+box. This is strictly better than the separate list: filtering and searching
+**compose**, so "blocked contacts in Ramallah" is one query, and there is **one
+contact list in the app** rather than two that can disagree about what a contact
+is. `GET /api/contacts/flagged` was deleted as redundant.
+
+`ContactSummaryDto` gained `FlagReason` so the filtered list can be read without
+opening every row — the one thing the separate screen did better, kept.
+
+**Bare numbers survive as an offer on an empty search.** S-45 allows a nuisance
+caller who is not a customer to be blocked, and with flagging attached to a
+contact there would otherwise be no way in. So a search that matches nothing and
+looks like a phone number offers *"Nobody has 0599… — flag it anyway"*. That is
+better than the form it replaces: the supervisor searched for the number first,
+which is what they should do anyway, and the offer only appears once the search
+has proved nobody has it.
+
+### What did not change
+
+**None of the server work.** `ContactFlagsService`, the supervisor-only writes,
+the three refusals, the audit trail, the block-list endpoint for A-17 — all of
+it was right and none of it moved. What changed was two React components and a
+query parameter. That is the argument for having split the service from the
+controller in the first place: the rule about who may write a flag survived a
+complete rearrangement of where the buttons live.
+
+**`UpsertContactRequest` still carries no flags.** The contact *form* cannot
+touch them; only the flag dialog can, through its own endpoint. Moving the
+button next to Edit did not put the flags in the contact save path, and that is
+the guarantee that mattered.
+
+### The lesson worth keeping
+
+The separate screen was defended with three reasons and only two were true. A
+reason that sounds like a safety argument — "agents must not see this" — is worth
+checking against who can actually reach the screen before it is used to justify
+a shape.
 
 ---
 

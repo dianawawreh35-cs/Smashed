@@ -36,10 +36,16 @@ public record ContactDto(
 }
 
 /// <summary>A contact as it appears in a list of search results (A-61).</summary>
+/// <param name="FlagReason">
+/// Why the contact is VIP or Blocked (S-45), null when neither. In the summary
+/// rather than only on the full contact so that a supervisor filtering the list
+/// to the blocked numbers can read the reasons without opening each one.
+/// </param>
 public record ContactSummaryDto(
     Guid Id,
     string? Name,
     string? Address,
     bool IsVip,
     bool IsBlocked,
+    string? FlagReason,
     IReadOnlyList<string> Phones);

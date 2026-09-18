@@ -41,17 +41,34 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
     }
 
     /// <summary>
-    /// Searches by name, address or phone number (A-61).
+    /// Searches by name, address or phone number (A-61), optionally narrowed to
+    /// the flagged contacts (S-45).
     /// </summary>
     /// <remarks>
     /// A query of digits is treated as a number and matched the way caller lookup
     /// does; anything else is matched against name and address. That guess is
     /// what lets one box serve both, which is what A-61 asks for.
+    ///
+    /// The flag filter is here rather than on an endpoint of its own so that the
+    /// two compose: "blocked contacts in Ramallah" is one query, and the list of
+    /// every blocked number S-45 asks for is this with an empty search box.
     /// </remarks>
+    /// <param name="flag">
+    /// <c>vip</c>, <c>blocked</c>, or null for everything. Anything else is
+    /// ignored rather than refused — a filter is a view, and a stale bookmark
+    /// should show the contact list, not an error.
+    /// </param>
     public async Task<IReadOnlyList<ContactSummaryDto>> SearchAsync(
-        string? query, CancellationToken ct = default)
+        string? query, string? flag = null, CancellationToken ct = default)
     {
         var contacts = Active();
+
+        contacts = flag?.ToLowerInvariant() switch
+        {
+            "vip" => contacts.Where(c => c.IsVip),
+            "blocked" => contacts.Where(c => c.IsBlocked),
+            _ => contacts,
+        };
 
         if (!string.IsNullOrWhiteSpace(query))
         {
@@ -95,6 +112,7 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
                 c.Address,
                 c.IsVip,
                 c.IsBlocked,
+                c.FlagReason,
                 c.Phones.OrderByDescending(p => p.IsPrimary).Select(p => p.Raw).ToList()))
             .ToListAsync(ct);
     }
@@ -137,6 +155,7 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
                 c.Address,
                 c.IsVip,
                 c.IsBlocked,
+                c.FlagReason,
                 c.Phones.OrderByDescending(p => p.IsPrimary).Select(p => p.Raw).ToList()))
             .ToListAsync(ct);
     }

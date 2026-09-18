@@ -11,8 +11,13 @@ import {
   searchContacts,
   updateContact,
 } from '../api/contacts'
-import type { Contact, ContactSummary, DuplicateNumber } from '../api/contacts'
+import type { Contact, ContactFilter, ContactSummary, DuplicateNumber } from '../api/contacts'
 import { errorCodeOf } from '../api/users'
+import FlagDialog from '../components/FlagDialog'
+import type { FlagTarget } from '../components/FlagDialog'
+
+/** Whether what was typed is a bare phone number, so it can be flagged unseen (S-45). */
+const looksLikeNumber = (query: string) => /^[\d\s+()-]{3,}$/.test(query.trim())
 
 /**
  * The shared contact list (A-60 to A-63).
@@ -20,19 +25,27 @@ import { errorCodeOf } from '../api/users'
  * Search takes one box: the server decides whether what was typed is a number
  * or a name, so the supervisor does not pick a mode (A-61).
  *
- * The VIP and Blocked flags are shown but not editable here — they belong to
- * their own screen (S-45), and this form must not be able to clear a block as a
- * side effect of fixing an address.
+ * The VIP and Blocked flags are set from the row's Flag button, which asks for
+ * a reason (S-45). They are deliberately **not** fields on the contact form:
+ * `UpsertContactRequest` carries no flags at all, so saving an address can
+ * never clear a block as a side effect. The list of every flagged number that
+ * S-45 asks for is this same list with the VIP or Blocked filter applied —
+ * filtering and searching compose, and there is one contact list in the app
+ * rather than two that can disagree.
  */
 export default function ContactsPage() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<ContactFilter>('all')
   const [editing, setEditing] = useState<Contact | 'new' | null>(null)
+  const [flagging, setFlagging] = useState<FlagTarget | null>(null)
 
   const { data: results, isLoading } = useQuery({
-    queryKey: ['contacts', query],
-    queryFn: () => searchContacts(query),
+    queryKey: ['contacts', query, filter],
+    queryFn: () => searchContacts(query, filter),
   })
+
+  const filters: ContactFilter[] = ['all', 'vip', 'blocked']
 
   return (
     <div className="space-y-6">
@@ -46,14 +59,32 @@ export default function ContactsPage() {
         </button>
       </div>
 
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t('contacts.searchPlaceholder')}
-        aria-label={t('contacts.search')}
-        className="input max-w-md"
-      />
+      <div className="flex flex-wrap items-center gap-4">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('contacts.searchPlaceholder')}
+          aria-label={t('contacts.search')}
+          className="input max-w-md"
+        />
+
+        {/* The VIP and blocked lists S-45 asks for, as a filter on this list
+            rather than a screen of their own. */}
+        <div role="group" aria-label={t('contacts.filter')} className="flex gap-1">
+          {filters.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setFilter(option)}
+              aria-pressed={filter === option}
+              className={filter === option ? 'btn-ghost btn-sm' : 'btn-quiet btn-sm'}
+            >
+              {t(`contacts.filters.${option}`)}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {editing && (
         <ContactForm
@@ -62,16 +93,31 @@ export default function ContactsPage() {
         />
       )}
 
+      {flagging && <FlagDialog target={flagging} onClose={() => setFlagging(null)} />}
+
       {isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : results && results.length > 0 ? (
-        <ContactTable contacts={results} onEdit={setEditing} />
+        <ContactTable contacts={results} onEdit={setEditing} onFlag={setFlagging} />
       ) : (
         /* An empty list and a failed search must not look the same. */
-        <div className="card card-body text-center">
+        <div className="card card-body flex flex-col items-center gap-3 text-center">
           <p className="text-slate-300">
             {query ? t('contacts.noMatches') : t('contacts.empty')}
           </p>
+
+          {/* A number nobody has on file is exactly the nuisance caller S-45
+              expects to be blockable, so offer it here rather than making the
+              supervisor invent a contact for them first. */}
+          {looksLikeNumber(query) && (
+            <button
+              type="button"
+              onClick={() => setFlagging({ kind: 'number', number: query.trim() })}
+              className="btn-ghost btn-sm"
+            >
+              {t('contacts.flagThisNumber', { number: query.trim() })}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -81,9 +127,11 @@ export default function ContactsPage() {
 function ContactTable({
   contacts,
   onEdit,
+  onFlag,
 }: {
   contacts: ContactSummary[]
   onEdit: (contact: Contact) => void
+  onFlag: (target: FlagTarget) => void
 }) {
   const { t } = useTranslation()
 
@@ -121,16 +169,30 @@ function ContactTable({
                 {contact.isBlocked && (
                   <span className="badge-blocked ms-2">{t('contacts.blocked')}</span>
                 )}
+                {/* Why, under the name: scanning the blocked list for the
+                    reasons should not mean opening every row (S-45). */}
+                {contact.flagReason && (
+                  <span className="block text-xs font-normal text-slate-500">
+                    {contact.flagReason}
+                  </span>
+                )}
               </td>
               <td className="tabular text-slate-400">{contact.phones.join(' · ')}</td>
               <td className="text-slate-400">{contact.address}</td>
-              <td className="text-end">
+              <td className="text-end whitespace-nowrap">
                 <button
                   type="button"
                   onClick={() => open.mutate(contact.id)}
                   className="btn-ghost btn-sm"
                 >
                   {t('contacts.edit')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onFlag({ kind: 'contact', ...contact })}
+                  className="btn-ghost btn-sm"
+                >
+                  {t('contacts.flag')}
                 </button>
               </td>
             </tr>

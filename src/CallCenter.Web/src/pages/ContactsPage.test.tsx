@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ContactsPage from './ContactsPage'
 import { setToken } from '../auth/token'
@@ -13,6 +13,7 @@ const AHMAD = {
   address: 'Ramallah',
   isVip: false,
   isBlocked: false,
+  flagReason: null,
   phones: ['0599123456'],
 }
 
@@ -55,7 +56,9 @@ describe('contacts page', () => {
     renderPage()
 
     expect(await screen.findByText('Ahmad')).toBeInTheDocument()
-    expect(screen.getByText('VIP')).toBeInTheDocument()
+
+    // Scoped to the table: "VIP" is also one of the filter buttons.
+    expect(within(screen.getByRole('table')).getByText('VIP')).toBeInTheDocument()
   })
 
   it('passes the typed query to the server rather than filtering locally', async () => {
@@ -185,5 +188,91 @@ describe('contacts page', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Sara' } })
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+  it('narrows the list to blocked contacts when the filter is used', async () => {
+    // S-45 asks for a list of all blocked and VIP numbers. It is this list with
+    // a filter, not a screen of its own, so the filter has to reach the server.
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Blocked' }))
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes('flag=blocked')),
+      ).toBe(true),
+    )
+  })
+
+  it('opens the flag dialog from the row and asks for a reason', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([AHMAD])))
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Flag\u2026' }))
+
+    expect(await screen.findByText('Flag Ahmad')).toBeInTheDocument()
+
+    // Nothing can be saved until a reason is given.
+    expect(screen.getByRole('button', { name: 'Save flag' })).toBeDisabled()
+  })
+
+  it('sends the chosen flag and the reason for an existing contact', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([AHMAD]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Flag\u2026' }))
+    fireEvent.click(await screen.findByLabelText('VIP'))
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Orders weekly' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save flag' }))
+
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+      expect(put).toBeDefined()
+      expect(String(put![0])).toBe('/api/contacts/c1/flags')
+      expect(JSON.parse(put![1].body)).toEqual({
+        isVip: true,
+        isBlocked: false,
+        reason: 'Orders weekly',
+      })
+    })
+  })
+
+  it('offers to flag a number that matched nothing', async () => {
+    // S-45 allows a bare number to be flagged. A nuisance caller who is not a
+    // customer must be blockable without inventing a contact for them first.
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '0599000111' } })
+
+    fireEvent.click(await screen.findByRole('button', { name: /flag it anyway/i }))
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Nuisance caller' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save flag' }))
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, init]) => String(url).includes('flags/by-number') && init?.method === 'POST',
+      )
+      expect(post).toBeDefined()
+      expect(JSON.parse(post![1].body)).toEqual({
+        number: '0599000111',
+        isVip: false,
+        isBlocked: true,
+        reason: 'Nuisance caller',
+      })
+    })
+  })
+
+  it('does not offer to flag a search that is not a number', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([])))
+
+    renderPage()
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'Ahmad' } })
+
+    expect(await screen.findByText('Nothing matched that search.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /flag it anyway/i })).not.toBeInTheDocument()
   })
 })

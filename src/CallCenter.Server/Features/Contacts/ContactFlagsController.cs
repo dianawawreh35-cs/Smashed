@@ -24,14 +24,10 @@ namespace CallCenter.Server.Features.Contacts;
 [Authorize(AuthPolicies.SignedIn)]
 public class ContactFlagsController(ContactFlagsService flags) : ControllerBase
 {
-    /// <summary>
-    /// Every flagged contact — the list of VIP and blocked numbers S-45 asks
-    /// for.
-    /// </summary>
-    [HttpGet("flagged")]
-    [ProducesResponseType<IReadOnlyList<FlaggedContactDto>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<FlaggedContactDto>>> Flagged(CancellationToken ct) =>
-        Ok(await flags.ListAsync(ct));
+    // The list of VIP and blocked numbers S-45 asks for is not here. It is
+    // GET /api/contacts?flag=vip|blocked - the same search, narrowed - so that
+    // filtering and searching compose and there is one list in the app rather
+    // than two that can disagree.
 
     /// <summary>
     /// The block list as normalised numbers, for the Agent App to cache (A-17).

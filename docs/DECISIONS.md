@@ -596,3 +596,7 @@ session were found only by opening the app:
 The build and the test suite verify structure. Nothing here can tell whether a
 screen *looks* right, because the apps cannot be launched from the development
 session. Screenshots from the developer are doing real work.
+
+All three were fixed, and **the developer confirmed the fixes on 2026-09-18** by
+running both apps: the contacts list renders as a dark grid with its empty state,
+and English stays left-to-right across a reload.

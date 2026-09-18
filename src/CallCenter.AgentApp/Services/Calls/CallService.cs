@@ -237,14 +237,37 @@ public class CallService(
         logger.LogInformation(
             "Second call from {Remote} refused as busy: another call is in progress", remoteEndPoint);
 
+        Decline(request, SIPResponseStatusCodesEnum.BusyHere, "busy");
+    }
+
+    /// <summary>
+    /// Answers an INVITE with one final response and nothing before it.
+    /// </summary>
+    /// <remarks>
+    /// The point is what it does <b>not</b> send. <c>AcceptCall</c> sends 100
+    /// Trying and 180 Ringing before handing back a server user agent, so
+    /// declining through it means the caller hears ringback first and is then
+    /// cut off. For a blocked caller that breaks the "no ringing" half of A-17;
+    /// for a busy agent it wastes the caller's time before the PBX can move
+    /// them on. Sending the final response straight into a new transaction
+    /// skips the provisional responses entirely.
+    ///
+    /// <b>603 Decline, not 486 Busy, for a block.</b> 6xx is a global failure:
+    /// RFC 3261 has a proxy stop trying other branches and pass it upstream,
+    /// which is the closest a phone can get to "hang up on this caller".
+    /// 486 means "this one line is busy" and invites the PBX to try elsewhere,
+    /// which is right for a second call and wrong for a blocked one.
+    /// </remarks>
+    private void Decline(SIPRequest request, SIPResponseStatusCodesEnum status, string why)
+    {
         try
         {
-            var busy = SIPResponse.GetResponse(request, SIPResponseStatusCodesEnum.BusyHere, null);
-            new UASInviteTransaction(transport.Transport, request, null).SendFinalResponse(busy);
+            var response = SIPResponse.GetResponse(request, status, null);
+            new UASInviteTransaction(transport.Transport, request, null).SendFinalResponse(response);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "A second call could not be refused cleanly");
+            logger.LogWarning(ex, "A {Why} call could not be turned away cleanly", why);
         }
     }
 
@@ -287,20 +310,20 @@ public class CallService(
         // works with the server down.
         if (blockList.IsBlocked(caller))
         {
-            logger.LogInformation("Call from {Caller} rejected: the number is blocked (A-17)", caller);
+            logger.LogInformation(
+                "Call from {Caller} rejected: the number is blocked (A-17), queue {Queue}",
+                caller, queue ?? "none");
 
-            try
-            {
-                agent.AcceptCall(request).Reject(SIPResponseStatusCodesEnum.Decline, null, null);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "A blocked call could not be declined cleanly");
-            }
+            // 603 Decline, and nothing before it. NOT AcceptCall().Reject():
+            // AcceptCall sends 100 Trying and 180 Ringing first, so the caller
+            // would hear ringback before being turned away — which is the
+            // "no ringing" half of A-17 broken, and what the caller experiences
+            // as being left hanging.
+            Decline(request, SIPResponseStatusCodesEnum.Decline, "blocked");
 
-            // Deliberately no state change: nothing rings, nothing is shown, and
-            // the agent never learns this happened. Recording it for the
-            // supervisor's reports is A-14, with the call logging.
+            // Deliberately no state change: nothing is shown and the agent never
+            // learns this happened. Recording it for the supervisor's reports is
+            // A-14, with the call logging.
             return;
         }
 

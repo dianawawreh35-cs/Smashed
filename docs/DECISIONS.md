@@ -839,6 +839,59 @@ on the same desktop, and this code was written from the library documentation
 instead. **Before the next piece of telephony — outbound, transfer, recording —
 read `pOC` first.** It has met the hardware.
 
+## 2026-09-18 — The first real call, and the ringback a blocked caller should never have heard
+
+Calls now arrive. The three fixes above worked, and the log proves each one:
+`SIP IN "OPTIONS"` answered, `to 2001` on the INVITE, and INVITEs reaching the
+app for the first time.
+
+The first three test calls were all rejected as blocked — correctly. The
+developer's own test phone had been blocked earlier while trying out the flags
+screen, so A-17 was working on the person testing it.
+
+### The bug that found: a blocked caller heard ringback
+
+The caller reported being left holding rather than cut off, and they were right.
+
+`SIPUserAgent.AcceptCall()` sends **100 Trying and 180 Ringing** before it hands
+back a server user agent. The blocked path called `AcceptCall(request).Reject(...)`,
+so the sequence on the wire was ring, ring, decline. A-17 says "no pop-up, no
+ringing"; half of that was broken, and the code carried a comment claiming
+"nothing rings" directly above the line that rang.
+
+Fixed by sending the final response straight into a new `UASInviteTransaction`,
+which skips the provisional responses entirely. The busy path already did this
+and now shares the helper.
+
+**603 Decline for a block, 486 Busy Here for a second call**, and the difference
+matters. 6xx is a global failure: RFC 3261 has a proxy stop trying other
+branches and pass it upstream, which is the closest a phone can get to "hang up
+on this caller". 486 says "this one line is busy" and invites the PBX to try
+somewhere else — right for a busy agent, wrong for a blocked number.
+
+### The limit worth being honest about
+
+Declining is not hanging up. The PBX owns the caller, and what they hear next is
+its decision: a queue may hold them and offer the call to other agents, or move
+them to a failover destination once every app has declined. Nothing the Agent
+App sends can change that.
+
+Only blocking at the PBX — Issabel's own blacklist — stops the call before it
+enters the queue. That is **S-46**, the export of the blocked list for the
+provider to load, and it is a *Should* that has not been built. This is already
+noted in SRS section 6; it has now been met in practice rather than in theory,
+and S-46 is worth more than its priority suggests.
+
+### A gap the same test exposed
+
+The Agent App refreshes the block list **only at sign-in**. A supervisor
+unblocking a number at 10am leaves every already-signed-in agent rejecting that
+caller for the rest of the shift. For a customer blocked by mistake that is a
+long time to be unreachable with nobody able to explain why.
+
+The server already has a SignalR hub the agents connect to. Pushing flag changes
+down it is small, and belongs with the call work.
+
 ---
 
 # How this project is tracked
@@ -876,6 +929,8 @@ and what comes after:
 | Next | Requirement | Depends on |
 |---|---|---|
 | **Logging calls as communications** | A-14 | a new table; blocks almost everything else |
+| Push flag changes to signed-in agents | S-45, A-17 | the SignalR hub, which exists |
+| Export the blocked list for Issabel | S-46 | nothing — and worth more than its *Should* |
 | The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
 | Mute and Hold | A-12 | nothing |
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
@@ -883,10 +938,14 @@ and what comes after:
 | Excel/CSV import | A-64 | nothing |
 | Contact history panel | A-62 | communications (A-14) |
 
-**A-17 is finished.** The block list is cached on the laptop and a blocked
-caller is rejected before anything rings — except that the rejection is **not
-recorded**, which A-17 also asks for ("logged with status Blocked and appears in
-the supervisor's reports"). That part waits for A-14.
+**A-17 works against the real PBX**, confirmed by test calls. Two pieces of it
+are still open. The rejection is **not recorded**, which A-17 also asks for
+("logged with status Blocked and appears in the supervisor's reports") — that
+waits for A-14. And **declining is not hanging up**: the PBX decides what the
+caller hears next, so a queue may still hold them or pass them on. Only
+**S-46**, the blacklist export the provider loads into Issabel, stops the call
+before it enters the queue. That is a *Should* in the SRS and is worth more than
+that in practice.
 
 **A-14 is the thing to do next, and it unlocks the most.** Right now no call is
 recorded at all: not answered, not missed, not rejected, not blocked. Which
@@ -944,11 +1003,11 @@ Section 4.5 and reports R-20/R-21 are deferred until these are answered
 - **Login has no database-backed test.** The suite runs without PostgreSQL by
   design, so token validation and encryption are covered and the actual login
   path is not.
-- **Nothing in the call path has met a PBX.** One attempt was made and the call
-  was never offered to the app; three causes were found and fixed (see the entry
-  above), and **it has not been retried since**. The pop-up, the answer, the
-  hang-up, the queue badge and the automatic rejection are all still unverified
-  against real hardware. The block-list rule is covered by tests because it was
+- **Most of the call path still has not met a PBX.** Calls now arrive, and the
+  automatic rejection of a blocked caller is confirmed working against the real
+  switch. **The pop-up, Answer, Hang up, the timer, the audio and the queue
+  badge are all still unverified** — every test call so far was blocked before
+  it reached any of them. The block-list rule is covered by tests because it was
   deliberately put in Shared; everything downstream of an actual INVITE is not.
 - **`docs/DEVELOPING.md` says to stop the apps before building, and the check
   for whether they are running is easy to get wrong.** Both run as `dotnet.exe`,

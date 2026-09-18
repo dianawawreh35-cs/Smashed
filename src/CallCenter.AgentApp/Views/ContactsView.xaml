@@ -76,6 +76,41 @@
                   Visibility="{Binding HasResults, Converter={StaticResource BoolToVisibility}}">
           <DataGrid.Columns>
             <DataGridTextColumn x:Name="NameColumn" Width="*" Binding="{Binding Name}" />
+
+            <!-- The flags, read-only (S-45). An agent must see that a caller is
+                 VIP or blocked, and must not be able to change it — so this is
+                 a chip, not a checkbox, and there is no editor anywhere in this
+                 app. -->
+            <DataGridTemplateColumn Width="Auto">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal"
+                              ToolTip="{Binding DataContext.Localizer[contacts.flagSetBySupervisor],
+                                        RelativeSource={RelativeSource AncestorType=DataGrid}}">
+                    <Border Padding="7,2"
+                            CornerRadius="{StaticResource CornerSmall}"
+                            Background="#3A2E12"
+                            Visibility="{Binding IsVip, Converter={StaticResource BoolToVisibility}}">
+                      <TextBlock Text="{Binding DataContext.Localizer[contacts.vip],
+                                        RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                 FontSize="11"
+                                 Foreground="{StaticResource Warning}" />
+                    </Border>
+                    <Border Padding="7,2"
+                            Margin="4,0,0,0"
+                            CornerRadius="{StaticResource CornerSmall}"
+                            Background="#3B1618"
+                            Visibility="{Binding IsBlocked, Converter={StaticResource BoolToVisibility}}">
+                      <TextBlock Text="{Binding DataContext.Localizer[contacts.blocked],
+                                        RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                 FontSize="11"
+                                 Foreground="{StaticResource Danger}" />
+                    </Border>
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+
             <DataGridTextColumn x:Name="AddressColumn" Width="*" Binding="{Binding Address}" />
             <DataGridTemplateColumn Width="Auto">
               <DataGridTemplateColumn.CellTemplate>

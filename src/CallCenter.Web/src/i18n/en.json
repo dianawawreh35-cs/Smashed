@@ -12,7 +12,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "logout": "Log out",
-    "users": "Users"
+    "users": "Users",
+    "flags": "VIP and blocked"
   },
   "login": {
     "heading": "Sign in",
@@ -162,5 +163,37 @@
     "sameNameHint": "If this is the same person, add the number to them. If it is someone else, carry on and save a separate contact.",
     "addNumberToThem": "Add this number to them",
     "intro": "Find a customer, or add one. The list is shared by every agent."
+  },
+  "flags": {
+    "heading": "VIP and blocked numbers",
+    "intro": "Flags are set here and nowhere else. Agents see them but cannot change them. Every change is recorded with who made it and why.",
+    "addHeading": "Flag a number",
+    "number": "Phone number",
+    "numberHint": "If the number already belongs to a contact, the flag goes on that contact.",
+    "reason": "Reason",
+    "reasonHint": "Why. Shown on the list, and kept in the log after the flag is removed.",
+    "flag": "Flag",
+    "vip": "VIP",
+    "blocked": "Blocked",
+    "apply": "Apply flag",
+    "applied": "Flag applied to {{name}}.",
+    "bareNumber": "Number only, no contact",
+    "name": "Name",
+    "numbers": "Numbers",
+    "changedBy": "Changed by",
+    "history": "History",
+    "noHistory": "No recorded changes.",
+    "removed": "Removed",
+    "remove": "Remove flag",
+    "empty": "No VIP or blocked numbers.",
+    "errors": {
+      "vip_and_blocked": "A contact cannot be VIP and Blocked at the same time.",
+      "reason_required": "Give a reason for the flag.",
+      "no_usable_number": "That is not a usable phone number.",
+      "contact_not_found": "That contact no longer exists.",
+      "invalid_request": "The flag could not be changed. Check the fields.",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "The server reported an error. Please try again."
+    }
   }
 }

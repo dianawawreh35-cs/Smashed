@@ -25,6 +25,11 @@ the same host.
 
 ## Run for development
 
+> **On a machine that blocks running locally-built executables** — `dotnet run`
+> answering *Access is denied* — use
+> [docs/DEVELOPING.md](docs/DEVELOPING.md) instead. It gives the commands that
+> work, and the ones below will not.
+
 ```bash
 docker compose -f deploy/docker-compose.dev.yml up -d   # 1. PostgreSQL 16 on 127.0.0.1:5432
 dotnet build CallCenter.sln                             # 2. build everything
@@ -72,5 +77,6 @@ docs/                      requirements, schema, runbook, decisions, prompt hist
 - [docs/SCHEMA.md](docs/SCHEMA.md) — database tables, columns and CHECK constraints
 - [docs/DEPLOY-server-runbook.md](docs/DEPLOY-server-runbook.md) — production install, backup and recovery
 - [docs/DECISIONS.md](docs/DECISIONS.md) — stack choices and the reasoning behind them
+- [docs/DEVELOPING.md](docs/DEVELOPING.md) — how to actually run the three parts on a development machine
 - [docs/RELEASING.md](docs/RELEASING.md) — push vs release vs deploy, and how each works
 - [docs/THIRD-PARTY-LICENSES.md](docs/THIRD-PARTY-LICENSES.md) — every dependency and its licence

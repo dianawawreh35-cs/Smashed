@@ -67,6 +67,9 @@
     },
     "intro": "Find a customer, or add one. The list is shared by every agent.",
     "emptyTitle": "Nothing to show",
-    "emptyHint": "Search by name or number, or add a new contact."
+    "emptyHint": "Search by name or number, or add a new contact.",
+    "vip": "VIP",
+    "blocked": "Blocked",
+    "flagSetBySupervisor": "Set by the supervisor."
   }
 }

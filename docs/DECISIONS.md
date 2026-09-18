@@ -476,6 +476,129 @@ expect** for all nine cases.
 rules ever change, the migration is history and must not be edited — write a new
 one.
 
+## 2026-09-18 — VIP and Blocked flags, and why they have their own screen
+
+S-45 built: a supervisor-only endpoint and screen, the list of every flagged
+number, and the audit trail. Agents see the flags and cannot change them.
+
+### The flags live on the contact, not in a list of numbers
+
+There is no `blocked_numbers` table. `contacts` already carries `is_vip`,
+`is_blocked`, `flag_reason`, `flag_changed_by` and `flag_changed_at`, so
+**nothing was migrated** — the columns were laid down with the initial schema
+and were waiting for this.
+
+That is the right shape and not just the cheap one. A flag is a property of a
+customer, and a customer may have three numbers; a table of numbers would need
+its own matching rules, and they would drift from the ones caller lookup uses
+(A-13). Flagging a number therefore **finds the contact that already owns it**,
+by exact normalised match and then by the last nine digits — the same two steps
+as the pop-up. Flagging `0599123456` flags the customer saved as
+`+970599123456` rather than creating a second record for the same person.
+
+A number that matches nobody creates a **nameless contact** to carry the flag.
+S-45 asks for a bare number to be flaggable, and `contacts.name` has been
+nullable since the start for exactly this. The alternative — a separate kind of
+row for numbers with no name — would mean every lookup in the system asking two
+questions instead of one.
+
+### Separate service, separate controller, and that is the enforcement
+
+`ContactFlagsService` and `ContactFlagsController` sit beside
+`ContactsService`/`ContactsController` rather than inside them.
+
+`ContactsController` is open to any signed-in account, because A-61 says every
+agent sees every contact and A-63 says agents create and edit them. If the
+flags lived there, "an agent cannot change a flag" would be a rule someone has
+to remember while adding a field to the contact form. Split, it is a fact about
+the routing table: every write carries `SupervisorOnly`, and
+`UpsertContactRequest` has no flag fields at all, so an agent fixing an address
+cannot clear a block as a side effect.
+
+Reading is deliberately **not** supervisor-only. Agents need the flags: the
+pop-up shows a VIP badge (A-16) and the app rejects a blocked caller from a
+cached copy of the block list (A-17).
+
+### Three refusals, and why each exists
+
+**VIP and Blocked at once is refused.** They ask the Agent App for opposite
+behaviour — show a badge, or reject the call without ringing — and there is no
+sensible winner. Refusing is also why both flags travel in one request rather
+than one endpoint each: two calls could leave a contact marked both between
+them.
+
+**Setting a flag with no reason is refused** (SRS S-45, amended today). A block
+nobody can account for is one nobody later dares remove. Removing a flag needs
+no reason, because the removal is logged with who and when, which is what a
+later reader actually wants.
+
+**Removing is the same request with both flags false**, not a `DELETE` of its
+own. One write path means one audit vocabulary: every change, including a
+removal, lands in the log the same way.
+
+### The audit trail is the log, not a column
+
+The contact's own columns hold the current state, which answers "who blocked
+this number?" and not "who unblocked it in March?" — and the second question is
+the one a dispute turns on. So flag changes are read back out of `audit_log`
+(`entity = contact`, action `flag` or `unflag`), with the before and after
+states in the existing `jsonb` columns, and the supervisor can open the full
+history of any flagged contact.
+
+The audit payload is a **named record**, `FlagState`, rather than the anonymous
+object the contact audit uses. It has to be deserialised again to render the
+history, and a write shape and a read shape that can drift apart is a bug
+waiting for a rename.
+
+### The screen is its own, not two checkboxes on the contact form
+
+Three reasons. S-45 asks for a list of every flagged number, which a
+per-contact form cannot give. A flag needs a reason, and a supervisor should
+give it deliberately rather than in passing while correcting an address. And
+the contact form is the one agents use, so the flags must not be on it at all.
+
+The form takes a **number**, not a contact picked from a list, because a number
+is what a supervisor has in front of them — from the call log, or from an agent
+who has just been shouted at. VIP and Blocked are **one radio choice**, not two
+checkboxes: a checkbox pair that cannot both be ticked is a radio group wearing
+a disguise.
+
+### What the Agent App got
+
+A read-only flag column in the contacts grid — a chip, not a checkbox, with no
+editor anywhere in the app (S-45, A-60).
+
+The block-list endpoint (`GET /api/contacts/blocked-numbers`, normalised
+numbers only, so customer names stay off every agent's laptop) is built and
+**not yet consumed**. Caching it locally and rejecting on it is A-17, which
+belongs with the call work — the flags existing is what unblocks that, and was
+the whole reason for doing this first.
+
+### Not done here
+
+S-46, exporting the blocked list for Issabel's own blacklist, is a *Should* and
+was left alone. It is a format question for the provider, and the list it would
+export now exists.
+
+---
+
+## 2026-09-18 — The development commands are written down
+
+`docs/DEVELOPING.md`. Until now the three commands that actually start this
+system lived only in conversation, and two of them are not the obvious ones:
+`dotnet run` is blocked by executable policy on the development machine, so
+everything runs as `dotnet <name>.dll` **from its output folder**, or it starts
+with no `appsettings.json`; and the Agent App is `net10.0-windows` while
+everything else is `net8.0`, so its path looks wrong to anyone expecting
+`net8.0`.
+
+It also records the two things that cost time every session: stop the running
+apps before building, or the compiler cannot replace their files; and a green
+build proves structure, not that a screen looks right.
+
+The README's quick start was left as it is — it is the textbook version, correct
+on a machine without the policy — with a pointer to `DEVELOPING.md` above it.
+
 ---
 
 # How this project is tracked
@@ -488,6 +611,7 @@ afterwards — a change that is not written down did not happen.
 | [`SRS-Smashed-Burger-Call-Center.md`](SRS-Smashed-Burger-Call-Center.md) | **What the system must do.** Every requirement has an ID (A-01, S-42, N-04a) and is the contract with the client. | **Any design change.** If behaviour, scope or an assumption changes, the requirement changes with it — in the same commit. A requirement that no longer describes the system is worse than no requirement. |
 | `DECISIONS.md` (this file) | **What was decided and why**, including what was considered and rejected, and what is deferred. | Anything a reader could not work out from the code: a trade-off, a constraint, a deferral, a correction. |
 | `SCHEMA.md` | The database shape. | Any migration. |
+| [`DEVELOPING.md`](DEVELOPING.md) | **How to run the three parts**, and the traps on this machine. | A command changes, or something costs an hour twice. |
 
 Requirement IDs go in commit messages and in code comments. `// A-02` next to a
 retry interval is what stops someone "tidying it up" a year from now.
@@ -502,30 +626,33 @@ Chat is not a record.
 Kept current. Resolved entries are deleted, not ticked — the decision log above
 is where history belongs.
 
-**Last reconciled: 2026-09-18.**
+**Last reconciled: 2026-09-18 (flags).**
 
 ## Where to pick up
 
-Contacts is the current thread. What remains of it, and what comes after:
+Contacts is the current thread. The flags (S-45) are done. What remains of it,
+and what comes after:
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **VIP and Blocked flags** | S-45 | nothing |
+| **Calls: answer, reject, hang up, the pop-up** | A-10 to A-22 | nothing now |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
-| **Calls: answer, reject, hang up, the pop-up** | A-10 to A-22 | the flags, in practice |
 | Contact history panel | A-62 | communications, which arrive with calls |
 
-**Do the flags before the calls.** The first recommendation was the other way
-round and was wrong: two pop-up requirements depend on the flags existing.
-**A-17** has the Agent App reject a call from a blocked number automatically,
-with the block list cached locally so it still works when the server is
-unreachable. **A-16** has the pop-up show a VIP badge. Building the pop-up first
-means building it again.
+**The calls are next, and the flags are no longer in the way.** That was the
+whole reason for doing S-45 first: **A-17** has the Agent App reject a call from
+a blocked number automatically, with the block list cached locally so it still
+works when the server is unreachable, and **A-16** has the pop-up show a VIP
+badge. Both now have something to read.
 
-The flags are also small and self-contained: a supervisor-only endpoint, the
-audit trail S-45 asks for, and a screen. Merging and import are independent of
-all of this and can be done whenever.
+Two pieces of A-17 are deliberately still open, because they are call work:
+`GET /api/contacts/blocked-numbers` exists and nothing consumes it yet, and
+**the local cache does not exist** — the Agent App must write the list to disk
+and reject from the cached copy, not from a live call, or the requirement's
+"even when the server is unreachable" is not met.
+
+Merging and import are independent of all of this and can be done whenever.
 
 The history panel (A-62) genuinely cannot start yet — it shows a contact's past
 calls, and communications do not exist until the call work lands.
@@ -571,6 +698,12 @@ Section 4.5 and reports R-20/R-21 are deferred until these are answered
 - **Login has no database-backed test.** The suite runs without PostgreSQL by
   design, so token validation and encryption are covered and the actual login
   path is not.
+- **The flags have no database-backed test either.** The new tests cover the
+  door (an agent is 403 on every write, and gets through on the two reads the
+  pop-up needs) and the three refusals that answer before any query. What the
+  flags then do — finding the contact a number belongs to, creating a nameless
+  one when nothing matches, and the audit rows — is untested for the same reason
+  as login: the suite runs without PostgreSQL.
 - **The Agent App accepts supervisor logins.** Deliberate while the phone was
   being built — it is how sign-in was tested before user management existed. The
   supervisor web app already refuses agents. Close this before handover.
@@ -578,8 +711,6 @@ Section 4.5 and reports R-20/R-21 are deferred until these are answered
   `Server`, `Username` or `Password`; they arrive in the login response (A-01).
   Misleading, because it looks like where the PBX is configured.
   `RtpPortMin`/`RtpPortMax` are real and should stay.
-- **`src/CallCenter.Web/tsconfig.app.tsbuildinfo` is committed.** A build
-  artifact; it belongs in `.gitignore`.
 - **The UI checks are throwaway scripts, not part of the build.** Three things
   were verified by hand during the redesign and none of them are reproducible by
   anyone else: that both Agent App language files carry the same keys, that

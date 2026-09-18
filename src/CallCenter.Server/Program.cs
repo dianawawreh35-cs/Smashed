@@ -54,6 +54,7 @@ try
     builder.Services.AddScoped<AuthService>();
     builder.Services.AddScoped<UsersService>();
     builder.Services.AddScoped<ContactsService>();
+    builder.Services.AddScoped<ContactFlagsService>();
     builder.Services.AddScoped<SettingsService>();
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()

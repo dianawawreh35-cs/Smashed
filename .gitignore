@@ -44,6 +44,10 @@ _ReSharper*/
 node_modules/
 dist/
 dist-ssr/
+
+# TypeScript incremental build state. A build artifact: it changes on every
+# `tsc -b` and was committed by mistake.
+*.tsbuildinfo
 .vite/
 *.local
 npm-debug.log*

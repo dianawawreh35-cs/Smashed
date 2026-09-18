@@ -508,19 +508,27 @@ is where history belongs.
 
 Contacts is the current thread. What remains of it, and what comes after:
 
-| Next | Requirement | Blocked by |
+| Next | Requirement | Depends on |
 |---|---|---|
-| VIP and Blocked flags | S-45 | nothing |
+| **VIP and Blocked flags** | S-45 | nothing |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
-| Contact history panel | A-62 | communications, which do not exist yet |
-| **Calls: answer, reject, hang up, the pop-up** | A-10 to A-22 | nothing — registration is proven |
+| **Calls: answer, reject, hang up, the pop-up** | A-10 to A-22 | the flags, in practice |
+| Contact history panel | A-62 | communications, which arrive with calls |
 
-**The recommendation was calls.** Registration works against the real PBX,
-contacts exist for the pop-up to look a caller up in, and everything built so
-far is scaffolding around the moment a phone rings. The flags are the sensible
-smaller alternative, and are a prerequisite for the pop-up behaving correctly
-anyway (A-16 shows a VIP badge, A-17 rejects a blocked caller).
+**Do the flags before the calls.** The first recommendation was the other way
+round and was wrong: two pop-up requirements depend on the flags existing.
+**A-17** has the Agent App reject a call from a blocked number automatically,
+with the block list cached locally so it still works when the server is
+unreachable. **A-16** has the pop-up show a VIP badge. Building the pop-up first
+means building it again.
+
+The flags are also small and self-contained: a supervisor-only endpoint, the
+audit trail S-45 asks for, and a screen. Merging and import are independent of
+all of this and can be done whenever.
+
+The history panel (A-62) genuinely cannot start yet — it shows a contact's past
+calls, and communications do not exist until the call work lands.
 
 ## Must fix before handover
 

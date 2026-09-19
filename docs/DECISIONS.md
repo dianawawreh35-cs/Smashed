@@ -892,6 +892,82 @@ long time to be unreachable with nobody able to explain why.
 The server already has a SignalR hub the agents connect to. Pushing flag changes
 down it is small, and belongs with the call work.
 
+## 2026-09-19 — No inbound port to the PBX. AMI is ruled out, and 4.5 is settled
+
+The question that had blocked section 4.5 since 16 September is answered, and
+the answer is no: **the PBX accepts no inbound connections, on any port.** The
+server **can** reach it outbound on the SIP port, exactly as the agents' laptops
+do.
+
+Section 4.5 was deferred waiting for this. It is now settled rather than
+deferred, and most of it survives.
+
+### What died
+
+**S-50 (AMI)** and **S-52 (database grant)**. Both need to connect *in* to the
+PBX. Marked **Ruled out**, not deferred — a requirement waiting for an answer
+that has arrived is not waiting for anything. Leaving them as "deferred" would
+have someone re-ask the provider in six months.
+
+Also dead: any automatic write to Issabel's blacklist. There is no path to it.
+
+### What survives, and why it survives
+
+**S-56, the call-back extension, is now the primary method and a Must.** It was
+a *Should* in the alternatives table.
+
+The reason it works is the whole point of the day: **a registration is
+outbound.** The server registers a dedicated extension the same way an agent's
+laptop registers theirs — same port, same direction, nothing opened, no firewall
+rule. The provider points the queue timeout at that extension; the server
+answers, plays "all agents are busy, we will call you back", hangs up, and
+records the caller with a call-back task. Real time, and it needs no more access
+than the Agent App already has.
+
+That is a better position than "AMI is unavailable, fall back to a daily
+import". Most of the real-time capability is kept.
+
+**S-55 (CDR) survives in reduced form.** It read "read-only access to the
+`asteriskcdrdb` database, **or** an export we can reach". The first half is gone;
+the export half stands, fetched outbound by the server.
+
+### The coverage, stated plainly
+
+- **Caller waits to the timeout** → real time, with a call-back task (S-56).
+- **Caller hangs up before the timeout** → not until the next CDR import (S-55).
+
+That is the honest shape of R-20 and R-21 now, and both are written that way.
+Neither is deferred any more.
+
+### Blocked numbers: the export stops being optional
+
+S-46 exports the blocked list for loading into Issabel's Blacklist screen. It
+was a *Should*, described as blocking "optionally... at the PBX level as well".
+
+With no inbound port it is the **only** route to PBX-level blocking, and today's
+testing showed why that matters: an Agent App can only *decline* a call, and a
+declined call is still the queue's problem — the caller may be held and offered
+to other agents. Only the PBX blacklist stops the call before the queue.
+
+Its priority stays *Should* because the client can type numbers into Issabel by
+hand, but section 6 now says PBX-level blocking is **recommended** rather than
+optional, and names the export as the way to feed it.
+
+### Three of the six provider questions are closed
+
+Questions 1–3 (server VPN, AMI, database access) are answered by this and were
+removed rather than ticked. The list is now about what is actually needed: the
+call-back extension and its credentials, how the CDR export will be delivered,
+queue or ring group, and who loads the blacklist.
+
+### What this does not change
+
+The Agent App. It already only talks outbound, and every fix made today —
+answering the PBX's keep-alives, naming the extension in the Contact header —
+was about being reachable *through* an existing registration rather than about
+opening anything. The architecture was already the one this constraint requires;
+nobody had stated the constraint.
+
 ---
 
 # How this project is tracked
@@ -930,7 +1006,8 @@ and what comes after:
 |---|---|---|
 | **Logging calls as communications** | A-14 | a new table; blocks almost everything else |
 | Push flag changes to signed-in agents | S-45, A-17 | the SignalR hub, which exists |
-| Export the blocked list for Issabel | S-46 | nothing — and worth more than its *Should* |
+| Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
+| Call-back extension: the server registers and answers | S-56 | the provider pointing the queue timeout at it |
 | The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
 | Mute and Hold | A-12 | nothing |
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
@@ -986,15 +1063,22 @@ calls, and communications do not exist until the call work lands.
 
 ## Questions for the telephony provider
 
-Section 4.5 and reports R-20/R-21 are deferred until these are answered
-(SRS §12.3). The first decides whether they are possible at all:
+**Answered 2026-09-19: no inbound port to the PBX, on any port.** The server can
+reach it outbound on the SIP port. AMI and database access are ruled out; S-56
+(the call-back extension the server registers) is the primary method for
+capturing calls that never reach an agent, and needs nothing opened. Section 4.5
+is settled — see the decision entry above.
 
-1. Can the **server** have its own VPN connection to the PBX? The agent laptops'
-   VPN does nothing for it, and the server is what talks to AMI or the CDR.
-2. Is **AMI** available (TCP 5038) with a user for us and our server's VPN
-   address permitted?
-3. Read-only access to the **`asteriskcdrdb`** database, or a regular CDR export?
-4. Is incoming customer routing a **queue or a ring group**?
+Still needed (SRS §12.3), and **nothing is blocked on them except the work they
+describe**:
+
+1. Will the provider point the **queue / ring-group timeout** at a call-back
+   extension we register, and give us its SIP credentials? S-56 depends on it.
+2. How will the **CDR export** be made available for the server to fetch — SFTP,
+   HTTPS, a file share? S-55 depends on it.
+3. Is incoming customer routing a **queue or a ring group**?
+4. Who administers Issabel's **Blacklist** screen, and how often will they load
+   the S-46 export?
 5. What **VPN uptime and support hours** are agreed, and who is called when the
    tunnel drops?
 

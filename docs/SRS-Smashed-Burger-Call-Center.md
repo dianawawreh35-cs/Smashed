@@ -56,7 +56,7 @@ The call center takes orders, cancellations, complaints and inquiries by phone t
 - **Agent App (Windows desktop):** registers to the Issabel PBX across the VPN as the agent's SIP extensions, handles inbound and outbound calls, records calls, shows the incoming-call pop-up, holds the agent's call log, the shared contacts and the App Orders tab.
 - **Server (mini PC, restaurant LAN):** PostgreSQL database, recordings storage, REST API used by the Agent Apps, nightly backups. It also needs its own VPN connection to the PBX for the call capture in 4.5 — see the note in 2.4.
 - **Supervisor Web App:** browser application served by the server for search, reports, statistics, recordings access and configuration of the classification form.
-- **Issabel PBX (hosted by the telephony provider):** not operated by the restaurant and not modified by this project. Issabel is an Asterisk distribution, so it offers standard SIP, and AMI and CDR for the server-side capture in 4.5 — but each of those has to be enabled and permitted by the provider (see 12.3).
+- **Issabel PBX (hosted by the telephony provider):** not operated by the restaurant and not modified by this project. It accepts **no inbound connections**, so this system only ever talks to it outbound — SIP registration from the agents' laptops and from the server (4.5). Issabel's own screens, such as the Blacklist, are used by whoever administers it, not by this system.
 - **VPN to the provider:** what the extensions register across. Every agent laptop runs a VPN client, and the server needs one too.
 
 ### 2.2 Users and roles
@@ -230,8 +230,8 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | R-17 | Complaint handling: open vs closed follow-ups, time to close, complaints per 100 orders. |
 | R-18 | Data quality: unclassified communications, calls from unknown numbers (not saved as contacts), duplicate contacts. |
 | R-19 | Daily summary sent by e-mail to the supervisor (yesterday's totals by type and channel, complaints, missed calls) [Could — requires internet or local mail]. |
-| R-20 | *(deferred with 4.5)* Abandoned and overflowed calls: count, rate (÷ inbound calls), average and maximum wait time, per hour and per day; list with call-back status. Real-time with AMI, otherwise as of the last CDR import (see 4.5). |
-| R-21 | *(deferred with 4.5)* Queue service level: percentage of inbound calls answered within N seconds (N configurable), per day and per hour. Requires AMI or CDR with wait times. |
+| R-20 | Abandoned and overflowed calls: count, rate (÷ inbound calls), average and maximum wait time, per hour and per day; list with call-back status. Overflowed calls in real time (S-56); abandoned calls as of the last CDR import (S-55). |
+| R-21 | Queue service level: percentage of inbound calls answered within N seconds (N configurable), per day and per hour. Wait times come from the CDR export (S-55), so this report is as of the last import rather than live. |
 
 ### 4.3 Dashboard
 
@@ -249,42 +249,51 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | S-43 | Recording retention period (default 90 days) and storage usage view. | Must |
 | S-44 | Backup now / view last backup status. | Should |
 | S-45 | Mark a contact (or a bare phone number) as VIP or Blocked, with a reason and date; remove the flag at any time; list of all blocked and VIP numbers. Agents can see the flags but cannot change them. Every change is logged. **A reason is required** whenever a flag is set — a block nobody can account for is one nobody later dares remove; removing a flag needs none, because the removal itself is logged with who and when. **VIP and Blocked are mutually exclusive** and setting both at once is refused: they ask the Agent App for opposite behaviour (A-16 shows a badge, A-17 rejects the call) and there is no sensible winner. A number given for flagging is matched against existing contacts the way an incoming caller is (A-13), so flagging `0599…` flags the customer already saved as `+970599…`; only a number that matches nobody creates a nameless contact to carry the flag. The supervisor can see the **full history of flag changes** on a contact, including removals. Flagging is done **from the contact itself** in the contact list, and asks for the reason at that moment; the list of flagged numbers is that same contact list filtered to VIP or Blocked, so searching and filtering compose. | Must |
-| S-46 | Export the blocked list in a format the provider can load into Issabel's blacklist, so the numbers can optionally be blocked at the PBX level as well (see note in section 6). | Should |
+| S-46 | Export the blocked list in a format that can be loaded into Issabel's blacklist, so numbers are blocked at the PBX level as well (see note in section 6). With no inbound port to the PBX (4.5) this export is the **only** route to PBX-level blocking — there is no automatic path — and it is what makes a blocked caller genuinely rejected rather than declined by each Agent App in turn. Loaded by whoever administers Issabel. | Should |
 | S-48 | Internal numbers list: the supervisor maintains the list of internal extension numbers — the other agents and the four branches (see 2.3). A call whose other party is on the list is an internal call: still recorded, still in the agent's call log and the contact history, but excluded from the customer-facing reports so it does not distort order counts, complaint rates, volumes or the service level. Entered as plain numbers, one per entry; every change is logged with who and when. | Must |
-| S-47 | System settings: view and change the values the system reads at runtime — the PBX host the Agent Apps register to (SRS 2.3), the call-back extension, the idle-logout time (A-05), how long an agent may edit their own classification (A-42), the service-level threshold (R-21) and the recording retention period (S-43). Changes take effect without a redeployment: the Agent App picks up a new PBX host at the next sign-in, so a change by the provider does not need a visit to each laptop. Every change is logged with who and when. The AMI connection settings belong with section 4.5 and are deferred with it. | Must |
+| S-47 | System settings: view and change the values the system reads at runtime — the PBX host the Agent Apps register to (SRS 2.3), the call-back extension, the idle-logout time (A-05), how long an agent may edit their own classification (A-42), the service-level threshold (R-21) and the recording retention period (S-43). Changes take effect without a redeployment: the Agent App picks up a new PBX host at the next sign-in, so a change by the provider does not need a visit to each laptop. Every change is logged with who and when. There are no AMI settings: AMI is ruled out (4.5). The call-back extension's own SIP credentials belong here. | Must |
 
 ### 4.5 Capture of calls that never reach an agent (queue / ring-group)
 
-> **Deferred — decision pending (16 September 2026).** How this is done, and
-> whether it can be done at all, depends on answers the telephony provider has
-> not given yet (see 12.3). Nothing in this section is being built until they
-> are in. It is deferred, not dropped: the requirements below stand as written
-> and are the starting point once the answers arrive.
+> **Settled — 19 September 2026.** **No inbound port to the PBX can be opened,
+> on any port.** That is the client's answer and it is final, so AMI (S-50) and
+> direct database access (S-52) are **ruled out, not deferred** — both need to
+> connect *in* to the PBX.
 >
-> What is blocked with it: **R-20** and **R-21**, and the server's own VPN
-> connection, which is only needed for this section.
+> The server **can** reach the PBX outbound on the SIP port, the same way the
+> agents' laptops already do. Everything below is built on that one fact: a
+> registration is outbound, so it needs nothing opened.
+>
+> **S-56 is therefore the primary method and is now a Must.** S-55 is the
+> catch-all behind it. R-20 and R-21 are no longer blocked — they are delivered
+> with the coverage S-56 and S-55 give, which is stated plainly under each.
 
 Calls that are abandoned while waiting in the queue, or that time out because all agents are busy, never ring an agent's extension and therefore cannot be seen by the Agent App. They are captured on the server side as follows.
 
-**Primary method — real-time via PBX AMI (preferred)**
+**Primary method — the call-back extension (real time, needs nothing opened)**
 
 | ID | Requirement | Priority |
 |---|---|---|
-| S-50 | The server connects to the provider's Issabel through AMI (Asterisk Manager Interface, TCP 5038) across the VPN and records every inbound call that ends before reaching an agent: caller number, date/time, queue or ring group, wait time, and whether the caller hung up (abandoned) or was moved by the PBX at timeout (overflowed). Stored as communications with status Abandoned / Overflowed, matched to contacts, visible in search, contact history and reports within seconds. | Must |
+| S-56 | Call-back extension: the provider points the queue / ring-group timeout or failover destination at a dedicated extension that **the server registers**, exactly as an agent's laptop registers its own — outbound, on the SIP port already in use, so no port is opened and no firewall rule is added. The server answers, plays a short message ("all agents are busy, we will call you back"), hangs up, and immediately creates a communication with status Overflowed and a call-back task carrying the caller's number and the queue. Real time. | Must |
 | S-51 | Each abandoned or overflowed call creates a call-back task assigned to the supervisor (or the next available agent, configurable). The task closes automatically when an outbound call to that number is made, or manually. | Should |
-| S-52 | Where the PBX offers database read access (Database Grant) instead of, or in addition to, AMI, the server may read the PBX call records directly at hang-up to obtain the same information. | Could |
 
-**Alternative — if AMI / database access is not available on the client's PBX**
+**What S-56 does not catch:** a caller who hangs up *before* the timeout. They never reach the call-back extension, so nothing on the server side sees them. That gap is what S-55 exists for.
 
-AMI is part of Asterisk and Issabel enables it by default, but the provider still has to create a user for us and permit the server's VPN address. If the provider will not do that (to be confirmed before installation, see 12.3), the following applies instead of S-50 and the real-time requirement is waived:
+**Catch-all behind it — CDR export (delayed)**
 
 | ID | Requirement | Priority |
 |---|---|---|
-| S-55 | CDR import: Issabel keeps its call detail records in the `cdr` table of the `asteriskcdrdb` MySQL database. The server reads them over the VPN — by read-only database access, or from an export the provider places where the server can reach it — at least daily and creates Abandoned / Overflowed records for inbound calls with no answered agent leg. Reports include these calls with the delay of the import (not real-time). | Must |
-| S-56 | Call-back extension: the client's PBX person sets the queue/ring-group timeout or failover destination to a dedicated extension registered by the server. The server answers, plays a short message ("all agents are busy, we will call you back"), hangs up, and immediately creates a communication record and a call-back task with the caller's number. This captures in real time every caller who waits until the timeout; callers who hang up before the timeout appear only through S-55. | Should |
-| S-57 | Ring-group option (client decision): if the PBX is configured as a ring group with "ring all" instead of a queue, every inbound call rings all free agents' Agent Apps; a call that nobody answers is logged by the Agent Apps as Missed with the caller number, in real time, without AMI. Hold music and position announcements are lost in this configuration. | Info |
+| S-55 | CDR export: the provider places Issabel's call detail records where the server can **fetch** them — an outbound pull by the server (SFTP, HTTPS or a file share), or a push from the provider to the server. Direct read-only access to the `asteriskcdrdb` MySQL database is **not** available, because it would need an inbound port. The server imports at least daily and creates Abandoned records for inbound calls with no answered agent leg. These appear in reports with the delay of the import. | Should |
+| S-57 | Ring-group option (client decision): if incoming routing is a ring group with "ring all" rather than a queue, every inbound call rings all free agents' Agent Apps, and a call nobody answers is logged by the Agent Apps themselves as Missed, in real time, with no server-side capture at all. The cost is hold music and queue position announcements, which a ring group does not have. | Info |
 
-**Dependency statement:** real-time detection of calls that never reach an agent depends on the client's PBX providing AMI or database access. If it does not, such calls are reported from the PBX's CDR with a delay and, where the client enables the call-back extension, captured in real time for calls reaching the timeout. This is a documented dependency and not a defect of the system.
+**Ruled out — both require connecting *in* to the PBX**
+
+| ID | Requirement | Status |
+|---|---|---|
+| S-50 | Real-time capture through AMI (Asterisk Manager Interface, TCP 5038). | **Ruled out (19 Sep 2026).** No inbound port. |
+| S-52 | Reading the PBX call records directly through a database grant. | **Ruled out (19 Sep 2026).** No inbound port. |
+
+**Dependency statement:** the client's PBX accepts no inbound connections, so calls that never reach an agent are captured by the server registering an extension the PBX sends them to (S-56), which is real-time and covers every caller who waits to the timeout, plus a CDR export (S-55) for those who hang up earlier. Reporting coverage is therefore: **timeout callers in real time, early hang-ups as of the last import.** This is a property of the client's network policy, documented and agreed, not a defect of the system.
 
 ---
 
@@ -310,8 +319,8 @@ AMI is part of Asterisk and Issabel enables it by default, but the provider stil
 ## 6. External Interfaces
 
 - **Issabel — calls:** standard SIP registration and calls across the VPN (two extensions per agent). No PBX add-on or licence required. Caller ID as delivered by the provider's trunks.
-- **Blocked numbers — note:** rejection by the Agent App means the PBX still receives the call and, in a queue, may offer it to other agents or send it to the failover destination after all apps reject it. Blocking at the PBX level (Issabel's blacklist, applied by the provider using the export in S-46) stops the call before it enters the queue and is recommended for persistent nuisance callers.
-- **Issabel — server side:** AMI (TCP 5038, read-only events) for calls that never reach an agent; alternatively read-only access to the `asteriskcdrdb` database or a CDR export, and/or a call-back extension (see 4.5). All of it reaches the PBX over the VPN, so the server needs its own VPN connection. No licensed Issabel add-on is required — the Contact Center (Asternic) module would provide the same figures ready-made, but this project does not depend on it.
+- **Blocked numbers — note:** rejection by the Agent App means the PBX still receives the call and, in a queue, may offer it to other agents or send it to the failover destination after all apps reject it — so the caller may experience being held rather than cut off, and nothing the Agent App sends can change that. Blocking at the PBX level, through Issabel's own **Blacklist** screen, stops the call before it enters the queue: no ringing, no queue, no agent involved. With no inbound port to the PBX there is no way to write that list automatically, so it is loaded by hand from the S-46 export. **Recommended for every persistent nuisance caller**, not merely optional.
+- **Issabel — server side:** the PBX accepts **no inbound connections**, so AMI and database access are out (4.5). The server instead **registers an extension outbound**, the same way an agent's laptop does, and the PBX sends timed-out callers to it (S-56); a CDR export the server fetches covers the rest (S-55). The server still needs to reach the PBX over the VPN, but only outbound on the SIP port the agents already use. No licensed Issabel add-on is required — the Contact Center (Asternic) module would provide the same figures ready-made, but this project does not depend on it.
 - **Messaging and delivery apps:** manual entry in this version. Automated WhatsApp Business API, Instagram/Facebook and delivery-app integrations are possible future phases (they require internet access, business verification and per-message fees).
 - **POS:** not integrated in this version; order value is entered by the agent. A future phase may import customers or order totals from the POS if it offers an export or API.
 
@@ -340,7 +349,7 @@ AMI is part of Asterisk and Issabel enables it by default, but the provider stil
 - The supervisor changes the classification form (e.g., adds a type); the next call's form on the agent's screen shows the change.
 - Reports R-01 to R-05 produce correct figures and charts for a test day with known calls, filterable by branch, and export to Excel.
 - Two agents use the same laptop in sequence: after logout/login the correct extensions register and each agent sees only their own calls.
-- A call that rings in the queue and hangs up before any agent answers appears in the supervisor's missed/abandoned report — immediately with AMI, or after the next CDR import in the alternative method.
+- A call that waits in the queue until the timeout is sent to the server's call-back extension, and appears in the supervisor's report with a call-back task within seconds (S-56). A caller who hangs up *before* the timeout is not seen until the next CDR import (S-55).
 - The server is switched off: agents can still receive, make and record calls; when it is switched on, the queued entries appear.
 - Backup runs and a restore on a test machine brings back the data.
 
@@ -359,11 +368,12 @@ AMI is part of Asterisk and Issabel enables it by default, but the provider stil
 
 ## 10. Open Questions for the Client [TBC]
 
-- **PBX provider — to confirm before installation.** The list of internal extension numbers for S-48 is also needed from the client. These answers decide whether 4.5 and reports R-20/R-21 can be delivered at all:
-  1. Can the **server** have its own VPN connection to the PBX, not just the agent laptops?
-  2. Is **AMI** available (TCP 5038), with a user for us and our server's VPN address in the permitted list?
-  3. Can we have **read-only access to the `asteriskcdrdb` database**, or a regular CDR export we can reach?
-  4. Is incoming customer routing a **queue or a ring group**? (Determines which method in 4.5 applies.)
+- **PBX provider — answered on 19 September 2026.** No inbound port to the PBX can be opened, on any port; the server can reach the PBX **outbound** on the SIP port, as the agent laptops do. That settles 4.5: AMI (S-50) and database access (S-52) are ruled out, and S-56 becomes the primary method. Three of the original six questions are closed by that answer and have been removed.
+- **PBX provider — still to confirm before installation.** The list of internal extension numbers for S-48 is also needed from the client:
+  1. Will the provider point the **queue / ring-group timeout** at a call-back extension we register, and give us its SIP credentials? (S-56 — the primary capture method depends on it.)
+  2. Can the provider make a **CDR export** available for the server to fetch, and how — SFTP, HTTPS, or a file share? (S-55 — covers callers who hang up before the timeout.)
+  3. Is incoming customer routing a **queue or a ring group**? (Determines whether S-57 applies instead.)
+  4. Who administers the Issabel **Blacklist** screen, and how often will they load the S-46 export?
   5. What are the agreed **VPN uptime and support hours**, and who is called when the tunnel drops?
   6. Can the provider add a **recording announcement** before ringing agents, if the client wants one?
 - PBX: confirm which of each agent's two extensions is the customer one and which is the internal one, and that internal dialling to the four branches works from the internal extension (SRS 2.3).
@@ -402,7 +412,7 @@ AMI is part of Asterisk and Issabel enables it by default, but the provider stil
 - All hardware: server (mini PC with SSD), agent laptops, headsets, network, UPS if desired, and any replacement of failed hardware.
 - PBX (Issabel, operated by the telephony provider) configuration and its maintenance: one working extension per agent with SIP credentials (see 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' extensions, outbound routes, and internal dialling between the agents and the branches. Recording announcement if wanted. The PBX is configured by the telephony provider, not by the developer; the client owns that relationship and any charges under it.
 - **The VPN**: an account and client configuration for every agent laptop, and a separate connection for the server. Supplying, licensing and supporting the VPN is the client's and the provider's responsibility, not the developer's.
-- For capture of calls that never reach an agent (4.5): an AMI user on Issabel (Manager Settings in the Issabel GUI, or `manager.conf`) with the server's VPN address in the permitted list — or, failing that, read-only access to the `asteriskcdrdb` database or a CDR export the server can reach, and optionally the call-back extension and its queue failover setting. The client confirms with the provider before installation which of these is available.
+- For capture of calls that never reach an agent (4.5): a **dedicated extension with SIP credentials** for the server to register, and the queue / ring-group timeout pointed at it (S-56); and a **CDR export** the server can fetch (S-55). Neither needs a port opened on the PBX. The client arranges both with the provider before installation.
 - LAN access between the laptops and the server, VPN access from both to the PBX, and administrator rights on the laptops for installing the app and the VPN client.
 - Customer list for the initial import (Excel/CSV), if available.
 - Decisions on all [TBC] items before installation.
@@ -423,7 +433,7 @@ From the acceptance date, the developer provides support free of charge for twel
 - Remote first (screen sharing / phone); on-site when remote is not possible.
 - Response within one working day, Sunday–Thursday, 9:00–17:00. Urgent "agents cannot work" issues are handled as a priority.
 
-**Not covered by support:** hardware failures, PBX, network or internet problems, changes made by third parties, unavailability of AMI/CDR access on the PBX (see 4.5), data loss caused by not keeping backups on the client's side, and anything listed as Out of Scope. Such work, if requested, is billed separately at USD 30 per hour (minimum one hour).
+**Not covered by support:** hardware failures, PBX, network or internet problems, changes made by third parties, unavailability of the call-back extension or the CDR export on the PBX (see 4.5), data loss caused by not keeping backups on the client's side, and anything listed as Out of Scope. Such work, if requested, is billed separately at USD 30 per hour (minimum one hour).
 
 After the 12 months, support is optional at USD 250 per year (same terms) or per hour as above.
 

@@ -1274,16 +1274,17 @@ and what comes after:
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
-| Contact history panel | A-62 | communications (A-14) |
 
-**A-17 works against the real PBX**, confirmed by test calls. Two pieces of it
-are still open. The rejection is **not recorded**, which A-17 also asks for
-("logged with status Blocked and appears in the supervisor's reports") — that
-waits for A-14. And **declining is not hanging up**: the PBX decides what the
-caller hears next, so a queue may still hold them or pass them on. Only
-**S-46**, the blacklist export the provider loads into Issabel, stops the call
-before it enters the queue. That is a *Should* in the SRS and is worth more than
-that in practice.
+**A-17 works against the real PBX**, confirmed by test calls, and since A-14 the
+rejection is recorded too — a blocked call is reported with status Blocked, so it
+reaches the supervisor's reports as the requirement asks. Nothing displays it
+yet, which is the general gap below rather than one of A-17's.
+
+One piece of A-17 stays open and cannot be closed in the Agent App:
+**declining is not hanging up.** The PBX decides what the caller hears next, so
+a queue may still hold them or pass them on. Only **S-46**, the blacklist the
+Issabel administrator loads, stops the call before it enters the queue. It is a
+*Should* in the SRS and worth more than that in practice.
 
 **A-14 landed on 19 September.** Every call the Agent App sees now reaches the
 server — answered, missed, rejected, blocked — with an on-disk queue behind it so

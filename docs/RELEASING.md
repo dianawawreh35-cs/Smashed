@@ -165,13 +165,19 @@ Runtime on every laptop first, which is one more thing to get wrong on a machine
 you may not be sitting at. For four laptops the larger folder is the cheaper
 trade.
 
-### Before the first install, check with the client's IT
+### Executable policy — asked and answered for this client
 
 Executables built in a user profile are blocked on some managed Windows
-machines — this was hit during development on the developer's own laptop, where
-`dotnet run` failed with *Access is denied* while `dotnet <dll>` worked. The
-same policy would block the Agent App at install time.
+machines. This was hit during development on the developer's own laptop, where
+`dotnet run` failed with *Access is denied* while `dotnet <dll>` worked, and the
+worry was that the same policy would block the Agent App at install time.
 
-Ask before installation day: *is there a policy blocking unsigned executables,
-and what is the approval process for our application?* Code-signing the
-executable is the usual answer, and it is not something to discover on the day.
+**Answered on 2026-09-20: the agents' laptops have no such policy.** The Agent
+App installs unsigned, and **code-signing is not required for this delivery.**
+The developer's own machine still has the restriction, which is a development
+inconvenience only — see `DEVELOPING.md`.
+
+**Ask again for any other client, before installation day:** *is there a policy
+blocking unsigned executables, and what is the approval process for our
+application?* Code-signing the executable is the usual answer, it costs money and
+adds a step to every release, and it is not something to discover on the day.

@@ -6,6 +6,11 @@
     The Agent App's look, following the CallPoc proof of concept: a dark shell,
     one blue accent, and cards on a near-black canvas.
 
+    #4F8CFF started as a placeholder carried over from that proof of concept.
+    On 2026-09-20 the client chose to keep it, so it is the brand colour rather
+    than a stand-in. The supervisor app's brand.400/500/600 is the same value —
+    change both together or the two apps stop matching.
+
     Dark suits the job. An agent has this on screen for an eight-hour shift,
     often in a back room, and a white full-screen window for that long is
     tiring. It also lets the one accent colour carry meaning - what is selected,

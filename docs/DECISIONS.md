@@ -1319,6 +1319,52 @@ placeholder is visibly provisional and a wrong brand colour is not.
 Both stay on the list, now marked as waiting on somebody other than the
 developer.
 
+## 2026-09-20 — The last two must-fix items are answered, and the list is empty
+
+Both were waiting on the client rather than on the developer, and both came back
+in one go.
+
+### The agents' laptops have no executable policy
+
+`dotnet run` is blocked on the **developer's** machine with *Access is denied*,
+and the worry was that the same policy would stop the Agent App installing on
+the agents' laptops. It does not — they have no such policy.
+
+So **code-signing is not needed for this delivery.** That was the expensive
+answer (a certificate, and a signing step in the release) and it is off the
+table.
+
+What stays is a development inconvenience, not a handover risk: the developer's
+own machine still requires `dotnet <name>.dll` from the output folder rather than
+`dotnet run`, which is why `DEVELOPING.md` leads with it. `RELEASING.md` keeps
+its code-signing section as background, since a future client may well have the
+policy this one does not.
+
+### The blue is the brand colour now
+
+`#4F8CFF` arrived from the CallPoc proof of concept as a placeholder, and before
+that the scaffold used Tailwind's default orange under a key called "brand",
+which was never the restaurant's either. The SRS specifies no colours at all.
+
+The client has chosen to keep the current theme. **That makes the blue a
+decision rather than a stand-in**, and the distinction is worth recording: the
+comments in `tailwind.config.js` and `Theme.xaml` described it as borrowed, so
+anyone tidying up later would have read it as unfinished work and been right to
+ask. They now say it was chosen, when, and — the part that actually matters — that
+the same value appears in both apps and they have to change together.
+
+No visual change. One value in each app, and both already held it.
+
+### The must-fix list is empty
+
+Four items on 19 September: the supervisor lockout, .NET 8 leaving support, the
+executable policy, and the brand colours. The first two were fixed yesterday;
+these two are answered. Nothing is left on it.
+
+That does not mean nothing is outstanding — the open items list above it is long,
+and the pop-up still has not been seen working. It means nothing on the list is
+a reason the system could not be handed over.
+
 ---
 
 # How this project is tracked
@@ -1403,19 +1449,12 @@ calls, and communications do not exist until the call work lands.
 
 ## Must fix before handover
 
-- **No password recovery for a locked-out supervisor.** There is no self-service
-  reset, the reset screen is behind supervisor login, and the seed command
-  refuses once any user exists. A lockout needs direct database access. Either a
-  `reset-password` command alongside `seed`, or a documented procedure. Hit for
-  real on 2026-09-17.
-- **Waiting on the client, not the developer — ask the client's IT about executable policy.** `dotnet run` was blocked on
-  the developer's own machine with *Access is denied* while `dotnet <dll>`
-  worked. The same policy would block the Agent App installer on the agents'
-  laptops. Code-signing is the usual answer. See `RELEASING.md`.
-- **Waiting on the client, not the developer — get the real brand colours.** Both apps use the blue from the CallPoc proof
-  of concept. The orange they used before was never the restaurant's — it came
-  from the initial scaffold as Tailwind's default orange under a key called
-  "brand". The SRS specifies no colours at all. One value in each app.
+**Empty as of 2026-09-20.** All four items are closed — see the decision entries
+for 19 and 20 September. Nothing on this list is a reason the system could not be
+handed over; the open items above are work, not blockers.
+
+Add to this list only what would make a handover irresponsible, not what is
+merely unfinished. It was useful because it stayed short.
 
 ## Questions for the telephony provider
 

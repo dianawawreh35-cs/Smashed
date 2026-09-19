@@ -20,8 +20,11 @@ export default {
           800: '#1E222B', // raised surface
           700: '#2A2F3A', // border
         },
-        // Named brand so existing markup keeps working; the values are the blue
-        // from the proof of concept this design follows.
+        // The brand colour. #4F8CFF began as the blue from the CallPoc proof of
+        // concept and was carried here as a placeholder; on 2026-09-20 the
+        // client chose to keep it, so it is now the restaurant's colour in this
+        // system and not a stand-in. The Agent App's Accent is the same value —
+        // change both together or the two apps stop matching.
         brand: {
           50: '#25355A',
           100: '#25355A',

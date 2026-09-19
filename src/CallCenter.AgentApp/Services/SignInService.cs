@@ -16,6 +16,7 @@ public class SignInService(
     SipRegistrationService sip,
     BlockListCache blockList,
     CallService calls,
+    CallLogReporter callLog,
     ILogger<SignInService> logger)
 {
     /// <summary>
@@ -63,6 +64,10 @@ public class SignInService(
             calls.Start();
             sip.Start(extensions);
         }
+
+        // Anything the last shift could not send. A laptop that was offline all
+        // evening catches up the moment somebody signs in on it (A-04, A-14).
+        await callLog.FlushAsync(ct);
 
         if (!session.HasPhone)
         {

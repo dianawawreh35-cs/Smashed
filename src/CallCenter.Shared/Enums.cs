@@ -17,6 +17,21 @@ public static class CommunicationKinds
     public static readonly IReadOnlyList<string> All = new[] { Call, App };
 }
 
+/// <summary>
+/// Channel names the code depends on by name rather than by id.
+/// </summary>
+/// <remarks>
+/// Only Phone is here, and only because two places need to agree on it: the seed
+/// creates it, and every call logged by the Agent App is attributed to it (A-14).
+/// The rest of the channels are the supervisor's to name and rename (S-41), so
+/// nothing may refer to them in code.
+/// </remarks>
+public static class ChannelNames
+{
+    /// <summary>The system channel every phone call belongs to. Never deleted.</summary>
+    public const string Phone = "Phone";
+}
+
 /// <summary><c>communications.direction</c>.</summary>
 public static class Directions
 {

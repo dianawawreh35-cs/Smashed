@@ -60,3 +60,45 @@ public record CallState(
     public TimeSpan? Duration =>
         ConnectedAt is { } connected ? DateTimeOffset.Now - connected : null;
 }
+
+/// <summary>How a call ended (A-14). What the supervisor's reports count.</summary>
+public enum CallOutcome
+{
+    /// <summary>The agent answered and spoke.</summary>
+    Answered,
+
+    /// <summary>The agent pressed Reject.</summary>
+    RejectedByAgent,
+
+    /// <summary>The number is on the block list and was declined automatically (A-17).</summary>
+    Blocked,
+
+    /// <summary>A second call arrived while this agent was already talking.</summary>
+    Busy,
+
+    /// <summary>It rang and nobody answered — the caller gave up, or the PBX moved on.</summary>
+    Missed,
+}
+
+/// <summary>
+/// A call that is over, as reported to the server (A-14).
+/// </summary>
+/// <remarks>
+/// Separate from <see cref="CallState"/>, which describes a call in progress and
+/// is what the pop-up binds to. A finished call is a different thing with
+/// different fields — it always has an end, and it has an outcome rather than a
+/// status — and merging the two would mean a record whose meaning depends on
+/// which half is filled in.
+///
+/// Blocked calls produce one of these even though they never appear on screen:
+/// A-17 requires them in the supervisor's reports.
+/// </remarks>
+public record FinishedCall(
+    string SipCallId,
+    string? Number,
+    string? CallerName,
+    string? Queue,
+    CallOutcome Outcome,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? AnsweredAt,
+    DateTimeOffset EndedAt);

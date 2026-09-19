@@ -1073,6 +1073,99 @@ Two settings, `callback.extension` and `pbx.ami.enabled`, are now dead in the
 catalogue. They are noted in `SCHEMA.md` rather than removed, because removing
 them is a code change and this was a documentation task.
 
+## 2026-09-19 — Calls are recorded: A-14, and the offline queue that is not SQLite
+
+Every call the Agent App sees now reaches the server: answered, missed, rejected
+by the agent, and rejected automatically because the number was blocked. This is
+the piece everything else was queued behind.
+
+### No migration. The table was already there
+
+`communications` has been in the database since the initial schema on
+14 September — with `sip_call_id`, `pbx_unique_id`, `wait_sec`, `queue_name` and
+both unique indexes. The entity and its EF configuration existed too. What was
+missing was only the code to use them, so A-14 turned out to be a service, a
+controller and the Agent App half, with nothing touching the schema.
+
+Worth noting for the CDR importer, which is in the same position: the shape it
+needs is already laid down.
+
+### Reporting a call twice is harmless, and that shaped the design
+
+`ux_comm_sip_call` is unique on (`sip_call_id`, `extension`). The service looks
+for that pair and updates rather than inserts when it finds one.
+
+That one index is what lets the Agent App's offline queue resend blindly. The
+alternative — an app that asks the server what already arrived and reconciles —
+is more code on the side of the system least able to run it, and it would be
+wrong on exactly the day it mattered, when the network is flapping and half the
+answers are missing. Better to make the repeat harmless than to avoid it.
+
+### The offline queue is a text file, deliberately
+
+A-04 requires the app to keep working with the server unreachable, and a call
+log that silently loses a shift would be worse than none: the supervisor's
+reports would be wrong with nothing to say they were wrong. So each call is
+written to disk **before** the request is attempted and removed only once the
+server has taken it.
+
+The plan called for the EF Core SQLite offline buffer. This is not that, and the
+reason is on the must-fix list: `SQLitePCLRaw.lib.e_sqlite3` is still pinned to a
+version carrying CVE-2025-6965, and **the offline buffer must not start without
+pinning it first**. This queue appends a record, reads them back in order and
+deletes the ones that succeeded. One JSON object per line does that in fifty
+lines and pulls in nothing.
+
+Appending rather than rewriting matters: a power cut during a write can cost the
+call being written, never the ones already queued. A torn final line is skipped
+rather than taken as a reason to discard the file.
+
+If the buffer later has to hold recordings and classifications too, that is the
+point to revisit this — and to pin the library first. The same reasoning produced
+the block-list cache, which is also a plain file for the same reason.
+
+### A refusal the server is sure about is dropped, not retried forever
+
+An `unknown_value` or `invalid_request` will fail identically however many times
+it is sent, and a queue that retries it blocks every call behind it — one bad
+record and the shift's log never arrives. Those are discarded with an error in
+the log. Anything else — unreachable, a 500, an expired token — stops the flush
+where it is and keeps the order.
+
+### What the app reports, and what it deliberately does not
+
+It sends what it saw: the Call-ID, the extension, the number, the name the PBX
+gave, the queue, and the times. It does **not** send a contact id. Matching a
+number to a customer is the server's job and its rules live there (A-13);
+working it out in the app would mean a second copy of those rules, and two
+copies is how a call ends up filed against the wrong customer.
+
+It also does not send the channel. A call is always Phone, and `ChannelNames.Phone`
+is now a shared constant so the seed and the service cannot drift apart on the
+name.
+
+### Duration is talk time, not ring time
+
+A call that rang for forty seconds and was never answered has no duration. Give
+it one and forty seconds of imaginary conversation goes into every average,
+which is the sort of error that is only noticed when somebody queries a report
+six months later.
+
+### Blocked and busy calls are reported although they never appear on screen
+
+A-17 requires a blocked call in the supervisor's reports, so the rejection now
+raises a finished-call record even though the agent never learns it happened. A
+second call refused while the agent is talking is reported as **Missed** — from
+the customer's side that is what it was, and "we were too busy to take it" is
+precisely what these reports exist to surface.
+
+### Still open
+
+The supervisor cannot see any of this yet. The endpoints exist and the data
+arrives; there is no screen. The agent's own call log (A-50), the contact
+history panel (A-62) and the reports are the next things, and they are now
+unblocked for the first time.
+
 ---
 
 # How this project is tracked
@@ -1109,7 +1202,7 @@ and what comes after:
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **Logging calls as communications** | A-14 | a new table; blocks almost everything else |
+| **A screen for the calls now being recorded** | A-50, A-62 | nothing — A-14 landed |
 | Push flag changes to signed-in agents | S-45, A-17 | the SignalR hub, which exists |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
@@ -1129,17 +1222,21 @@ caller hears next, so a queue may still hold them or pass them on. Only
 before it enters the queue. That is a *Should* in the SRS and is worth more than
 that in practice.
 
-**A-14 is the thing to do next, and it unlocks the most.** Right now no call is
-recorded at all: not answered, not missed, not rejected, not blocked. Which
-means no reports (R-01 to R-21), no contact history (A-62), no classification
-(A-40) and no call-back tasks. It needs the `communications` table, an endpoint,
-and the Agent App reporting each call as it ends.
+**A-14 landed on 19 September.** Every call the Agent App sees now reaches the
+server — answered, missed, rejected, blocked — with an on-disk queue behind it so
+nothing is lost when the server is down. That unblocks the reports (R-01 to
+R-21), the contact history (A-62), the agent's own call log (A-50), the
+classification (A-40) and the call-back tasks, none of which could start before
+it.
 
-**The CDR importer (S-55) queues behind it, not beside it.** The importer's whole
-job is to write `communications` rows, so the table and the endpoint have to
-exist first. Its own prerequisite — three test calls and a look at real rows of
-`Master.csv` — can be done at any time and does not need A-14, so it is worth
-doing early while the PBX access is fresh.
+**Nothing shows any of it yet.** The data arrives and there is no screen. The
+agent's call log and the contact history panel are the smallest useful next
+step, and both are now possible.
+
+**The CDR importer (S-55) is unblocked too** — it writes the same
+`communications` rows — but still needs its own prerequisite first: three test
+calls, then read real rows of `Master.csv` and record what marks an abandoned
+call. That needs access to the Issabel box and does not depend on anything here.
 
 **Pin `SQLitePCLRaw.lib.e_sqlite3` before A-14 if the offline buffer is part of
 it.** The block-list cache deliberately avoided SQLite, so the advisory has not
@@ -1215,6 +1312,15 @@ there at all. See the 19 September CDR entry.
   command that works is
   `Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'"` and reading the
   command line.
+- **Call logging has no database-backed test either.** The new tests cover the
+  door (a supervisor is 403, an agent is not), that every outcome the app
+  reports is accepted — including Blocked, which A-17 needs — and the refusals
+  that answer before any query. What it then does with the row, including the
+  contact matching and the update-rather-than-insert on a repeat, is untested
+  for the same reason as login: the suite runs without PostgreSQL.
+- **Nothing displays the calls being recorded.** The rows accumulate and no
+  screen reads them, so a mistake in what is stored would not be visible to
+  anybody until the reports are built.
 - **The flags have no database-backed test either.** The new tests cover the
   door (an agent is 403 on every write, and gets through on the two reads the
   pop-up needs) and the three refusals that answer before any query. What the

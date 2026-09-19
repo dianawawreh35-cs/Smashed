@@ -55,6 +55,13 @@ public class CallService(
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event EventHandler<CallState>? StateChanged;
 
+    /// <summary>
+    /// Raised once per call, when it is over, for the record the supervisor's
+    /// reports are built from (A-14). Raised for blocked and busy calls too,
+    /// which never appear on screen.
+    /// </summary>
+    public event EventHandler<FinishedCall>? CallFinished;
+
     public CallState State
     {
         get { lock (_gate) return _state; }
@@ -238,6 +245,17 @@ public class CallService(
             "Second call from {Remote} refused as busy: another call is in progress", remoteEndPoint);
 
         Decline(request, SIPResponseStatusCodesEnum.BusyHere, "busy");
+
+        // Reported as Missed: from the customer's side that is what it was, and
+        // "we were too busy to take it" is precisely what the reports exist to
+        // surface (A-14).
+        var identity = CallerId.FromInvite(request);
+        var now = DateTimeOffset.Now;
+
+        Report(new FinishedCall(
+            request.Header?.CallId ?? Guid.NewGuid().ToString(),
+            identity.Number, identity.DisplayName, SipCustomHeaders.QueueFrom(request),
+            CallOutcome.Busy, now, null, now));
     }
 
     /// <summary>
@@ -321,9 +339,14 @@ public class CallService(
             // as being left hanging.
             Decline(request, SIPResponseStatusCodesEnum.Decline, "blocked");
 
-            // Deliberately no state change: nothing is shown and the agent never
-            // learns this happened. Recording it for the supervisor's reports is
-            // A-14, with the call logging.
+            // No state change: nothing is shown and the agent never learns this
+            // happened. It is still reported, because A-17 requires a blocked
+            // call to appear in the supervisor's reports.
+            var now = DateTimeOffset.Now;
+            Report(new FinishedCall(
+                request.Header?.CallId ?? Guid.NewGuid().ToString(),
+                caller, identity.DisplayName, queue, CallOutcome.Blocked, now, null, now));
+
             return;
         }
 
@@ -399,7 +422,7 @@ public class CallService(
         }
 
         logger.LogInformation("Call ended: {Why}", why);
-        Finish(why);
+        Finish(why, CallOutcome.RejectedByAgent);
     }
 
     /// <summary>
@@ -445,22 +468,67 @@ public class CallService(
         }
     }
 
-    private void Finish(string why)
+    /// <summary>
+    /// Ends the call in progress and reports it (A-14).
+    /// </summary>
+    /// <param name="outcome">
+    /// Null means "work it out from the state": a call that was connected was
+    /// answered, one that was only ringing was missed. Callers that know better
+    /// — the agent pressing Reject — say so.
+    /// </param>
+    private void Finish(string why, CallOutcome? outcome = null)
     {
+        CallState state;
+        string? callId;
+
         lock (_gate)
         {
+            state = _state;
+            callId = _callId;
             _pending = null;
             _callId = null;
         }
 
         CloseMedia();
 
-        if (State.Status is not CallStatus.Idle)
+        if (state.Status is CallStatus.Idle)
         {
-            logger.LogInformation("Call finished: {Why}", why);
+            // Nothing was in progress - a second Finish for the same call, which
+            // happens when both ends hang up at once. Reporting twice would be
+            // harmless, but there is nothing to report.
+            Set(CallState.Idle);
+            return;
         }
 
+        logger.LogInformation("Call finished: {Why}", why);
+
+        Report(new FinishedCall(
+            callId ?? Guid.NewGuid().ToString(),
+            state.Number,
+            state.CallerName,
+            state.Queue,
+            outcome ?? (state.Status is CallStatus.Connected ? CallOutcome.Answered : CallOutcome.Missed),
+            state.StartedAt ?? DateTimeOffset.Now,
+            state.ConnectedAt,
+            DateTimeOffset.Now));
+
         Set(CallState.Idle);
+    }
+
+    /// <summary>
+    /// Hands a finished call to whoever is recording them. Never throws: a
+    /// reporting problem must not take the phone down mid-shift.
+    /// </summary>
+    private void Report(FinishedCall call)
+    {
+        try
+        {
+            CallFinished?.Invoke(this, call);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "A finished call could not be reported");
+        }
     }
 
     private void Set(CallState state)

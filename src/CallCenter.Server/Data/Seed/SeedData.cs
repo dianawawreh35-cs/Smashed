@@ -21,7 +21,7 @@ public static class SeedData
     /// </summary>
     public static readonly (string Name, bool IsSystem)[] Channels =
     [
-        ("Phone", true),
+        (ChannelNames.Phone, true),
         ("WhatsApp", false),
         ("Facebook", false),
         ("Instagram", false),

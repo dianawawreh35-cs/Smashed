@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CallCenter.Shared.Contracts.Auth;
+using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Contracts.Contacts;
 using Microsoft.Extensions.Logging;
 
@@ -157,6 +158,21 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
     public Task<Result<BlockedNumbersDto>> GetBlockedNumbersAsync(CancellationToken ct = default) =>
         SendAsync<BlockedNumbersDto>(
             () => new HttpRequestMessage(HttpMethod.Get, "api/contacts/blocked-numbers"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// Records one finished call (A-14). Safe to send again: the server keys a
+    /// call on its Call-ID and extension, so a retry updates rather than
+    /// duplicates.
+    /// </summary>
+    public Task<Result<CommunicationDto>> LogCallAsync(
+        LogCallRequest request, CancellationToken ct = default) =>
+        SendAsync<CommunicationDto>(
+            () => new HttpRequestMessage(HttpMethod.Post, "api/communications/calls")
+            {
+                Content = JsonContent.Create(request),
+            },
             authenticated: true,
             ct);
 

@@ -77,6 +77,10 @@ public partial class App : Application
         // Built now, hidden, so a call only has to show it (A-10).
         _host.Services.GetRequiredService<CallPopupWindow>();
 
+        // Every finished call reaches the server, or the queue on disk (A-14).
+        _host.Services.GetRequiredService<CallLogReporter>()
+            .Listen(_host.Services.GetRequiredService<CallService>());
+
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();
@@ -101,6 +105,8 @@ public partial class App : Application
         services.AddSingleton<SipRegistrationService>();
         services.AddSingleton<BlockListCache>();
         services.AddSingleton<CallService>();
+        services.AddSingleton<CallLogQueue>();
+        services.AddSingleton<CallLogReporter>();
         services.AddSingleton<SignInService>();
 
         // The UI thread, so the call view model can marshal SIP events onto it.

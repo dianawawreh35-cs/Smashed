@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using CallCenter.AgentApp.Data;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Localization;
@@ -8,6 +9,7 @@ using CallCenter.AgentApp.ViewModels;
 using CallCenter.AgentApp.Views;
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -17,8 +19,7 @@ namespace CallCenter.AgentApp;
 
 /// <summary>
 /// Application entry point. Builds the generic host that will own the SIP
-/// stack, the SignalR connection, the Sqlite offline buffer and every view
-/// model; for now it only wires up configuration, logging and the shell window.
+/// stack, the offline buffer, the SignalR connection and every view model.
 /// </summary>
 public partial class App : Application
 {
@@ -77,7 +78,11 @@ public partial class App : Application
         // Built now, hidden, so a call only has to show it (A-10).
         _host.Services.GetRequiredService<CallPopupWindow>();
 
-        // Every finished call reaches the server, or the queue on disk (A-14).
+        // The offline buffer, and anything the previous version left in the old
+        // queue file (A-04).
+        await _host.Services.GetRequiredService<CallLogQueue>().InitialiseAsync();
+
+        // Every finished call reaches the server, or the buffer (A-14).
         _host.Services.GetRequiredService<CallLogReporter>()
             .Listen(_host.Services.GetRequiredService<CallService>());
 
@@ -89,8 +94,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Registers application services. SIP, audio, the SignalR client and the
-    /// Sqlite offline buffer are added with their respective features.
+    /// Registers application services. The SignalR client is added with its
+    /// own feature; audio belongs to the call service.
     /// </summary>
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
@@ -105,6 +110,11 @@ public partial class App : Application
         services.AddSingleton<SipRegistrationService>();
         services.AddSingleton<BlockListCache>();
         services.AddSingleton<CallService>();
+        // A factory, not a scoped context: the queue is used from SIP threads
+        // and from the UI, and a DbContext is not safe to share between them.
+        services.AddDbContextFactory<AgentBufferDbContext>(options =>
+            options.UseSqlite($"Data Source={AgentBufferDbContext.DatabasePath}"));
+
         services.AddSingleton<CallLogQueue>();
         services.AddSingleton<CallLogReporter>();
         services.AddSingleton<SignInService>();

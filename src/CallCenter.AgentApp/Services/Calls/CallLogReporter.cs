@@ -59,7 +59,7 @@ public class CallLogReporter(
     /// </summary>
     public async Task ReportAsync(LogCallRequest call, CancellationToken ct = default)
     {
-        queue.Enqueue(call);
+        await queue.EnqueueAsync(call, ct);
         await FlushAsync(ct);
     }
 
@@ -77,21 +77,21 @@ public class CallLogReporter(
             return;
         }
 
-        var pending = queue.Pending();
+        var pending = await queue.PendingAsync(ct);
         if (pending.Count == 0)
         {
             return;
         }
 
-        var sent = new List<LogCallRequest>();
+        var done = new List<long>();
 
-        foreach (var call in pending)
+        foreach (var (id, call) in pending)
         {
             var result = await api.LogCallAsync(call, ct);
 
             if (result.IsOk)
             {
-                sent.Add(call);
+                done.Add(id);
                 continue;
             }
 
@@ -101,27 +101,30 @@ public class CallLogReporter(
             if (result.ErrorCode is "unknown_value" or "invalid_request")
             {
                 logger.LogError(
-                    "The server refused a queued call ({Code}); it is discarded rather than retried forever",
-                    result.ErrorCode);
+                    "The server refused queued call {Id} ({Code}); it is discarded rather than retried forever",
+                    id, result.ErrorCode);
 
-                sent.Add(call);
+                done.Add(id);
                 continue;
             }
 
             // Anything else - unreachable, a 500, an expired token - is worth
             // retrying. Stop here rather than working through the rest: they
-            // will fail the same way, and the order is worth keeping.
+            // will fail the same way, and the order is worth keeping, because a
+            // classification must never reach the server before its call.
+            await queue.RecordFailureAsync(id, result.ErrorCode, ct);
+
             logger.LogInformation(
-                "{Count} call(s) still waiting to reach the server ({Reason})",
-                pending.Count - sent.Count, result.ErrorCode ?? "unreachable");
+                "{Count} item(s) still waiting to reach the server ({Reason})",
+                pending.Count - done.Count, result.ErrorCode ?? "unreachable");
 
             break;
         }
 
-        if (sent.Count > 0)
+        if (done.Count > 0)
         {
-            queue.Acknowledge(sent);
-            logger.LogInformation("{Count} call(s) reported to the server", sent.Count);
+            await queue.AcknowledgeAsync(done, ct);
+            logger.LogInformation("{Count} call(s) reported to the server", done.Count);
         }
     }
 

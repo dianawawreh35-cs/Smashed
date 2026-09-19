@@ -1166,6 +1166,69 @@ arrives; there is no screen. The agent's own call log (A-50), the contact
 history panel (A-62) and the reports are the next things, and they are now
 unblocked for the first time.
 
+## 2026-09-19 — The SQLite advisory is fixed, and the buffer becomes a database
+
+`SQLitePCLRaw.lib.e_sqlite3` is pinned to **2.1.12** and CVE-2025-6965 is gone
+from the solution. The call queue built this morning has moved off its text file
+and onto the SQLite offline buffer A-04 always described.
+
+### The fix was forward, not backward
+
+Worth writing down because the instinct is natural and wrong: the advisory
+affects versions *up to* 2.1.11 and is fixed in 2.1.12. Going to an older
+release does not escape it — it lands somewhere still affected, and collects
+every other bug fixed since. A security advisory is not a bad production run
+with a good batch behind it.
+
+The pin is one line in `Directory.Packages.props` plus an explicit
+`PackageReference` in the Agent App, because EF Core 8.0.11 asks for 2.1.6 and
+the explicit reference is what makes the newer version win. It comes out when EF
+Core itself asks for 2.1.12 or later.
+
+### Why the file went, having been defended this morning
+
+The text file was the right call at the time and is no longer. Two things
+changed.
+
+The advisory is fixed, so the reason for avoiding SQLite has gone.
+
+And **classifications are next**, which changes what the queue has to promise.
+A classification belongs to a call. Replay them out of order and a
+classification arrives for a call the server has never heard of. A file can hold
+a list; it cannot promise that two related things stay in order across a crash,
+and it cannot delete a call and its classification together or not at all.
+
+That is the argument for a database, and it was not true this morning when the
+queue held one kind of row.
+
+### One generic table, deliberately
+
+`pending_uploads` holds every kind of waiting item: a `Kind`, the request body
+as JSON, a `Reference` so a classification can find its call while both are
+queued, and the attempt count and last error so a row that never succeeds can be
+found rather than silently retried.
+
+Not a table per kind, for two reasons. **Ordering**: one auto-incrementing id
+across everything is what keeps a call ahead of its classification. And **the
+shape never changes**: adding notes or app orders later is a new `Kind`, not a
+migration — which is what makes `EnsureCreated()` safe here. A buffer that needed
+migrations would have to choose between losing an offline shift's work and
+shipping a migration runner to laptops nobody administers.
+
+### The old file is imported, not abandoned
+
+On first start the app reads `pending-calls.jsonl`, writes its rows into the
+buffer, commits, and only then deletes the file. It matters on exactly one day —
+the first run after this update on a laptop that had calls waiting — and skipping
+it would lose a shift's work silently, which is the precise failure the queue
+exists to prevent.
+
+### What this closes
+
+The "must fix before handover" item for CVE-2025-6965 is resolved, and the
+condition attached to it — *the offline-buffer work must not start without
+pinning this first* — was honoured: the pin landed before the buffer did.
+
 ---
 
 # How this project is tracked
@@ -1254,10 +1317,6 @@ calls, and communications do not exist until the call work lands.
   refuses once any user exists. A lockout needs direct database access. Either a
   `reset-password` command alongside `seed`, or a documented procedure. Hit for
   real on 2026-09-17.
-- **`SQLitePCLRaw.lib.e_sqlite3` 2.1.6 carries CVE-2025-6965** (high, memory
-  corruption), arriving through EF Core Sqlite in the Agent App. Nothing reaches
-  it — the offline buffer is still a README. **The offline-buffer work must not
-  start without pinning this first.** Fixed from 2.1.12.
 - **The server still targets `net8.0`**, Dockerfile included, and .NET 8 leaves
   support in **November 2026**. The Agent App moved to .NET 10 on 2026-09-17.
 - **Ask the client's IT about executable policy.** `dotnet run` was blocked on

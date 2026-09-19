@@ -24,5 +24,13 @@ public static class LogoutReasons
     /// <summary>A supervisor ended the session.</summary>
     public const string Forced = "Forced";
 
-    public static readonly IReadOnlyList<string> All = new[] { Manual, Idle, AppClosed, Forced };
+    /// <summary>
+    /// The account's password was reset from the server console, which closes
+    /// every session it had open. Told apart from <see cref="Forced"/> because a
+    /// row of sessions ending at once is worth being able to explain.
+    /// </summary>
+    public const string PasswordReset = "PasswordReset";
+
+    public static readonly IReadOnlyList<string> All =
+        new[] { Manual, Idle, AppClosed, Forced, PasswordReset };
 }

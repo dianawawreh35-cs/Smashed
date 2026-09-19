@@ -18,7 +18,7 @@ the same host.
 
 | Tool | Version | Notes |
 | --- | --- | --- |
-| .NET SDK | **8.0** | Pinned in [global.json](global.json) (`latestFeature` roll-forward) |
+| .NET SDK | **10.0** | Pinned in [global.json](global.json) (`latestFeature` roll-forward) |
 | Node.js | **20+** | For the supervisor web app |
 | Docker + Compose | v2 | PostgreSQL 16 in development, the full stack in production |
 | Windows 10 1809+ | — | Only to build/run the WPF agent app |

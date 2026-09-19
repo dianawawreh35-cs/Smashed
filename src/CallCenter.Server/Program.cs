@@ -159,6 +159,13 @@ try
         return await SeedCommand.RunAsync(app, args);
     }
 
+    // `dotnet CallCenter.Server.dll reset-password ...` - the way back in when
+    // the supervisor password is lost. Runs against the database and exits.
+    if (ResetPasswordCommand.IsRequested(args))
+    {
+        return await ResetPasswordCommand.RunAsync(app, args);
+    }
+
     // Bring the schema up to date before serving. This is what makes the
     // runbook's "on first start the API applies database migrations" true.
     await DatabaseInitialiser.MigrateAsync(app.Services);

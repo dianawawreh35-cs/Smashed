@@ -271,6 +271,27 @@ command line and is in this machine's shell history.
 
 From a laptop browser: `http://192.168.1.100` → log in → **change the password** → check Settings shows the branches, types and channels.
 
+### If the supervisor password is ever lost
+
+There is no self-service reset: the system has no email or SMS to send a link
+to. The way back in is from the server's own command line.
+
+```bash
+docker compose exec api dotnet CallCenter.Server.dll reset-password   --user supervisor --password 'NewPass!2026'
+```
+
+It also re-enables the account if it had been disabled, and closes every session
+it had open. If the login is wrong it prints the supervisor logins that do
+exist, so you do not need a database client to find out.
+
+If there is no supervisor account left at all, promote an agent:
+```bash
+docker compose exec api dotnet CallCenter.Server.dll reset-password   --user dia20 --password 'NewPass!2026' --make-supervisor
+```
+
+**Change the password again in the app afterwards** - what you type here stays
+in this machine's shell history.
+
 ---
 
 ## Step 8 — Connect the PBX (CDR import)

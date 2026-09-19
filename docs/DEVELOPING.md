@@ -59,7 +59,7 @@ survives a reboot happily.
 ### Server
 
 ```powershell
-cd "src\CallCenter.Server\bin\Debug\net8.0"
+cd "src\CallCenter.Server\bin\Debug\net10.0"
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 dotnet CallCenter.Server.dll --urls http://localhost:5000
 ```
@@ -78,9 +78,10 @@ cd "src\CallCenter.AgentApp\bin\Debug\net10.0-windows10.0.17763.0\win-x64"
 dotnet CallCenter.AgentApp.dll
 ```
 
-Note the target: the Agent App is **`net10.0-windows`**, everything else is
-**`net8.0`**. The long folder name is the Windows 10 1809 moniker SIPSorcery
-requires. If the path does not exist, the build has not produced it yet.
+Note the target: everything is **.NET 10** since 19 September 2026, but the
+Agent App's folder name carries the Windows 10 1809 moniker SIPSorcery requires,
+so it is longer than the server's. If the path does not exist, the build has not
+produced it yet.
 
 ### Supervisor web app
 
@@ -108,7 +109,7 @@ is on the list to close before handover.
 If no account exists yet, seed one:
 
 ```powershell
-cd "src\CallCenter.Server\bin\Debug\net8.0"
+cd "src\CallCenter.Server\bin\Debug\net10.0"
 dotnet CallCenter.Server.dll seed
 ```
 

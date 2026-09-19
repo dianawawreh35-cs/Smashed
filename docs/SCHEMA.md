@@ -281,7 +281,7 @@ CREATE TABLE agent_sessions (
   app_version   text,
   logged_in_at  timestamptz NOT NULL DEFAULT now(),
   logged_out_at timestamptz,
-  logout_reason text                        -- Manual, Idle, AppClosed, Forced
+  logout_reason text                        -- Manual, Idle, AppClosed, Forced, PasswordReset
 );
 CREATE INDEX ix_sessions_user ON agent_sessions(user_id, logged_in_at DESC);
 

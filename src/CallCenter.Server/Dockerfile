@@ -13,7 +13,7 @@ RUN npm run build
 
 
 # ---------- stage 2: build and publish the API ----------
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore first, on the project files alone, so the layer caches.
@@ -33,7 +33,7 @@ RUN dotnet publish src/CallCenter.Server/CallCenter.Server.csproj \
 
 
 # ---------- stage 3: runtime ----------
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
 ENV ASPNETCORE_ENVIRONMENT=Production \

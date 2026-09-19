@@ -11,9 +11,9 @@ chosen and why, so a later reader does not have to re-derive it.
 
 | Layer | Choice |
 | --- | --- |
-| Runtime | .NET 8 SDK, C# `latest`, nullable + implicit usings on, `TreatWarningsAsErrors=false` |
+| Runtime | .NET 8 SDK at the time; **.NET 10 since 19 Sep 2026** — C# `latest`, nullable + implicit usings on, `TreatWarningsAsErrors=false` |
 | Server | ASP.NET Core Web API, SignalR, EF Core 8, Npgsql, Serilog |
-| Agent App | WPF (.NET 8, Windows), SIPSorcery + SIPSorceryMedia.Windows, EF Core SQLite offline buffer, CommunityToolkit.Mvvm |
+| Agent App | WPF (.NET 8 at the time; **.NET 10 since 17 Sep 2026**), SIPSorcery + SIPSorceryMedia.Windows, EF Core SQLite offline buffer, CommunityToolkit.Mvvm |
 | Supervisor Web | React 18, TypeScript, Vite, Tailwind, Recharts, react-router, TanStack Query, i18next (Arabic RTL default, English) |
 | Shared | Class library referenced by Server and Agent App |
 | Tests | xUnit + FluentAssertions; Vitest for the web |
@@ -307,6 +307,9 @@ The deciding argument was not the advisory. **There is no SIP code yet**, and
 the 8.x and 10.x APIs differ; moving before writing the registration layer costs
 one line, and moving after it costs a rewrite. **.NET 8 also leaves support in
 November 2026**, so this was weeks away regardless.
+
+**Closed 19 September 2026: the server moved to net10.0 as well.** The rest of
+that paragraph is how it stood on the 17th.
 
 The server still targets net8.0 and its Dockerfile still uses 8.0 images. That
 move is not urgent today but should be deliberate, and before November.
@@ -1229,6 +1232,93 @@ The "must fix before handover" item for CVE-2025-6965 is resolved, and the
 condition attached to it — *the offline-buffer work must not start without
 pinning this first* — was honoured: the pin landed before the buffer did.
 
+## 2026-09-19 — Everything is on .NET 10, and the password lockout has a way out
+
+Two of the four "must fix before handover" items, done. The other two are not
+mine to do — see below.
+
+### The server moved to .NET 10
+
+`net8.0` → `net10.0` across the server, the shared library, both test projects and
+the PBX simulator; EF Core, Npgsql, the JWT handler, the hosting packages and
+`Microsoft.AspNetCore.Mvc.Testing` to their 10.x releases; and the Dockerfile's
+build and runtime images to `10.0`.
+
+**This was urgent and read as though it were not.** .NET 8 leaves support in
+**November 2026** — about two months from today. A system being handed to a
+client should not arrive on a runtime that stops getting security fixes in the
+same quarter.
+
+It went through without a single code change. 300 tests pass on .NET 10,
+restore found no version conflicts, and `Swashbuckle.AspNetCore` 6.9.0 works
+unchanged on the new runtime, so it was deliberately left alone rather than
+jumped four major versions for no reason. The Agent App had already moved on
+17 September, so the two halves now match.
+
+### A useful thing the upgrade proved about the SQLite advisory
+
+The pin to `SQLitePCLRaw` 2.1.12 was removed as a probe, to see whether EF Core
+10 had fixed the problem on its own.
+
+It has not. **EF Core 10.0.8 asks for 2.1.11, which is still affected by
+CVE-2025-6965.** Upgrading the framework does not resolve this; only the pin
+does. The comment in `Directory.Packages.props` now says so with the version
+checked, so nobody removes it on the reasonable-sounding assumption that a newer
+EF Core must have moved past it.
+
+### `reset-password`, because there was no way back in
+
+```
+dotnet CallCenter.Server.dll reset-password --user supervisor --password 'NewPass!2026'
+```
+
+Password resets live behind supervisor login (S-42) and `seed` refuses once any
+user exists, so a forgotten supervisor password meant editing the database by
+hand. That happened for real on 17 September.
+
+**Not a self-service reset**, and that is deliberate. A "forgot password" flow
+needs somewhere to send a link, and this system has no email, no SMS and no
+internet access by design. What it does have is a server the client controls:
+anyone who can run a command on it could already edit the database directly, so
+this grants nothing new — it just removes the need for a database client and the
+knowledge to use one.
+
+Three things it does beyond setting the password, each because the alternative
+is a command that looks like it worked:
+
+- **Re-enables a disabled account.** The lockout worth planning for is "the only
+  supervisor was disabled by accident"; a reset that fixes the password and
+  leaves the account disabled fixes nothing.
+- **Closes every open session**, with reason `PasswordReset` — a new value, so a
+  row of sessions all ending at once can be explained later. If the password was
+  reset because it may have leaked, leaving the old tokens working defeats the
+  point.
+- **Lists the supervisor logins when the one asked for does not exist.** A
+  lockout is often "was it `supervisor` or `admin`", and sending somebody to a
+  database client to find out is the problem this command exists to remove.
+
+Promotion to supervisor is opt-in (`--make-supervisor`): resetting a password
+must not quietly change what an account can do.
+
+Eleven tests cover the argument parsing. That is the half worth testing — it is
+run once, under pressure, by somebody locked out, and a command that does the
+wrong thing because an option was mistyped is worse than one that refuses.
+
+### The other two items are not the developer's to close
+
+**The executable policy** needs the client's IT to answer whether locally built
+executables are blocked on the agents' laptops, and if so, to agree
+code-signing. Nothing in the repository moves that forward.
+
+**The brand colours** need the restaurant to say what they are. Both apps use the
+blue from the CallPoc proof of concept, which was never the restaurant's colour,
+and the SRS specifies none. It is one value in each app and cannot be guessed —
+inventing a colour and shipping it would be worse than the placeholder, because a
+placeholder is visibly provisional and a wrong brand colour is not.
+
+Both stay on the list, now marked as waiting on somebody other than the
+developer.
+
 ---
 
 # How this project is tracked
@@ -1318,13 +1408,11 @@ calls, and communications do not exist until the call work lands.
   refuses once any user exists. A lockout needs direct database access. Either a
   `reset-password` command alongside `seed`, or a documented procedure. Hit for
   real on 2026-09-17.
-- **The server still targets `net8.0`**, Dockerfile included, and .NET 8 leaves
-  support in **November 2026**. The Agent App moved to .NET 10 on 2026-09-17.
-- **Ask the client's IT about executable policy.** `dotnet run` was blocked on
+- **Waiting on the client, not the developer — ask the client's IT about executable policy.** `dotnet run` was blocked on
   the developer's own machine with *Access is denied* while `dotnet <dll>`
   worked. The same policy would block the Agent App installer on the agents'
   laptops. Code-signing is the usual answer. See `RELEASING.md`.
-- **Get the real brand colours.** Both apps use the blue from the CallPoc proof
+- **Waiting on the client, not the developer — get the real brand colours.** Both apps use the blue from the CallPoc proof
   of concept. The orange they used before was never the restaurant's — it came
   from the initial scaffold as Tailwind's default orange under a key called
   "brand". The SRS specifies no colours at all. One value in each app.

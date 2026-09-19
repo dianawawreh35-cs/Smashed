@@ -116,7 +116,7 @@ docker compose version
 
 ## Step 5 — Application folder and settings
 
-**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, PBX address, AMI login) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database or recordings.
+**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, PBX address, the CDR pull account) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database or recordings.
 
 **Work**
 ```bash
@@ -140,10 +140,12 @@ JWT_SECRET=<long random, 64+ chars>
 SIP_SECRET_KEY=<long random, 32+ chars>
 SERVER_IP=192.168.1.100
 PBX_IP=192.168.1.10
-AMI_USER=callcenter
-AMI_PASSWORD=<as set by the provider>
-CALLBACK_EXT=199
-CALLBACK_EXT_PASSWORD=<as set by the provider>
+CDR__HOST=192.168.1.10
+CDR__PORT=22
+CDR__USERNAME=cdrpull
+CDR__KEYPATH=/opt/callcenter/secrets/cdrpull
+CDR__REMOTEPATH=/var/log/asterisk/cdr-csv/Master.csv
+CDR__INTERVALSECONDS=300
 RTP_PORT_MIN=10000
 RTP_PORT_MAX=10100
 RECORDING_RETENTION_DAYS=90
@@ -177,7 +179,7 @@ services:
   api:
     image: callcenter-api:latest
     restart: unless-stopped
-    network_mode: host          # needed for AMI + SIP/RTP without port mapping
+    network_mode: host          # needed for SIP/RTP without port mapping
     env_file: .env
     environment:
       ConnectionStrings__Default: Host=127.0.0.1;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}
@@ -271,38 +273,128 @@ From a laptop browser: `http://192.168.1.100` → log in → **change the passwo
 
 ---
 
-## Step 8 — Connect the PBX (telephony provider) — *deferred*
+## Step 8 — Connect the PBX (CDR import)
 
-> **Skip this step for now.** It serves section 4.5 of the SRS, which is on hold
-> until the telephony provider answers the questions in SRS 12.3. Calls,
-> pop-ups, recording and classification do not depend on it — only the
-> abandoned-call reports R-20 and R-21 do. Come back to it when the answers
-> arrive.
+**What it does:** Asterisk writes one line to a CSV file as each call ends. Your server fetches that file over SFTP every few minutes and turns the calls that never reached an agent into abandoned-call records and call-back tasks. Nothing is opened on the PBX — the connection is outbound from your server, the same direction as a phone registering.
 
-**What it does:** an AMI user on Issabel opens the event feed your server listens to for calls that never reach an agent; the permitted address limits who may connect to only your server. The callback extension is an ordinary extension your server registers as a phone, so the PBX can send timed-out queue calls to it. The status page proves the whole chain.
+This is the only method: AMI and direct database access need an inbound port and are ruled out, and the call-back extension was removed (SRS 4.5).
 
 **Prerequisite — the server's VPN connection**
-The PBX is only reachable over the VPN, so set this up first and confirm it before asking the provider for anything else:
+The PBX is only reachable over the VPN, so set this up first and confirm it:
 ```bash
 ping -c 3 10.8.0.1                 # the PBX on the VPN
-nc -vz 10.8.0.1 5038               # AMI port reachable
+nc -vz 10.8.0.1 22                 # SSH/SFTP port reachable
 ```
 Make the VPN start on boot, so a power cut does not leave the server silently cut off from the PBX.
 
-**Work — the provider does this (Issabel side)**
-1. Create an **AMI user**: Issabel GUI → Manager Settings (or `/etc/asterisk/manager.conf`); Username `callcenter`; Password = `AMI_PASSWORD` from `.env`; **permit** = the server's VPN address (`10.8.0.20/255.255.255.255`). Reload Asterisk.
-2. Create extension `199` "Callback" with the password from `.env`.
-3. Queue / ring group: set **Failover / timeout destination** → extension 199 (if the callback method is used).
-4. Confirm incoming routing type (queue or ring group) and that caller ID reaches extensions today.
+### 8.1 Check the PBX is writing the CDR file
 
-**Work — verify on the server**
-Supervisor app → Settings → PBX status: `AMI: connected`, `Callback extension: registered`.
+On the Issabel box:
 ```bash
-docker compose logs api | grep -i ami | tail
+cat /etc/asterisk/cdr.conf | grep -Ev '^\s*(;|$)'
+ls -l /var/log/asterisk/cdr-csv/
 ```
-Test: call the restaurant number from a mobile, let it ring until the queue times out. It should appear in the dashboard as **Abandoned/Overflowed** within seconds.
+You need `[csv]` enabled and, in it:
+```ini
+[csv]
+usegmtime=no
+loguniqueid=yes
+loguserfield=yes
+```
+**`loguniqueid=yes` is not optional.** It puts Asterisk's `uniqueid` in every row, which is the key the importer uses to avoid inserting the same call twice. Without it there is no stable key and duplicate protection is lost.
 
-If the provider will not grant AMI, skip 1 and use the alternative: read-only MySQL access to the `asteriskcdrdb` database (table `cdr`), or a scheduled CDR export dropped where the server can fetch it. The API's CDR importer watches `/data/cdr-import/`.
+If you change `cdr.conf`:
+```bash
+asterisk -rx "module reload cdr_csv"
+asterisk -rx "cdr show status"
+```
+
+### 8.2 Create a restricted SFTP account on the PBX
+
+An account that can read the CDR directory and nothing else. On the Issabel box, as root:
+```bash
+useradd -r -m -d /home/cdrpull -s /sbin/nologin cdrpull
+mkdir -p /home/cdrpull/.ssh
+chmod 700 /home/cdrpull/.ssh
+usermod -a -G asterisk cdrpull          # read access to the CDR directory
+```
+Then in `/etc/ssh/sshd_config`, restrict it to SFTP only:
+```
+Match User cdrpull
+    ForceCommand internal-sftp
+    PasswordAuthentication no
+    AllowTcpForwarding no
+    X11Forwarding no
+```
+```bash
+systemctl restart sshd
+```
+
+Read-only and key-only on purpose: this account exists to pull one file, and it should not be able to do anything else if the key ever leaks.
+
+### 8.3 Generate the key on your server and install it on the PBX
+
+On **your server**:
+```bash
+ssh-keygen -t ed25519 -f /opt/callcenter/secrets/cdrpull -N '' -C 'callcenter cdr import'
+chmod 600 /opt/callcenter/secrets/cdrpull
+cat /opt/callcenter/secrets/cdrpull.pub
+```
+Copy that public key onto the **PBX**, into `/home/cdrpull/.ssh/authorized_keys`:
+```bash
+chown -R cdrpull:cdrpull /home/cdrpull/.ssh
+chmod 600 /home/cdrpull/.ssh/authorized_keys
+```
+The private key never leaves your server.
+
+### 8.4 Verify the connection
+
+From your server:
+```bash
+sftp -i /opt/callcenter/secrets/cdrpull cdrpull@10.8.0.1
+sftp> ls -l /var/log/asterisk/cdr-csv/
+sftp> bye
+```
+You should see `Master.csv` and its size. If it refuses, the usual causes are the key not installed, the group membership missing, or `sshd_config` not reloaded.
+
+### 8.5 Settings the server needs
+
+In `/opt/callcenter/.env`:
+```ini
+CDR__HOST=10.8.0.1
+CDR__PORT=22
+CDR__USERNAME=cdrpull
+CDR__KEYPATH=/opt/callcenter/secrets/cdrpull
+CDR__REMOTEPATH=/var/log/asterisk/cdr-csv/Master.csv
+CDR__INTERVALSECONDS=300
+```
+`docker compose up -d` after any change to `.env`.
+
+The import interval is also a supervisor setting (S-47) once the app is running; the `.env` value is the starting point.
+
+### 8.6 Before the importer is written — read real rows
+
+**Do this before any parsing work.** The rule for "this call was abandoned" cannot be guessed: `disposition = 'NO ANSWER'` is not sufficient, because an inbound route or IVR that answers before the queue makes Asterisk record `ANSWERED` even though no agent ever spoke.
+
+Make three calls to the restaurant number:
+1. one **answered by an agent**
+2. one **hung up while still ringing**
+3. one **left until the queue timeout**
+
+Then:
+```bash
+tail -n 20 /var/log/asterisk/cdr-csv/Master.csv
+```
+Write down what distinguishes the three — `lastapp`, `billsec`, `disposition`, and whether any column carries a usable **wait time**. The wait time decides whether report R-21 can show a service-level percentage or only counts.
+
+That observation is what the importer is written against.
+
+**Verify once it is running**
+Supervisor app → Settings → PBX status: last import time and rows read.
+```bash
+docker compose logs api | grep -i cdr | tail
+```
+Test: call the restaurant number and hang up while it is still ringing. It should appear in the dashboard as **Abandoned** within one import interval — not instantly.
 
 ---
 
@@ -368,7 +460,7 @@ Point a local API at it and confirm calls and contacts are there.
 
 **Work**
 - Give the supervisor a one-page sheet: server IP, web address, how to reboot (just power on — everything auto-starts), where backups go, your contact and support hours.
-- Store in your password manager: `.env` contents, admin password, the AMI credentials from the provider, the VPN accounts for the server and each laptop, the router reservation.
+- Store in your password manager: `.env` contents, admin password, the `cdrpull` SSH key pair (step 8), the VPN accounts for the server and each laptop, the router reservation.
 - Commit `docker-compose.yml`, `.env.example`, `backup.sh` and this runbook to the repo (never the real `.env`).
 - Walk the supervisor through the dashboard for 1 hour; agents 1 hour.
 

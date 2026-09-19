@@ -968,6 +968,111 @@ was about being reachable *through* an existing registration rather than about
 opening anything. The architecture was already the one this constraint requires;
 nobody had stated the constraint.
 
+## 2026-09-19 — The call-back extension is rejected. CDR import takes its place
+
+Two things changed since this morning's entry, and between them they reverse the
+decision it recorded.
+
+**We have administrative access to the Issabel box ourselves.** Not through the
+provider. We can read `/var/log/asterisk/cdr-csv/`, check `/etc/asterisk/cdr.conf`,
+create a restricted SFTP account and look at the queue settings. A row of things
+written as "ask the provider" are now things we do, which is why the question
+list in this file and in SRS §10 is shorter than it was.
+
+**The client has rejected S-56 on customer experience.** S-56 had the server
+answer a waiting caller, say "all agents are busy, we will call you back", and
+hang up. The client will not have a caller hung up on. That is their call to
+make about their customers, and it ends the requirement.
+
+### S-56 is removed, not deferred
+
+It was the **primary** method as of this morning. This is a reversal of a
+decision a few hours old, not a refinement of it, and it is worth being plain
+about that.
+
+The design was sound for the constraint it was built against: no inbound port,
+so capture the caller by having the PBX send them to something we *do* control.
+It solved that well. What it could not do was be pleasant, and nobody had asked
+the client whether a recorded brush-off was acceptable before it was written
+into the SRS as a Must.
+
+The ID is retired. It is listed in 4.5 under "Ruled out" with the reason, so a
+later reader does not propose it again, and it is not reused.
+
+### CDR is better anyway, and that matters
+
+This is not purely a concession. S-56 could only ever catch callers who waited
+all the way to the **queue timeout**. Somebody who gave up after five seconds
+was invisible to it — structurally, not through any defect. The CDR file has a
+row for **every** call, so the coverage is complete.
+
+So the change trades real-time capture of *some* abandoned calls for delayed
+capture of *all* of them. For a call-back list that is the better trade: the
+business action is ringing the customer back within the hour, not within the
+minute. A caller who abandons at 19:05 appearing at 19:10 changes nothing about
+what anybody does with it.
+
+### What is lost, stated so nobody is surprised
+
+**Real-time capture is gone.** There is no longer any path to knowing about an
+abandoned call the moment it happens. R-11, R-20 and R-21 now say so in their
+own definitions rather than only in 4.5, because a report that quietly lags by
+five minutes is worse than one that says it lags by five minutes.
+
+### The mechanism, and the one setting it depends on
+
+Asterisk's `cdr_csv` module appends a row to `Master.csv` as each call ends,
+independently of the `asteriskcdrdb` database — which is the point, since the
+database would need an inbound port and is ruled out. The server pulls that file
+over **SFTP, outbound, key-based**, every few minutes, reading from the byte
+offset it last reached so that a file which grows all year is not re-downloaded.
+A file shorter than the stored offset means rotation: reset to zero and log it.
+
+**`loguniqueid=yes` in `cdr.conf` is a prerequisite, not a preference.** It puts
+Asterisk's `uniqueid` on every row, which maps to `communications.pbx_unique_id`
+and its unique index. That index is what makes re-reading the same lines
+harmless. Without it there is no stable key, the importer cannot tell a row it
+has already seen from a new one, and duplicate protection is gone. Runbook step
+8 checks it first for that reason.
+
+### The rule for "abandoned" is not written yet, deliberately
+
+`disposition = 'NO ANSWER'` is **not** the test, and writing it into the SRS as
+settled fact would have been the easy mistake here. Where an inbound route or an
+IVR answers the call before it reaches the queue, Asterisk records `ANSWERED`
+even though no agent ever spoke. The expectation is `lastapp = 'Queue'` with a
+zero or near-zero `billsec` — but that is an expectation, not an observation.
+
+**Prerequisite before any parser is written:** three test calls — one answered by
+an agent, one hung up while ringing, one left to the timeout — then read the last
+rows of `Master.csv` and write down what distinguishes them. The importer is
+written against those rows.
+
+The same look answers whether the CDR carries a usable per-call **wait time**.
+R-21 is a service-level percentage if it does and a count of answered versus
+abandoned if it does not, and the SRS says so conditionally rather than
+promising a figure that may not be available.
+
+### Dependency on A-14
+
+The importer writes `communications` rows. **A-14 has to land first** — the table
+and the endpoint have to exist before anything can import into them. Nothing
+about the CDR work changes that ordering; it lengthens the queue behind A-14
+rather than competing with it.
+
+### What did not change
+
+The schema. `pbx_unique_id` with its unique index, `source = 'CDR'`,
+`status = 'Abandoned'`, `wait_sec`, `queue_name` and `pbx_events_raw` were all
+laid down in the initial schema and accommodate this without a migration. Two
+values in the CHECK constraints — `source = 'AMI'` and `status = 'Overflowed'` —
+are now never written, and are left in place: narrowing a CHECK is a migration
+that would gain nothing.
+
+Two settings, `callback.extension` and `pbx.ami.enabled`, are now dead in the
+catalogue. They are noted in `SCHEMA.md` rather than removed, because removing
+them is a code change and this was a documentation task.
+
 ---
 
 # How this project is tracked
@@ -1007,7 +1112,7 @@ and what comes after:
 | **Logging calls as communications** | A-14 | a new table; blocks almost everything else |
 | Push flag changes to signed-in agents | S-45, A-17 | the SignalR hub, which exists |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
-| Call-back extension: the server registers and answers | S-56 | the provider pointing the queue timeout at it |
+| CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
 | The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
 | Mute and Hold | A-12 | nothing |
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
@@ -1029,6 +1134,12 @@ recorded at all: not answered, not missed, not rejected, not blocked. Which
 means no reports (R-01 to R-21), no contact history (A-62), no classification
 (A-40) and no call-back tasks. It needs the `communications` table, an endpoint,
 and the Agent App reporting each call as it ends.
+
+**The CDR importer (S-55) queues behind it, not beside it.** The importer's whole
+job is to write `communications` rows, so the table and the endpoint have to
+exist first. Its own prerequisite — three test calls and a look at real rows of
+`Master.csv` — can be done at any time and does not need A-14, so it is worth
+doing early while the PBX access is fresh.
 
 **Pin `SQLitePCLRaw.lib.e_sqlite3` before A-14 if the offline buffer is part of
 it.** The block-list cache deliberately avoided SQLite, so the advisory has not
@@ -1063,24 +1174,29 @@ calls, and communications do not exist until the call work lands.
 
 ## Questions for the telephony provider
 
-**Answered 2026-09-19: no inbound port to the PBX, on any port.** The server can
-reach it outbound on the SIP port. AMI and database access are ruled out; S-56
-(the call-back extension the server registers) is the primary method for
-capturing calls that never reach an agent, and needs nothing opened. Section 4.5
-is settled — see the decision entry above.
+**Mostly answered, 2026-09-19.** No inbound port to the PBX, on any port — so
+AMI and database access are ruled out. The client will not have a waiting caller
+answered and hung up on — so S-56 is removed. And **we now have administrative
+access to the Issabel box ourselves**, so the questions about the CDR export and
+the call-back extension are not questions any more: they are runbook step 8,
+which we perform.
 
-Still needed (SRS §12.3), and **nothing is blocked on them except the work they
+Still to confirm, and **nothing is blocked on them except the work they
 describe**:
 
-1. Will the provider point the **queue / ring-group timeout** at a call-back
-   extension we register, and give us its SIP credentials? S-56 depends on it.
-2. How will the **CDR export** be made available for the server to fetch — SFTP,
-   HTTPS, a file share? S-55 depends on it.
-3. Is incoming customer routing a **queue or a ring group**?
-4. Who administers Issabel's **Blacklist** screen, and how often will they load
+1. Is incoming customer routing a **queue or a ring group**? Decides whether
+   S-57 applies instead of S-55.
+2. Who administers Issabel's **Blacklist** screen, and how often will they load
    the S-46 export?
-5. What **VPN uptime and support hours** are agreed, and who is called when the
+3. What **VPN uptime and support hours** are agreed, and who is called when the
    tunnel drops?
+4. Can a **recording announcement** be added before ringing agents, if the
+   client wants one?
+
+Not a question for anybody — an observation we make ourselves, before the
+importer is written: three test calls, then read the last rows of `Master.csv`
+and record what marks an abandoned call, and whether a usable wait time is
+there at all. See the 19 September CDR entry.
 
 ## Known gaps in what is built
 

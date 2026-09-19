@@ -123,11 +123,11 @@ CREATE TABLE communications (
   answered_at        timestamptz,
   ended_at           timestamptz,
   duration_sec       int,                                         -- talk time (answered→ended)
-  wait_sec           int,                                         -- queue wait (AMI/CDR)
+  wait_sec           int,                                         -- queue wait, from the CDR import (S-55)
   queue_name         text,
   extension          text,                                        -- which extension handled it
   sip_call_id        text,                                        -- from the Agent App INVITE
-  pbx_unique_id      text,                                        -- Asterisk uniqueid (AMI/CDR), for joining
+  pbx_unique_id      text,                                        -- Asterisk uniqueid; the CDR import's dedupe key (needs loguniqueid=yes)
   source             text NOT NULL CHECK (source IN ('AgentApp','AMI','CDR','Manual')),
   laptop_id          text,                                        -- machine name that logged it
   created_at         timestamptz NOT NULL DEFAULT now(),
@@ -140,6 +140,11 @@ CREATE INDEX ix_comm_remote         ON communications(remote_normalised);
 CREATE INDEX ix_comm_status         ON communications(status);
 CREATE UNIQUE INDEX ux_comm_pbx_unique ON communications(pbx_unique_id) WHERE pbx_unique_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_comm_sip_call   ON communications(sip_call_id, extension) WHERE sip_call_id IS NOT NULL;
+```
+
+> **Two values in these CHECK constraints are no longer written** (SRS 4.5, 19 Sep 2026): `source = 'AMI'`, because AMI is ruled out, and `status = 'Overflowed'`, because the call-back extension that produced it was removed. Both are **left in place deliberately** — narrowing a CHECK is a migration, it would gain nothing, and a future method could use either again. `ux_comm_pbx_unique` is what makes re-reading the same CDR rows harmless.
+
+```sql
 
 CREATE TABLE recordings (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -307,7 +312,9 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - channels: Phone (system), WhatsApp, Facebook, Instagram, Wheels
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)
 - form_definitions v1: the JSON above without the `reason` field
-- settings: `recording.retention_days=90`, `agent.idle_logout_minutes=30`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `callback.extension=`, `pbx.host=`, `pbx.ami.enabled=false`, `reports.internal_numbers=`
+- settings: `recording.retention_days=90`, `agent.idle_logout_minutes=30`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `cdr.interval_seconds=300`, `cdr.last_offset=0`
+  - `cdr.last_offset` is the byte position in `Master.csv` the importer has read to (SRS S-55). It is state, not configuration, and is kept here so a restart resumes rather than re-reads. A file shorter than this value means the log rotated: reset to 0 and log it.
+  - **Still seeded but now unused:** `callback.extension` (S-56 removed) and `pbx.ami.enabled` (S-50 ruled out). They remain in the settings catalogue in code; removing them is a follow-up to be done with the CDR importer, not before.
 - users: one Supervisor created by the seed command
 
 ---

@@ -221,7 +221,7 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | ID | Report |
 |---|---|
 | R-10 | Peak hours: communications per hour of day and per weekday (heat table) — for staffing. |
-| R-11 | Missed calls: calls not answered by an agent, calls abandoned in the queue, and calls overflowed at timeout (see 4.5) — count, list, and time until the customer was called back (or "never"). |
+| R-11 | Missed calls: calls not answered by an agent, and calls abandoned in the queue (see 4.5) — count, list, and time until the customer was called back (or "never"). Calls the agents' apps saw are immediate; abandoned calls come from the CDR import and appear within its interval (S-55). |
 | R-12 | Orders by channel: Phone vs WhatsApp vs Facebook vs Instagram vs delivery apps — count and total order value; trend over time. |
 | R-13 | Order value: total and average per channel, per branch, per agent, per day. |
 | R-14 | Cancellation rate: cancellations ÷ orders, per branch, channel and agent; cancellation notes list. |
@@ -230,8 +230,8 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | R-17 | Complaint handling: open vs closed follow-ups, time to close, complaints per 100 orders. |
 | R-18 | Data quality: unclassified communications, calls from unknown numbers (not saved as contacts), duplicate contacts. |
 | R-19 | Daily summary sent by e-mail to the supervisor (yesterday's totals by type and channel, complaints, missed calls) [Could — requires internet or local mail]. |
-| R-20 | Abandoned and overflowed calls: count, rate (÷ inbound calls), average and maximum wait time, per hour and per day; list with call-back status. Overflowed calls in real time (S-56); abandoned calls as of the last CDR import (S-55). |
-| R-21 | Queue service level: percentage of inbound calls answered within N seconds (N configurable), per day and per hour. Wait times come from the CDR export (S-55), so this report is as of the last import rather than live. |
+| R-20 | Abandoned calls: count, rate (÷ inbound calls), average and maximum wait time, per hour and per day; list with call-back status. Sourced entirely from the CDR import (S-55), so figures are current as of the last import — **not real time** — and a call abandoned at 19:05 appears in the report at the next import after it. Wait time is subject to the CDR supplying one; see R-21. |
+| R-21 | Queue service level: percentage of inbound calls answered within N seconds (N configurable), per day and per hour. As of the last CDR import, not live. **Conditional:** it needs a usable per-call wait time from `Master.csv`. Whether the CDR on this PBX supplies one has not been checked — it is part of the S-55 prerequisite. If it does not, this report degrades to counts of answered and abandoned calls without a service-level percentage, and the client is told before the work starts. |
 
 ### 4.3 Dashboard
 
@@ -251,49 +251,54 @@ All filterable by time period; also by agent, branch, channel where applicable.
 | S-45 | Mark a contact (or a bare phone number) as VIP or Blocked, with a reason and date; remove the flag at any time; list of all blocked and VIP numbers. Agents can see the flags but cannot change them. Every change is logged. **A reason is required** whenever a flag is set — a block nobody can account for is one nobody later dares remove; removing a flag needs none, because the removal itself is logged with who and when. **VIP and Blocked are mutually exclusive** and setting both at once is refused: they ask the Agent App for opposite behaviour (A-16 shows a badge, A-17 rejects the call) and there is no sensible winner. A number given for flagging is matched against existing contacts the way an incoming caller is (A-13), so flagging `0599…` flags the customer already saved as `+970599…`; only a number that matches nobody creates a nameless contact to carry the flag. The supervisor can see the **full history of flag changes** on a contact, including removals. Flagging is done **from the contact itself** in the contact list, and asks for the reason at that moment; the list of flagged numbers is that same contact list filtered to VIP or Blocked, so searching and filtering compose. | Must |
 | S-46 | Export the blocked list in a format that can be loaded into Issabel's blacklist, so numbers are blocked at the PBX level as well (see note in section 6). With no inbound port to the PBX (4.5) this export is the **only** route to PBX-level blocking — there is no automatic path — and it is what makes a blocked caller genuinely rejected rather than declined by each Agent App in turn. Loaded by whoever administers Issabel. | Should |
 | S-48 | Internal numbers list: the supervisor maintains the list of internal extension numbers — the other agents and the four branches (see 2.3). A call whose other party is on the list is an internal call: still recorded, still in the agent's call log and the contact history, but excluded from the customer-facing reports so it does not distort order counts, complaint rates, volumes or the service level. Entered as plain numbers, one per entry; every change is logged with who and when. | Must |
-| S-47 | System settings: view and change the values the system reads at runtime — the PBX host the Agent Apps register to (SRS 2.3), the call-back extension, the idle-logout time (A-05), how long an agent may edit their own classification (A-42), the service-level threshold (R-21) and the recording retention period (S-43). Changes take effect without a redeployment: the Agent App picks up a new PBX host at the next sign-in, so a change by the provider does not need a visit to each laptop. Every change is logged with who and when. There are no AMI settings: AMI is ruled out (4.5). The call-back extension's own SIP credentials belong here. | Must |
+| S-47 | System settings: view and change the values the system reads at runtime — the PBX host the Agent Apps register to (SRS 2.3), the idle-logout time (A-05), how long an agent may edit their own classification (A-42), the service-level threshold (R-21), the recording retention period (S-43) and the CDR import interval (S-55). Changes take effect without a redeployment: the Agent App picks up a new PBX host at the next sign-in, so a change by the provider does not need a visit to each laptop. Every change is logged with who and when. There are no AMI settings and no call-back extension: both are ruled out or removed (4.5). | Must |
 
 ### 4.5 Capture of calls that never reach an agent (queue / ring-group)
 
-> **Settled — 19 September 2026.** **No inbound port to the PBX can be opened,
-> on any port.** That is the client's answer and it is final, so AMI (S-50) and
+> **Settled — 19 September 2026, revised.** Two constraints, both final.
+>
+> **No inbound port to the PBX can be opened, on any port.** AMI (S-50) and
 > direct database access (S-52) are **ruled out, not deferred** — both need to
 > connect *in* to the PBX.
 >
-> The server **can** reach the PBX outbound on the SIP port, the same way the
-> agents' laptops already do. Everything below is built on that one fact: a
-> registration is outbound, so it needs nothing opened.
+> **A waiting caller is not to be answered and hung up on.** The client has
+> rejected that behaviour, which removes S-56 (the call-back extension)
+> entirely. It is not deferred or downgraded; a requirement describing
+> behaviour the client has refused would be wrong.
 >
-> **S-56 is therefore the primary method and is now a Must.** S-55 is the
-> catch-all behind it. R-20 and R-21 are no longer blocked — they are delivered
-> with the coverage S-56 and S-55 give, which is stated plainly under each.
+> **S-55, the CDR import, is therefore the only method, and is a Must.** It is
+> also a better fit than S-56 ever was: it captures *every* abandoned call,
+> including the caller who hangs up after five seconds, which S-56 structurally
+> could not see.
+>
+> **The cost is latency.** Abandoned calls appear within the import interval,
+> not instantly. R-11, R-20 and R-21 say so in their own definitions.
 
 Calls that are abandoned while waiting in the queue, or that time out because all agents are busy, never ring an agent's extension and therefore cannot be seen by the Agent App. They are captured on the server side as follows.
 
-**Primary method — the call-back extension (real time, needs nothing opened)**
+**Method — CDR import over SFTP**
 
 | ID | Requirement | Priority |
 |---|---|---|
-| S-56 | Call-back extension: the provider points the queue / ring-group timeout or failover destination at a dedicated extension that **the server registers**, exactly as an agent's laptop registers its own — outbound, on the SIP port already in use, so no port is opened and no firewall rule is added. The server answers, plays a short message ("all agents are busy, we will call you back"), hangs up, and immediately creates a communication with status Overflowed and a call-back task carrying the caller's number and the queue. Real time. | Must |
-| S-51 | Each abandoned or overflowed call creates a call-back task assigned to the supervisor (or the next available agent, configurable). The task closes automatically when an outbound call to that number is made, or manually. | Should |
-
-**What S-56 does not catch:** a caller who hangs up *before* the timeout. They never reach the call-back extension, so nothing on the server side sees them. That gap is what S-55 exists for.
-
-**Catch-all behind it — CDR export (delayed)**
-
-| ID | Requirement | Priority |
-|---|---|---|
-| S-55 | CDR export: the provider places Issabel's call detail records where the server can **fetch** them — an outbound pull by the server (SFTP, HTTPS or a file share), or a push from the provider to the server. Direct read-only access to the `asteriskcdrdb` MySQL database is **not** available, because it would need an inbound port. The server imports at least daily and creates Abandoned records for inbound calls with no answered agent leg. These appear in reports with the delay of the import. | Should |
+| S-55 | CDR import: Asterisk's `cdr_csv` module appends one row to `/var/log/asterisk/cdr-csv/Master.csv` as each call ends, independently of the `asteriskcdrdb` database. The server fetches that file over **SFTP, outbound, key-based authentication**, on a short interval (5 minutes is the working assumption, configurable), and creates communications with status Abandoned for inbound calls that never reached an agent, matched to contacts and visible in search, contact history and reports. Reading is **resumed from the byte offset last reached**, so a file that grows all year is not re-downloaded; a file smaller than the stored offset means the log has rotated, and the offset resets to zero and the event is logged. Rows are keyed by Asterisk's `uniqueid` against `communications.pbx_unique_id` and its unique index, so re-reading the same lines is harmless. **`cdr.conf` must have `loguniqueid=yes`** — without it there is no stable key and duplicate protection is lost; this is a prerequisite, not a preference. | Must |
+| S-51 | Each abandoned call creates a call-back task assigned to the supervisor (or the next available agent, configurable). The task closes automatically when an outbound call to that number is made, or manually. Tasks appear with the latency of the import. | Should |
 | S-57 | Ring-group option (client decision): if incoming routing is a ring group with "ring all" rather than a queue, every inbound call rings all free agents' Agent Apps, and a call nobody answers is logged by the Agent Apps themselves as Missed, in real time, with no server-side capture at all. The cost is hold music and queue position announcements, which a ring group does not have. | Info |
 
-**Ruled out — both require connecting *in* to the PBX**
+**Identifying an abandoned call — provisional, to be confirmed before implementation**
+
+`disposition = 'NO ANSWER'` is **not** a sufficient test. Where an inbound route or IVR answers the call before it reaches the queue, Asterisk records `ANSWERED` even though no agent ever spoke. The better test is expected to be `lastapp = 'Queue'` with a zero or near-zero `billsec`, **but the rule must be confirmed against real rows from this PBX before any parser is written.**
+
+**Prerequisite (S-55):** three test calls — one answered by an agent, one hung up while ringing, one left to the queue timeout — then read the last rows of `Master.csv` and record what distinguishes them. That observation, not this paragraph, is what the importer is written against.
+
+**Ruled out**
 
 | ID | Requirement | Status |
 |---|---|---|
-| S-50 | Real-time capture through AMI (Asterisk Manager Interface, TCP 5038). | **Ruled out (19 Sep 2026).** No inbound port. |
-| S-52 | Reading the PBX call records directly through a database grant. | **Ruled out (19 Sep 2026).** No inbound port. |
+| S-50 | Real-time capture through AMI (Asterisk Manager Interface, TCP 5038). | **Ruled out (19 Sep 2026).** No inbound port to the PBX. |
+| S-52 | Reading the PBX call records directly through a database grant. | **Ruled out (19 Sep 2026).** No inbound port to the PBX. |
+| S-56 | Call-back extension: the server registers an extension the PBX sends timed-out callers to, answers, plays "all agents are busy, we will call you back" and hangs up. | **Removed (19 Sep 2026).** Answering a waiting caller and hanging up on them is not a customer experience the client will accept. The ID is retired and not reused. |
 
-**Dependency statement:** the client's PBX accepts no inbound connections, so calls that never reach an agent are captured by the server registering an extension the PBX sends them to (S-56), which is real-time and covers every caller who waits to the timeout, plus a CDR export (S-55) for those who hang up earlier. Reporting coverage is therefore: **timeout callers in real time, early hang-ups as of the last import.** This is a property of the client's network policy, documented and agreed, not a defect of the system.
+**Dependency statement:** the client's PBX accepts no inbound connections, and a waiting caller is not to be answered and hung up on. Calls that never reach an agent are therefore captured from the PBX's own CDR file, fetched outbound by the server on a short interval. **Real-time capture is not available.** Coverage is complete — every abandoned call is seen, whenever the caller gave up — but each appears within the import interval rather than instantly. This is a documented characteristic of the solution given the client's constraints, not a defect.
 
 ---
 
@@ -320,7 +325,7 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 
 - **Issabel — calls:** standard SIP registration and calls across the VPN (two extensions per agent). No PBX add-on or licence required. Caller ID as delivered by the provider's trunks.
 - **Blocked numbers — note:** rejection by the Agent App means the PBX still receives the call and, in a queue, may offer it to other agents or send it to the failover destination after all apps reject it — so the caller may experience being held rather than cut off, and nothing the Agent App sends can change that. Blocking at the PBX level, through Issabel's own **Blacklist** screen, stops the call before it enters the queue: no ringing, no queue, no agent involved. With no inbound port to the PBX there is no way to write that list automatically, so it is loaded by hand from the S-46 export. **Recommended for every persistent nuisance caller**, not merely optional.
-- **Issabel — server side:** the PBX accepts **no inbound connections**, so AMI and database access are out (4.5). The server instead **registers an extension outbound**, the same way an agent's laptop does, and the PBX sends timed-out callers to it (S-56); a CDR export the server fetches covers the rest (S-55). The server still needs to reach the PBX over the VPN, but only outbound on the SIP port the agents already use. No licensed Issabel add-on is required — the Contact Center (Asternic) module would provide the same figures ready-made, but this project does not depend on it.
+- **Issabel — server side:** the PBX accepts **no inbound connections**, so AMI and database access are out (4.5). The server instead **fetches Asterisk's CDR file over SFTP** — `/var/log/asterisk/cdr-csv/Master.csv`, outbound, key-based, on a short interval — and reads from the byte offset it last reached (S-55). The only PBX-side requirements are `cdr_csv` enabled with `loguniqueid=yes` in `/etc/asterisk/cdr.conf`, and a restricted SFTP account scoped to that directory. The server reaches the PBX over the VPN, outbound only. No licensed Issabel add-on is required — the Contact Center (Asternic) module would provide the same figures ready-made, but this project does not depend on it.
 - **Messaging and delivery apps:** manual entry in this version. Automated WhatsApp Business API, Instagram/Facebook and delivery-app integrations are possible future phases (they require internet access, business verification and per-message fees).
 - **POS:** not integrated in this version; order value is entered by the agent. A future phase may import customers or order totals from the POS if it offers an export or API.
 
@@ -349,7 +354,7 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 - The supervisor changes the classification form (e.g., adds a type); the next call's form on the agent's screen shows the change.
 - Reports R-01 to R-05 produce correct figures and charts for a test day with known calls, filterable by branch, and export to Excel.
 - Two agents use the same laptop in sequence: after logout/login the correct extensions register and each agent sees only their own calls.
-- A call that waits in the queue until the timeout is sent to the server's call-back extension, and appears in the supervisor's report with a call-back task within seconds (S-56). A caller who hangs up *before* the timeout is not seen until the next CDR import (S-55).
+- A call that rings in the queue and is abandoned — whether the caller gives up after five seconds or waits to the timeout — appears in the supervisor's abandoned-call report with a call-back task **within one import interval** (S-55). Verified by making both kinds of call and checking they appear after the next import, with the caller's number and, where the CDR supplies it, the wait time.
 - The server is switched off: agents can still receive, make and record calls; when it is switched on, the queued entries appear.
 - Backup runs and a restore on a test machine brings back the data.
 
@@ -368,14 +373,13 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 
 ## 10. Open Questions for the Client [TBC]
 
-- **PBX provider — answered on 19 September 2026.** No inbound port to the PBX can be opened, on any port; the server can reach the PBX **outbound** on the SIP port, as the agent laptops do. That settles 4.5: AMI (S-50) and database access (S-52) are ruled out, and S-56 becomes the primary method. Three of the original six questions are closed by that answer and have been removed.
-- **PBX provider — still to confirm before installation.** The list of internal extension numbers for S-48 is also needed from the client:
-  1. Will the provider point the **queue / ring-group timeout** at a call-back extension we register, and give us its SIP credentials? (S-56 — the primary capture method depends on it.)
-  2. Can the provider make a **CDR export** available for the server to fetch, and how — SFTP, HTTPS, or a file share? (S-55 — covers callers who hang up before the timeout.)
-  3. Is incoming customer routing a **queue or a ring group**? (Determines whether S-57 applies instead.)
-  4. Who administers the Issabel **Blacklist** screen, and how often will they load the S-46 export?
-  5. What are the agreed **VPN uptime and support hours**, and who is called when the tunnel drops?
-  6. Can the provider add a **recording announcement** before ringing agents, if the client wants one?
+- **PBX — largely answered as of 19 September 2026.** No inbound port can be opened, on any port (so S-50 and S-52 are ruled out); a waiting caller is not to be answered and hung up on (so S-56 is removed); and **we now have administrative access to the Issabel box ourselves**, so several items that were questions for the provider are now work we do. See 4.5 and 12.3.
+- **Before the CDR importer is written (S-55) — an observation, not a question.** Make three test calls: one answered by an agent, one hung up while ringing, one left to the queue timeout. Then read the last rows of `/var/log/asterisk/cdr-csv/Master.csv` and record what distinguishes them. The abandoned-call rule is written against those rows. Also confirm at the same time whether the CDR carries a usable per-call **wait time**, which decides whether R-21 is a service-level percentage or only counts.
+- **Still to confirm with the client / provider.** The list of internal extension numbers for S-48 is also needed:
+  1. Is incoming customer routing a **queue or a ring group**? (Determines whether S-57 applies instead.)
+  2. Who administers the Issabel **Blacklist** screen, and how often will they load the S-46 export?
+  3. What are the agreed **VPN uptime and support hours**, and who is called when the tunnel drops?
+  4. Can a **recording announcement** be added before ringing agents, if the client wants one?
 - PBX: confirm which of each agent's two extensions is the customer one and which is the internal one, and that internal dialling to the four branches works from the internal extension (SRS 2.3).
 - Exact list of channels (WhatsApp, Facebook, Instagram, Wheels, others?) and of classification types to start with.
 - Should supervisors be able to see live agent status and listen to live calls? (Not included by default.)
@@ -410,9 +414,9 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 ### 12.3 What the client provides
 
 - All hardware: server (mini PC with SSD), agent laptops, headsets, network, UPS if desired, and any replacement of failed hardware.
-- PBX (Issabel, operated by the telephony provider) configuration and its maintenance: one working extension per agent with SIP credentials (see 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' extensions, outbound routes, and internal dialling between the agents and the branches. Recording announcement if wanted. The PBX is configured by the telephony provider, not by the developer; the client owns that relationship and any charges under it.
+- PBX (Issabel) configuration and its maintenance: one working extension per agent with SIP credentials (see 2.3), one spare extension for testing, caller ID delivered on incoming calls, routing of incoming customer calls to the agents' extensions, outbound routes, and internal dialling between the agents and the branches. Recording announcement if wanted. Trunk and routing configuration remains the telephony provider's work; the client owns that relationship and any charges under it.
 - **The VPN**: an account and client configuration for every agent laptop, and a separate connection for the server. Supplying, licensing and supporting the VPN is the client's and the provider's responsibility, not the developer's.
-- For capture of calls that never reach an agent (4.5): a **dedicated extension with SIP credentials** for the server to register, and the queue / ring-group timeout pointed at it (S-56); and a **CDR export** the server can fetch (S-55). Neither needs a port opened on the PBX. The client arranges both with the provider before installation.
+- For capture of calls that never reach an agent (4.5): **administrative access to the Issabel box for the developer**, sufficient to read `/var/log/asterisk/cdr-csv/`, verify `/etc/asterisk/cdr.conf`, create a restricted SFTP account scoped to that directory, and inspect queue settings. Nothing is opened on the PBX — the server connects outbound only. The client grants this access before installation; the developer performs the setup (runbook step 8).
 - LAN access between the laptops and the server, VPN access from both to the PBX, and administrator rights on the laptops for installing the app and the VPN client.
 - Customer list for the initial import (Excel/CSV), if available.
 - Decisions on all [TBC] items before installation.
@@ -433,7 +437,7 @@ From the acceptance date, the developer provides support free of charge for twel
 - Remote first (screen sharing / phone); on-site when remote is not possible.
 - Response within one working day, Sunday–Thursday, 9:00–17:00. Urgent "agents cannot work" issues are handled as a priority.
 
-**Not covered by support:** hardware failures, PBX, network or internet problems, changes made by third parties, unavailability of the call-back extension or the CDR export on the PBX (see 4.5), data loss caused by not keeping backups on the client's side, and anything listed as Out of Scope. Such work, if requested, is billed separately at USD 30 per hour (minimum one hour).
+**Not covered by support:** hardware failures, PBX, network or internet problems, changes made by third parties, unavailability of the CDR file or the SFTP account on the PBX (see 4.5), data loss caused by not keeping backups on the client's side, and anything listed as Out of Scope. Such work, if requested, is billed separately at USD 30 per hour (minimum one hour).
 
 After the 12 months, support is optional at USD 250 per year (same terms) or per hour as above.
 

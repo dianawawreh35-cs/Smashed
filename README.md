@@ -66,7 +66,7 @@ src/CallCenter.Server/     ASP.NET Core API, SignalR hub, EF Core, background wo
 src/CallCenter.AgentApp/   WPF softphone (SIPSorcery), SQLite offline buffer
 src/CallCenter.Web/        React 18 + Vite supervisor SPA (Arabic RTL default)
 tests/                     xUnit test projects
-tools/pbx-sim/             console app that will replay AMI/SIP events without a live PBX
+tools/pbx-sim/             console app that will replay SIP events and CDR rows without a live PBX
 deploy/                    Docker Compose, .env.example, backup script
 docs/                      requirements, schema, runbook, decisions, prompt history
 ```

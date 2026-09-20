@@ -82,7 +82,7 @@
     "reject": "Reject"
   },
   "callLog": {
-    "intro": "Your calls today. Only yours - no agent sees another agent’s calls.",
+    "intro": "Your recent calls — the last 100, newest first. Only yours: no agent sees another agent’s calls.",
     "refresh": "Refresh",
     "searchHint": "Filter by number or name",
     "unclassifiedOnly": "Needs classifying",
@@ -94,7 +94,7 @@
     "duration": "Duration",
     "statusHeader": "Result",
     "numberWithheld": "Number withheld",
-    "empty": "No calls yet today.",
+    "empty": "No calls yet.",
     "emptyTitle": "No calls yet",
     "emptyHint": "Calls appear here as soon as they end.",
     "noMatches": "No calls match that.",

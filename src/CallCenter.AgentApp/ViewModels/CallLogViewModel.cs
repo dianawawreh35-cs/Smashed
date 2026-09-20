@@ -142,8 +142,30 @@ public class CallRow(CommunicationDto call, Localizer localizer)
 {
     public Guid Id => call.Id;
 
-    /// <summary>Time only. The list is today's calls; the date would be noise.</summary>
-    public string When => call.StartedAt.ToLocalTime().ToString("HH:mm");
+    /// <summary>
+    /// The time for a call from today, the date as well for an older one.
+    /// </summary>
+    /// <remarks>
+    /// The list is not today's calls — it is the agent's last hundred, whenever
+    /// they were. Showing only the time was written on the assumption that it
+    /// was today's, and made a call from three days ago look like this
+    /// afternoon. Today's calls are the overwhelming majority, so the date is
+    /// added only where it changes the meaning.
+    ///
+    /// Numeric rather than a month name: it reads the same in both languages,
+    /// and is narrower.
+    /// </remarks>
+    public string When
+    {
+        get
+        {
+            var local = call.StartedAt.ToLocalTime();
+
+            return local.Date == DateTimeOffset.Now.Date
+                ? local.ToString("HH:mm")
+                : local.ToString("dd/MM HH:mm");
+        }
+    }
 
     /// <summary>The customer's name, or the number when nobody is on file.</summary>
     public string Who => string.IsNullOrWhiteSpace(call.ContactName)

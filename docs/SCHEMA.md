@@ -312,7 +312,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - channels: Phone (system), WhatsApp, Facebook, Instagram, Wheels
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)
 - form_definitions v1: the JSON above without the `reason` field
-- settings: `recording.retention_days=90`, `agent.idle_logout_minutes=30`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `cdr.interval_seconds=300`, `cdr.last_offset=0`
+- settings: `recording.retention_days=90`, `agent.idle_logout_minutes=30`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `cdr.interval_seconds=300`, `cdr.last_offset=0`, `agent.call_log_days=7`
   - `cdr.last_offset` is the byte position in `Master.csv` the importer has read to (SRS S-55). It is state, not configuration, and is kept here so a restart resumes rather than re-reads. A file shorter than this value means the log rotated: reset to 0 and log it.
   - **Still seeded but now unused:** `callback.extension` (S-56 removed) and `pbx.ami.enabled` (S-50 ruled out). They remain in the settings catalogue in code; removing them is a follow-up to be done with the CDR importer, not before.
 - users: one Supervisor created by the seed command

@@ -122,6 +122,10 @@
       "reports.internal_numbers": {
         "label": "Internal numbers",
         "hint": "The agents and branch extension numbers, comma separated. A call with one of these is recorded as usual but left out of the customer reports (S-48)."
+      },
+      "agent.call_log_days": {
+        "label": "Agent call log window (days)",
+        "hint": "How far back an agent can see their own calls. A week by default. Nothing is deleted - the contact history and your reports still show everything."
       }
     }
   },

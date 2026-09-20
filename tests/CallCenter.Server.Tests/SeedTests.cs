@@ -71,6 +71,7 @@ public class SeedDataTests
             "pbx.host",
             "pbx.ami.enabled",
             "reports.internal_numbers",
+            "agent.call_log_days",
         ]);
     }
 
@@ -80,6 +81,7 @@ public class SeedDataTests
     [InlineData("agent.edit_window", "SameDay")]     // A-42
     [InlineData("sla.answer_seconds", "20")]         // R-21
     [InlineData("pbx.ami.enabled", "false")]         // 4.5 - confirmed at installation
+    [InlineData("agent.call_log_days", "7")]         // A-50
     public void Setting_defaults_match_the_schema(string key, string expected)
     {
         SeedData.Settings.Single(s => s.Key == key).Value.Should().Be(expected);

@@ -53,6 +53,16 @@ public static class SettingsCatalog
 
         // A-33 / S-43: recordings are deleted after this many days.
         new("recording.retention_days", SettingKinds.Integer, null, IntegerBetween(1, 3650)),
+
+        // A-50: how far back an agent's own call log reaches. A week by
+        // default. It is a working window, not a retention rule - nothing is
+        // deleted, and the supervisor's reports still see everything.
+        //
+        // Bounded at 90 days rather than left open, because this is the one
+        // setting where a large value costs performance on every agent's
+        // screen: the query is a range scan over (agent_id, started_at), and a
+        // year-wide window on a busy extension is a slow page for everybody.
+        new("agent.call_log_days", SettingKinds.Integer, null, IntegerBetween(1, 90)),
     ];
 
     private static readonly Dictionary<string, Definition> ByKey =

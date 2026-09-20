@@ -1640,6 +1640,63 @@ as a check that exists only as a throwaway script. That check would have caught
 the white contacts list, and it would have caught this. It is still not in the
 test project.
 
+## 2026-09-20 — An agent's call log reaches back a week, and the supervisor decides
+
+The agent's call log had no lower bound. Asked to limit it — first to a day, then
+a week, then settled as a setting, which is the right answer: the useful window
+depends on how the restaurant works, and guessing it in code means a code change
+to correct the guess.
+
+`agent.call_log_days`, default **7**, range **1–90** (S-47).
+
+### A working window, not a retention rule
+
+Nothing is deleted. The contact history (A-62) still shows every call a customer
+ever made, and the supervisor's reports see everything. What the setting bounds
+is one screen: how far back an agent can look at their own calls.
+
+Worth saying plainly in the SRS and in the supervisor's hint, because "call log
+window" reads like data expiry and would be alarming if it were.
+
+### Enforced by the server, or it is not a limit
+
+The window is applied in the query, not by the screen. The method takes whatever
+`from` the caller asks for and moves it forward if it reaches past the window, so
+an agent cannot see older calls by editing a request — and the app does not have
+to be trusted to enforce a rule that is the supervisor's.
+
+### The speed question, which was asked directly
+
+The concern was lag once there are many calls. Three things carry it:
+
+**The window bounds the scan.** One agent, one week, rather than a walk back
+through the year.
+
+**The index matches the query exactly.** `ix_comm_agent_started` is
+(`agent_id`, `started_at DESC`), which is precisely the filter and precisely the
+sort, so PostgreSQL walks the index backwards from the window's edge and stops
+after the page limit. It never reads what it is not returning.
+
+**Nothing is tracked.** These are reads, and EF was building a change snapshot of
+every row for a list nobody edits. `AsNoTracking()` on the call log, the contact
+history and the three lookups behind them.
+
+The text search is the one part that cannot use an index — `ILIKE '%text%'` never
+can — but it runs after the agent and window filters, so it only ever examines
+one agent's week.
+
+The 90-day ceiling exists for the same reason. It is the one setting where a
+generous value costs performance on every agent's screen, so it is bounded rather
+than open.
+
+### Caught by a test, which is worth noting
+
+Adding the setting broke `Settings_are_the_keys_the_schema_lists` — the seed and
+the schema document must agree. That is the check working as intended: the seeded
+settings are the ones a fresh installation gets, and a new one that reached
+production unseeded would be invisible until somebody wondered why the default
+was not applying.
+
 ---
 
 # How this project is tracked

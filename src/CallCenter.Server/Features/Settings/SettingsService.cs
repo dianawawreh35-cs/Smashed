@@ -12,6 +12,37 @@ namespace CallCenter.Server.Features.Settings;
 public class SettingsService(CallCenterDbContext db, ILogger<SettingsService> logger)
 {
     /// <summary>Everything the supervisor may change, in catalogue order.</summary>
+    /// <summary>
+    /// A whole-number setting, or <paramref name="fallback"/> when it is unset
+    /// or unreadable.
+    /// </summary>
+    /// <remarks>
+    /// Never throws. A settings row somebody has edited by hand into nonsense
+    /// must not take a screen down; the default is always a sane value, and the
+    /// supervisor can correct it in the app.
+    /// </remarks>
+    public async Task<int> GetIntAsync(string key, int fallback, CancellationToken ct = default)
+    {
+        var value = await db.Settings
+            .Where(s => s.Key == key)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync(ct);
+
+        if (int.TryParse(value, out var parsed))
+        {
+            return parsed;
+        }
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            logger.LogWarning(
+                "Setting {Key} is {Value}, which is not a whole number; using {Fallback}",
+                key, value, fallback);
+        }
+
+        return fallback;
+    }
+
     public async Task<IReadOnlyList<SettingDto>> ListAsync(CancellationToken ct = default)
     {
         var stored = await db.Settings

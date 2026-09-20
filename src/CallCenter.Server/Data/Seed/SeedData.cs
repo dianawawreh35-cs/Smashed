@@ -73,6 +73,10 @@ public static class SeedData
     [
         // How long recordings are kept before the retention job deletes them (A-33, S-43).
         ("recording.retention_days", "90"),
+        // How far back an agent's own call log reaches (A-50). A week. Not a
+        // retention rule - nothing is deleted, and the contact history and the
+        // supervisor's reports are unaffected.
+        ("agent.call_log_days", "7"),
 
         // Idle logout, so a shared laptop does not leave the previous shift signed in (A-05).
         ("agent.idle_logout_minutes", "30"),

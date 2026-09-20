@@ -23,8 +23,17 @@ namespace CallCenter.Server.Features.Communications;
 /// than it sounds: the alternative is an app that has to reconcile, and an app
 /// that has to reconcile will get it wrong on the day the network is flapping.
 /// </remarks>
-public class CommunicationsService(CallCenterDbContext db, ILogger<CommunicationsService> logger)
+public class CommunicationsService(
+    CallCenterDbContext db,
+    Settings.SettingsService settings,
+    ILogger<CommunicationsService> logger)
 {
+    /// <summary>
+    /// How far back an agent's call log reaches when the supervisor has not set
+    /// it (A-50, setting <c>agent.call_log_days</c>).
+    /// </summary>
+    public const int DefaultCallLogDays = 7;
+
     public enum Failure
     {
         /// <summary>The status or direction was not one this system knows.</summary>
@@ -135,8 +144,22 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
     ///
     /// A busy agent takes fifty to a hundred calls a day, so a hundred rows is
     /// roughly one shift. Anything historical was always going to be outside it.
+    ///
+    /// <b>An agent sees a window, not the whole history.</b> How far back is
+    /// <c>agent.call_log_days</c>, a week by default and set by the supervisor
+    /// (S-47). Enforced here rather than by the screen, because a limit the
+    /// client applies is not a limit: this method takes the caller's
+    /// <paramref name="from"/> and moves it forward if it reaches past the
+    /// window.
+    ///
+    /// It is a working window, not a retention rule. Nothing is deleted, the
+    /// contact history still shows every call, and the supervisor's reports see
+    /// all of it. What it bounds is the query behind one agent's screen — which
+    /// is also what keeps that screen fast on a busy extension, since the window
+    /// plus <c>ix_comm_agent_started</c> makes this a short range scan rather
+    /// than a walk back through the year.
     /// </remarks>
-    /// <param name="from">Inclusive. Null for no lower bound.</param>
+    /// <param name="from">Inclusive, and clamped to the window the supervisor allows.</param>
     /// <param name="to">Inclusive of the whole day: the caller passes a date, not an instant.</param>
     /// <param name="query">Matches the number as dialled, the normalised number, or the contact's name.</param>
     /// <param name="unclassifiedOnly">Only answered calls with no classification (A-41).</param>
@@ -149,12 +172,15 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
         int limit = 100,
         CancellationToken ct = default)
     {
+        var days = await settings.GetIntAsync("agent.call_log_days", DefaultCallLogDays, ct);
+        var earliest = DateTimeOffset.UtcNow.AddDays(-days);
+
         var calls = db.Communications.Where(c => c.AgentId == agentId);
 
-        if (from is { } start)
-        {
-            calls = calls.Where(c => c.StartedAt >= start);
-        }
+        // The window always applies. A caller asking for more gets the window;
+        // a caller asking for less gets what they asked for.
+        var start = from is { } requested && requested > earliest ? requested : earliest;
+        calls = calls.Where(c => c.StartedAt >= start);
 
         if (to is { } end)
         {
@@ -191,7 +217,16 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
                 .Where(c => !db.Classifications.Any(x => x.CommunicationId == c.Id));
         }
 
+        // AsNoTracking: this is a read. Tracking would have EF build a change
+        // snapshot of every row it returns, for a list nobody edits.
+        //
+        // The shape of the query is what keeps it quick on a busy extension:
+        // ix_comm_agent_started is (agent_id, started_at DESC), which is exactly
+        // the filter and exactly the sort, so PostgreSQL walks the index
+        // backwards from the window's edge and stops after `limit` rows. It
+        // never reads the year behind it.
         var rows = await calls
+            .AsNoTracking()
             .OrderByDescending(c => c.StartedAt)
             .Take(limit)
             .ToListAsync(ct);
@@ -206,7 +241,12 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
     public async Task<IReadOnlyList<CommunicationDto>> ForContactAsync(
         Guid contactId, int limit = 100, CancellationToken ct = default)
     {
+        // ix_comm_contact is (contact_id, started_at DESC) - the same shape, so
+        // the same short range scan. No time window here: A-62 asks for a
+        // contact's full history, and one customer's calls are few enough that
+        // the page limit is the only bound needed.
         var calls = await db.Communications
+            .AsNoTracking()
             .Where(c => c.ContactId == contactId)
             .OrderByDescending(c => c.StartedAt)
             .Take(limit)
@@ -269,6 +309,7 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
         // navigation include: the classification itself is not wanted here, only
         // whether there is one.
         var classified = await db.Classifications
+            .AsNoTracking()
             .Where(c => ids.Contains(c.CommunicationId))
             .Select(c => c.CommunicationId)
             .ToListAsync(ct);
@@ -276,10 +317,12 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
         var classifiedSet = classified.ToHashSet();
 
         var contactNames = await db.Contacts
+            .AsNoTracking()
             .Where(c => contactIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => c.Name, ct);
 
         var agentNames = await db.Users
+            .AsNoTracking()
             .Where(u => agentIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
 

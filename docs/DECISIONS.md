@@ -1472,6 +1472,45 @@ family, after the login 500 and the white contacts list.
 every `SELECT` and `INSERT` the buffer runs. On a laptop that detail is noise,
 and it will bury the lines that matter once calls are flowing.
 
+## 2026-09-20 — Unblocking a number now takes effect without signing out
+
+The block list was fetched at sign-in and never again. The gap was written down
+on 19 September as something to fix "with the call work"; it bit during testing
+today instead, and cost twenty minutes of a call that would not come through
+after the number had been unblocked.
+
+### Why it only matters in one direction
+
+Blocking somebody late is harmless — they get through once more. **Unblocking
+somebody late is not.** Every agent already signed in keeps rejecting that
+customer until they next sign out, which on a normal shift is hours. The
+customer cannot order all evening, and nobody in the restaurant can explain why,
+because from the agent's side nothing happens at all.
+
+### A timer, not a SignalR push
+
+The hub exists and would be instant, which is why it was the first idea.
+Rejected on reliability: a push fails silently when the connection drops, and
+the connection dropping is exactly the circumstance in which the list goes
+stale and nobody notices. A poll that repeats every two minutes cannot fail
+that way — the worst case is being two minutes behind.
+
+Two minutes is the staleness the client is accepting. Short enough that a
+supervisor unblocking somebody sees it work while they are still at their desk;
+long enough to be invisible.
+
+A push could still be added later as an optimisation, with the timer underneath
+it as the guarantee. That is the right order; doing the push first would have
+left the guarantee missing.
+
+### Quieter about it
+
+A refresh that changes nothing now logs at Debug. At one refresh every two
+minutes an unchanging list would otherwise write thirty lines an hour saying
+nothing happened, and bury the ones that matter. A change logs the count before
+and after at Information, because a block list that suddenly empties is worth
+seeing in a log.
+
 ---
 
 # How this project is tracked
@@ -1510,7 +1549,6 @@ and what comes after:
 |---|---|---|
 | **Classification: the form and the supervisor's designer** | A-40, S-40 | nothing — A-14 landed |
 | Opening a call from the log: details, classify | A-51 | classification (A-40) |
-| Push flag changes to signed-in agents | S-45, A-17 | the SignalR hub, which exists |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
 | The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |

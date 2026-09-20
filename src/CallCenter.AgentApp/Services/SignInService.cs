@@ -55,7 +55,10 @@ public class SignInService(
         // the extension registers, and it has to be checked against a list that
         // is already loaded (A-17). A failure here is not fatal - the cached
         // list from the last shift stays in place, which is what it is for.
-        await blockList.RefreshAsync(ct);
+        //
+        // And it keeps refreshing from here, so a number unblocked mid-shift
+        // stops being rejected without the agent signing out and in.
+        await blockList.StartRefreshingAsync(ct);
 
         if (session.Extensions is { } extensions)
         {
@@ -94,6 +97,7 @@ public class SignInService(
         // dropping it.
         sip.Stop();
         calls.Stop();
+        blockList.StopRefreshing();
 
         if (session.SessionId is { } sessionId)
         {

@@ -22,12 +22,35 @@ namespace CallCenter.AgentApp.Services.Calls;
 /// shift.
 ///
 /// Plain JSON rather than the SQLite offline buffer: this is one list of
-/// strings, it is replaced wholesale rather than edited, and the buffer's
-/// library is still pinned to a version carrying a security advisory. Nothing
-/// here is worth a database.
+/// strings, replaced wholesale rather than edited. Nothing here is worth a
+/// database.
+///
+/// <b>Refreshed on a timer, not only at sign-in.</b> Sign-in alone was the first
+/// design and it is wrong in one direction that matters: a supervisor who
+/// <i>unblocks</i> a customer leaves every signed-in agent still rejecting them
+/// until the next shift change. That was hit in testing on 2026-09-20 and cost
+/// twenty minutes of confusion; in a restaurant it is a customer who cannot
+/// order all evening and nobody able to say why.
+///
+/// A timer rather than a push down the SignalR hub. The hub would be instant,
+/// but it is more machinery, and it fails silently when the connection drops —
+/// which is precisely when the list would go stale. A poll that repeats is
+/// harder to break. <see cref="RefreshInterval"/> is the staleness the client
+/// accepts, and two minutes is short enough that nobody notices.
 /// </remarks>
-public class BlockListCache(ApiClient api, ILogger<BlockListCache> logger)
+public class BlockListCache(ApiClient api, ILogger<BlockListCache> logger) : IDisposable
 {
+    /// <summary>
+    /// How often the list is re-fetched while an agent is signed in. Short
+    /// enough that unblocking somebody takes effect while the supervisor is
+    /// still at their desk.
+    /// </summary>
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(2);
+
+    private readonly Lock _timerGate = new();
+
+    private Timer? _timer;
+
     /// <summary>What is written to disk, so the file says when it was true.</summary>
     private record CachedList(IReadOnlyList<string> Numbers, DateTimeOffset AsOf);
 
@@ -125,11 +148,57 @@ public class BlockListCache(ApiClient api, ILogger<BlockListCache> logger)
             return;
         }
 
+        var before = Count;
+
         Replace(new BlockList(result.Value.Numbers), result.Value.AsOf);
         Save(result.Value);
 
-        logger.LogInformation("Block list refreshed: {Count} number(s)", Count);
+        // Only worth a line when it changed: at one refresh every two minutes,
+        // an unchanging list would otherwise fill the log with nothing.
+        if (Count != before)
+        {
+            logger.LogInformation(
+                "Block list changed: {Before} -> {Count} number(s)", before, Count);
+        }
+        else
+        {
+            logger.LogDebug("Block list refreshed, unchanged at {Count} number(s)", Count);
+        }
     }
+
+    /// <summary>
+    /// Refreshes now, then keeps refreshing. Called at sign-in; the first
+    /// refresh is awaited so the phone never comes up with no list at all.
+    /// </summary>
+    public async Task StartRefreshingAsync(CancellationToken ct = default)
+    {
+        await RefreshAsync(ct);
+
+        lock (_timerGate)
+        {
+            _timer?.Dispose();
+
+            // Fire and forget inside the callback: a refresh that fails leaves
+            // the previous list in place and says so, and the timer keeps going.
+            _timer = new Timer(
+                _ => _ = RefreshAsync(),
+                state: null,
+                dueTime: RefreshInterval,
+                period: RefreshInterval);
+        }
+    }
+
+    /// <summary>Stops refreshing. Called at sign-out.</summary>
+    public void StopRefreshing()
+    {
+        lock (_timerGate)
+        {
+            _timer?.Dispose();
+            _timer = null;
+        }
+    }
+
+    public void Dispose() => StopRefreshing();
 
     private void Replace(BlockList list, DateTimeOffset asOf)
     {

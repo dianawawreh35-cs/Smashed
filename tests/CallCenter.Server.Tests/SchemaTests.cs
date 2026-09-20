@@ -45,6 +45,7 @@ public class SchemaTests
         "communications", "recordings",
         "classification_types", "form_definitions", "classifications", "classification_history",
         "follow_up_tasks",
+        "delivery_areas",
         "pbx_events_raw", "agent_sessions", "audit_log", "outbox_sync",
     ];
 

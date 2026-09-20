@@ -63,6 +63,7 @@ public static class SeedCommand
             Console.WriteLine($"  types      {Describe(result.TypesAdded)}");
             Console.WriteLine($"  form v1    {(result.FormAdded ? "created" : "already present")}");
             Console.WriteLine($"  settings   {Describe(result.SettingsAdded)}");
+            Console.WriteLine($"  delivery   {Describe(result.DeliveryAreasAdded)}");
 
             if (result.UserCreated)
             {

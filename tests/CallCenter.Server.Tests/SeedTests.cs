@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CallCenter.Server.Data.Seed;
+using CallCenter.Shared.Text;
 using CallCenter.Shared;
 using FluentAssertions;
 using Xunit;
@@ -16,8 +17,43 @@ public class SeedDataTests
     [Fact]
     public void Four_branches_are_seeded()
     {
-        // SRS 2.4: the restaurant operates four branches.
-        SeedData.Branches.Should().Equal("Branch 1", "Branch 2", "Branch 3", "Branch 4");
+        // SRS 2.4: the restaurant operates four branches. Named rather than
+        // numbered since 2026-09-20, because the delivery areas (A-65) refer to
+        // them and an area cannot belong to "Branch 3".
+        SeedData.Branches.Should().Equal("رافات", "بطن الهوى", "ايكون", "نابلس");
+    }
+
+    [Fact]
+    public void Every_delivery_area_names_a_branch_that_is_seeded()
+    {
+        // A seed row naming a branch that does not exist is skipped with a
+        // warning at install time, which nobody reads. Caught here instead.
+        var branches = SeedData.Branches.ToHashSet();
+
+        SeedData.DeliveryAreas
+            .Where(a => !branches.Contains(a.Branch))
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void No_delivery_area_is_listed_twice()
+    {
+        // The unique index would refuse the second one, so a duplicate here is
+        // a row silently lost at install time.
+        SeedData.DeliveryAreas
+            .GroupBy(a => NameNormalizer.Normalize(a.Area))
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void No_delivery_area_is_priced_below_zero()
+    {
+        // Zero is allowed and meant: three areas beside the Rafat branch
+        // deliver free. Negative is somebody's typo, and the CHECK constraint
+        // would reject the whole seed.
+        SeedData.DeliveryAreas.Where(a => a.Price < 0).Should().BeEmpty();
     }
 
     [Fact]

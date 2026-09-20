@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CallCenter.Server.Data.Entities;
+using CallCenter.Shared.Text;
 using CallCenter.Shared;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +25,7 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
         int TypesAdded,
         bool FormAdded,
         int SettingsAdded,
+        int DeliveryAreasAdded,
         bool UserCreated,
         string? UserSkippedReason);
 
@@ -47,23 +49,87 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
         var formAdded = await SeedFormDefinitionAsync(cancellationToken);
         var settingsAdded = await SeedSettingsAsync(cancellationToken);
 
+        // After the branches, and after their save: each area needs a branch id.
+        await db.SaveChangesAsync(cancellationToken);
+        var areasAdded = await SeedDeliveryAreasAsync(cancellationToken);
+
         var (userCreated, skipped) = await SeedFirstUserAsync(
             adminLogin, adminPassword, adminDisplayName, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
 
         var result = new Result(
-            branchesAdded, channelsAdded, typesAdded, formAdded, settingsAdded, userCreated, skipped);
+            branchesAdded, channelsAdded, typesAdded, formAdded, settingsAdded,
+            areasAdded, userCreated, skipped);
 
         logger.LogInformation(
             "Seed complete: {Branches} branches, {Channels} channels, {Types} types, "
-            + "form v1 {Form}, {Settings} settings, user {User}",
+            + "form v1 {Form}, {Settings} settings, {Areas} delivery areas, user {User}",
             branchesAdded, channelsAdded, typesAdded,
             formAdded ? "created" : "already present",
-            settingsAdded,
+            settingsAdded, areasAdded,
             userCreated ? "created" : skipped ?? "not requested");
 
         return result;
+    }
+
+    /// <summary>
+    /// The branches' delivery price lists (A-65, S-58).
+    /// </summary>
+    /// <remarks>
+    /// Skipped entirely once any area exists, like every other part of this
+    /// seeder: these are starting contents, and a supervisor who has since
+    /// edited a price must not have it put back on the next run.
+    ///
+    /// An area whose branch is not in the database is skipped with a warning
+    /// rather than failing the seed. It means somebody renamed a branch before
+    /// seeding, and losing one area is better than losing the installation.
+    /// </remarks>
+    private async Task<int> SeedDeliveryAreasAsync(CancellationToken ct)
+    {
+        if (await db.DeliveryAreas.AnyAsync(ct))
+        {
+            return 0;
+        }
+
+        var branchIds = await db.Branches
+            .ToDictionaryAsync(b => b.Name, b => b.Id, ct);
+
+        var added = 0;
+        var seen = new HashSet<string>();
+
+        foreach (var (area, branch, price) in SeedData.DeliveryAreas)
+        {
+            if (!branchIds.TryGetValue(branch, out var branchId))
+            {
+                logger.LogWarning(
+                    "Delivery area {Area} names branch {Branch}, which does not exist; skipped",
+                    area, branch);
+                continue;
+            }
+
+            var normalised = NameNormalizer.Normalize(area);
+
+            // The unique index would refuse a repeat anyway; catching it here
+            // means the seed reports it rather than throwing.
+            if (normalised.Length == 0 || !seen.Add(normalised))
+            {
+                logger.LogWarning("Delivery area {Area} is a duplicate or has no name; skipped", area);
+                continue;
+            }
+
+            db.DeliveryAreas.Add(new DeliveryArea
+            {
+                Name = area,
+                NameNormalised = normalised,
+                BranchId = branchId,
+                Price = price,
+            });
+
+            added++;
+        }
+
+        return added;
     }
 
     private async Task<int> SeedBranchesAsync(IReadOnlyList<string>? names, CancellationToken ct)

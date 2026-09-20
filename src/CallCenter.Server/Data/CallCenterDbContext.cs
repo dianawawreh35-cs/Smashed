@@ -34,6 +34,9 @@ public partial class CallCenterDbContext(DbContextOptions<CallCenterDbContext> o
     public DbSet<ClassificationType> ClassificationTypes => Set<ClassificationType>();
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
     public DbSet<Classification> Classifications => Set<Classification>();
+
+    /// <summary>Where the restaurant delivers, which branch covers it, and the price (A-65, S-58).</summary>
+    public DbSet<DeliveryArea> DeliveryAreas => Set<DeliveryArea>();
     public DbSet<ClassificationHistory> ClassificationHistory => Set<ClassificationHistory>();
 
     // Follow-up

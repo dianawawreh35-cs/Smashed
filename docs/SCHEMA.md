@@ -237,6 +237,46 @@ Built-in kinds `type`, `branch`, `number`(order_value), `textarea`(notes), `chec
 
 ---
 
+## 4a. Delivery areas
+
+Where the restaurant delivers, which branch covers it, and the price (A-65,
+S-58). Read by agents mid-call; maintained by the supervisor, usually by pasting
+a branch's list out of the spreadsheet it already lives in.
+
+```sql
+CREATE TABLE delivery_areas (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             varchar(200) NOT NULL,        -- as typed, as the agent reads it
+  name_normalised  varchar(200) NOT NULL,        -- NameNormalizer: hamza folded, spacing levelled
+  branch_id        uuid NOT NULL REFERENCES branches(id),
+  price            numeric(10,2) NOT NULL,
+  is_active        boolean NOT NULL DEFAULT true,
+  created_by       uuid REFERENCES users(id),
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_by       uuid REFERENCES users(id),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_delivery_areas_price CHECK (price >= 0)
+);
+CREATE UNIQUE INDEX ux_delivery_area_name ON delivery_areas(name_normalised);
+CREATE INDEX ix_delivery_area_branch ON delivery_areas(branch_id);
+```
+
+- **The name is unique on its own, not per branch.** The agent's question is
+  "who delivers to Kafr Aqab?", and an area listed under two branches has no
+  answer. The restaurant's own lists work this way — 228 areas, four branches,
+  none shared.
+- **`price = 0` is a real price**, not a missing one: three areas beside the
+  Rafat branch deliver free. Nothing may treat 0 as unset. Negative is refused
+  by the CHECK.
+- **`name_normalised`** gets the same folding as contact names, because these
+  are Arabic place names copied from handwritten lists by several people. Without
+  it an agent searches, finds nothing, and quotes the wrong price.
+- **`is_active`** hides an area without losing its price. Deleting is also
+  allowed — nothing references a delivery area — but an area the restaurant stops
+  serving usually comes back.
+
+---
+
 ## 5. Follow-up tasks
 
 ```sql
@@ -308,7 +348,8 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 
 ## 7. Seed data
 
-- branches: Branch 1–4 (renamed by the supervisor)
+- branches: رافات, بطن الهوى, ايكون, نابلس (renameable by the supervisor; the delivery areas hold a branch id, not a name)
+- delivery_areas: 228 rows from the branches' own price lists (A-65)
 - channels: Phone (system), WhatsApp, Facebook, Instagram, Wheels
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)
 - form_definitions v1: the JSON above without the `reason` field

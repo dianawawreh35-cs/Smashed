@@ -197,6 +197,17 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
     {
         var contactIds = calls.Where(c => c.ContactId is not null).Select(c => c.ContactId!.Value).Distinct().ToList();
         var agentIds = calls.Where(c => c.AgentId is not null).Select(c => c.AgentId!.Value).Distinct().ToList();
+        var ids = calls.Select(c => c.Id).ToList();
+
+        // Which of these have been classified (A-41). One query rather than a
+        // navigation include: the classification itself is not wanted here, only
+        // whether there is one.
+        var classified = await db.Classifications
+            .Where(c => ids.Contains(c.CommunicationId))
+            .Select(c => c.CommunicationId)
+            .ToListAsync(ct);
+
+        var classifiedSet = classified.ToHashSet();
 
         var contactNames = await db.Contacts
             .Where(c => contactIds.Contains(c.Id))
@@ -221,7 +232,8 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
             c.DurationSec,
             c.QueueName,
             c.Extension,
-            c.AgentId is { } agentId && agentNames.TryGetValue(agentId, out var agent) ? agent : null))
+            c.AgentId is { } agentId && agentNames.TryGetValue(agentId, out var agent) ? agent : null,
+            classifiedSet.Contains(c.Id)))
             .ToList();
     }
 }

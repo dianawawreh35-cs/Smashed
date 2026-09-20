@@ -176,6 +176,18 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             authenticated: true,
             ct);
 
+    /// <summary>
+    /// The signed-in agent's own calls (A-50). No agent id is sent and none is
+    /// accepted: the token decides whose calls these are, so there is no request
+    /// this app could make that would return another agent's (A-52).
+    /// </summary>
+    public Task<Result<IReadOnlyList<CommunicationDto>>> GetMyCallsAsync(
+        int limit = 100, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<CommunicationDto>>(
+            () => new HttpRequestMessage(HttpMethod.Get, $"api/communications/mine?limit={limit}"),
+            authenticated: true,
+            ct);
+
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>
         SendAsync<CurrentUserDto>(

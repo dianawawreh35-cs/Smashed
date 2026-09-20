@@ -20,6 +20,9 @@ public partial class HomeView : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
 
+        // The call log first: it is what an agent checks between calls, and
+        // what they work through at the end of a shift (A-50, A-41).
+        AddSection("nav.callLog", new CallLogView(services.GetRequiredService<CallLogViewModel>()));
         AddSection("nav.contacts", new ContactsView(services.GetRequiredService<ContactsViewModel>()));
 
         Nav.SelectionChanged += (_, _) => ShowSelected();

@@ -195,5 +195,27 @@
       "server_unreachable": "The server could not be reached.",
       "server_error": "The server reported an error. Please try again."
     }
+  },
+  "history": {
+    "heading": "Call history",
+    "when": "When",
+    "status": "Result",
+    "duration": "Duration",
+    "queue": "Queue",
+    "agent": "Agent",
+    "unclassified": "Not classified",
+    "empty": "No calls with this customer yet.",
+    "emptyHint": "Calls appear here as soon as they end.",
+    "statuses": {
+      "Answered": "Answered",
+      "Missed": "Missed",
+      "Rejected": "Rejected",
+      "Blocked": "Blocked",
+      "Abandoned": "Abandoned",
+      "Overflowed": "Overflowed",
+      "Failed": "Failed",
+      "Ringing": "Ringing",
+      "Logged": "Logged"
+    }
   }
 }

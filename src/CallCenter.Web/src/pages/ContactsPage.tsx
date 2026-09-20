@@ -13,6 +13,7 @@ import {
 } from '../api/contacts'
 import type { Contact, ContactFilter, ContactSummary, DuplicateNumber } from '../api/contacts'
 import { errorCodeOf } from '../api/users'
+import ContactHistory from '../components/ContactHistory'
 import FlagDialog from '../components/FlagDialog'
 import type { FlagTarget } from '../components/FlagDialog'
 
@@ -377,6 +378,16 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
           {t('contacts.cancel')}
         </button>
       </div>
+
+      {/* A-62: the customer's history, under their details. Only for a contact
+          that exists — a new one has none, and an empty table on the "add"
+          form would just be noise. */}
+      {contact && (
+        <div className="border-t border-ink-700 pt-4">
+          <p className="field-label mb-2">{t('history.heading')}</p>
+          <ContactHistory contactId={contact.id} />
+        </div>
+      )}
     </form>
   )
 }

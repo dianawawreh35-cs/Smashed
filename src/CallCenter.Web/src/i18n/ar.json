@@ -195,5 +195,27 @@
       "server_unreachable": "تعذّر الوصول إلى الخادم.",
       "server_error": "حدث خطأ في الخادم. حاول مرة أخرى."
     }
+  },
+  "history": {
+    "heading": "سجل المكالمات",
+    "when": "التاريخ",
+    "status": "النتيجة",
+    "duration": "المدة",
+    "queue": "الطابور",
+    "agent": "الموظف",
+    "unclassified": "غير مصنّفة",
+    "empty": "لا توجد مكالمات مع هذا الزبون بعد.",
+    "emptyHint": "تظهر المكالمات هنا فور انتهائها.",
+    "statuses": {
+      "Answered": "تم الرد",
+      "Missed": "فائتة",
+      "Rejected": "مرفوضة",
+      "Blocked": "محظورة",
+      "Abandoned": "متروكة",
+      "Overflowed": "محوّلة",
+      "Failed": "فاشلة",
+      "Ringing": "ترنّ",
+      "Logged": "مسجّلة"
+    }
   }
 }

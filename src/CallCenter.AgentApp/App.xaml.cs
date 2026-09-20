@@ -140,6 +140,7 @@ public partial class App : Application
         services.AddTransient<LoginViewModel>();
         services.AddTransient<HomeViewModel>();
         services.AddTransient<ContactsViewModel>();
+        services.AddTransient<CallLogViewModel>();
 
         services.AddSingleton<MainWindow>();
     }

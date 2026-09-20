@@ -71,4 +71,18 @@ public record CommunicationDto(
     int? DurationSec,
     string? QueueName,
     string? Extension,
-    string? AgentDisplayName);
+    string? AgentDisplayName,
+    bool IsClassified)
+{
+    /// <summary>
+    /// A call the agent still owes a classification for (A-41), highlighted in
+    /// their call log until they deal with it.
+    /// </summary>
+    /// <remarks>
+    /// Only answered calls. A missed, rejected or blocked call has nothing to
+    /// classify — there was no conversation — and marking them as owing one
+    /// would leave every agent with a list of work they can never clear.
+    /// </remarks>
+    public bool IsUnclassified =>
+        !IsClassified && Status == CommunicationStatuses.Answered;
+}

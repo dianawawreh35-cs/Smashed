@@ -40,7 +40,8 @@
     "retrying": "تعذّر الوصول — إعادة المحاولة"
   },
   "nav": {
-    "contacts": "جهات الاتصال"
+    "contacts": "جهات الاتصال",
+    "callLog": "سجل المكالمات"
   },
   "contacts": {
     "search": "بحث",
@@ -79,5 +80,35 @@
     "incoming": "مكالمة واردة",
     "numberWithheld": "رقم محجوب",
     "reject": "رفض"
+  },
+  "callLog": {
+    "intro": "مكالماتك اليوم. مكالماتك أنت فقط — لا يرى أي موظف مكالمات غيره.",
+    "refresh": "تحديث",
+    "searchHint": "تصفية بالرقم أو الاسم",
+    "unclassifiedOnly": "بحاجة إلى تصنيف",
+    "unclassified": "غير مصنّفة",
+    "when": "الوقت",
+    "who": "الزبون",
+    "number": "الرقم",
+    "queue": "الطابور",
+    "duration": "المدة",
+    "statusHeader": "النتيجة",
+    "numberWithheld": "رقم محجوب",
+    "empty": "لا توجد مكالمات اليوم بعد.",
+    "emptyTitle": "لا توجد مكالمات بعد",
+    "emptyHint": "تظهر المكالمات هنا فور انتهائها.",
+    "noMatches": "لا توجد مكالمات مطابقة.",
+    "offline": "تعذّر الوصول إلى الخادم — سجل المكالمات غير متاح الآن.",
+    "status": {
+      "Answered": "تم الرد",
+      "Missed": "فائتة",
+      "Rejected": "مرفوضة",
+      "Blocked": "محظورة",
+      "Failed": "فاشلة",
+      "Ringing": "ترنّ",
+      "Abandoned": "متروكة",
+      "Overflowed": "محوّلة",
+      "Logged": "مسجّلة"
+    }
   }
 }

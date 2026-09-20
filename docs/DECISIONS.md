@@ -1365,6 +1365,66 @@ That does not mean nothing is outstanding — the open items list above it is lo
 and the pop-up still has not been seen working. It means nothing on the list is
 a reason the system could not be handed over.
 
+## 2026-09-20 — The calls become visible: the agent's log and the contact history
+
+A-50, A-52 and A-62. Calls have been recorded since yesterday and nothing could
+look at them, which meant a mistake in what is stored would not have surfaced
+until the reports were built. Two screens fix that.
+
+### The agent's call log
+
+A new first section in the Agent App's rail — first because it is what an agent
+checks between calls and works through at the end of a shift.
+
+**A-52 is enforced by the endpoint's shape, not by the screen.** `GET
+/api/communications/mine` takes no agent id and accepts none; the token decides.
+There is no request this app could make that would return another agent's calls,
+which is a stronger guarantee than a screen that simply does not offer the
+option.
+
+Filtering happens in the app rather than on the server. One agent's shift is a
+small list, and a filter that answers as they type beats one that makes a round
+trip per keystroke. When the list outgrows that the filter moves server-side and
+the screen does not change.
+
+### "Not classified" is a property of answered calls only
+
+A-41 wants unclassified calls highlighted until dealt with. The flag is
+`!IsClassified && Status == Answered`.
+
+Missed, rejected and blocked calls are deliberately excluded. There was no
+conversation to classify, and marking them would hand every agent a list of work
+they can never clear — which is the fastest way to make a highlight meaningless.
+
+### The contact history
+
+Under the contact's details in the supervisor app (A-62): every agent's calls
+with that customer, newest first, with the outcome, duration, queue and who took
+it. Not just the viewer's calls — the panel exists to show the customer's whole
+relationship with the restaurant, and half of it would mislead.
+
+Colour is by outcome rather than by call: answered is green, missed and abandoned
+are red. Scanning that column shows how often this customer has failed to get
+through, which is the question the panel is really for.
+
+Recordings are the part A-62 restricts to the viewing agent's own calls. They do
+not exist yet, so nothing here has to enforce it.
+
+### Two presentation rules, applied in both screens
+
+**A call that was never answered shows a blank duration, not 0:00.** Zero reads
+as a call that connected and was silent.
+
+**A call with no contact shows its number where the name would be**, rather than
+an empty cell. The agent needs something to recognise the caller by, and a blank
+reads as a broken row.
+
+### What this did not include
+
+A-51 — opening a call to see its details, play the recording and classify it — is
+not built. It needs the classification form and recordings, neither of which
+exists. The log lists calls; it does not open them yet.
+
 ---
 
 # How this project is tracked
@@ -1401,7 +1461,8 @@ and what comes after:
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **A screen for the calls now being recorded** | A-50, A-62 | nothing — A-14 landed |
+| **Classification: the form and the supervisor's designer** | A-40, S-40 | nothing — A-14 landed |
+| Opening a call from the log: details, classify | A-51 | classification (A-40) |
 | Push flag changes to signed-in agents | S-45, A-17 | the SignalR hub, which exists |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
@@ -1429,9 +1490,17 @@ R-21), the contact history (A-62), the agent's own call log (A-50), the
 classification (A-40) and the call-back tasks, none of which could start before
 it.
 
-**Nothing shows any of it yet.** The data arrives and there is no screen. The
-agent's call log and the contact history panel are the smallest useful next
-step, and both are now possible.
+**The calls are visible as of 20 September**: the agent's own call log in the
+Agent App (A-50) and the contact's history in the supervisor app (A-62). Neither
+has been seen running — both are unverified UI, like the pop-up.
+
+**Classification is the next substantial piece** (A-40, S-40), and the biggest
+remaining feature: a server side, the supervisor's form designer, and a form in
+the Agent App that renders fields it has never seen. One design question to
+settle first — a classification attaches to a call record, and a call made while
+the server was down has no id yet, so the classification endpoint should accept
+the SIP Call-ID and extension as an alternative key. Both already ride in the
+offline buffer together.
 
 **The CDR importer (S-55) is unblocked too** — it writes the same
 `communications` rows — but still needs its own prerequisite first: three test

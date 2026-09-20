@@ -40,7 +40,8 @@
     "retrying": "Cannot reach the PBX — retrying"
   },
   "nav": {
-    "contacts": "Contacts"
+    "contacts": "Contacts",
+    "callLog": "Call log"
   },
   "contacts": {
     "search": "Search",
@@ -79,5 +80,35 @@
     "incoming": "Incoming call",
     "numberWithheld": "Number withheld",
     "reject": "Reject"
+  },
+  "callLog": {
+    "intro": "Your calls today. Only yours - no agent sees another agent’s calls.",
+    "refresh": "Refresh",
+    "searchHint": "Filter by number or name",
+    "unclassifiedOnly": "Needs classifying",
+    "unclassified": "Not classified",
+    "when": "Time",
+    "who": "Customer",
+    "number": "Number",
+    "queue": "Queue",
+    "duration": "Duration",
+    "statusHeader": "Result",
+    "numberWithheld": "Number withheld",
+    "empty": "No calls yet today.",
+    "emptyTitle": "No calls yet",
+    "emptyHint": "Calls appear here as soon as they end.",
+    "noMatches": "No calls match that.",
+    "offline": "The server could not be reached - your call log is unavailable right now.",
+    "status": {
+      "Answered": "Answered",
+      "Missed": "Missed",
+      "Rejected": "Rejected",
+      "Blocked": "Blocked",
+      "Failed": "Failed",
+      "Ringing": "Ringing",
+      "Abandoned": "Abandoned",
+      "Overflowed": "Overflowed",
+      "Logged": "Logged"
+    }
   }
 }

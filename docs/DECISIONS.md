@@ -1563,6 +1563,33 @@ of the exact session where the hang-up was being investigated. A flag set around
 down while the BYE was still being built. Nothing observed went wrong, but the
 order was backwards; the BYE goes first now and the audio closes after.
 
+## 2026-09-20 — The busy path covers direct dials, not queued customers
+
+Raised by the developer while planning the test for it, and it corrects
+something written as though it were broader than it is.
+
+A **queue does not offer a call to a member who is already talking**, so a
+second INVITE never arrives at a busy agent from `smashed-002`. The app's busy
+handling fires only on a **direct dial** to the extension — an internal call
+from a branch or another agent.
+
+### What that means for the reports
+
+A customer who rings while every agent is busy **never touches the Agent App**.
+They wait in the queue, and either get through when somebody frees up or give
+up. Nothing in this system sees them.
+
+Those are the abandoned calls, and they are precisely what section 4.5 exists
+for: they arrive from the PBX's CDR file (S-55), with the latency of the import.
+So the coverage stands as already written — this does not open a new gap — but it
+is worth being exact that "Missed because we were busy" in the call log means an
+internal caller, not a customer.
+
+The code comments said busy "lets the PBX offer the caller to somebody else",
+which reads as though the queue would re-offer it. Corrected in place: it is the
+queue's own skipping that keeps a busy agent out of the rotation, before any of
+this runs.
+
 ---
 
 # How this project is tracked

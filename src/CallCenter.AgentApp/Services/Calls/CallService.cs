@@ -31,6 +31,13 @@ namespace CallCenter.AgentApp.Services.Calls;
 /// fires for a second call and the caller would hear nothing until the PBX
 /// timed out.
 ///
+/// That path fires less often than it looks. A <b>queue</b> does not offer a
+/// call to a member who is already on one, so a second INVITE only arrives on a
+/// <b>direct dial</b> to the extension — an internal call from a branch or
+/// another agent. A customer who rings while every agent is busy waits in the
+/// queue, and this app never hears about them at all: they are captured from
+/// the PBX's CDR (SRS S-55), not from here.
+///
 /// Every event here arrives on a SIPSorcery background thread. Nothing in this
 /// class touches the UI; it raises events and the view model marshals them.
 /// </remarks>
@@ -263,16 +270,17 @@ public class CallService(
             return;
         }
 
-        // One extension, one call. Busy lets the PBX offer the caller to
-        // somebody else rather than leaving them listening to nothing.
+        // One extension, one call. In practice this is a direct dial: a queue
+        // skips a member who is already talking, so a second INVITE means
+        // somebody rang the extension itself.
         logger.LogInformation(
             "Second call from {Remote} refused as busy: another call is in progress", remoteEndPoint);
 
         Decline(request, SIPResponseStatusCodesEnum.BusyHere, "busy");
 
-        // Reported as Missed: from the customer's side that is what it was, and
-        // "we were too busy to take it" is precisely what the reports exist to
-        // surface (A-14).
+        // Reported as Missed: from the caller's side that is what it was. Note
+        // this counts direct dials only, not customers waiting in a queue -
+        // those never reach this app and come from the CDR import (S-55).
         var identity = CallerId.FromInvite(request);
         var now = DateTimeOffset.Now;
 

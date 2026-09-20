@@ -1425,6 +1425,53 @@ A-51 — opening a call to see its details, play the recording and classify it �
 not built. It needs the classification form and recordings, neither of which
 exists. The log lists calls; it does not open them yet.
 
+## 2026-09-20 — Every call log was 500ing: DateTimeOffset and PostgreSQL
+
+The first real call to reach the new call log failed, and every one after it.
+Found in the server log:
+
+```
+Cannot write DateTimeOffset with Offset=03:00:00 to PostgreSQL type
+'timestamp with time zone', only offset 0 (UTC) is supported.
+```
+
+Npgsql refuses a `DateTimeOffset` carrying a non-zero offset. Everything the
+server writes uses `UtcNow`, so nothing had ever hit this. The Agent App stamps
+a call with `DateTimeOffset.Now` — which is right, it is describing a moment in
+the agent's day — and Palestine is +03:00, so every insert failed.
+
+### Fixed in the context, not in the service that hit it
+
+A value converter in `ConfigureConventions` normalises every `DateTimeOffset` to
+UTC on the way to the database. The alternative — converting in
+`CommunicationsService` — fixes today's caller and leaves the next one to
+rediscover it: the classification endpoint would have taken a timestamp from the
+same app and failed the same way.
+
+Nothing is lost by converting. The instant is identical, and `timestamptz` never
+stored the offset anyway.
+
+### What it cost, and what it proved
+
+Five calls failed before it was noticed, because the only symptom on the agent's
+side is a log line — the pop-up works, the call log is simply empty.
+
+**Nothing was lost.** All five sat in the offline buffer with their attempt
+counts rising, and go through on the next flush. That is the first time the
+queue has earned its keep, and it did so against a bug on the server rather than
+a network outage, which is not the failure it was designed for.
+
+### Two things this exposes
+
+**No database-backed test would have caught it either.** The suite runs without
+PostgreSQL by design, so a rule enforced by the driver — not by the model — is
+invisible to it. This is the third defect in the "green build, broken system"
+family, after the login 500 and the white contacts list.
+
+**The Agent App's SQL logging is too loud.** Finding this meant reading past
+every `SELECT` and `INSERT` the buffer runs. On a laptop that detail is noise,
+and it will bury the lines that matter once calls are flowing.
+
 ---
 
 # How this project is tracked

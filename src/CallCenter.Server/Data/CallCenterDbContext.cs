@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using CallCenter.Server.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace CallCenter.Server.Data;
@@ -43,6 +44,44 @@ public partial class CallCenterDbContext(DbContextOptions<CallCenterDbContext> o
     public DbSet<AgentSession> AgentSessions => Set<AgentSession>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<OutboxSync> OutboxSync => Set<OutboxSync>();
+
+    /// <summary>
+    /// Every <see cref="DateTimeOffset"/> is converted to UTC on the way to the
+    /// database.
+    /// </summary>
+    /// <remarks>
+    /// Npgsql refuses to write a <c>DateTimeOffset</c> with a non-zero offset to
+    /// <c>timestamp with time zone</c>: only UTC is accepted. Everything written
+    /// by the server used <c>UtcNow</c> and so never hit it. The Agent App
+    /// stamps a call with <c>DateTimeOffset.Now</c> — correctly, since it is
+    /// describing a moment in the agent's day — and that arrives carrying
+    /// +03:00, which failed every insert with a 500.
+    ///
+    /// Fixed here rather than in the one service that hit it, because the next
+    /// timestamp to arrive from a client would fail the same way and the fix
+    /// would have to be remembered again. Converting loses nothing: the instant
+    /// is identical, and the offset was never stored by this column type in the
+    /// first place.
+    /// </remarks>
+    protected override void ConfigureConventions(ModelConfigurationBuilder builder)
+    {
+        base.ConfigureConventions(builder);
+
+        builder.Properties<DateTimeOffset>()
+            .HaveConversion<UtcDateTimeOffsetConverter>();
+
+        builder.Properties<DateTimeOffset?>()
+            .HaveConversion<UtcDateTimeOffsetConverter>();
+    }
+
+    /// <summary>
+    /// Normalises to UTC on write and leaves reads alone — what comes back from
+    /// <c>timestamptz</c> is already UTC.
+    /// </summary>
+    private sealed class UtcDateTimeOffsetConverter()
+        : ValueConverter<DateTimeOffset, DateTimeOffset>(
+            write => write.ToUniversalTime(),
+            read => read);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

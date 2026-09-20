@@ -71,7 +71,12 @@ public class DeliveryAreasService(CallCenterDbContext db, ILogger<DeliveryAreasS
 
             if (normalised.Length > 0)
             {
-                areas = areas.Where(a => EF.Functions.Like(a.NameNormalised, $"%{normalised}%"));
+                // ILike, matching the contact search. Both sides are already
+                // lowercased by NameNormalizer, so Like would give the same
+                // answer today - but that is an invariant declared in another
+                // file, and relying on it means this search breaks silently if
+                // the normaliser ever stops folding case.
+                areas = areas.Where(a => EF.Functions.ILike(a.NameNormalised, $"%{normalised}%"));
             }
         }
 

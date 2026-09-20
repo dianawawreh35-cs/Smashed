@@ -6,6 +6,7 @@ using System.Text.Json;
 using CallCenter.Shared.Contracts.Auth;
 using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Contracts.Contacts;
+using CallCenter.Shared.Contracts.Delivery;
 using Microsoft.Extensions.Logging;
 
 namespace CallCenter.AgentApp.Services;
@@ -221,6 +222,19 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             authenticated: true,
             ct);
     }
+
+    /// <summary>
+    /// Which branch delivers to a place and what it costs (A-65). Read-only:
+    /// only a supervisor changes these (S-58).
+    /// </summary>
+    public Task<Result<IReadOnlyList<DeliveryAreaDto>>> SearchDeliveryAreasAsync(
+        string? query, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<DeliveryAreaDto>>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get,
+                $"api/delivery-areas?q={Uri.EscapeDataString(query ?? string.Empty)}"),
+            authenticated: true,
+            ct);
 
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>

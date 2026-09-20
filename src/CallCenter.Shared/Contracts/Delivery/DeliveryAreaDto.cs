@@ -16,6 +16,9 @@ public record DeliveryAreaDto(
     decimal Price,
     bool IsActive);
 
+/// <summary>One of the restaurant's branches (S-41).</summary>
+public record BranchDto(Guid Id, string Name, bool IsActive);
+
 /// <summary>Creates or updates one area (S-58).</summary>
 public record UpsertDeliveryAreaRequest(
     [Required, MaxLength(200)] string Name,

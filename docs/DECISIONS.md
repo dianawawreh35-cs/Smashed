@@ -1697,6 +1697,108 @@ settings are the ones a fresh installation gets, and a new one that reached
 production unseeded would be invisible until somebody wondered why the default
 was not applying.
 
+## 2026-09-20 — Delivery areas: a feature the SRS did not have
+
+Asked for by the client and not in the requirements: an agent needs to know
+**which branch delivers to a place and what delivery costs**, and the supervisor
+needs to maintain that list. Added as **A-65** and **S-58**, with the two
+spreadsheets the restaurant already keeps seeded as the starting data.
+
+Written into the SRS in the same commit as the code, as everything here is. A
+feature the contract does not mention is a feature nobody agreed to pay for.
+
+### One area, one branch
+
+The unique index is on the area name alone, not on the pair with the branch.
+The agent's question is "who delivers to Kafr Aqab?", and an area listed under
+two branches has no answer to it — the screen would show two prices and the
+agent would pick one.
+
+The restaurant's own lists work this way: 228 areas across four branches, none
+shared. Should that ever change, it is a schema change and a deliberate one,
+which is the right amount of friction for something that would make every lookup
+ambiguous.
+
+### Arabic names get the contact-name treatment
+
+These are place names copied from handwritten lists by several people, so
+<c>الطيرة</c> and <c>الطيره</c> have to be the same place. They run through
+`NameNormalizer`, the same folding contact names get (17 September). Without it
+an agent searches, finds nothing, and quotes the wrong price — which is worse
+than finding nothing, because they will quote *something*.
+
+Search is a substring match rather than exact: an agent hears half a name and
+types what they caught.
+
+### Pasting a list is the requirement, not a convenience
+
+166 rows for Nablus alone. A form that takes them one at a time is a form the
+supervisor stops using, and then the agents quote last year's prices — the
+feature fails quietly rather than visibly.
+
+So: pick a branch, paste two columns, save. Tab-separated first because that is
+what a paste out of Excel gives, comma accepted for a list typed by hand. The
+price is read from the **last** field rather than the second, so an area name
+containing a comma still works.
+
+Three decisions inside it:
+
+**Parse everything, then write.** The whole import is one transaction. A paste
+that is half-rejected must not leave the branch half-updated, because the
+supervisor's next move is to fix the file and paste it again, and they need the
+first attempt to have changed nothing.
+
+**Every rejected line comes back with its number and a reason.** "154 of 168
+added" leaves somebody to find the other fourteen by eye, which is how a list
+ends up quietly incomplete.
+
+**An area belonging to another branch is reported, not moved.** Moving it
+silently is how an area ends up served by whichever branch was pasted last, and
+nobody would see it happen.
+
+`Replace` empties the branch first, so a pasted list becomes the whole list. Off
+by default and spelled out in full on the screen, because it is the one
+destructive thing here.
+
+### The branches got their real names
+
+They were still `Branch 1` to `Branch 4` — placeholders from the initial seed
+that nobody had renamed. An area cannot belong to "Branch 3", so the seed now
+creates رافات, بطن الهوى, ايكون and نابلس, and the four in the
+development database were renamed in place.
+
+Safe to rename at any time: everything that refers to a branch holds its id. The
+seed data is the one place a branch is named, and only to create it.
+
+### What the spreadsheets needed
+
+Three things, each recorded in `SeedData` so a later reader comparing the code
+against the files does not think rows were lost:
+
+- One Ramallah row spelled the Rafat branch **رفات** — the same name without its
+  alif. Merged.
+- The Nablus list held one area **twice**, identical branch and price. Imported
+  once.
+- **Three areas are priced 0**, all beside the Rafat branch. That is free
+  delivery for the street outside, not missing data, and nothing may treat it as
+  unset. The CHECK allows zero and refuses negative; the supervisor's screen
+  shows "Free" rather than a bare 0, which reads as missing.
+
+### A read-only branches endpoint, deliberately narrow
+
+The supervisor's screen needs a branch dropdown and there was no branches API at
+all. `GET /api/branches` returns the list and nothing else. **S-41** — creating,
+renaming and disabling branches — is still unbuilt; this is not a start on it,
+it is the one read that was blocking S-58, and building S-41 replaces this
+controller rather than working around it.
+
+### What is not built
+
+The price does not appear on the call pop-up. That needs the caller's address
+matched to an area, and address matching does not exist — A-13 matches phone
+numbers, not places. The agent looks it up on the Delivery tab, which is what
+was asked for.
+
 ---
 
 # How this project is tracked
@@ -1742,6 +1844,8 @@ and what comes after:
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
+| Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
+| Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |
 
 **A-17 works against the real PBX**, confirmed by test calls, and since A-14 the
 rejection is recorded too — a blocked call is reported with status Blocked, so it

@@ -12,7 +12,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "logout": "Log out",
-    "users": "Users"
+    "users": "Users",
+    "delivery": "Delivery"
   },
   "login": {
     "heading": "Sign in",
@@ -220,6 +221,57 @@
       "Failed": "Failed",
       "Ringing": "Ringing",
       "Logged": "Logged"
+    }
+  },
+  "delivery": {
+    "heading": "Delivery areas",
+    "intro": "Where you deliver, from which branch, and what it costs. Agents can see this but not change it.",
+    "search": "Search",
+    "searchPlaceholder": "Search by area name",
+    "branch": "Branch",
+    "allBranches": "All branches",
+    "chooseBranch": "Choose a branch",
+    "area": "Area",
+    "price": "Price",
+    "priceHint": "0 means free delivery.",
+    "free": "Free",
+    "count": "{{count}} shown",
+    "add": "Add area",
+    "addHeading": "New delivery area",
+    "editHeading": "Edit delivery area",
+    "edit": "Edit",
+    "remove": "Remove",
+    "save": "Save",
+    "cancel": "Cancel",
+    "inactive": "Hidden",
+    "activeLabel": "Visible to agents",
+    "empty": "No delivery areas yet.",
+    "noMatches": "Nothing matched that search.",
+    "importButton": "Paste a list",
+    "importHeading": "Paste a branch’s list",
+    "importHint": "Copy two columns from your spreadsheet — area name and price — and paste them here. One area per line.",
+    "pasteLabel": "Areas",
+    "pastePlaceholder": "Kafr Aqab\t20\nBirnabala\t20",
+    "importSubmit": "Import",
+    "replaceLabel": "Replace this branch’s whole list",
+    "replaceHint": "Removes every area currently under this branch first, so what you paste becomes the complete list. Leave unticked to add and update only.",
+    "importDone": "Added {{added}}, updated {{updated}}, removed {{removed}}.",
+    "importProblems": "{{count}} line(s) could not be used:",
+    "importReasons": {
+      "no_price": "no price on this line",
+      "bad_price": "the price is not a number",
+      "no_name": "no area name",
+      "duplicate_in_paste": "listed twice in this paste",
+      "other_branch": "already listed under another branch"
+    },
+    "errors": {
+      "duplicate_area": "Another area already has this name.",
+      "unknown_branch": "That branch no longer exists.",
+      "no_name": "The area needs a name.",
+      "area_not_found": "That area no longer exists.",
+      "invalid_request": "It could not be saved. Check the fields.",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "The server reported an error. Please try again."
     }
   }
 }

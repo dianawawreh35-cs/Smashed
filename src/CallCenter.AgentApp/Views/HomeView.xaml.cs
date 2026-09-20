@@ -25,6 +25,9 @@ public partial class HomeView : UserControl
         AddSection("nav.callLog", new CallLogView(services.GetRequiredService<CallLogViewModel>()));
         AddSection("nav.contacts", new ContactsView(services.GetRequiredService<ContactsViewModel>()));
 
+        // A-65: which branch delivers where, and for how much. Read-only.
+        AddSection("nav.delivery", new DeliveryView(services.GetRequiredService<DeliveryViewModel>()));
+
         Nav.SelectionChanged += (_, _) => ShowSelected();
         Nav.SelectedIndex = 0;
         ShowSelected();

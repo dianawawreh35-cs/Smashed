@@ -41,7 +41,8 @@
   },
   "nav": {
     "contacts": "Contacts",
-    "callLog": "Call log"
+    "callLog": "Call log",
+    "delivery": "Delivery"
   },
   "contacts": {
     "search": "Search",
@@ -113,5 +114,13 @@
     "from": "From",
     "to": "To",
     "clearFilters": "Clear filters"
+  },
+  "delivery": {
+    "intro": "Which branch delivers to a place, and what delivery costs. Set by your supervisor.",
+    "searchHint": "Type part of the place name",
+    "emptyTitle": "Nothing to show",
+    "emptyHint": "Type part of a place name to see its branch and delivery price.",
+    "noMatches": "That place is not on the list.",
+    "offline": "The server could not be reached - delivery prices are unavailable right now."
   }
 }

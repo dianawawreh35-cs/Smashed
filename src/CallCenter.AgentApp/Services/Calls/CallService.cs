@@ -52,6 +52,18 @@ public class CallService(
     /// </summary>
     private string? _callId;
 
+    /// <summary>
+    /// Set while this app is the one hanging up.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SIPUserAgent.OnCallHungup"/> fires for <b>both</b> ends: it is
+    /// raised from inside <c>Hangup()</c> as well as when a BYE arrives. Without
+    /// this flag every agent-initiated hang-up was logged as "the other party
+    /// hung up", which is exactly backwards and is the sort of line somebody
+    /// spends an hour believing while debugging something else.
+    /// </remarks>
+    private bool _hangingUpLocally;
+
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event EventHandler<CallState>? StateChanged;
 
@@ -79,7 +91,7 @@ public class CallService(
         {
             _agent = new SIPUserAgent(transport.Transport, null);
             _agent.OnIncomingCall += OnIncomingCall;
-            _agent.OnCallHungup += OnRemoteHangup;
+            _agent.OnCallHungup += OnCallHungup;
             _agent.ServerCallCancelled += (_, _) => Finish("the caller gave up");
 
             transport.Transport.SIPTransportRequestReceived += OnTransportRequest;
@@ -177,6 +189,17 @@ public class CallService(
     public void Reject() => RejectWith(SIPResponseStatusCodesEnum.Decline, "rejected by the agent");
 
     /// <summary>Ends the call in progress (A-12).</summary>
+    /// <remarks>
+    /// The BYE goes first and the audio is closed afterwards, by
+    /// <see cref="Finish"/>. The other order tears down the RTP session while
+    /// the BYE is still being built, which is asking for a hang-up that does
+    /// not leave cleanly.
+    ///
+    /// What the <i>caller</i> hears next is the PBX's business, not this app's.
+    /// A BYE ends the leg between this extension and the PBX; whether the caller
+    /// is then hung up, returned to the queue or sent somewhere else is decided
+    /// by what follows <c>Queue()</c> in the dialplan.
+    /// </remarks>
     public void HangUp()
     {
         SIPUserAgent? agent;
@@ -184,6 +207,7 @@ public class CallService(
         lock (_gate)
         {
             agent = _agent;
+            _hangingUpLocally = true;
         }
 
         try
@@ -195,7 +219,7 @@ public class CallService(
             logger.LogWarning(ex, "Hanging up did not complete cleanly");
         }
 
-        Finish("hung up by the agent");
+        Finish("hung up by the agent", CallOutcome.Answered);
     }
 
     /// <summary>
@@ -400,7 +424,24 @@ public class CallService(
             CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null));
     }
 
-    private void OnRemoteHangup(SIPDialogue? dialogue) => Finish("the other party hung up");
+    /// <summary>
+    /// The call ended. Raised for a BYE arriving <b>and</b> from inside our own
+    /// <c>Hangup()</c>, so the flag decides which it was.
+    /// </summary>
+    private void OnCallHungup(SIPDialogue? dialogue)
+    {
+        lock (_gate)
+        {
+            if (_hangingUpLocally)
+            {
+                // Our own Hangup() raised this. HangUp() finishes the call
+                // itself, once the BYE is away.
+                return;
+            }
+        }
+
+        Finish("the caller hung up");
+    }
 
     private void RejectWith(SIPResponseStatusCodesEnum status, string why)
     {
@@ -487,6 +528,7 @@ public class CallService(
             callId = _callId;
             _pending = null;
             _callId = null;
+            _hangingUpLocally = false;
         }
 
         CloseMedia();

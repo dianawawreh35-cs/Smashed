@@ -1511,6 +1511,58 @@ nothing happened, and bury the ones that matter. A change logs the count before
 and after at Information, because a block list that suddenly empties is worth
 seeing in a log.
 
+## 2026-09-20 — The first call all the way through, and where a hang-up stops being ours
+
+```
+10:05:44  INVITE from 0569498581 via queue smashed-002
+10:05:54  Call answered
+10:06:03  Call finished
+```
+
+Pop-up, answer, two-way audio, hang-up. Everything built since 18 September had
+been unverified against real hardware; most of it now is not.
+
+### The caller is not hung up on, and that is the dialplan's doing
+
+The agent puts the phone down, and the caller keeps hearing a tone rather than
+being released.
+
+The app is correct here: it sends `BYE`, the PBX answers `200 OK`, and the leg
+between this extension and the PBX is gone. There is no further thing a phone
+can send — SIP has no way to say "and release the other leg too". That leg
+belongs to the PBX.
+
+What happens to the caller is decided by what follows `Queue()` in the dialplan
+for `smashed-002`. With a `Hangup()` after it the caller is released; without
+one they fall through to whatever is next, which is what is being heard. **A
+dialplan fix on the Issabel side, not an app one**, and worth recording because
+the symptom points squarely at the app.
+
+This is the same shape as the blocked-caller-on-hold question: the Agent App
+controls its own leg and nothing beyond it.
+
+### A log line that said the opposite of the truth
+
+```
+Call finished: the other party hung up
+SIP OUT "BYE"
+```
+
+The agent hung up. `SIPUserAgent.OnCallHungup` fires for **both** ends — it is
+raised from inside our own `Hangup()` as well as when a BYE arrives — and the
+handler assumed remote.
+
+Harmless to the call and expensive to a person: it is the kind of line somebody
+believes for an hour while debugging something else, and it appeared in the log
+of the exact session where the hang-up was being investigated. A flag set around
+`Hangup()` now tells the two apart.
+
+### And the audio was closed a moment too early
+
+`HangUp()` finished the call before the BYE had left, so the RTP session was torn
+down while the BYE was still being built. Nothing observed went wrong, but the
+order was backwards; the BYE goes first now and the audio closes after.
+
 ---
 
 # How this project is tracked
@@ -1610,6 +1662,16 @@ handed over; the open items above are work, not blockers.
 Add to this list only what would make a handover irresponsible, not what is
 merely unfinished. It was useful because it stayed short.
 
+## For whoever administers the Issabel PBX
+
+- **A caller is not released when the agent hangs up.** Check what follows
+  `Queue()` in the dialplan for `smashed-002`: a `Hangup()` after it releases the
+  caller, and without one they fall through to whatever is next and keep hearing
+  a tone. Confirmed on 2026-09-20 that the Agent App sends `BYE` and is answered
+  `200 OK`, so its own leg ends correctly — the remaining leg is the dialplan's.
+- **Blocking at the PBX (S-46)** is the only way to stop a blocked caller
+  entering the queue at all; the Agent App can only decline its own leg.
+
 ## Questions for the telephony provider
 
 **Mostly answered, 2026-09-19.** No inbound port to the PBX, on any port — so
@@ -1641,11 +1703,12 @@ there at all. See the 19 September CDR entry.
 - **Login has no database-backed test.** The suite runs without PostgreSQL by
   design, so token validation and encryption are covered and the actual login
   path is not.
-- **Most of the call path still has not met a PBX.** Calls now arrive, and the
-  automatic rejection of a blocked caller is confirmed working against the real
-  switch. **The pop-up, Answer, Hang up, the timer, the audio and the queue
-  badge are all still unverified** — every test call so far was blocked before
-  it reached any of them. The block-list rule is covered by tests because it was
+- **The call path has met a PBX and works.** Confirmed on 2026-09-20: a call
+  arrives through queue `smashed-002`, the pop-up appears, Answer connects
+  two-way audio, and Hang up ends the leg cleanly. The automatic rejection of a
+  blocked caller was confirmed earlier. **Still unverified:** the queue badge and
+  the timer as they appear on screen, the agent's call log, and the contact
+  history panel — all built but not yet seen running. The block-list rule is covered by tests because it was
   deliberately put in Shared; everything downstream of an actual INVITE is not.
 - **`docs/DEVELOPING.md` says to stop the apps before building, and the check
   for whether they are running is easy to get wrong.** Both run as `dotnet.exe`,

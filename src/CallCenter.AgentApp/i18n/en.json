@@ -109,6 +109,9 @@
       "Abandoned": "Abandoned",
       "Overflowed": "Overflowed",
       "Logged": "Logged"
-    }
+    },
+    "from": "From",
+    "to": "To",
+    "clearFilters": "Clear filters"
   }
 }

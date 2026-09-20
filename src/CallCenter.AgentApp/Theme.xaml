@@ -360,4 +360,108 @@
     <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
   </Style>
 
+  <!-- ===== DatePicker ===============================================
+       WPF's default DatePicker is light-themed, and a control with no style
+       here falls back to it - which is exactly how the contacts list came out
+       as a white block on 2026-09-17. The calendar popup is a separate control
+       with its own default, so both are styled. -->
+
+  <Style TargetType="DatePickerTextBox">
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CaretBrush" Value="{StaticResource Text}" />
+    <Setter Property="SelectionBrush" Value="{StaticResource Accent}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="DatePickerTextBox">
+          <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="DatePicker">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="DatePicker">
+          <Border x:Name="Chrome"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{StaticResource CornerSmall}">
+            <Grid Margin="{TemplateBinding Padding}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+
+              <DatePickerTextBox x:Name="PART_TextBox" Grid.Column="0" />
+
+              <Button x:Name="PART_Button"
+                      Grid.Column="1"
+                      Width="18"
+                      Margin="6,0,0,0"
+                      Padding="0"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="{StaticResource TextMuted}"
+                      Content="&#x1F4C5;"
+                      FontSize="11"
+                      Cursor="Hand" />
+
+              <Popup x:Name="PART_Popup"
+                     Grid.Column="0"
+                     AllowsTransparency="True"
+                     Placement="Bottom"
+                     StaysOpen="False">
+                <Border Background="{StaticResource Surface}"
+                        BorderBrush="{StaticResource BorderSoft}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource CornerSmall}"
+                        Padding="4">
+                  <ContentPresenter />
+                </Border>
+              </Popup>
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Chrome" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="Calendar">
+    <Setter Property="Background" Value="{StaticResource Surface}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+  </Style>
+
+  <Style TargetType="CalendarDayButton">
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style TargetType="CalendarButton">
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
 </ResourceDictionary>

@@ -109,6 +109,9 @@
       "Abandoned": "متروكة",
       "Overflowed": "محوّلة",
       "Logged": "مسجّلة"
-    }
+    },
+    "from": "من",
+    "to": "إلى",
+    "clearFilters": "مسح التصفية"
   }
 }

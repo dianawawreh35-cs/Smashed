@@ -181,12 +181,46 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
     /// accepted: the token decides whose calls these are, so there is no request
     /// this app could make that would return another agent's (A-52).
     /// </summary>
+    /// <param name="from">Inclusive lower bound on the call's start.</param>
+    /// <param name="to">A date, not an instant: the whole of that day is included.</param>
+    /// <param name="query">Number or customer name.</param>
+    /// <param name="unclassifiedOnly">Only answered calls still needing a classification (A-41).</param>
     public Task<Result<IReadOnlyList<CommunicationDto>>> GetMyCallsAsync(
-        int limit = 100, CancellationToken ct = default) =>
-        SendAsync<IReadOnlyList<CommunicationDto>>(
-            () => new HttpRequestMessage(HttpMethod.Get, $"api/communications/mine?limit={limit}"),
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? query = null,
+        bool unclassifiedOnly = false,
+        int limit = 100,
+        CancellationToken ct = default)
+    {
+        var parameters = new List<string> { $"limit={limit}" };
+
+        if (from is { } start)
+        {
+            parameters.Add($"from={Uri.EscapeDataString(start.ToString("o"))}");
+        }
+
+        if (to is { } end)
+        {
+            parameters.Add($"to={Uri.EscapeDataString(end.ToString("o"))}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            parameters.Add($"q={Uri.EscapeDataString(query.Trim())}");
+        }
+
+        if (unclassifiedOnly)
+        {
+            parameters.Add("unclassified=true");
+        }
+
+        return SendAsync<IReadOnlyList<CommunicationDto>>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get, $"api/communications/mine?{string.Join("&", parameters)}"),
             authenticated: true,
             ct);
+    }
 
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>

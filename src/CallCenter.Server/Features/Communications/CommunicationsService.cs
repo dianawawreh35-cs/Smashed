@@ -120,17 +120,83 @@ public class CommunicationsService(CallCenterDbContext db, ILogger<Communication
         return (await ToDtoAsync(call, ct), null);
     }
 
-    /// <summary>An agent's own calls, newest first (A-50).</summary>
+    /// <summary>
+    /// An agent's own calls, newest first, narrowed by date, text and whether
+    /// they still need classifying (A-50).
+    /// </summary>
+    /// <remarks>
+    /// <b>The filtering has to happen here, not in the app.</b> The first
+    /// version fetched the last hundred calls and filtered them on the laptop,
+    /// which is wrong in a way that is invisible: an agent searching for a
+    /// customer they spoke to two hundred calls ago is told "no calls match",
+    /// and a date filter would report an empty Tuesday. A screen that answers
+    /// "nothing" when it means "nothing in the part I looked at" is worse than
+    /// one that cannot answer at all.
+    ///
+    /// A busy agent takes fifty to a hundred calls a day, so a hundred rows is
+    /// roughly one shift. Anything historical was always going to be outside it.
+    /// </remarks>
+    /// <param name="from">Inclusive. Null for no lower bound.</param>
+    /// <param name="to">Inclusive of the whole day: the caller passes a date, not an instant.</param>
+    /// <param name="query">Matches the number as dialled, the normalised number, or the contact's name.</param>
+    /// <param name="unclassifiedOnly">Only answered calls with no classification (A-41).</param>
     public async Task<IReadOnlyList<CommunicationDto>> ForAgentAsync(
-        Guid agentId, int limit = 100, CancellationToken ct = default)
+        Guid agentId,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? query = null,
+        bool unclassifiedOnly = false,
+        int limit = 100,
+        CancellationToken ct = default)
     {
-        var calls = await db.Communications
-            .Where(c => c.AgentId == agentId)
+        var calls = db.Communications.Where(c => c.AgentId == agentId);
+
+        if (from is { } start)
+        {
+            calls = calls.Where(c => c.StartedAt >= start);
+        }
+
+        if (to is { } end)
+        {
+            // The caller means a day, not a moment: "to Tuesday" includes
+            // Tuesday's calls, so the bound runs to the end of that day.
+            var endOfDay = end.Date.AddDays(1).AddTicks(-1);
+            calls = calls.Where(c => c.StartedAt <= endOfDay);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var text = query.Trim();
+            var like = $"%{text}%";
+
+            // The number as dialled and the normalised form both, so searching
+            // "0599" finds a call stored as 970599… and vice versa.
+            var digits = PhoneNormalizer.DigitsOnly(text);
+            var digitsLike = digits.Length > 0 ? $"%{digits}%" : null;
+
+            calls = calls.Where(c =>
+                (c.RemoteNumberRaw != null && EF.Functions.ILike(c.RemoteNumberRaw, like))
+                || (digitsLike != null && c.RemoteNormalised != null
+                    && EF.Functions.ILike(c.RemoteNormalised, digitsLike))
+                || (c.Contact != null && c.Contact.Name != null
+                    && EF.Functions.ILike(c.Contact.Name, like)));
+        }
+
+        if (unclassifiedOnly)
+        {
+            // Answered calls only: a missed or blocked call has no conversation
+            // to classify, so it can never be cleared off the list (A-41).
+            calls = calls
+                .Where(c => c.Status == CommunicationStatuses.Answered)
+                .Where(c => !db.Classifications.Any(x => x.CommunicationId == c.Id));
+        }
+
+        var rows = await calls
             .OrderByDescending(c => c.StartedAt)
             .Take(limit)
             .ToListAsync(ct);
 
-        return await ToDtosAsync(calls, ct);
+        return await ToDtosAsync(rows, ct);
     }
 
     /// <summary>

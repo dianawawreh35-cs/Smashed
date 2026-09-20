@@ -42,12 +42,23 @@ public class CommunicationsController(CommunicationsService communications) : Co
     /// The signed-in agent's own calls, newest first (A-50). An agent sees only
     /// their own, which is why there is no id in the route — the token decides.
     /// </summary>
+    /// <remarks>
+    /// The filters are applied here rather than by the caller. Filtering a
+    /// fetched page would answer "no calls match" whenever the match is older
+    /// than the page, which reads as "this never happened".
+    /// </remarks>
     [HttpGet("mine")]
     [Authorize(AuthPolicies.AgentOnly)]
     [ProducesResponseType<IReadOnlyList<CommunicationDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<CommunicationDto>>> Mine(
-        [FromQuery] int limit, CancellationToken ct) =>
-        Ok(await communications.ForAgentAsync(User.GetRequiredUserId(), Clamp(limit), ct));
+        [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to,
+        [FromQuery] string? q,
+        [FromQuery] bool unclassified,
+        [FromQuery] int limit,
+        CancellationToken ct) =>
+        Ok(await communications.ForAgentAsync(
+            User.GetRequiredUserId(), from, to, q, unclassified, Clamp(limit), ct));
 
     /// <summary>
     /// One contact's history of calls, newest first — the panel in A-62.

@@ -33,12 +33,33 @@
                Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                ToolTip="{Binding Localizer[callLog.searchHint]}" />
 
+      <!-- A-50: filter by date. Every filter is sent to the server, so these
+           search the whole history rather than the page already fetched. -->
+      <TextBlock Text="{Binding Localizer[callLog.from]}"
+                 Style="{StaticResource Subtle}"
+                 VerticalAlignment="Center"
+                 Margin="14,0,6,0" />
+      <DatePicker SelectedDate="{Binding From}" Width="120" VerticalAlignment="Center" />
+
+      <TextBlock Text="{Binding Localizer[callLog.to]}"
+                 Style="{StaticResource Subtle}"
+                 VerticalAlignment="Center"
+                 Margin="10,0,6,0" />
+      <DatePicker SelectedDate="{Binding To}" Width="120" VerticalAlignment="Center" />
+
       <!-- A-41: what the agent still owes. One tick rather than a filter menu,
            because it is the only filter that matters at the end of a shift. -->
       <CheckBox Content="{Binding Localizer[callLog.unclassifiedOnly]}"
                 IsChecked="{Binding UnclassifiedOnly}"
                 VerticalAlignment="Center"
                 Margin="14,0,0,0" />
+
+      <Button Content="{Binding Localizer[callLog.clearFilters]}"
+              Style="{StaticResource GhostButton}"
+              Margin="10,0,0,0"
+              VerticalAlignment="Center"
+              Command="{Binding ClearFiltersCommand}"
+              Visibility="{Binding HasFilters, Converter={StaticResource BoolToVisibility}}" />
 
       <TextBlock Text="{Binding StatusMessage}"
                  Style="{StaticResource Subtle}"

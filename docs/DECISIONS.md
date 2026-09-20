@@ -1590,6 +1590,56 @@ which reads as though the queue would re-offer it. Corrected in place: it is the
 queue's own skipping that keeps a busy agent out of the rotation, before any of
 this runs.
 
+## 2026-09-20 — The call log filters on the server, because filtering a page lies
+
+Asked what would happen if an agent filtered by date and the match was older
+than the hundred calls fetched. The answer was that the screen would say **"no
+calls match"** — and mean "none in the part I looked at".
+
+The first version fetched the agent's last hundred calls and filtered them on
+the laptop. The comment defending that said the filter would move to the server
+"when the list outgrows a hundred". A busy agent takes fifty to a hundred calls
+a day, so it had outgrown it before it was written; the flaw was already live in
+the name and number search, not merely waiting on the unbuilt date filter.
+
+Searching for a customer spoken to two hundred calls ago answered "no calls
+match", which reads as "you never called them". **A screen that reports nothing
+when it means nothing-here is worse than one that cannot answer at all**, because
+the first is believed.
+
+### Now
+
+`GET /api/communications/mine` takes `from`, `to`, `q` and `unclassified`, and
+every one is applied in the query. The text search covers the number as dialled,
+the normalised number and the contact's name, so `0599` finds a call stored as
+`970599…`. `to` is a date rather than an instant and includes the whole of that
+day — "to Tuesday" that excluded Tuesday's calls would be the same class of quiet
+wrongness.
+
+The cost is a round trip per change, so the text box waits for a pause in typing.
+And each fetch cancels the one before it: a slow answer for `05` landing after
+the answer for `0599` would put the wrong rows on screen, which looks exactly
+like the filter being broken.
+
+### A-50's date filter, which was the question
+
+Built at the same time, because building it over a client-side filter would have
+shipped the bug rather than the feature. From and To date pickers, and a Clear
+button that appears only when something is set.
+
+### The DatePicker needed a style, and that is a repeat
+
+WPF's `DatePicker` is light-themed by default, and a control with no style in
+`Theme.xaml` falls back to that default — which is precisely how the contacts
+list came out as a white block on 17 September. The calendar popup is a separate
+control with its own default, so `DatePicker`, `DatePickerTextBox`, `Calendar`,
+`CalendarDayButton` and `CalendarButton` are all styled.
+
+The open items have listed "every control a view uses has a style in the theme"
+as a check that exists only as a throwaway script. That check would have caught
+the white contacts list, and it would have caught this. It is still not in the
+test project.
+
 ---
 
 # How this project is tracked

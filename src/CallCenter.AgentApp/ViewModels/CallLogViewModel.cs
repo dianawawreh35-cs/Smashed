@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows.Threading;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.Shared;
@@ -14,30 +15,54 @@ namespace CallCenter.AgentApp.ViewModels;
 /// make that would return somebody else's.
 /// </summary>
 /// <remarks>
-/// Filtering is done here rather than on the server. The endpoint returns the
-/// agent's recent calls, which for one person on one shift is a small list, and
-/// a filter that answers as the agent types beats one that makes a round trip
-/// per keystroke. When the list outgrows that, the filter moves to the server;
-/// the screen will not change.
+/// <b>Every filter is applied by the server.</b> The first version fetched the
+/// last hundred calls and filtered those on the laptop, which is wrong in a way
+/// nobody would see: a search for a customer two hundred calls ago answers "no
+/// calls match", and picking a date last week returns an empty day. Both read as
+/// "that never happened". A screen that says "nothing" when it means "nothing in
+/// the part I looked at" is worse than one that cannot answer.
+///
+/// The cost is a round trip per change, which is why the text box waits for a
+/// pause in typing rather than asking on every keystroke.
 /// </remarks>
-public partial class CallLogViewModel : ObservableObject
+public partial class CallLogViewModel : ObservableObject, IDisposable
 {
+    /// <summary>
+    /// How long the typing has to stop before the search is sent. Long enough
+    /// that a number is typed in one request, short enough to feel immediate.
+    /// </summary>
+    private static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(400);
+
     private readonly ApiClient _api;
+    private readonly Dispatcher _dispatcher;
+    private readonly DispatcherTimer _typingTimer;
 
-    /// <summary>Everything fetched, before the filter.</summary>
-    private readonly List<CommunicationDto> _all = [];
+    /// <summary>Cancels a fetch that a newer one has replaced.</summary>
+    private CancellationTokenSource? _inFlight;
 
-    public CallLogViewModel(ApiClient api, Localizer localizer)
+    public CallLogViewModel(ApiClient api, Localizer localizer, Dispatcher dispatcher)
     {
         _api = api;
+        _dispatcher = dispatcher;
         Localizer = localizer;
+
+        _typingTimer = new DispatcherTimer(DispatcherPriority.Normal, dispatcher)
+        {
+            Interval = TypingPause,
+        };
+
+        _typingTimer.Tick += (_, _) =>
+        {
+            _typingTimer.Stop();
+            _ = RefreshAsync(CancellationToken.None);
+        };
 
         Calls.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCalls));
 
         localizer.LanguageChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(StatusMessage));
-            Apply();
+            Rebuild();
         };
     }
 
@@ -52,7 +77,7 @@ public partial class CallLogViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasStatus))]
     private string? _statusKey;
 
-    /// <summary>Filters by number or contact name as it is typed.</summary>
+    /// <summary>Filters by number or contact name. Sent once typing pauses.</summary>
     [ObservableProperty]
     private string _query = string.Empty;
 
@@ -60,72 +85,142 @@ public partial class CallLogViewModel : ObservableObject
     [ObservableProperty]
     private bool _unclassifiedOnly;
 
+    /// <summary>Earliest call to show. Null for no lower bound.</summary>
+    [ObservableProperty]
+    private DateTime? _from;
+
+    /// <summary>Latest day to show, included whole. Null for no upper bound.</summary>
+    [ObservableProperty]
+    private DateTime? _to;
+
     public bool HasStatus => StatusKey is not null;
 
     public bool HasCalls => Calls.Count > 0;
 
     public string? StatusMessage => StatusKey is null ? null : Localizer[StatusKey];
 
-    partial void OnQueryChanged(string value) => Apply();
+    /// <summary>
+    /// Typing restarts the clock, so a whole number costs one request rather
+    /// than one per digit.
+    /// </summary>
+    partial void OnQueryChanged(string value)
+    {
+        _typingTimer.Stop();
+        _typingTimer.Start();
+    }
 
-    partial void OnUnclassifiedOnlyChanged(bool value) => Apply();
+    // The tick boxes and dates are single decisions, so they ask at once.
+    partial void OnUnclassifiedOnlyChanged(bool value) => _ = RefreshAsync(CancellationToken.None);
+
+    partial void OnFromChanged(DateTime? value) => _ = RefreshAsync(CancellationToken.None);
+
+    partial void OnToChanged(DateTime? value) => _ = RefreshAsync(CancellationToken.None);
+
+    /// <summary>Clears every filter and shows the most recent calls again.</summary>
+    [RelayCommand]
+    private void ClearFilters()
+    {
+        _typingTimer.Stop();
+
+        Query = string.Empty;
+        From = null;
+        To = null;
+
+        // Setting UnclassifiedOnly last: each of these triggers a refresh, and
+        // the final one is the only fetch that matters.
+        UnclassifiedOnly = false;
+
+        _ = RefreshAsync(CancellationToken.None);
+    }
+
+    public void Dispose()
+    {
+        _typingTimer.Stop();
+        _inFlight?.Cancel();
+        _inFlight?.Dispose();
+    }
+
+    /// <summary>Everything the last fetch returned, kept only to re-render labels.</summary>
+    private IReadOnlyList<CommunicationDto> _fetched = [];
+
+    /// <summary>Whether any filter is set, so the screen can offer to clear them.</summary>
+    public bool HasFilters =>
+        From is not null || To is not null || UnclassifiedOnly || Query.Trim().Length > 0;
 
     [RelayCommand]
     private async Task RefreshAsync(CancellationToken ct)
     {
+        // A newer request replaces an older one. Without this, a slow answer for
+        // "05" can land after the answer for "0599" and put the wrong rows on
+        // screen - and it looks exactly like the filter not working.
+        var previous = _inFlight;
+        var current = new CancellationTokenSource();
+        _inFlight = current;
+        previous?.Cancel();
+        previous?.Dispose();
+
         IsBusy = true;
         StatusKey = null;
+        OnPropertyChanged(nameof(HasFilters));
 
         try
         {
-            var result = await _api.GetMyCallsAsync(ct: ct);
+            var result = await _api.GetMyCallsAsync(
+                from: From is { } from ? new DateTimeOffset(from.Date) : null,
+                to: To is { } to ? new DateTimeOffset(to.Date) : null,
+                query: Query,
+                unclassifiedOnly: UnclassifiedOnly,
+                ct: current.Token);
 
-            _all.Clear();
+            if (current.Token.IsCancellationRequested)
+            {
+                return;
+            }
 
             if (!result.IsOk || result.Value is null)
             {
+                _fetched = [];
                 Calls.Clear();
 
                 // A-04: the app keeps working with the server down, so this says
                 // so rather than showing an empty log, which would read as "you
-                // have taken no calls today".
+                // have taken no calls".
                 StatusKey = "callLog.offline";
                 return;
             }
 
-            _all.AddRange(result.Value);
-            Apply();
+            _fetched = result.Value;
+            Rebuild();
 
-            if (Calls.Count == 0)
-            {
-                StatusKey = "callLog.empty";
-            }
+            StatusKey = Calls.Count > 0
+                ? null
+                : HasFilters ? "callLog.noMatches" : "callLog.empty";
+        }
+        catch (OperationCanceledException)
+        {
+            // Replaced by a newer request; its answer is the one that counts.
         }
         finally
         {
-            IsBusy = false;
+            if (ReferenceEquals(_inFlight, current))
+            {
+                IsBusy = false;
+            }
         }
     }
 
-    /// <summary>Re-runs the filter over what was fetched.</summary>
-    private void Apply()
+    /// <summary>
+    /// Re-renders what was fetched. Used when the language changes — the rows
+    /// carry translated labels, and nothing needs re-fetching to change them.
+    /// </summary>
+    private void Rebuild()
     {
-        var query = Query.Trim();
-
-        var matching = _all.Where(c =>
-            (!UnclassifiedOnly || c.IsUnclassified)
-            && (query.Length == 0
-                || (c.RemoteNumberRaw?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-                || (c.ContactName?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)));
-
         Calls.Clear();
 
-        foreach (var call in matching)
+        foreach (var call in _fetched)
         {
             Calls.Add(new CallRow(call, Localizer));
         }
-
-        StatusKey = Calls.Count == 0 && _all.Count > 0 ? "callLog.noMatches" : null;
     }
 }
 

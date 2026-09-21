@@ -145,8 +145,8 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 
 | ID | Requirement | Priority |
 |---|---|---|
-| A-40 | At hang-up, the classification form opens automatically for inbound and outbound calls. The form's fields are defined by the supervisor (see S-40). Default fields: Type (Order, Cancellation, Complaint, Inquiry, Wrong number, Other), Branch (one of 4), Order value, Notes, Follow-up required. | Must |
-| A-41 | The agent may skip; the call remains "Unclassified" and is highlighted in the call log until classified. | Must |
+| A-40 | **The classification form opens as soon as the call is answered**, for inbound and outbound calls, and stays open while the agent is talking. It is filled in **during** the call, not after it: the agent is taking the order as the customer speaks, and the order value, the branch and the notes are what is being said. The form stays on screen after hang-up until it is saved or skipped, so a call that ends mid-sentence does not take the agent's typing with it. Saving is possible during the call and at any point after it. The form's fields are defined by the supervisor (see S-40). Default fields: Type (Order, Cancellation, Complaint, Inquiry, Wrong number, Other), Branch (one of 4), Order value, Notes, Follow-up required. | Must |
+| A-41 | The agent may skip; the call remains "Unclassified" and is highlighted in the call log until classified. A form left untouched when the call ends is a skip, not a loss — nothing is saved until the agent saves it, and the call is simply unclassified. | Must |
 | A-42 | Agents can classify or edit the classification of their own calls for the current day only. Older entries are read-only for agents; supervisors can edit at any time. | Must |
 | A-43 | Every classification change is stored with who changed it and when (audit trail). | Must |
 

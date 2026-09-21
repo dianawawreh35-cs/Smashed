@@ -2328,6 +2328,43 @@ a `select` and a `showWhenType` rule to draw.
 Part 2, the Agent App: the form at hang-up (A-40) and classifying from the call
 log. Part 3, the supervisor's form editor (S-40).
 
+## 2026-09-21 — The classification form opens on answer, not at hang-up (A-40)
+
+Dia, on being told slice 2 would open the form at hang-up: *"the form opens on
+call accept not on hangup"*. Right, and the reason is the business, not the
+software.
+
+A-40 said "at hang-up" and that was written as if classifying were paperwork
+done after the fact. It is not. **The agent is taking the order while the
+customer is speaking.** The order value, the branch, the notes — those are the
+call, not a summary of it. A form that appears once the customer has gone asks
+the agent to remember what they were just told, which is slower and wrong more
+often.
+
+A-40 now reads: the form opens **as soon as the call is answered**, stays open
+while the agent talks, and **stays on screen after hang-up until saved or
+skipped** — so a call that ends mid-sentence does not take the agent's typing
+with it. A-41 gains a sentence saying an untouched form is a skip, not a loss:
+nothing is stored until the agent saves.
+
+### The consequence that matters for the build
+
+**During a call, the server has no record of it yet.** The call is logged when it
+ends, so for the whole time the form is on screen there is no communication id
+to attach a classification to.
+
+That is exactly the situation the offline route was built for this morning —
+`PUT /api/classifications/by-call`, keyed on the SIP Call-ID and the extension.
+It was designed as the exception for a server that was down. It is now **the
+normal path**, and the server-id route is the special case used when editing an
+older call from the log.
+
+Worth noting as a piece of luck rather than foresight: the endpoint exists
+because Dia asked for offline working, and the design that answered that
+question turned out to answer this one too. Had the form only ever opened at
+hang-up, the id-based route would have looked sufficient and this change would
+have needed new server work.
+
 ---
 
 # How this project is tracked

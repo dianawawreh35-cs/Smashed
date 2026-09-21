@@ -5,6 +5,7 @@ import UsersPage from './pages/UsersPage'
 import SettingsPage from './pages/SettingsPage'
 import ContactsPage from './pages/ContactsPage'
 import DeliveryPage from './pages/DeliveryPage'
+import MenuPage from './pages/MenuPage'
 import AppLayout from './components/AppLayout'
 import RequireAuth from './components/RequireAuth'
 
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
+          <Route path="/menu" element={<MenuPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

@@ -142,6 +142,7 @@ public partial class App : Application
         services.AddTransient<ContactsViewModel>();
         services.AddTransient<CallLogViewModel>();
         services.AddTransient<DeliveryViewModel>();
+        services.AddTransient<MenuViewModel>();
 
         services.AddSingleton<MainWindow>();
     }

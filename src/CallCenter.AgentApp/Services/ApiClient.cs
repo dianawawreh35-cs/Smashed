@@ -7,6 +7,7 @@ using CallCenter.Shared.Contracts.Auth;
 using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Contracts.Contacts;
 using CallCenter.Shared.Contracts.Delivery;
+using CallCenter.Shared.Contracts.Menu;
 using Microsoft.Extensions.Logging;
 
 namespace CallCenter.AgentApp.Services;
@@ -235,6 +236,55 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
                 $"api/delivery-areas?q={Uri.EscapeDataString(query ?? string.Empty)}"),
             authenticated: true,
             ct);
+
+    /// <summary>
+    /// The menu, or the part of it matching what was typed (A-66). Read-only:
+    /// only a supervisor changes it (S-59).
+    /// </summary>
+    public Task<Result<IReadOnlyList<MenuItemDto>>> SearchMenuAsync(
+        string? query, CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<MenuItemDto>>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get,
+                $"api/menu?q={Uri.EscapeDataString(query ?? string.Empty)}"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// One menu item's picture (A-66).
+    /// </summary>
+    /// <remarks>
+    /// Raw bytes rather than JSON, and fetched per row as the list renders: the
+    /// list is what the agent reads, and it should not wait on a megabyte of
+    /// photographs. The server marks these cacheable for a day.
+    /// </remarks>
+    public async Task<Result<byte[]>> GetMenuImageAsync(Guid id, CancellationToken ct = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"api/menu/{id}/image");
+
+            if (session.AccessToken is { } token)
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            using var response = await http.SendAsync(request, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Result<byte[]>.Failed(ApiStatus.ServerError, "image_unavailable");
+            }
+
+            return Result<byte[]>.Ok(await response.Content.ReadAsByteArrayAsync(ct));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            // A missing picture is not worth a message to the agent; the row
+            // simply shows without one.
+            return Result<byte[]>.Failed(ApiStatus.Unreachable, "server_unreachable");
+        }
+    }
 
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>

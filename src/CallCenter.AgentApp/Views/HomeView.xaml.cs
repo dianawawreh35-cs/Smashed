@@ -28,6 +28,9 @@ public partial class HomeView : UserControl
         // A-65: which branch delivers where, and for how much. Read-only.
         AddSection("nav.delivery", new DeliveryView(services.GetRequiredService<DeliveryViewModel>()));
 
+        // A-66: what is on the menu, what is in it and what it costs.
+        AddSection("nav.menu", new MenuView(services.GetRequiredService<MenuViewModel>()));
+
         Nav.SelectionChanged += (_, _) => ShowSelected();
         Nav.SelectedIndex = 0;
         ShowSelected();

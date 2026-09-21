@@ -42,7 +42,8 @@
   "nav": {
     "contacts": "Contacts",
     "callLog": "Call log",
-    "delivery": "Delivery"
+    "delivery": "Delivery",
+    "menu": "Menu"
   },
   "contacts": {
     "search": "Search",
@@ -122,5 +123,16 @@
     "emptyHint": "Type part of a place name to see its branch and delivery price.",
     "noMatches": "That place is not on the list.",
     "offline": "The server could not be reached - delivery prices are unavailable right now."
+  },
+  "menu": {
+    "intro": "What is on the menu, what is in it and what it costs. Set by your supervisor.",
+    "searchHint": "Type part of an item name, or something in it",
+    "meal": "meal",
+    "free": "Free",
+    "priceNotShown": "Ask the branch",
+    "emptyTitle": "Nothing to show",
+    "emptyHint": "Type part of an item name to see its price and contents.",
+    "noMatches": "Nothing on the menu matches that.",
+    "offline": "The server could not be reached - the menu is unavailable right now."
   }
 }

@@ -1821,6 +1821,95 @@ This had been recorded twice as a follow-up "to be done with the CDR importer".
 It took five minutes and did not need the importer at all, which is the usual
 shape of a deferred tidy-up.
 
+## 2026-09-21 — The menu: a second feature the SRS did not have
+
+Asked for straight after the delivery areas and built the same way: an agent
+mid-call is asked "what comes in the Overdose?" and "how much is a double as a
+meal?", and the answer today is a printed sheet beside the laptop that goes
+stale the moment a price changes. **A-66** and **S-59**, seeded from the
+restaurant's own menu spreadsheet — 44 items, 12 categories, 39 photographs.
+
+### Four price shapes, and why they are four columns and not one string
+
+The printed menu writes prices four ways and each means something different:
+
+| The menu says | Stored as |
+|---|---|
+| `26 (sandwich) / 36 (meal)` | price 26, meal price 36 |
+| `25` | price 25 |
+| `+2` | price 2, `is_surcharge` |
+| `FREE` | price 0, `is_surcharge` |
+| `not shown on menu` | price **null** |
+
+Keeping the original string and letting the screen print it would have been
+less work and wrong: reports cannot add up a string, and the supervisor's form
+could not validate one.
+
+**Null and zero are deliberately different.** Null is "the menu prints no
+price" — there is exactly one such item, a combination offer. Zero is a free
+extra. An agent has to be able to tell "free" from "ask the branch", and a
+single number cannot say both.
+
+**`is_surcharge` earns its column.** Without it, "إضافة الجبنة — 2" reads as a
+portion of cheese costing 2, and an agent would quote it as a line of its own
+instead of adding it to a burger. Both apps render it as "+2" and never as a
+bare number.
+
+### Arabic only, as instructed
+
+The spreadsheet carries English names and contents too. Not stored: the menu is
+Arabic, the agents speak Arabic to customers, and a second set of names is a
+second thing to keep correct and a second thing to forget. The English stays in
+`docs/smashed_menu.xlsx` if it is ever wanted.
+
+Names are folded by `NameNormalizer` as everything else is, and it matters more
+here than anywhere. These are English words written in Arabic — سماشد, ماشروم,
+كرسبي — and nobody spells them the same way twice. The description is searched
+as well as the name, because "what has mushrooms in it?" is a question agents
+are asked and the answer is in the contents.
+
+### The pictures are in the database
+
+39 photographs, 1.2 MB. Held as `bytea` rather than files on disk, for one
+reason that decides it: **the backup already covers the database** (runbook step
+9), and a folder of images is one more thing to back up separately and one more
+thing to forget. The seed is self-contained too — the pictures are embedded
+resources in the server assembly, so a fresh install needs the one DLL and no
+folder beside it.
+
+Served from their own endpoint rather than inside the list, and cached for a
+day. 44 items carrying 1.2 MB on every keystroke would make the search crawl
+over a VPN; a changed photograph taking a day to appear is a fair trade for a
+picture of a burger.
+
+**When this should change:** past a few tens of megabytes, move to files and
+stream them. At 40 KB an item that is several hundred items away, and the
+endpoint is already the seam to do it behind.
+
+### What the spreadsheet needed
+
+Nothing, which is unusual. Every item had an Arabic name, the categories were
+unambiguous, and the only oddities were structural — the trailing provenance
+note is not a category, and the five add-ons have no photographs because the
+printed menu does not photograph them.
+
+### The tests worth having are about the transcription
+
+The endpoint tests cover the door, as usual. The ones that matter more check
+the seed data itself, because a transcription error would be quoted to a
+customer without anybody blinking:
+
+- every item names a category that exists
+- no item is listed twice within a category
+- no price is negative
+- **a meal costs more than the sandwich alone** — a meal price at or below the
+  sandwich is a typo, and an agent would read it out
+- **only add-ons are marked as surcharges** — a burger marked wrongly would be
+  quoted as "+26"
+
+The schema test caught the two new tables before anything else did, as it did
+for the delivery areas.
+
 ---
 
 # How this project is tracked
@@ -1867,6 +1956,7 @@ and what comes after:
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
+| Menu category management on the supervisor screen | S-59 | nothing — the API exists, the screen only picks from them |
 | Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |
 
 **A-17 works against the real PBX**, confirmed by test calls, and since A-14 the

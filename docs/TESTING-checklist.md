@@ -29,6 +29,10 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 ### 1.1 The menu screen (S-59) — most recently changed, least seen
 
 - [ ] **The menu lists 44 items with photographs.**
+      *Every picture failed here on 21 September — an image tag cannot send the
+      sign-in token, so all 44 came back refused and drew the same blank box as
+      an item with no photograph. Fixed; this is the check that it stayed
+      fixed.*
       *If the pictures are broken:* this is the first run since the pictures
       moved from the database to files. The server reads them from
       `data/menu-images` relative to wherever it was started. Check the folder
@@ -38,6 +42,12 @@ Nothing here needs the PBX or a phone. Start the database, the server and
       `+2`, not `2`. The combination offer shows "not on the menu", not `0`.
       *If an add-on shows a bare number:* an agent would quote it as a line of
       its own instead of adding it to a burger.
+- [ ] **Double-click a row.** The editor opens **under that row**, not at the
+      top of the list. Try one near the bottom — that is where it used to be
+      annoying.
+- [ ] **Double-click the Remove button on purpose.** Nothing should happen.
+      *Deliberate: otherwise a stray double-click deletes a row and then opens
+      an editor for the thing it just deleted.*
 - [ ] **Edit an item, change its price, save.** The table shows the new price.
 - [ ] **Edit an item and choose a new photograph.** The chosen picture appears
       in the form *before* you save.
@@ -72,6 +82,9 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 ### 1.2 The delivery areas (S-58)
 
 - [ ] 228 areas are listed, each with a branch and a price.
+- [ ] **Double-click an area near the bottom of the list.** The editor opens
+      there rather than at the top. With 228 rows this is the worst case, and
+      the reason the change was asked for.
 - [ ] Search for an area by part of its name, in Arabic.
 - [ ] Add one area; add several at once.
 - [ ] Edit a price; delete an area.
@@ -83,7 +96,15 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 - [ ] Block a contact, giving a reason. Unblock it again.
       *You have already confirmed unblocking works end to end.*
 
-### 1.4 Settings
+### 1.4 The interface itself
+
+- [ ] **Hovering a label shows the hand, not the text I-beam**, and a label's
+      text cannot be dragged and highlighted. Labels are controls: clicking one
+      puts the cursor in its box.
+- [ ] **No blinking cursor in the page text.** If there is one, that is the
+      browser's caret browsing, not the app — press **F7**.
+
+### 1.5 Settings
 
 - [ ] `agent.call_log_days` is there and can be changed.
 - [ ] `agent.idle_logout_minutes` reads **240**.
@@ -100,7 +121,17 @@ Sign in as `dia20`. None of this needs a call.
       one. The folding is meant to find them all.
 - [ ] **Search by what is in an item** — "mushroom" in the contents, not the
       name. "What has mushrooms in it?" is a real question agents get.
-- [ ] **Pictures load in the Agent App too.** Same disk-file change as 1.1.
+- [x] **Pictures load in the Agent App.** *Confirmed 21 September.* They did
+      not at first: every row fetched its own picture at once, so a search fired
+      39 simultaneous requests per keystroke and most timed out silently — and
+      starved the delivery search, the call log and the block-list refresh with
+      them. Now fetched once and kept, four at a time.
+- [ ] **Search the menu quickly, several letters in a row.** The pictures
+      should stay put rather than flickering or disappearing, and the delivery
+      and call log tabs should still answer straight afterwards.
+- [ ] **Count the boxes with no picture: there should be exactly 5**, all in
+      إضافات, each saying **بلا صورة**. A box saying **تعذّر تحميل الصورة**
+      is a fault — report it.
 - [ ] **An item from the category you hid in 1.1 is still findable.**
 - [ ] **Delivery tab (A-65).** Search an area; it names the branch and price.
 - [ ] **Call log tab (A-14).** It lists past calls.
@@ -135,6 +166,16 @@ cannot be faked, and the part most likely to find something.
 - [ ] **Does taking a call reset the idle-logout timer?** Flagged and never
       checked. If it does not, an agent on a long call gets logged out
       mid-conversation.
+
+---
+
+## Round 3b — before any deployment
+
+- [ ] **`npm run build` succeeds** in `src/CallCenter.Web`. This is not the same
+      check as the tests: it was broken for half a day on 21 September while all
+      41 tests passed, because the tests never package the app. A green test run
+      does not mean the app can be installed.
+- [ ] **`dotnet build CallCenter.sln`** succeeds with the apps closed.
 
 ---
 

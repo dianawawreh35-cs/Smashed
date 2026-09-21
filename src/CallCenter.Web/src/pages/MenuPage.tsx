@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -96,9 +96,12 @@ export default function MenuPage() {
         {items && <span className="text-sm text-slate-400">{t('menu.count', { count: items.length })}</span>}
       </div>
 
-      {editing && (
+      {/* A new item has no row to sit under, so it opens here, where the
+          button that asked for it is. An edit opens beside the row being
+          edited - see ItemTable. */}
+      {editing === 'new' && (
         <ItemForm
-          item={editing === 'new' ? null : editing}
+          item={null}
           imageStamp={imageStamp}
           onSaved={() => setImageStamp(Date.now())}
           onClose={() => setEditing(null)}
@@ -108,7 +111,20 @@ export default function MenuPage() {
       {isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : items && items.length > 0 ? (
-        <ItemTable items={items} imageStamp={imageStamp} onEdit={setEditing} />
+        <ItemTable
+          items={items}
+          imageStamp={imageStamp}
+          editing={editing === 'new' ? null : editing}
+          onEdit={setEditing}
+          renderEditor={(item) => (
+            <ItemForm
+              item={item}
+              imageStamp={imageStamp}
+              onSaved={() => setImageStamp(Date.now())}
+              onClose={() => setEditing(null)}
+            />
+          )}
+        />
       ) : (
         <div className="card card-body text-center">
           <p className="text-slate-300">{query ? t('menu.noMatches') : t('menu.empty')}</p>
@@ -307,11 +323,16 @@ function priceLabel(item: MenuItem, t: (key: string) => string): string {
 function ItemTable({
   items,
   imageStamp,
+  editing,
   onEdit,
+  renderEditor,
 }: {
   items: MenuItem[]
   imageStamp: number
+  /** The item being edited, so its form can open under its own row. */
+  editing: MenuItem | null
   onEdit: (item: MenuItem) => void
+  renderEditor: (item: MenuItem) => ReactNode
 }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -336,7 +357,14 @@ function ItemTable({
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id}>
+            <Fragment key={item.id}>
+            {/* Double-click opens the editor, as it does on the contacts list.
+                The Edit button stays: a double-click is a shortcut, never the
+                only way in. */}
+            <tr
+              onDoubleClick={() => onEdit(item)}
+              className={editing?.id === item.id ? 'bg-ink-800/40' : undefined}
+            >
               <td>
                 <MenuImage itemId={item.id} hasImage={item.hasImage} stamp={imageStamp} />
               </td>
@@ -352,7 +380,9 @@ function ItemTable({
               <td className="text-slate-400">{item.categoryName}</td>
               <td className="tabular text-slate-300">{priceLabel(item, t)}</td>
               <td className="tabular text-slate-400">{item.mealPrice ?? ''}</td>
-              <td className="text-end whitespace-nowrap">
+              {/* The double-click must not reach here: two quick clicks on
+                  Remove would delete the row and then open an editor for it. */}
+              <td className="text-end whitespace-nowrap" onDoubleClick={(e) => e.stopPropagation()}>
                 <button type="button" onClick={() => onEdit(item)} className="btn-ghost btn-sm">
                   {t('menu.edit')}
                 </button>
@@ -366,6 +396,17 @@ function ItemTable({
                 </button>
               </td>
             </tr>
+
+            {/* The editor, where the supervisor is already looking rather than
+                at the top of a list they have scrolled past. */}
+            {editing?.id === item.id && (
+              <tr>
+                <td colSpan={6} className="bg-ink-900/60">
+                  {renderEditor(item)}
+                </td>
+              </tr>
+            )}
+            </Fragment>
           ))}
         </tbody>
       </table>

@@ -2139,6 +2139,31 @@ only — but that is a guess, and the honest position is that a call centre with
 several agents is exactly a burst of concurrent authenticated requests. It
 belongs on the list to settle before handover.
 
+## 2026-09-21 — The editors open where you are, not at the top of the list
+
+Dia asked for double-click to edit, and for the edit form to appear where the
+list is scrolled to rather than above everything.
+
+Both lists had the same flaw: the form rendered above the table, so editing an
+item near the bottom of 44 menu items — or 228 delivery areas — opened a form
+the supervisor then had to scroll up to find, and scroll back down from. The
+longer the list, the worse it got, which is backwards.
+
+The Users screen already did the right thing and had done since it was written:
+the panel opens in a row beneath the row it belongs to. Menu and delivery now
+follow it, so there is one pattern across the three rather than two.
+
+**Double-click is a shortcut, never the only way in.** The Edit button stays.
+A control that exists only on double-click cannot be reached from a keyboard and
+is invisible to anyone who does not already know it is there.
+
+**The double-click stops at the action buttons.** Without that, two quick clicks
+on Remove would delete the row and then open an editor for the thing that had
+just been deleted.
+
+A new item still opens above the list, where the button that asked for it is:
+there is no row for it to sit under yet.
+
 ---
 
 # How this project is tracked

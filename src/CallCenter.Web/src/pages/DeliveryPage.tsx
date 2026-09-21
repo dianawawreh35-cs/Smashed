@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -82,14 +82,19 @@ export default function DeliveryPage() {
 
       {importing && <ImportPanel onClose={() => setImporting(false)} />}
 
-      {editing && (
-        <AreaForm area={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
-      )}
+      {/* A new area has no row to sit under, so it opens here, beside the
+          button that asked for it. An edit opens beside its own row. */}
+      {editing === 'new' && <AreaForm area={null} onClose={() => setEditing(null)} />}
 
       {isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : areas && areas.length > 0 ? (
-        <AreaTable areas={areas} onEdit={setEditing} />
+        <AreaTable
+          areas={areas}
+          editing={editing === 'new' ? null : editing}
+          onEdit={setEditing}
+          onCloseEdit={() => setEditing(null)}
+        />
       ) : (
         <div className="card card-body text-center">
           <p className="text-slate-300">{query ? t('delivery.noMatches') : t('delivery.empty')}</p>
@@ -101,10 +106,15 @@ export default function DeliveryPage() {
 
 function AreaTable({
   areas,
+  editing,
   onEdit,
+  onCloseEdit,
 }: {
   areas: DeliveryArea[]
+  /** The area being edited, so its form can open under its own row. */
+  editing: DeliveryArea | null
   onEdit: (area: DeliveryArea) => void
+  onCloseEdit: () => void
 }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -127,7 +137,14 @@ function AreaTable({
         </thead>
         <tbody>
           {areas.map((area) => (
-            <tr key={area.id}>
+            <Fragment key={area.id}>
+            {/* Double-click opens the editor, as it does on the contacts list.
+                The Edit button stays: a double-click is a shortcut, never the
+                only way in. */}
+            <tr
+              onDoubleClick={() => onEdit(area)}
+              className={editing?.id === area.id ? 'bg-ink-800/40' : undefined}
+            >
               <td className="font-medium text-slate-100">
                 {area.name}
                 {!area.isActive && (
@@ -140,7 +157,9 @@ function AreaTable({
               <td className="tabular text-slate-300">
                 {area.price === 0 ? t('delivery.free') : area.price}
               </td>
-              <td className="text-end whitespace-nowrap">
+              {/* The double-click must not reach here: two quick clicks on
+                  Remove would delete the row and then open an editor for it. */}
+              <td className="text-end whitespace-nowrap" onDoubleClick={(e) => e.stopPropagation()}>
                 <button type="button" onClick={() => onEdit(area)} className="btn-ghost btn-sm">
                   {t('delivery.edit')}
                 </button>
@@ -154,6 +173,17 @@ function AreaTable({
                 </button>
               </td>
             </tr>
+
+            {/* The editor, where the supervisor is already looking rather than
+                at the top of a list of 228 areas they have scrolled past. */}
+            {editing?.id === area.id && (
+              <tr>
+                <td colSpan={4} className="bg-ink-900/60">
+                  <AreaForm area={area} onClose={onCloseEdit} />
+                </td>
+              </tr>
+            )}
+            </Fragment>
           ))}
         </tbody>
       </table>

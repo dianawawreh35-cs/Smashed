@@ -233,6 +233,37 @@ describe('menu page', () => {
     ).toBe(false)
   })
 
+  it('opens the editor on a double-click, in the row that was clicked', async () => {
+    // The form used to open above the table. On a menu of 44 items a supervisor
+    // editing one near the bottom had to scroll back up to find it.
+    stubApi()
+    renderPage()
+
+    const row = (await screen.findByText('Smashed')).closest('tr')!
+    fireEvent.doubleClick(row)
+
+    const form = screen.getByRole('button', { name: 'Save' }).closest('form')!
+    expect(form).toBeInTheDocument()
+
+    // The editor sits inside the table, after the row it belongs to - not at
+    // the top of the page.
+    const table = row.closest('table')!
+    expect(table.contains(form)).toBe(true)
+    expect(row.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('does not open the editor when the buttons are double-clicked', async () => {
+    // Two quick clicks on Remove would otherwise delete the row and then open
+    // an editor for the thing that had just been deleted.
+    stubApi()
+    renderPage()
+
+    const row = (await screen.findByText('Smashed')).closest('tr')!
+    fireEvent.doubleClick(within(row).getByRole('button', { name: 'Remove' }))
+
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+  })
+
   it('renames a category and refreshes the items that print its name', async () => {
     const fetchMock = stubApi()
     renderPage()

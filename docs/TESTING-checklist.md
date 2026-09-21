@@ -193,6 +193,18 @@ cannot be faked, and the part most likely to find something.
 - [ ] **Does taking a call reset the idle-logout timer?** Flagged and never
       checked. If it does not, an agent on a long call gets logged out
       mid-conversation.
+- [ ] **Mute (A-12).** Answer, press Mute. The status line at the top must say
+      "Muted" and the button must now say "Unmute". Speak: the other phone hears
+      nothing. Have the other side speak: you still hear them. Press Unmute:
+      both ways again, status back to "Connected".
+      *If the other phone still hears you:* the microphone was not paused; check
+      the log for "could not be muted".
+- [ ] **Stay muted for two full minutes.** The call must survive.
+      *If the PBX drops it:* Issabel has an RTP timeout switched on. The fix is
+      on our side — send frames of silence instead of pausing the microphone —
+      and is described in the DECISIONS entry for Mute.
+- [ ] **Hang up while muted, then take the next call.** The next call must not
+      start muted.
 
 ---
 
@@ -232,5 +244,5 @@ These cannot be checked on this laptop, and each has burned a project somewhere.
 Not testable yet, and listed so the gaps are not mistaken for failures:
 classification (A-40, S-40), branch management (S-41), opening a call from the
 log (A-51), caller identity in the pop-up (A-16, A-11), blacklist export
-(S-46), mute and hold, outbound calls, merging contacts, and contact import
+(S-46), hold, outbound calls, merging contacts, and contact import
 from Excel. `DECISIONS.md` holds the live list.

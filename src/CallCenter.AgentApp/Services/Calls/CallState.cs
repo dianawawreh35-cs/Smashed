@@ -52,6 +52,12 @@ public enum CallStatus
 /// to. Without it the form would have nothing to point at.
 /// </para>
 /// </param>
+/// <param name="IsMuted">
+/// The microphone is paused (A-12). The customer hears nothing; the agent still
+/// hears the customer. A flag on a connected call rather than a status of its
+/// own, so everything that asks "is the call connected" — the timer, the
+/// classification form, the outcome at hang-up — is untouched by it.
+/// </param>
 public record CallState(
     CallStatus Status,
     string? Number,
@@ -59,7 +65,8 @@ public record CallState(
     string? Queue,
     DateTimeOffset? StartedAt,
     DateTimeOffset? ConnectedAt,
-    string? SipCallId = null)
+    string? SipCallId = null,
+    bool IsMuted = false)
 {
     /// <summary>No call in progress.</summary>
     public static readonly CallState Idle = new(CallStatus.Idle, null, null, null, null, null);

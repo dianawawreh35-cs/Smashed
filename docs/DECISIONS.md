@@ -2597,6 +2597,45 @@ recording rather than long after it.
 
 Redial and blind transfer (A-22, A-15) are **Should**, not Must, and can follow.
 
+## 2026-09-21 — Mute (A-12): done in the microphone, not in SIP
+
+The first of the two missing call controls. Mute is the smaller one, and it goes
+first deliberately: it is the safest way into `CallService.cs`, the file that
+took a day to get right, before Hold touches the SIP dialogue itself.
+
+**Mute is not a SIP feature.** A desk phone that is muted simply stops feeding
+the microphone into the stream; the phone system is never told. The same here:
+the microphone object SIPSorcery gives us has `PauseAudio()` and `ResumeAudio()`,
+and mute is exactly those two calls. The customer's audio is untouched, so the
+agent keeps hearing them — which is the point of mute over hold.
+
+**One difference from a desk phone, noted rather than fixed.** A paused source
+produces no samples at all, so no RTP leaves the laptop while muted. A desk phone
+keeps sending frames of silence. Asterisk only cares if its RTP timeout is
+switched on, which it is not by default; if a long mute ever drops a call on the
+real PBX, the change is to send silence instead of pausing. Tested by muting for
+two minutes, on the checklist.
+
+**Muted is a flag on a connected call, not a new status.** `CallState` gains
+`IsMuted`; `Status` stays `Connected`. Everything that asks "is the call
+connected" — the timer, the form opening on answer, the outcome at hang-up —
+keeps working without knowing mute exists. The flag dies with the media session,
+which is created per call, so it cannot leak into the next one.
+
+**The state is shown where the agent looks.** The status line at the top reads
+"Muted" instead of "Connected" for as long as it lasts. The button reads the
+*action* — Mute, then Unmute — not the state. An agent who has forgotten they are
+muted is talking to nobody, and a small pressed-looking button is not enough to
+tell them.
+
+**Unmute is automatic at the end of the call**, and there is no remembered mute
+across calls: a customer who rings next should never be greeted by silence
+because the last call ended muted.
+
+Hold follows in its own commit, with its own test call, because it sends a
+re-INVITE and is the first thing in this app to change a call after it is
+answered.
+
 ---
 
 # How this project is tracked
@@ -2638,7 +2677,7 @@ and what comes after:
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
 | The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
-| Mute and Hold | A-12 | nothing |
+| Hold | A-12 | nothing — Mute is done |
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |

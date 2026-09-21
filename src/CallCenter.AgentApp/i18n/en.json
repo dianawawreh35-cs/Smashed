@@ -80,8 +80,11 @@
     "connected": "Connected",
     "hangUp": "Hang up",
     "incoming": "Incoming call",
+    "mute": "Mute",
+    "muted": "Muted",
     "numberWithheld": "Number withheld",
-    "reject": "Reject"
+    "reject": "Reject",
+    "unmute": "Unmute"
   },
   "callLog": {
     "intro": "Your recent calls — the last 100, newest first. Only yours: no agent sees another agent’s calls.",

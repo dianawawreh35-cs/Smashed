@@ -135,13 +135,21 @@
                    TextWrapping="Wrap" />
       </StackPanel>
 
-      <!-- Connected: one way out. -->
-      <StackPanel HorizontalAlignment="Center"
+      <!-- Connected: mute, and one way out (A-12). Mute is a toggle whose
+           label says what pressing it does next; the muted state itself is
+           shown in the status line at the top, where the agent looks. -->
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Center"
                   Margin="0,22,0,0"
                   Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+        <Button Content="{Binding MuteLabel}"
+                Style="{StaticResource GhostButton}"
+                MinWidth="110"
+                Command="{Binding ToggleMuteCommand}" />
         <Button Content="{Binding Localizer[call.hangUp]}"
                 Style="{StaticResource DangerButton}"
                 MinWidth="150"
+                Margin="10,0,0,0"
                 Command="{Binding HangUpCommand}" />
       </StackPanel>
 

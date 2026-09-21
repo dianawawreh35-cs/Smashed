@@ -85,6 +85,8 @@ public partial class CallViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasQueue))]
     [NotifyPropertyChangedFor(nameof(CallerName))]
     [NotifyPropertyChangedFor(nameof(HasCallerName))]
+    [NotifyPropertyChangedFor(nameof(IsMuted))]
+    [NotifyPropertyChangedFor(nameof(MuteLabel))]
     private CallState _state = CallState.Idle;
 
     public bool IsRinging => State.Status is CallStatus.Ringing;
@@ -99,8 +101,23 @@ public partial class CallViewModel : ObservableObject
         ? Localizer["call.numberWithheld"]
         : State.Number!;
 
-    /// <summary>Ringing, or connected — the line above the number.</summary>
-    public string StatusText => Localizer[IsConnected ? "call.connected" : "call.incoming"];
+    /// <summary>The microphone is paused (A-12).</summary>
+    public bool IsMuted => State.IsMuted;
+
+    /// <summary>
+    /// What the mute button offers next. It reads as the action, not the state:
+    /// the state is shown separately, so "Unmute" while muted is the button
+    /// telling the agent what pressing it will do.
+    /// </summary>
+    public string MuteLabel => Localizer[IsMuted ? "call.unmute" : "call.mute"];
+
+    /// <summary>
+    /// Ringing, connected, or muted — the line above the number. Muted takes
+    /// the line over: an agent who has forgotten they are muted is talking to
+    /// nobody, and this is the one place they look.
+    /// </summary>
+    public string StatusText => Localizer[
+        IsMuted ? "call.muted" : IsConnected ? "call.connected" : "call.incoming"];
 
     /// <summary>
     /// The queue this call came through, above the number, because it changes
@@ -136,6 +153,9 @@ public partial class CallViewModel : ObservableObject
 
     [RelayCommand]
     private void HangUp() => _calls.HangUp();
+
+    [RelayCommand]
+    private void ToggleMute() => _calls.ToggleMute();
 
     /// <summary>
     /// Brings the call onto the screen, or takes it away. Marshalled: this
@@ -184,5 +204,6 @@ public partial class CallViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(Number));
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(MuteLabel));
     }
 }

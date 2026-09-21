@@ -117,7 +117,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 |---|---|---|
 | A-10 | On an incoming call the app brings a pop-up to the front (even if minimised) showing: caller number, matched contact (name, address, notes), branch, last five communications with type and notes, and totals (orders, complaints, cancellations). | Must |
 | A-11 | Unknown numbers show "New customer" with an inline form to save name, address and notes; saving links the current call to the new contact. | Must |
-| A-12 | Controls: Answer, Reject, Hang up, Mute, Hold. Call timer shown while connected. | Must |
+| A-12 | Controls: Answer, Reject, Hang up, Mute, Hold. Call timer shown while connected. **Mute** pauses the agent's microphone: the customer hears nothing and the agent still hears the customer; the pop-up shows "Muted" in place of "Connected" for as long as it lasts, and a mute ends with the call. **Hold** places the customer on the PBX's hold music, with neither side hearing the other, until the agent resumes. Neither stops the timer: the call is still in progress. A mute or hold that fails leaves the call exactly as it was and is logged; it never ends the call. | Must |
 | A-13 | Phone numbers are matched regardless of format (05…, +9705…, 02…, 972…). | Must |
 | A-14 | Missed and rejected calls are logged with status Missed / Rejected. | Must |
 | A-15 | Transfer to another extension (blind transfer). | Should |

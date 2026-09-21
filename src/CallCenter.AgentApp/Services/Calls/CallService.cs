@@ -51,6 +51,13 @@ public class CallService(
     private SIPUserAgent? _agent;
     private SIPServerUserAgent? _pending;
     private VoIPMediaSession? _media;
+
+    /// <summary>
+    /// The microphone and speaker of the call in progress. Kept beside the
+    /// media session because Mute (A-12) is done here — pausing the source —
+    /// and not at the SIP level, which has no notion of mute at all.
+    /// </summary>
+    private WindowsAudioEndPoint? _audio;
     private CallState _state = CallState.Idle;
 
     /// <summary>
@@ -159,11 +166,12 @@ public class CallService(
 
         try
         {
-            var media = CreateMedia();
+            var (media, audio) = CreateMedia();
 
             lock (_gate)
             {
                 _media = media;
+                _audio = audio;
             }
 
             var answered = await agent.Answer(pending, media);
@@ -227,6 +235,59 @@ public class CallService(
         }
 
         Finish("hung up by the agent", CallOutcome.Answered);
+    }
+
+    /// <summary>
+    /// Mutes or unmutes the microphone (A-12).
+    /// </summary>
+    /// <remarks>
+    /// Pausing the audio source stops it producing samples, so <b>no</b> RTP
+    /// leaves the laptop while muted — unlike a desk phone, which keeps sending
+    /// frames of silence. Asterisk only minds if its RTP timeout is switched on,
+    /// which it is not by default; if a long mute ever drops a call, switch to
+    /// sending silence instead. The customer's audio is untouched, so the agent
+    /// keeps hearing them.
+    ///
+    /// Nothing here goes near the SIP dialogue, so a failure is logged and the
+    /// state left as it was. Mute must never end a call.
+    /// </remarks>
+    public void ToggleMute()
+    {
+        WindowsAudioEndPoint? audio;
+        CallState state;
+
+        lock (_gate)
+        {
+            audio = _audio;
+            state = _state;
+        }
+
+        if (audio is null || state.Status is not CallStatus.Connected)
+        {
+            return;
+        }
+
+        var mute = !state.IsMuted;
+
+        try
+        {
+            if (mute)
+            {
+                audio.PauseAudio().GetAwaiter().GetResult();
+            }
+            else
+            {
+                audio.ResumeAudio().GetAwaiter().GetResult();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The microphone could not be {Action}", mute ? "muted" : "unmuted");
+            return;
+        }
+
+        logger.LogInformation("Microphone {Action}", mute ? "muted" : "unmuted");
+        Set(State with { IsMuted = mute });
     }
 
     /// <summary>
@@ -480,7 +541,7 @@ public class CallService(
     /// than held open, so the app does not sit on the microphone between calls —
     /// on a shared laptop that is both rude and a privacy question.
     /// </summary>
-    private VoIPMediaSession CreateMedia()
+    private (VoIPMediaSession Media, WindowsAudioEndPoint Audio) CreateMedia()
     {
         var audio = new WindowsAudioEndPoint(new AudioEncoder());
 
@@ -495,7 +556,7 @@ public class CallService(
         // where the SDP said would be a call with no sound.
         media.AcceptRtpFromAny = true;
 
-        return media;
+        return (media, audio);
     }
 
     private void CloseMedia()
@@ -506,6 +567,9 @@ public class CallService(
         {
             media = _media;
             _media = null;
+            // Closing the session closes the endpoint with it; the reference
+            // only needs dropping so a stale mute cannot outlive the call.
+            _audio = null;
         }
 
         try

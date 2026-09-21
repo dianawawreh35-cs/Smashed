@@ -42,13 +42,24 @@ public enum CallStatus
 /// </param>
 /// <param name="StartedAt">When the call arrived, so a missed call can be timed.</param>
 /// <param name="ConnectedAt">When it was answered, which is where the timer counts from.</param>
+/// <param name="SipCallId">
+/// The phone system's own reference for this call.
+/// <para>
+/// Carried here because the classification form opens while the call is still
+/// in progress (A-40), and at that point the server has never heard of the call
+/// — it is not reported until it ends. This, with the extension, is the same
+/// pair the server keys a call on, so it is what a classification is attached
+/// to. Without it the form would have nothing to point at.
+/// </para>
+/// </param>
 public record CallState(
     CallStatus Status,
     string? Number,
     string? CallerName,
     string? Queue,
     DateTimeOffset? StartedAt,
-    DateTimeOffset? ConnectedAt)
+    DateTimeOffset? ConnectedAt,
+    string? SipCallId = null)
 {
     /// <summary>No call in progress.</summary>
     public static readonly CallState Idle = new(CallStatus.Idle, null, null, null, null, null);

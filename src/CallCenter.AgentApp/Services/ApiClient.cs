@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using CallCenter.Shared.Contracts.Auth;
+using CallCenter.Shared.Contracts.Classifications;
 using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Contracts.Contacts;
 using CallCenter.Shared.Contracts.Delivery;
@@ -172,6 +173,60 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
         LogCallRequest request, CancellationToken ct = default) =>
         SendAsync<CommunicationDto>(
             () => new HttpRequestMessage(HttpMethod.Post, "api/communications/calls")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// The classification form, its types and the branches (A-40).
+    /// </summary>
+    /// <remarks>
+    /// Fetched once at sign-in and kept. The supervisor's changes reach agents
+    /// without reinstalling anything (S-40), so the version is checked again
+    /// whenever the app has reason to.
+    /// </remarks>
+    public Task<Result<ClassificationFormDto>> GetClassificationFormAsync(
+        CancellationToken ct = default) =>
+        SendAsync<ClassificationFormDto>(
+            () => new HttpRequestMessage(HttpMethod.Get, "api/classifications/form"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// Records what a call was about, keyed on the call rather than its server
+    /// id (A-40, A-04).
+    /// </summary>
+    /// <remarks>
+    /// The app never learns a call's server id - the form opens while the call
+    /// is still in progress, and the call itself is not reported until it ends.
+    /// The SIP Call-ID and extension are the same pair the server keys the call
+    /// on, so this always lands on the right one.
+    /// </remarks>
+    public Task<Result<ClassificationDto>> ClassifyByCallAsync(
+        SaveClassificationByCallRequest request, CancellationToken ct = default) =>
+        SendAsync<ClassificationDto>(
+            () => new HttpRequestMessage(HttpMethod.Put, "api/classifications/by-call")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// Records what an older call was about, by its server id (A-42).
+    /// </summary>
+    /// <remarks>
+    /// For classifying from the call log, where the id is known because the list
+    /// came from the server. Sent directly rather than queued: the agent is
+    /// looking at a list the server just gave them, so it is there.
+    /// </remarks>
+    public Task<Result<ClassificationDto>> ClassifyAsync(
+        Guid communicationId, SaveClassificationRequest request, CancellationToken ct = default) =>
+        SendAsync<ClassificationDto>(
+            () => new HttpRequestMessage(
+                HttpMethod.Put, $"api/classifications/{communicationId}")
             {
                 Content = JsonContent.Create(request),
             },

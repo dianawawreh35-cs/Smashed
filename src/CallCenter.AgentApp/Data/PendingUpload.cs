@@ -61,9 +61,15 @@ public static class PendingUploadKinds
     public const string Call = "Call";
 
     /// <summary>
-    /// A classification (A-40). Not written yet — the form does not exist — but
-    /// named here because the ordering guarantee only means something if both
-    /// kinds share the queue.
+    /// What a call was about (A-40).
     /// </summary>
+    /// <remarks>
+    /// Always queued behind its call, never sent directly, and this is not an
+    /// offline concession - it is the normal path. The form opens when the call
+    /// is answered, and the call itself is not reported to the server until it
+    /// ends, so for the whole time the agent is filling the form in there is no
+    /// call on the server to attach to. The shared sequence is what guarantees
+    /// the call arrives first.
+    /// </remarks>
     public const string Classification = "Classification";
 }

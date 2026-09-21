@@ -1,4 +1,5 @@
 using CallCenter.Shared;
+using CallCenter.Shared.Contracts.Classifications;
 using CallCenter.Shared.Contracts.Communications;
 using Microsoft.Extensions.Logging;
 
@@ -64,6 +65,26 @@ public class CallLogReporter(
     }
 
     /// <summary>
+    /// Records what a call was about (A-40).
+    /// </summary>
+    /// <remarks>
+    /// Queued rather than sent, always, even with the server right there. The
+    /// form opens when the call is answered and the call is not reported until
+    /// it ends, so a classification saved while the agent is still talking would
+    /// arrive for a call the server has never heard of. The shared queue puts it
+    /// behind its call; the flush below sends it when its turn comes.
+    ///
+    /// Saving during the call is therefore normal and safe: the agent presses
+    /// save, the form closes, and the ordering is somebody else's problem.
+    /// </remarks>
+    public async Task ClassifyAsync(
+        SaveClassificationByCallRequest classification, CancellationToken ct = default)
+    {
+        await queue.EnqueueAsync(classification, ct);
+        await FlushAsync(ct);
+    }
+
+    /// <summary>
     /// Sends everything waiting. Called after each call and at sign-in, so a
     /// laptop that was offline for a shift catches up as soon as somebody logs
     /// in on it.
@@ -77,7 +98,7 @@ public class CallLogReporter(
             return;
         }
 
-        var pending = await queue.PendingAsync(ct);
+        var pending = await queue.PendingItemsAsync(ct);
         if (pending.Count == 0)
         {
             return;
@@ -85,24 +106,56 @@ public class CallLogReporter(
 
         var done = new List<long>();
 
-        foreach (var (id, call) in pending)
+        foreach (var item in pending)
         {
-            var result = await api.LogCallAsync(call, ct);
+            var (id, call, classification) = (item.Id, item.Call, item.Classification);
 
-            if (result.IsOk)
+            // One loop over both kinds, in one sequence. Sending all the calls
+            // and then all the classifications would look tidier and would be
+            // wrong: a classification whose call is stuck behind a failure would
+            // go first and be refused.
+            bool ok;
+            string? errorCode;
+
+            if (call is not null)
+            {
+                var sent = await api.LogCallAsync(call, ct);
+                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
+            }
+            else
+            {
+                var sent = await api.ClassifyByCallAsync(classification!, ct);
+                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
+            }
+
+            if (ok)
             {
                 done.Add(id);
                 continue;
             }
 
+            // A classification for a call the server does not have yet. Normal
+            // rather than exceptional while a call is still in progress: the
+            // call is reported when it ends, so this resolves itself on the next
+            // flush. Kept, and not counted as a failure worth shouting about.
+            if (classification is not null && errorCode is "call_not_found")
+            {
+                logger.LogDebug(
+                    "A classification is waiting for its call to be reported ({Reference})",
+                    classification.SipCallId);
+
+                break;
+            }
+
             // A refusal the server is certain about will never succeed, however
             // often it is retried, and a queue that retries it forever blocks
             // every call behind it. Drop it, loudly.
-            if (result.ErrorCode is "unknown_value" or "invalid_request")
+            if (errorCode is "unknown_value" or "invalid_request"
+                or "unknown_type" or "unknown_branch" or "not_your_call")
             {
                 logger.LogError(
-                    "The server refused queued call {Id} ({Code}); it is discarded rather than retried forever",
-                    id, result.ErrorCode);
+                    "The server refused queued item {Id} ({Code}); it is discarded rather than retried forever",
+                    id, errorCode);
 
                 done.Add(id);
                 continue;
@@ -112,11 +165,11 @@ public class CallLogReporter(
             // retrying. Stop here rather than working through the rest: they
             // will fail the same way, and the order is worth keeping, because a
             // classification must never reach the server before its call.
-            await queue.RecordFailureAsync(id, result.ErrorCode, ct);
+            await queue.RecordFailureAsync(id, errorCode, ct);
 
             logger.LogInformation(
                 "{Count} item(s) still waiting to reach the server ({Reason})",
-                pending.Count - done.Count, result.ErrorCode ?? "unreachable");
+                pending.Count - done.Count, errorCode ?? "unreachable");
 
             break;
         }

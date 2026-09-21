@@ -429,7 +429,8 @@ public class CallService(
         }
 
         Set(new CallState(
-            CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null));
+            CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null,
+            _callId));
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using CallCenter.AgentApp.Data;
+using CallCenter.Shared.Contracts.Classifications;
 using CallCenter.Shared.Contracts.Communications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -64,6 +65,110 @@ public class CallLogQueue(IDbContextFactory<AgentBufferDbContext> buffer, ILogge
                 AgentBufferDbContext.DatabasePath);
         }
     }
+
+    /// <summary>
+    /// Adds a classification to the queue (A-40).
+    /// </summary>
+    /// <remarks>
+    /// Replaces whatever was queued for the same call rather than adding a
+    /// second row: an agent who corrects the order value three times during one
+    /// call means three edits to one classification, not three classifications.
+    /// The replacement keeps its place in the sequence, so it still arrives
+    /// after the call it belongs to.
+    /// </remarks>
+    public async Task EnqueueAsync(
+        SaveClassificationByCallRequest classification, CancellationToken ct = default)
+    {
+        var reference = $"{classification.SipCallId}|{classification.Extension}";
+
+        try
+        {
+            await using var db = await buffer.CreateDbContextAsync(ct);
+
+            var existing = await db.PendingUploads
+                .Where(u => u.Kind == PendingUploadKinds.Classification && u.Reference == reference)
+                .FirstOrDefaultAsync(ct);
+
+            if (existing is not null)
+            {
+                existing.Payload = JsonSerializer.Serialize(classification);
+                existing.Attempts = 0;
+                existing.LastError = null;
+            }
+            else
+            {
+                db.PendingUploads.Add(new PendingUpload
+                {
+                    Kind = PendingUploadKinds.Classification,
+                    Payload = JsonSerializer.Serialize(classification),
+                    Reference = reference,
+                    CreatedAt = DateTimeOffset.Now,
+                });
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "A classification could not be queued to the offline buffer");
+        }
+    }
+
+    /// <summary>
+    /// Everything waiting, of either kind, oldest first.
+    /// </summary>
+    /// <remarks>
+    /// One list rather than one per kind, because the order across kinds is the
+    /// whole point: a classification replayed before its call would be refused
+    /// by a server that has never heard of the call.
+    /// </remarks>
+    public async Task<IReadOnlyList<PendingItem>> PendingItemsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await using var db = await buffer.CreateDbContextAsync(ct);
+
+            var rows = await db.PendingUploads.OrderBy(u => u.Id).ToListAsync(ct);
+            var items = new List<PendingItem>();
+
+            foreach (var row in rows)
+            {
+                try
+                {
+                    if (row.Kind == PendingUploadKinds.Call)
+                    {
+                        if (JsonSerializer.Deserialize<LogCallRequest>(row.Payload) is { } call)
+                        {
+                            items.Add(new PendingItem(row.Id, call, null));
+                        }
+                    }
+                    else if (row.Kind == PendingUploadKinds.Classification)
+                    {
+                        if (JsonSerializer.Deserialize<SaveClassificationByCallRequest>(row.Payload)
+                            is { } classification)
+                        {
+                            items.Add(new PendingItem(row.Id, null, classification));
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    logger.LogError("Queued item {Id} could not be read and will be skipped", row.Id);
+                }
+            }
+
+            return items;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The offline buffer could not be read");
+            return [];
+        }
+    }
+
+    /// <summary>One queued thing: exactly one of the two is set.</summary>
+    public record PendingItem(
+        long Id, LogCallRequest? Call, SaveClassificationByCallRequest? Classification);
 
     /// <summary>Adds a call to the queue. Called before the send is attempted.</summary>
     public async Task EnqueueAsync(LogCallRequest call, CancellationToken ct = default)

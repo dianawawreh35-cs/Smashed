@@ -2565,6 +2565,38 @@ With that, classification (A-40 to A-43, S-40) is complete and every part of it
 has been seen working: the form during a call, the supervisor's editor, and
 classifying or editing from the call log.
 
+## 2026-09-21 — What comes next, reordered: the phone before the archive
+
+I proposed call recording as the next feature, on the grounds that it is the
+biggest unbuilt Must. Dia asked what about mute, hold and outbound dialling. The
+right question, and the order changes.
+
+Weigh what each gap costs on a shift today:
+
+| Missing | Cost now |
+|---|---|
+| **Hold** (A-12) | An agent who needs to check something must keep talking or hang up |
+| **Mute** (A-12) | Everything in the room goes down the line |
+| **Dial** (A-20) | **An agent cannot phone a customer at all** — no callbacks, no returning a missed call |
+| **Recording** (A-30) | A supervisor cannot review calls — and could not today regardless, because there is no screen to play them on |
+
+The first three are missing every shift. Recording is missing for someone who has
+no way to reach a recording either way, since the supervisor app still has no call
+search (S-02, S-03).
+
+**They also live in the same file.** `CallService.cs` holds the call controls, the
+dialling that does not exist yet, and the media session where recording's audio
+tap has to go. Going in with small, testable changes first — and learning that
+code — beats opening with the riskiest one. The SIP layer already cost three bugs
+and a day to get right the first time.
+
+**Order from here:** mute and hold (A-12), then outbound dial and click-to-call
+(A-20), then recording (A-30 to A-33), then the supervisor's call search (S-02,
+S-03) — which is what makes recordings reachable at all, and so belongs beside
+recording rather than long after it.
+
+Redial and blind transfer (A-22, A-15) are **Should**, not Must, and can follow.
+
 ---
 
 # How this project is tracked

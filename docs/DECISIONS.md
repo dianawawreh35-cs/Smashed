@@ -2201,6 +2201,38 @@ A green test run is not evidence the app can be shipped — the same lesson as t
 green build that hid the white contacts list, arriving from a different
 direction.
 
+## 2026-09-21 — The date filter's calendar was unreadable
+
+Dia asked for the date filter's text colour to be fixed. The box itself was
+fine — near-white on near-black. The problem was the calendar that drops out of
+it.
+
+`Calendar` had a style setting `Foreground` and `Background`, and that looked
+like enough. It was not. The panel that actually draws a month is a
+**`CalendarItem`**, an inner control with its own default template, and that
+template keeps Windows' light chrome whatever the `Calendar` around it says. So
+the day numbers were painted in our near-white text on a near-white panel, and
+the Su/Mo/Tu row in a dark grey the default template writes for itself. Two
+different ways to be invisible in one dropdown.
+
+Properties could not fix it because the colours live **inside** the template,
+where a `Setter` cannot reach. `CalendarItem`, `CalendarDayButton` and
+`CalendarButton` are now templated rather than set.
+
+Third time this exact trap has bitten: the contacts list that came out white on
+17 September, the `DatePicker` styled just after it, and now the calendar behind
+that same `DatePicker`. **An unstyled WPF control does not inherit a dark theme
+— it falls back to a light one.** Styling the outer control is not enough when
+the inner one has its own template. Worth checking the remaining popups
+(`ComboBox` dropdowns, `ToolTip`, `ContextMenu`) before handover rather than
+waiting to be told.
+
+Two API details cost a build each, and are written down so the next person does
+not repeat them: `DisplayMode` belongs to `Calendar`, not `CalendarItem` —
+`CalendarItem` shows and hides its own month and year views — and
+`CalendarButton` is a month or a year, so it has `HasSelectedDays` rather than
+`IsSelected`.
+
 ---
 
 # How this project is tracked

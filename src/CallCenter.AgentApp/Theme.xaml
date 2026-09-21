@@ -447,21 +447,209 @@
     </Setter>
   </Style>
 
+  <!-- ===== Calendar =================================================
+       The dropdown behind the date filters (A-50).
+
+       Setting Foreground and Background on Calendar alone was not enough, and
+       the result was a filter nobody could read. The panel that draws the month
+       is a CalendarItem: an inner control with its own default template, which
+       keeps Windows' light chrome whatever the Calendar around it says. So the
+       day numbers were painted in our near-white text on a near-white panel,
+       and the day-of-week row in a dark grey the default template writes
+       itself.
+
+       The fix is to template CalendarItem rather than set properties on it: the
+       colours live inside its template, where a Setter cannot reach. Same
+       lesson as the contacts list that came out white on 2026-09-17 - an
+       unstyled WPF control does not inherit a dark theme, it falls back to a
+       light one. -->
+
   <Style TargetType="Calendar">
     <Setter Property="Background" Value="{StaticResource Surface}" />
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
   </Style>
 
+  <Style TargetType="CalendarItem">
+    <Setter Property="Background" Value="{StaticResource Surface}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CalendarItem">
+          <ControlTemplate.Resources>
+            <!-- The Su/Mo/Tu row. The default hard-codes it to a dark grey,
+                 which is invisible on a dark panel. -->
+            <DataTemplate x:Key="{x:Static CalendarItem.DayTitleTemplateResourceKey}">
+              <TextBlock Text="{Binding}"
+                         Foreground="{StaticResource TextMuted}"
+                         FontSize="11"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Margin="0,4" />
+            </DataTemplate>
+          </ControlTemplate.Resources>
+
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{StaticResource BorderSoft}"
+                  BorderThickness="1"
+                  CornerRadius="{StaticResource CornerSmall}"
+                  Padding="6">
+            <Grid x:Name="PART_Root">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+
+              <Grid Grid.Row="0" Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="PART_PreviousButton"
+                        Grid.Column="0"
+                        Content="&#x2039;"
+                        Style="{StaticResource GhostButton}"
+                        Padding="8,2"
+                        FontSize="14" />
+
+                <Button x:Name="PART_HeaderButton"
+                        Grid.Column="1"
+                        Style="{StaticResource GhostButton}"
+                        Padding="8,2"
+                        FontWeight="SemiBold" />
+
+                <Button x:Name="PART_NextButton"
+                        Grid.Column="2"
+                        Content="&#x203A;"
+                        Style="{StaticResource GhostButton}"
+                        Padding="8,2"
+                        FontSize="14" />
+              </Grid>
+
+              <!-- The two views the control switches between: days, and the
+                   months/years reached through the header button. Both must
+                   exist under these names or the calendar cannot render, and
+                   CalendarItem shows and hides them itself - DisplayMode is a
+                   property of the Calendar around it, not of this control, so
+                   there is nothing to template here. -->
+              <Grid x:Name="PART_MonthView" Grid.Row="1" Visibility="Visible">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+              </Grid>
+
+              <Grid x:Name="PART_YearView" Grid.Row="1" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+              </Grid>
+            </Grid>
+          </Border>
+
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- One day in the grid. Templated rather than set, for the same reason as
+       CalendarItem: the default draws its own light background. -->
   <Style TargetType="CalendarDayButton">
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="MinWidth" Value="30" />
+    <Setter Property="MinHeight" Value="26" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CalendarDayButton">
+          <Border x:Name="Chrome"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="{StaticResource CornerSmall}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SurfaceAlt}" />
+            </Trigger>
+            <!-- Today, and the days spilling in from the months either side.
+                 Both stay legible without competing with the chosen day. -->
+            <Trigger Property="IsToday" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentDim}" />
+            </Trigger>
+            <Trigger Property="IsInactive" Value="True">
+              <Setter Property="Foreground" Value="{StaticResource TextFaint}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Foreground" Value="{StaticResource TextFaint}" />
+            </Trigger>
+            <!-- Last, so the chosen day wins over today and over hover. -->
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Accent}" />
+              <Setter Property="Foreground" Value="White" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
+  <!-- A month or a year, in the view behind the header button. -->
   <Style TargetType="CalendarButton">
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="MinWidth" Value="52" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CalendarButton">
+          <Border x:Name="Chrome"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="{StaticResource CornerSmall}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SurfaceAlt}" />
+            </Trigger>
+            <!-- CalendarButton is a month or a year, so it has no IsSelected
+                 of its own - what it knows is whether the chosen date falls
+                 inside it. -->
+            <Trigger Property="HasSelectedDays" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Accent}" />
+              <Setter Property="Foreground" Value="White" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
 </ResourceDictionary>

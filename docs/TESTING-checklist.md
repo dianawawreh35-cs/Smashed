@@ -135,6 +135,10 @@ Sign in as `dia20`. None of this needs a call.
 - [ ] **An item from the category you hid in 1.1 is still findable.**
 - [ ] **Delivery tab (A-65).** Search an area; it names the branch and price.
 - [ ] **Call log tab (A-14).** It lists past calls.
+- [ ] **Open a date filter's calendar.** The day numbers, the Su/Mo/Tu row and
+      the month name must all be readable, the chosen day is blue and today is
+      tinted. *It was near-white text on a near-white panel until 21 September:
+      the Calendar was styled but the panel inside it was not.*
 - [ ] **Filter the log by a date older than the newest 100 calls.** This is the
       bug that was fixed but never seen: filtering used to happen in the app
       over one fetched page, so a date outside that page found nothing.

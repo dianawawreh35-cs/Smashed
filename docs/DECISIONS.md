@@ -2555,6 +2555,16 @@ calendar styles this afternoon were the same shape. Both were invisible to the
 compiler, because XAML resolves resources by name at runtime. **For this app,
 "it builds" says nothing about whether it runs.**
 
+`b8fd8f7` was pushed carrying a "NOT YET VERIFIED BY HAND" line in its own
+message, because Dia asked for the push before testing it. **Verified by hand
+shortly after** — a classified call opens filled in, and changing the call type,
+the step that crashed, holds. The caveat in that commit message no longer
+applies; this entry is the record of it.
+
+With that, classification (A-40 to A-43, S-40) is complete and every part of it
+has been seen working: the form during a call, the supervisor's editor, and
+classifying or editing from the call log.
+
 ---
 
 # How this project is tracked

@@ -96,6 +96,19 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 - [ ] Block a contact, giving a reason. Unblock it again.
       *You have already confirmed unblocking works end to end.*
 
+### 1.3b Classification, the supervisor's half (S-40)
+
+- [x] **The Classification tab lists the six types and the form's questions.**
+      *Confirmed 21 September.*
+- [x] **Add a question, tick a call type under "Asked for", publish.** The Agent
+      App asks it on the next call. *Confirmed — a required field added here
+      appeared in the Agent App without anything being reinstalled.*
+- [ ] **Rename a type.** The agent sees the new label; reports are unaffected,
+      because they are written against the key shown greyed beside it.
+- [ ] **Try to delete a type that is in use.** The row offers hiding instead.
+- [ ] **Publish a form, then publish the previous one again.** That is the way
+      back from a bad change, and it is what the hint under the button promises.
+
 ### 1.4 The interface itself
 
 - [ ] **Hovering a label shows the hand, not the text I-beam**, and a label's
@@ -143,6 +156,16 @@ Sign in as `dia20`. None of this needs a call.
       bug that was fixed but never seen: filtering used to happen in the app
       over one fetched page, so a date outside that page found nothing.
       *If an old date finds nothing, the fix did not take.*
+- [x] **Classify a call while talking (A-40).** *Confirmed 21 September — three
+      real calls, through the offline queue, into the database.* The form opens
+      when the call is answered and stays until saved or skipped.
+- [x] **Classify a call from the log, and edit one already classified (A-41,
+      A-42).** *Confirmed 21 September.* Double-click a row; an already
+      classified call opens filled in.
+- [ ] **Double-click a call from a previous day.** It opens **read-only** with a
+      message, because the agent's edit window has closed (A-42).
+- [ ] **Classify with the server stopped.** The form still saves; the call and
+      its classification reach the server at the next sign-in (A-04).
 - [ ] **Contact history.** Open a contact; its past calls are listed.
 - [ ] **Leave the app sitting idle.** With 240 minutes that is a four-hour test,
       so do it on a day you are at the desk anyway rather than blocking on it.

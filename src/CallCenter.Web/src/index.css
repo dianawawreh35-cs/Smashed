@@ -24,6 +24,30 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  /* A label is a control, not prose. Clicking one focuses or toggles the thing
+     it names, so it gets the hand rather than the text I-beam - which read as
+     "this text is editable" and invited people to try to type into it. Its text
+     is not selectable for the same reason: dragging across a label used to
+     highlight it like a paragraph instead of clicking through to the input. */
+  label {
+    @apply cursor-pointer select-none;
+  }
+
+  /* The control inside the label keeps its own behaviour: text can be typed
+     into and selected, so it must not inherit either of the rules above. */
+  label input,
+  label textarea,
+  label select {
+    @apply cursor-auto select-text;
+  }
+
+  label select,
+  label input[type='checkbox'],
+  label input[type='radio'],
+  label input[type='file'] {
+    @apply cursor-pointer;
+  }
 }
 
 @layer components {

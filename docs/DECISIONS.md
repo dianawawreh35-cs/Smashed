@@ -2164,6 +2164,43 @@ just been deleted.
 A new item still opens above the list, where the button that asked for it is:
 there is no row for it to sit under yet.
 
+## 2026-09-21 — Labels looked editable, and `tsc --noEmit` was not the build
+
+Dia asked why a cursor appears next to the labels on the supervisor screens, and
+said it was two things at once: the mouse showing the text I-beam over a label,
+and a blinking caret sitting in the label text.
+
+**The first is ours.** Nothing said a label is a control. Clicking one focuses
+or toggles the input it names, but it drew the I-beam and its text could be
+dragged and highlighted like a paragraph — so it read as "this text is
+editable", which is an invitation to try to type into it. Labels now take the
+hand cursor and are not selectable; the input inside keeps the I-beam and stays
+selectable, and checkboxes, selects and file pickers take the hand.
+
+**The second is not ours, and could not be.** A blinking caret in plain text
+means the browser has **caret browsing** on — Edge and Chrome toggle it with
+**F7**, which sits next to the function keys people actually reach for, and the
+confirmation dialog is easy to dismiss without reading. Nothing in the app can
+put a caret in a label: there is no `contentEditable` and no `tabIndex` on any
+text in the codebase, which is what made this diagnosable rather than a guess.
+
+### The more important finding: the production build was broken
+
+Checking this turned up that `npm run build` had been **failing since the menu
+picture fix that morning** — a type error in `requestBlob`. It had been
+committed, and it had passed everything that was run at the time.
+
+The gap: `npx tsc --noEmit` uses the root config, while `npm run build` runs
+`tsc -b` across the project references, which is stricter. Unit tests do not
+type-check the build either, and Vitest compiles through esbuild, which strips
+types without checking them. So the full suite was green against a tree that
+could not be built for deployment.
+
+**`npm run build` is now the check that counts** before committing web changes.
+A green test run is not evidence the app can be shipped — the same lesson as the
+green build that hid the white contacts list, arriving from a different
+direction.
+
 ---
 
 # How this project is tracked

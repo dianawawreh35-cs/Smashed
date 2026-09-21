@@ -117,14 +117,24 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
  * The browser's HTTP cache still applies — this is an ordinary GET — so a
  * picture the server marked good for a day is still only fetched once.
  */
-export async function requestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
-  const { query, headers, ...rest } = options
+export async function requestBlob(
+  path: string,
+  // Deliberately narrower than RequestOptions: a file is always fetched with a
+  // GET, so there is no body to pass, and RequestOptions types `body` as
+  // `unknown`, which fetch will not take.
+  options: {
+    query?: RequestOptions['query']
+    headers?: Record<string, string>
+    signal?: AbortSignal
+  } = {},
+): Promise<Blob> {
+  const { query, headers, signal } = options
   const token = getToken()
 
   const response = await fetch(buildUrl(path, query), {
     credentials: 'include',
-    ...rest,
     method: 'GET',
+    signal,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,

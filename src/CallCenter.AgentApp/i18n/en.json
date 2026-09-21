@@ -149,6 +149,9 @@
     "fieldOrderValue": "Order value",
     "fieldNotes": "Notes",
     "fieldFollowUp": "Follow-up required",
-    "stillNeeded": "Still needed:"
+    "stillNeeded": "Still needed:",
+    "tooOld": "This call can no longer be changed. Ask a supervisor.",
+    "notYours": "That call belongs to another agent.",
+    "classifyHeading": "Classify an earlier call"
   }
 }

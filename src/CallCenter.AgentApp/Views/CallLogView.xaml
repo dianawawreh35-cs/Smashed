@@ -14,6 +14,8 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
+      <!-- The classification form, when a call has been chosen from the list. -->
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <StackPanel Grid.Row="0" Grid.Column="0">
@@ -92,6 +94,14 @@
         <DataGrid ItemsSource="{Binding Calls}"
                   Margin="6"
                   Visibility="{Binding HasCalls, Converter={StaticResource BoolToVisibility}}">
+          <DataGrid.InputBindings>
+            <!-- A-41: the way back to a call that was skipped. Double-click, as
+                 the contacts, menu and delivery lists open their editors. -->
+            <MouseBinding MouseAction="LeftDoubleClick"
+                          Command="{Binding ClassifyCommand}"
+                          CommandParameter="{Binding SelectedItem,
+                                             RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+          </DataGrid.InputBindings>
           <DataGrid.Columns>
             <DataGridTextColumn x:Name="WhenColumn" Width="Auto" Binding="{Binding When}"
                                 FontFamily="{StaticResource MonoFont}" />
@@ -125,6 +135,52 @@
         </DataGrid>
 
       </Grid>
+    </Border>
+
+    <!-- The form for a call chosen from the list above. Its own instance, so an
+         incoming call cannot wipe out what is being typed here. -->
+    <Border Grid.Row="3" Grid.ColumnSpan="2"
+            Margin="0,14,0,0"
+            Style="{StaticResource Card}"
+            Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
+      <StackPanel>
+        <TextBlock Text="{Binding Localizer[classification.classifyHeading]}"
+                   Foreground="{StaticResource Text}"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,12" />
+
+        <ItemsControl ItemsSource="{Binding Classification.Fields}">
+          <ItemsControl.ItemContainerStyle>
+            <Style TargetType="ContentPresenter">
+              <Setter Property="Visibility"
+                      Value="{Binding AppliesNow, Converter={StaticResource BoolToVisibility}}" />
+            </Style>
+          </ItemsControl.ItemContainerStyle>
+        </ItemsControl>
+
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <Button Content="{Binding Localizer[classification.save]}"
+                  Style="{StaticResource PrimaryButton}"
+                  MinWidth="120"
+                  Command="{Binding Classification.SaveCommand}" />
+          <Button Content="{Binding Localizer[classification.skip]}"
+                  Style="{StaticResource GhostButton}"
+                  MinWidth="100"
+                  Margin="10,0,0,0"
+                  Command="{Binding Classification.SkipCommand}" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding Classification.Missing}"
+                   Foreground="{StaticResource Warning}"
+                   FontSize="11"
+                   Margin="0,8,0,0"
+                   TextWrapping="Wrap" />
+
+        <TextBlock Text="{Binding Classification.Message}"
+                   Style="{StaticResource Subtle}"
+                   Margin="0,4,0,0"
+                   TextWrapping="Wrap" />
+      </StackPanel>
     </Border>
 
   </Grid>

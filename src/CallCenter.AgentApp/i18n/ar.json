@@ -149,6 +149,9 @@
     "fieldOrderValue": "قيمة الطلب",
     "fieldNotes": "ملاحظات",
     "fieldFollowUp": "بحاجة إلى متابعة",
-    "stillNeeded": "ينقص:"
+    "stillNeeded": "ينقص:",
+    "tooOld": "لم يعد بالإمكان تعديل هذه المكالمة. راجع المشرف.",
+    "notYours": "هذه المكالمة تخص موظفًا آخر.",
+    "classifyHeading": "تصنيف مكالمة سابقة"
   }
 }

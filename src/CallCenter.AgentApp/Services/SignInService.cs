@@ -17,7 +17,7 @@ public class SignInService(
     BlockListCache blockList,
     CallService calls,
     CallLogReporter callLog,
-    ViewModels.ClassificationFormViewModel classification,
+    ClassificationCatalog classification,
     ILogger<SignInService> logger)
 {
     /// <summary>

@@ -40,11 +40,27 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     /// <summary>Cancels a fetch that a newer one has replaced.</summary>
     private CancellationTokenSource? _inFlight;
 
-    public CallLogViewModel(ApiClient api, Localizer localizer, Dispatcher dispatcher)
+    public CallLogViewModel(
+        ApiClient api,
+        ClassificationFormViewModel classification,
+        Localizer localizer,
+        Dispatcher dispatcher)
     {
         _api = api;
         _dispatcher = dispatcher;
+        Classification = classification;
         Localizer = localizer;
+
+        // A saved classification clears the chip on the row it belongs to, so
+        // the list is refetched rather than guessed at.
+        Classification.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ClassificationFormViewModel.IsSaved)
+                && Classification.IsSaved)
+            {
+                _ = RefreshAsync(CancellationToken.None);
+            }
+        };
 
         _typingTimer = new DispatcherTimer(DispatcherPriority.Normal, dispatcher)
         {
@@ -115,6 +131,31 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     partial void OnFromChanged(DateTime? value) => _ = RefreshAsync(CancellationToken.None);
 
     partial void OnToChanged(DateTime? value) => _ = RefreshAsync(CancellationToken.None);
+
+    /// <summary>
+    /// The form for tidying up a call that was skipped (A-41).
+    /// </summary>
+    /// <remarks>
+    /// Its own instance, not the pop-up's. An incoming call must not wipe out
+    /// what the agent is typing here.
+    /// </remarks>
+    public ClassificationFormViewModel Classification { get; }
+
+    /// <summary>
+    /// Opens the form for a call in the list (A-41, A-42).
+    /// </summary>
+    /// <remarks>
+    /// The way back to a skipped call. Without it the chip in this list points
+    /// at work nobody can do.
+    /// </remarks>
+    [RelayCommand]
+    private void Classify(CallRow? row)
+    {
+        if (row is not null)
+        {
+            Classification.BeginForLoggedCall(row.Id);
+        }
+    }
 
     /// <summary>Clears every filter and shows the most recent calls again.</summary>
     [RelayCommand]

@@ -32,14 +32,27 @@ namespace CallCenter.AgentApp.ViewModels;
 /// </remarks>
 public partial class ClassificationFormViewModel(
     ApiClient api,
+    ClassificationCatalog catalog,
     CallLogReporter reporter,
     AgentSession session,
     Localizer localizer,
     ILogger<ClassificationFormViewModel> logger) : ObservableObject
 {
-    private ClassificationFormDto? _form;
     private string? _sipCallId;
     private string? _extension;
+
+    /// <summary>
+    /// Set when classifying a call from the log rather than one in progress.
+    /// </summary>
+    /// <remarks>
+    /// The two paths differ in what they can key on. A call in progress has no
+    /// server id yet, so it is keyed on the SIP Call-ID and queued behind the
+    /// call. A call in the log came from the server, so its id is known and the
+    /// classification goes straight there.
+    /// </remarks>
+    private Guid? _communicationId;
+
+    private ClassificationFormDto? _form => catalog.Form;
 
     public Localizer Localizer { get; } = localizer;
 
@@ -71,30 +84,6 @@ public partial class ClassificationFormViewModel(
     public bool IsUnfinished => IsOpen && !IsSaved;
 
     /// <summary>
-    /// Fetches the form (A-40, S-40).
-    /// </summary>
-    /// <remarks>
-    /// At sign-in, so the fields are in hand before the first call rather than
-    /// being fetched while an agent waits. A supervisor's change reaches agents
-    /// at the next sign-in without anything being reinstalled.
-    /// </remarks>
-    public async Task LoadAsync(CancellationToken ct = default)
-    {
-        var result = await api.GetClassificationFormAsync(ct);
-
-        if (result.IsOk && result.Value is { } form)
-        {
-            _form = form;
-            logger.LogInformation("Classification form version {Version} loaded", form.Version);
-            return;
-        }
-
-        logger.LogWarning(
-            "The classification form could not be loaded ({Code}); classifying is unavailable",
-            result.ErrorCode);
-    }
-
-    /// <summary>
     /// Starts a blank form for a call that has just been answered (A-40).
     /// </summary>
     /// <remarks>
@@ -118,6 +107,40 @@ public partial class ClassificationFormViewModel(
 
         _sipCallId = sipCallId;
         _extension = extension;
+        _communicationId = null;
+
+        Build();
+
+        IsSaved = false;
+        IsSaving = false;
+        Message = string.Empty;
+        IsOpen = true;
+    }
+
+    /// <summary>
+    /// Opens a blank form for a call already on the server (A-41, A-42).
+    /// </summary>
+    /// <remarks>
+    /// The way back to a call the agent skipped. Without it, "the agent may
+    /// skip" means "the call is unclassified for ever", and the chip in the call
+    /// log points at work nobody can do.
+    ///
+    /// The server decides whether it is allowed: an agent may edit their own
+    /// calls within the window the supervisor set, and gets a plain refusal
+    /// otherwise rather than a form that will not save.
+    /// </remarks>
+    public void BeginForLoggedCall(Guid communicationId)
+    {
+        if (_form is null)
+        {
+            logger.LogWarning("A logged call cannot be classified: the form was never loaded");
+            IsOpen = false;
+            return;
+        }
+
+        _communicationId = communicationId;
+        _sipCallId = null;
+        _extension = null;
 
         Build();
 
@@ -134,6 +157,7 @@ public partial class ClassificationFormViewModel(
         Fields.Clear();
         _sipCallId = null;
         _extension = null;
+        _communicationId = null;
     }
 
     private void Build()
@@ -253,7 +277,7 @@ public partial class ClassificationFormViewModel(
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task SaveAsync()
     {
-        if (_sipCallId is null || _extension is null || _form is null)
+        if (_form is null || (_communicationId is null && (_sipCallId is null || _extension is null)))
         {
             return;
         }
@@ -288,7 +312,31 @@ public partial class ClassificationFormViewModel(
                     FormVersion: _form.Version,
                     CustomValues: JsonSerializer.SerializeToDocument(custom)));
 
-            await reporter.ClassifyAsync(request);
+            if (_communicationId is { } communicationId)
+            {
+                // A call from the log: the server knows it, so this goes
+                // straight there and a refusal can be shown to the agent now
+                // rather than failing silently in a queue.
+                var result = await api.ClassifyAsync(communicationId, request.Classification);
+
+                if (!result.IsOk)
+                {
+                    Message = Localizer[result.ErrorCode switch
+                    {
+                        "edit_window_closed" => "classification.tooOld",
+                        "not_your_call" => "classification.notYours",
+                        _ => "classification.saveFailed",
+                    }];
+
+                    return;
+                }
+            }
+            else
+            {
+                // A call in progress: queued behind the call, which the server
+                // has not been told about yet.
+                await reporter.ClassifyAsync(request);
+            }
 
             IsSaved = true;
             Message = Localizer["classification.saved"];

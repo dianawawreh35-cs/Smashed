@@ -2477,6 +2477,45 @@ the built-in questions cannot be removed, publishing needs a change, and — the
 one that matters most — **the show-when rule is written against the type's name,
 not its label**.
 
+## 2026-09-21 — Classification, part 4: the way back to a skipped call
+
+A-41 lets an agent skip, and the call log has said "unclassified" on those calls
+since it was built. Until now that chip pointed at work nobody could do: there
+was no way back in. Double-clicking a row in the call log now opens the form for
+it, the same gesture the contacts, menu and delivery lists use for their
+editors.
+
+### The form view model had to stop being shared
+
+It was a singleton, held by the call pop-up. Giving the call log the same
+instance would have meant **an incoming call wiping out whatever the agent was
+typing in the log** — the pop-up calls `Begin` on answer, which rebuilds the
+fields from scratch.
+
+Split in two:
+
+- **`ClassificationCatalog`**, shared, holds the one definition the supervisor
+  published and fetches it at sign-in.
+- **`ClassificationFormViewModel`**, one per screen, is a form being filled in.
+
+One definition, several forms. Obvious once written down, and it was only
+noticed because the second screen forced the question — with one screen a
+singleton looked right.
+
+### Two ways to save, for a real reason
+
+A call **in progress** has no server id: it is keyed on the SIP Call-ID and
+queued behind the call. A call **from the log** came from the server, so its id
+is known and the classification goes straight there — which also means a refusal
+can be shown to the agent immediately rather than failing quietly in a queue.
+
+Those refusals now say what they mean: "this call can no longer be changed, ask
+a supervisor" for a closed edit window (A-42), and "that call belongs to another
+agent". The server was already returning both; nothing was reading them.
+
+Saving from the log refetches the list, so the chip clears on the row it belongs
+to rather than lingering until the next search.
+
 ---
 
 # How this project is tracked

@@ -2075,6 +2075,70 @@ is the other way to get this wrong.
 same shape — a protected file, in a media tag that cannot authenticate. Use
 `requestBlob`.
 
+## 2026-09-21 — The Agent App fetched 39 photographs at once, on every keystroke
+
+Dia opened the menu tab and asked why not all the photos showed. The expected
+answer was "five add-ons have no photograph". The real one was that most of them
+were failing.
+
+Each row fetched its own picture the moment it was built, with nothing holding
+the result and nothing limiting how many went at once. Typing rebuilds the rows,
+so a search fired **39 simultaneous requests per keystroke**. The log for one
+session: **121 image requests started, 44 responses received.** The rest timed
+out after ten seconds and were discarded in silence.
+
+Worse than the missing pictures: they starved everything else. The same log has
+the delivery search, the call log and the **block-list refresh** all timing out
+while an agent was doing nothing but browsing the menu. A block list that fails
+to refresh is a barred caller getting through.
+
+Fixed with `MenuImageCache`: fetched once per picture for the life of the app,
+at most four in flight, failures logged rather than swallowed. And the empty box
+now says which kind of empty it is — "بلا صورة" for the five add-ons the printed
+menu does not photograph, "تعذّر تحميل الصورة" when one was promised and did
+not arrive. Those two drew the identical grey box before, which is the entire
+reason a screenful of failures passed for a menu of add-ons. Second time today
+that exact confusion has hidden a bug; the first was the web app's 401s.
+
+### Open, and genuinely unresolved: the server collapses under concurrency here
+
+Chasing the above turned up something I could not explain and should record
+rather than pretend about. On this development machine, **authenticated requests
+that touch the database collapse when they arrive together**, while everything
+else is fine:
+
+| 39 at once | result |
+|---|---|
+| `/health` (no auth, no database) | 39/39 in 0.07s |
+| `/api/menu` **without** a token (401, no database) | 39/39 in 0.03s |
+| `/api/menu` **with** a token | 7/39 in 25s |
+
+One at a time each takes **10 ms**. Confirmed with two independent clients
+(Python and curl), so it is not the measuring tool.
+
+Ruled out: Postgres itself (10 concurrent queries inside the container, 0.3s),
+Docker's port forwarding (39 TCP connects from the host, 0.03s), IPv6 versus
+IPv4 for `localhost`, the log volume (same collapse at `MinimumLevel=Warning`),
+OneDrive (same collapse with the whole server copied outside it), and
+sync-over-async in our own code (there is none).
+
+The odd detail: during the collapse `pg_stat_activity` shows **one or two
+connections**, so the requests are not reaching the database — they are waiting
+somewhere before it. Individual `DbCommand` entries take 1–47 ms, with
+**eleven-second gaps between them where nothing is logged at all**.
+
+**Leading hypothesis, untested:** `EnableRetryOnFailure()` on the Npgsql
+provider. If connections fail transiently under load, EF's execution strategy
+retries with exponential backoff, which would produce exactly these 10–30 second
+action times and the near-empty connection count. Worth testing by turning it
+off and re-measuring.
+
+**Whether production is affected is unknown.** The deployed server runs on Linux
+with `network_mode: host` and a different connection path, so this may be local
+only — but that is a guess, and the honest position is that a call centre with
+several agents is exactly a burst of concurrent authenticated requests. It
+belongs on the list to settle before handover.
+
 ---
 
 # How this project is tracked
@@ -2120,6 +2184,7 @@ and what comes after:
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
+| **Concurrency: authenticated requests collapse when they arrive together** | — | **unresolved.** Reproduced locally, cause not found, production impact unknown. Test `EnableRetryOnFailure()` first. Settle before handover. |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |
 

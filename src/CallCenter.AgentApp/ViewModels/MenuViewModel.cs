@@ -26,13 +26,16 @@ public partial class MenuViewModel : ObservableObject, IDisposable
     private static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(350);
 
     private readonly ApiClient _api;
+    private readonly MenuImageCache _images;
     private readonly DispatcherTimer _typingTimer;
 
     private CancellationTokenSource? _inFlight;
 
-    public MenuViewModel(ApiClient api, Localizer localizer, Dispatcher dispatcher)
+    public MenuViewModel(
+        ApiClient api, MenuImageCache images, Localizer localizer, Dispatcher dispatcher)
     {
         _api = api;
+        _images = images;
         Localizer = localizer;
 
         _typingTimer = new DispatcherTimer(DispatcherPriority.Normal, dispatcher)
@@ -108,7 +111,7 @@ public partial class MenuViewModel : ObservableObject, IDisposable
 
             foreach (var item in result.Value)
             {
-                Items.Add(new MenuRow(item, _api, Localizer));
+                Items.Add(new MenuRow(item, _images, Localizer));
             }
 
             if (Items.Count == 0)
@@ -149,20 +152,22 @@ public partial class MenuViewModel : ObservableObject, IDisposable
 public partial class MenuRow : ObservableObject
 {
     private readonly MenuItemDto _item;
-    private readonly ApiClient _api;
+    private readonly MenuImageCache _images;
     private readonly Localizer _localizer;
 
-    public MenuRow(MenuItemDto item, ApiClient api, Localizer localizer)
+    public MenuRow(MenuItemDto item, MenuImageCache images, Localizer localizer)
     {
         _item = item;
-        _api = api;
+        _images = images;
         _localizer = localizer;
 
         if (item.HasImage)
         {
             // Fetched per row as the list renders, rather than with the search:
             // the list is what the agent reads, and it should not wait on a
-            // megabyte of photographs to appear.
+            // megabyte of photographs to appear. The cache makes this cheap -
+            // a picture already fetched comes back without a request, and no
+            // more than four are ever in flight.
             _ = LoadImageAsync();
         }
     }
@@ -209,34 +214,49 @@ public partial class MenuRow : ObservableObject
     [ObservableProperty]
     private BitmapImage? _image;
 
+    /// <summary>
+    /// The picture was promised by the row but did not arrive.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from "this item has no photograph" because the two used to
+    /// draw the same empty box, and that is exactly how 39 failed fetches a
+    /// search stayed invisible. Five of the 44 items genuinely have none - the
+    /// printed menu does not photograph the add-ons.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _imageFailed;
+
+    /// <summary>
+    /// What to write in the empty picture box: nothing while one is still on
+    /// its way, "no picture" for an item that never had one, and "could not be
+    /// loaded" when one was promised and did not arrive.
+    /// </summary>
+    /// <remarks>
+    /// The last two used to look identical, and that is the whole reason a
+    /// screenful of failed fetches passed for a menu of add-ons.
+    /// </remarks>
+    public string PictureStatusText =>
+        Image is not null ? string.Empty
+        : ImageFailed ? _localizer["menu.pictureFailed"]
+        : !_item.HasImage ? _localizer["menu.noPicture"]
+        : string.Empty;
+
+    partial void OnImageChanged(BitmapImage? value) =>
+        OnPropertyChanged(nameof(PictureStatusText));
+
+    partial void OnImageFailedChanged(bool value) =>
+        OnPropertyChanged(nameof(PictureStatusText));
+
     private async Task LoadImageAsync()
     {
-        var result = await _api.GetMenuImageAsync(_item.Id);
+        var bitmap = await _images.GetAsync(_item.Id);
 
-        if (!result.IsOk || result.Value is null || result.Value.Length == 0)
+        if (bitmap is null)
         {
+            ImageFailed = true;
             return;
         }
 
-        try
-        {
-            using var stream = new MemoryStream(result.Value);
-
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = stream;
-            bitmap.EndInit();
-
-            // Frozen so it can be handed to the UI thread from here.
-            bitmap.Freeze();
-
-            Image = bitmap;
-        }
-        catch (Exception)
-        {
-            // A picture that will not decode is not worth interrupting an agent
-            // over; the row shows without it.
-        }
+        Image = bitmap;
     }
 }

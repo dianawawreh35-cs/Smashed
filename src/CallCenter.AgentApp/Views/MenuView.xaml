@@ -73,7 +73,22 @@
                             CornerRadius="{StaticResource CornerSmall}"
                             Background="{StaticResource Surface}"
                             Margin="0,0,12,0">
-                      <Image Source="{Binding Image}" Stretch="UniformToFill" />
+                      <Grid>
+                        <Image Source="{Binding Image}" Stretch="UniformToFill" />
+
+                        <!-- Says which kind of empty box this is. Five of the
+                             44 items have no photograph on the printed menu;
+                             a box that stays blank for any other reason is a
+                             fault, and should not be mistaken for one of them. -->
+                        <TextBlock Text="{Binding PictureStatusText}"
+                                   Style="{StaticResource Subtle}"
+                                   FontSize="10"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="4"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                      </Grid>
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">

@@ -142,6 +142,9 @@ public partial class App : Application
         services.AddTransient<ContactsViewModel>();
         services.AddTransient<CallLogViewModel>();
         services.AddTransient<DeliveryViewModel>();
+        // Singleton: the point of it is that a picture fetched on one visit to
+        // the menu is still there on the next.
+        services.AddSingleton<MenuImageCache>();
         services.AddTransient<MenuViewModel>();
 
         services.AddSingleton<MainWindow>();

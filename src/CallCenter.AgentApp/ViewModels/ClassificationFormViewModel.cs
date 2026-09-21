@@ -72,6 +72,13 @@ public partial class ClassificationFormViewModel(
     [ObservableProperty]
     private bool _isSaving;
 
+    /// <summary>
+    /// The call can be read but not changed (A-42) — past the agent's window, or
+    /// another agent's call.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isReadOnly;
+
     /// <summary>Shown under the buttons — a confirmation or a reason it cannot be saved.</summary>
     [ObservableProperty]
     private string _message = string.Empty;
@@ -129,7 +136,7 @@ public partial class ClassificationFormViewModel(
     /// calls within the window the supervisor set, and gets a plain refusal
     /// otherwise rather than a form that will not save.
     /// </remarks>
-    public void BeginForLoggedCall(Guid communicationId)
+    public async Task BeginForLoggedCallAsync(Guid communicationId, CancellationToken ct = default)
     {
         if (_form is null)
         {
@@ -146,8 +153,79 @@ public partial class ClassificationFormViewModel(
 
         IsSaved = false;
         IsSaving = false;
+        IsReadOnly = false;
         Message = string.Empty;
         IsOpen = true;
+
+        // What the call already says, if anything. Opening blank over an
+        // existing classification is not just unhelpful - saving it would
+        // replace a real answer with nothing, and the agent would never know.
+        var existing = await api.GetClassificationAsync(communicationId, ct);
+
+        if (existing.IsOk && existing.Value is { } saved)
+        {
+            Prefill(saved);
+
+            if (!saved.CanEdit)
+            {
+                // A-42: past the window, or another agent's call. Shown rather
+                // than discovered by pressing Save.
+                IsReadOnly = true;
+                Message = Localizer["classification.tooOld"];
+            }
+        }
+
+        SaveCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(Missing));
+    }
+
+    /// <summary>
+    /// Puts an existing classification back on screen (A-42).
+    /// </summary>
+    /// <remarks>
+    /// The built-in answers have their own columns; everything the supervisor
+    /// added is in <c>customValues</c>, keyed by field key. A key with no field
+    /// is skipped: the form may have changed since, and an answer to a question
+    /// nobody asks any more has nowhere to go.
+    /// </remarks>
+    private void Prefill(ClassificationDto saved)
+    {
+        foreach (var field in Fields)
+        {
+            switch (field)
+            {
+                case TypeFieldViewModel type:
+                    type.Select(saved.TypeId, _form!.Types, Localizer);
+                    break;
+
+                case BranchFieldViewModel branch when saved.BranchId is { } branchId:
+                    branch.Select(branchId);
+                    break;
+
+                case NumberFieldViewModel number when field.Key == "order_value":
+                    number.Text = saved.OrderValue?.ToString() ?? string.Empty;
+                    break;
+
+                case TextAreaFieldViewModel notes when field.Key == "notes":
+                    notes.Text = saved.Notes ?? string.Empty;
+                    break;
+
+                case CheckboxFieldViewModel followUp when field.Key == "follow_up":
+                    followUp.IsChecked = saved.FollowUp;
+                    break;
+
+                default:
+                    if (saved.CustomValues.RootElement.ValueKind == JsonValueKind.Object
+                        && saved.CustomValues.RootElement.TryGetProperty(field.Key, out var value))
+                    {
+                        field.Prefill(value);
+                    }
+
+                    break;
+            }
+        }
+
+        ApplyVisibility(Fields.OfType<TypeFieldViewModel>().FirstOrDefault()?.SelectedName);
     }
 
     /// <summary>Puts the form away, saved or skipped.</summary>
@@ -158,6 +236,7 @@ public partial class ClassificationFormViewModel(
         _sipCallId = null;
         _extension = null;
         _communicationId = null;
+        IsReadOnly = false;
     }
 
     private void Build()
@@ -244,6 +323,7 @@ public partial class ClassificationFormViewModel(
 
     private bool CanSave =>
         !IsSaving
+        && !IsReadOnly
         && Fields.OfType<TypeFieldViewModel>().FirstOrDefault()?.Selected is not null
         && Fields.Where(f => f.AppliesNow).All(f => f.IsSatisfied);
 

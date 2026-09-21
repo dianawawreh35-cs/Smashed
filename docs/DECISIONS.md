@@ -2516,6 +2516,45 @@ agent". The server was already returning both; nothing was reading them.
 Saving from the log refetches the list, so the chip clears on the row it belongs
 to rather than lingering until the next search.
 
+## 2026-09-21 — Classification, part 5: opening a call that already has an answer
+
+Three fixes, all found by Dia opening the screen, and the middle one was the
+serious one.
+
+**The form came out as a list of class names.** The field templates were defined
+in `CallPopupWindow`'s own resources, so the call log — the second screen to draw
+the same form — could not see them, and an `ItemsControl` with no template for
+its items falls back to printing the type name. Moved into `Theme.xaml`. An hour
+earlier the *data* had been split to be shared and the *drawing* was left behind;
+this was the other half of one job. **A form drawn in two places belongs to
+neither of them.**
+
+**An already-classified call opened blank.** Worse than unhelpful: pressing Save
+would have replaced a real answer with nothing, and the agent would have had no
+way of knowing — the audit trail would have faithfully recorded them wiping their
+own work. The form is now fetched and prefilled before it is shown.
+
+Three details that came with it:
+
+- A call the agent may no longer edit (A-42) opens **read-only**, showing what it
+  says, with the reason. Before, they would have filled the whole form in and
+  found out on Save.
+- A type the supervisor has since **hidden** is still shown on the calls that used
+  it. Blanking it would misrepresent what the agent recorded.
+- An answer to a question the supervisor has since **removed** has nowhere to go
+  and is skipped, rather than throwing.
+
+**Changing the type crashed the app.** `BoolToVisibility` was declared in
+`App.xaml` *after* the merged theme, and a `StaticResource` can only see what has
+already been declared — so the templates inside the theme pointed at nothing. It
+only fell over when one of those templates was first drawn. The converters now
+live at the top of `Theme.xaml`, above everything that uses them.
+
+Second crash today from moving code without moving what it depends on; the
+calendar styles this afternoon were the same shape. Both were invisible to the
+compiler, because XAML resolves resources by name at runtime. **For this app,
+"it builds" says nothing about whether it runs.**
+
 ---
 
 # How this project is tracked

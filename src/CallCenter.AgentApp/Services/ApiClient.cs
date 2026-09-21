@@ -215,6 +215,23 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             ct);
 
     /// <summary>
+    /// What a call was already classified as, if anything (A-42).
+    /// </summary>
+    /// <remarks>
+    /// Fetched before the form is drawn so it opens showing what is there
+    /// rather than blank. A blank form over an existing classification is not
+    /// merely unhelpful: saving it would replace a real answer with nothing,
+    /// and the agent would have no way of knowing they had done it.
+    /// </remarks>
+    public Task<Result<ClassificationDto>> GetClassificationAsync(
+        Guid communicationId, CancellationToken ct = default) =>
+        SendAsync<ClassificationDto>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get, $"api/classifications/{communicationId}"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
     /// Records what an older call was about, by its server id (A-42).
     /// </summary>
     /// <remarks>

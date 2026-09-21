@@ -149,11 +149,11 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     /// at work nobody can do.
     /// </remarks>
     [RelayCommand]
-    private void Classify(CallRow? row)
+    private async Task ClassifyAsync(CallRow? row)
     {
         if (row is not null)
         {
-            Classification.BeginForLoggedCall(row.Id);
+            await Classification.BeginForLoggedCallAsync(row.Id);
         }
     }
 

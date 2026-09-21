@@ -48,7 +48,12 @@ public abstract partial class ClassificationFieldViewModel : ObservableObject
             : [];
     }
 
-    protected Localizer Localizer { get; }
+    /// <summary>
+    /// Public so the templates can bind to it. They are drawn on two different
+    /// screens, and reaching up to an ancestor Window for the words only worked
+    /// on one of them.
+    /// </summary>
+    public Localizer Localizer { get; }
 
     public string Key { get; }
 
@@ -81,6 +86,21 @@ public abstract partial class ClassificationFieldViewModel : ObservableObject
 
     /// <summary>What the agent entered, or null when they entered nothing.</summary>
     public abstract object? Value { get; }
+
+    /// <summary>
+    /// Puts a stored answer back on screen, when an already-classified call is
+    /// opened (A-42).
+    /// </summary>
+    /// <remarks>
+    /// Takes the raw JSON because the supervisor's own fields are stored as
+    /// jsonb and arrive untyped. A value that does not fit the field is ignored
+    /// rather than throwing: a supervisor who changes a question from a number
+    /// to a list leaves answers behind that no longer fit, and an agent opening
+    /// one of those calls should see an empty field, not a crash.
+    /// </remarks>
+    public virtual void Prefill(JsonElement value)
+    {
+    }
 
     /// <summary>Whether a required field has been answered.</summary>
     public virtual bool IsSatisfied => !Required || Value is not null;
@@ -133,6 +153,27 @@ public partial class TypeFieldViewModel : ClassificationFieldViewModel
 
     /// <summary>The type's stable name, which the show-when rules are matched on.</summary>
     public string? SelectedName => Selected?.Type.Name;
+
+    /// <summary>
+    /// Selects a type by id.
+    /// </summary>
+    /// <remarks>
+    /// A hidden type is still selected here, unlike in the list of choices: the
+    /// call was classified as that before it was retired, and showing it blank
+    /// would misrepresent what the agent recorded.
+    /// </remarks>
+    public void Select(Guid id, IReadOnlyList<ClassificationTypeDto> all, Localizer localizer)
+    {
+        var known = Types.FirstOrDefault(t => t.Type.Id == id);
+
+        if (known is null && all.FirstOrDefault(t => t.Id == id) is { } retired)
+        {
+            known = new TypeOption(retired, localizer);
+            Types.Add(known);
+        }
+
+        Selected = known;
+    }
 }
 
 /// <summary>
@@ -164,6 +205,9 @@ public partial class BranchFieldViewModel(
     private BranchOption? _selected;
 
     public override object? Value => Selected?.Branch.Id;
+
+    public void Select(Guid id) =>
+        Selected = Branches.FirstOrDefault(b => b.Branch.Id == id);
 }
 
 /// <summary>
@@ -195,6 +239,14 @@ public partial class TextFieldViewModel(JsonElement field, Localizer localizer)
     private string _text = string.Empty;
 
     public override object? Value => string.IsNullOrWhiteSpace(Text) ? null : Text.Trim();
+
+    public override void Prefill(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            Text = value.GetString() ?? string.Empty;
+        }
+    }
 }
 
 /// <summary>Several lines — notes, mostly.</summary>
@@ -205,6 +257,14 @@ public partial class TextAreaFieldViewModel(JsonElement field, Localizer localiz
     private string _text = string.Empty;
 
     public override object? Value => string.IsNullOrWhiteSpace(Text) ? null : Text.Trim();
+
+    public override void Prefill(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            Text = value.GetString() ?? string.Empty;
+        }
+    }
 }
 
 /// <summary>
@@ -228,6 +288,14 @@ public partial class NumberFieldViewModel(JsonElement field, Localizer localizer
     public bool IsUnreadable => !string.IsNullOrWhiteSpace(Text) && Value is null;
 
     public override bool IsSatisfied => !IsUnreadable && base.IsSatisfied;
+
+    public override void Prefill(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Number)
+        {
+            Text = value.GetDecimal().ToString();
+        }
+    }
 }
 
 /// <summary>A yes/no — follow-up required, mostly.</summary>
@@ -240,6 +308,9 @@ public partial class CheckboxFieldViewModel(JsonElement field, Localizer localiz
     // Always answered: an unticked box is "no", not "unanswered", so a required
     // checkbox must not block saving.
     public override object? Value => IsChecked;
+
+    public override void Prefill(JsonElement value) =>
+        IsChecked = value.ValueKind == JsonValueKind.True;
 }
 
 /// <summary>A list the supervisor wrote (S-40).</summary>
@@ -260,6 +331,16 @@ public partial class SelectFieldViewModel : ClassificationFieldViewModel
     private SelectOption? _selected;
 
     public override object? Value => Selected?.Value;
+
+    public override void Prefill(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            // A choice the supervisor has since removed simply does not match,
+            // and the field opens empty rather than showing a stale label.
+            Selected = Options.FirstOrDefault(o => o.Value == value.GetString());
+        }
+    }
 }
 
 /// <summary>One choice in a supervisor-defined list.</summary>

@@ -134,6 +134,9 @@ public partial class App : Application
 
         // One per process, not transient: the pop-up exists from startup and is
         // shown and hidden, rather than built while the phone is ringing (A-10).
+        // Singleton like the pop-up it lives in, and for the same reason: the
+        // form is on screen from the moment a call is answered, not built then.
+        services.AddSingleton<ClassificationFormViewModel>();
         services.AddSingleton<CallViewModel>();
         services.AddSingleton<CallPopupWindow>();
 

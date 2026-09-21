@@ -106,14 +106,16 @@ public class CallLogReporter(
 
         var done = new List<long>();
 
+        // Set when a classification was skipped because its call had not been
+        // sent yet. If a call did go out in this pass, one more pass clears it
+        // rather than leaving it until the next call ends.
+        var deferred = false;
+
         foreach (var item in pending)
         {
             var (id, call, classification) = (item.Id, item.Call, item.Classification);
 
-            // One loop over both kinds, in one sequence. Sending all the calls
-            // and then all the classifications would look tidier and would be
-            // wrong: a classification whose call is stuck behind a failure would
-            // go first and be refused.
+            // One loop over both kinds, in one sequence.
             bool ok;
             string? errorCode;
 
@@ -134,17 +136,26 @@ public class CallLogReporter(
                 continue;
             }
 
-            // A classification for a call the server does not have yet. Normal
-            // rather than exceptional while a call is still in progress: the
-            // call is reported when it ends, so this resolves itself on the next
-            // flush. Kept, and not counted as a failure worth shouting about.
+            // A classification for a call the server does not have yet.
+            //
+            // This is the normal case, not the exception, and the queue order is
+            // the opposite of what it looks like: the agent saves the form while
+            // still talking, so the classification is queued *before* the call,
+            // which is not reported until hang-up. Its id is therefore lower
+            // than its call's.
+            //
+            // Skipped and left in place, never break. Stopping here would leave
+            // the classification blocking the very call it is waiting for, and
+            // the queue would deadlock - which is exactly what it did: two calls
+            // and two classifications sat unsent behind each other.
             if (classification is not null && errorCode is "call_not_found")
             {
                 logger.LogDebug(
                     "A classification is waiting for its call to be reported ({Reference})",
                     classification.SipCallId);
 
-                break;
+                deferred = true;
+                continue;
             }
 
             // A refusal the server is certain about will never succeed, however
@@ -177,9 +188,34 @@ public class CallLogReporter(
         if (done.Count > 0)
         {
             await queue.AcknowledgeAsync(done, ct);
-            logger.LogInformation("{Count} call(s) reported to the server", done.Count);
+            logger.LogInformation("{Count} item(s) reported to the server", done.Count);
+        }
+
+        // A classification was skipped, and a call went out in the same pass -
+        // very likely the call it was waiting for. One more pass sends it now
+        // rather than leaving it queued until the next call ends.
+        //
+        // Guarded by done.Count so this can never loop: a pass that sent
+        // nothing cannot have changed the answer.
+        if (deferred && done.Count > 0 && !_retrying)
+        {
+            try
+            {
+                _retrying = true;
+                await FlushAsync(ct);
+            }
+            finally
+            {
+                _retrying = false;
+            }
         }
     }
+
+    /// <summary>
+    /// Guards the single extra pass above against a chain of retries. One level
+    /// is all that is ever needed: the second pass has its calls already sent.
+    /// </summary>
+    private bool _retrying;
 
     /// <summary>
     /// Turns a finished call into the report the server stores. The status is

@@ -17,6 +17,7 @@ public class SignInService(
     BlockListCache blockList,
     CallService calls,
     CallLogReporter callLog,
+    ViewModels.ClassificationFormViewModel classification,
     ILogger<SignInService> logger)
 {
     /// <summary>
@@ -71,6 +72,12 @@ public class SignInService(
         // Anything the last shift could not send. A laptop that was offline all
         // evening catches up the moment somebody signs in on it (A-04, A-14).
         await callLog.FlushAsync(ct);
+
+        // The classification form, so the fields are in hand before the first
+        // call rather than being fetched while an agent waits with a customer on
+        // the line. This is also how a supervisor's change to the form reaches
+        // agents without anything being reinstalled (S-40).
+        await classification.LoadAsync(ct);
 
         if (!session.HasPhone)
         {

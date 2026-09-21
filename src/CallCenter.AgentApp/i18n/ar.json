@@ -136,5 +136,19 @@
     "offline": "تعذّر الوصول إلى الخادم — المنيو غير متاح الآن.",
     "noPicture": "بلا صورة",
     "pictureFailed": "تعذّر تحميل الصورة"
+  },
+  "classification": {
+    "heading": "تصنيف المكالمة",
+    "save": "حفظ",
+    "skip": "تخطّي",
+    "saved": "تم الحفظ",
+    "saveFailed": "تعذّر الحفظ. حاول مرة أخرى.",
+    "notANumber": "أدخل رقمًا",
+    "fieldType": "نوع المكالمة",
+    "fieldBranch": "الفرع",
+    "fieldOrderValue": "قيمة الطلب",
+    "fieldNotes": "ملاحظات",
+    "fieldFollowUp": "بحاجة إلى متابعة",
+    "stillNeeded": "ينقص:"
   }
 }

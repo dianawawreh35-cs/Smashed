@@ -2365,6 +2365,69 @@ question turned out to answer this one too. Had the form only ever opened at
 hang-up, the id-based route would have looked sufficient and this change would
 have needed new server work.
 
+## 2026-09-21 — Classification, part 2: the form the agent fills in
+
+The form is on screen and working end to end: three real calls classified by
+`dia`, on form version 2, with Arabic notes and branches, from the pop-up
+through the offline queue into the database.
+
+It is built from whatever the supervisor has defined rather than written into
+the screen — seven kinds of question, each its own small class so WPF picks a
+template by type and nothing decides what to draw with a switch. A field the app
+does not recognise is skipped with a warning rather than crashing the form: a
+supervisor on a newer server must not be able to stop every agent classifying.
+
+### Four bugs, all found by opening the screen
+
+None of these would have been caught by any test worth writing, and all four
+came from a single screenshot or one sentence from Dia.
+
+**The queue deadlocked.** The worst of them, and it made saving silently do
+nothing. The classification is queued **before** its call — obvious in hindsight,
+because the agent saves while still talking and the call is not reported until
+hang-up, so the classification always gets the lower id. The flush loop stopped
+at the first refusal, so the classification sat at the front being refused for a
+call that did not exist yet, blocking the very call it was waiting for. Two
+calls and two classifications were stuck behind each other.
+
+The commit that introduced it asserted the opposite in its own message: *"one
+sequence guarantees the call goes first"*. It was wrong, and it was wrong
+**because of the A-40 change made an hour earlier** — moving the form to the
+answer inverted the order, and the queue was not rethought. A refused
+classification is now skipped rather than stopped at, and one extra pass sends
+it as soon as its call has gone.
+
+**`ComboBox` had no dark style**, so Windows drew it light: a white list with
+near-white text. Fourth control to fall into this hole after the contacts list,
+the `DatePicker` and the calendar behind it — and this afternoon's entry had
+named dropdowns as the likely next one and said to check them before handover.
+They were not checked. Both `ComboBox` and `ComboBoxItem` are templated now;
+`ToolTip` and `ContextMenu` remain unchecked.
+
+**`IsVisible` collided with WPF's own.** The field's "does this apply to the
+chosen type" flag was called `IsVisible`, and the item container bound its
+Visibility to it — resolving to the container's **own** `IsVisible` and looping.
+Notes vanished and the complaint field appeared when nothing was selected.
+Renamed `AppliesNow`.
+
+**Save was dead with no explanation.** It re-evaluated only when the type
+changed, so choosing the branch — also required — never re-enabled it. Now every
+field re-checks, and a line underneath names what is still missing, because a
+disabled control that will not say why is worse than no control.
+
+**A branch printed as `FormBranchDto { Id = 8f3c…, Name = ايكون }`.** The type
+and select lists went through wrappers that print their label; the branch bound
+straight to a record, and a record prints all of its contents. Second bug of the
+day caused by one item in a list being treated differently from its neighbours.
+
+### What the screenshots were worth
+
+Two screenshots and two sentences found five defects in about forty minutes.
+Every one of them was invisible to the build, the tests and the type checker.
+That is now the fourth separate way this project has demonstrated the same
+thing, and it is worth stating plainly in the record: **on this project, code
+that compiles and passes its tests is evidence of very little. Open the screen.**
+
 ---
 
 # How this project is tracked

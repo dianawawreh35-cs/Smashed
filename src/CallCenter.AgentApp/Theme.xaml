@@ -155,6 +155,130 @@
   </Style>
 
   <!-- ===== Text input ============================================== -->
+
+  <!-- ===== ComboBox =================================================
+       Unstyled until 2026-09-21, which meant Windows drew it light: a white
+       list with our near-white text on it, unreadable in the classification
+       form. Fourth control on this project to fall into the same hole after the
+       contacts list, the DatePicker and the calendar behind it.
+
+       Both parts are templated, because the list is a Popup with its own
+       chrome and the item inside it draws its own background. Styling the box
+       alone would have left the list white. -->
+
+  <Style TargetType="ComboBoxItem">
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBoxItem">
+          <Border x:Name="Chrome"
+                  Background="Transparent"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentDim}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Accent}" />
+              <Setter Property="Foreground" Value="White" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="ComboBox">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBox">
+          <Grid>
+            <Border x:Name="Chrome"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{StaticResource CornerSmall}" />
+
+            <!-- The whole box opens the list, not just an arrow at the end:
+                 a supervisor or agent aiming at a 14-pixel chevron mid-call is
+                 a needless bit of precision. -->
+            <ToggleButton Background="Transparent"
+                          BorderThickness="0"
+                          Focusable="False"
+                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                      RelativeSource={RelativeSource TemplatedParent}}">
+              <ToggleButton.Template>
+                <ControlTemplate TargetType="ToggleButton">
+                  <Border Background="Transparent" />
+                </ControlTemplate>
+              </ToggleButton.Template>
+            </ToggleButton>
+
+            <ContentPresenter x:Name="ContentSite"
+                              Content="{TemplateBinding SelectionBoxItem}"
+                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                              Margin="{TemplateBinding Padding}"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Stretch"
+                              IsHitTestVisible="False" />
+
+            <TextBlock x:Name="Chevron"
+                       Text="&#x2304;"
+                       Foreground="{StaticResource TextMuted}"
+                       FontSize="14"
+                       Margin="0,0,10,3"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center"
+                       IsHitTestVisible="False" />
+
+            <Popup x:Name="PART_Popup"
+                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                   Placement="Bottom"
+                   AllowsTransparency="True"
+                   PopupAnimation="Fade"
+                   Focusable="False">
+              <Border Background="{StaticResource Surface}"
+                      BorderBrush="{StaticResource BorderSoft}"
+                      BorderThickness="1"
+                      CornerRadius="{StaticResource CornerSmall}"
+                      MinWidth="{TemplateBinding ActualWidth}"
+                      MaxHeight="260"
+                      Margin="0,2,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                  <ItemsPresenter />
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
+
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource SurfaceAlt}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style TargetType="TextBox">
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />

@@ -1,15 +1,97 @@
 <Window x:Class="CallCenter.AgentApp.Views.CallPopupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:CallCenter.AgentApp.ViewModels"
         Title="{Binding Localizer[call.incoming]}"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
         Background="{StaticResource Bg}"
-        Width="380"
+        Width="420"
         SizeToContent="Height"
+        MaxHeight="760"
         ResizeMode="NoResize"
         ShowInTaskbar="True"
         WindowStartupLocation="CenterScreen">
+
+  <Window.Resources>
+
+    <!-- One template per kind of question. WPF picks these by the type of the
+         view model, so nothing decides what to draw with a switch: the
+         supervisor's field list becomes controls on its own. -->
+
+    <DataTemplate DataType="{x:Type vm:TypeFieldViewModel}">
+      <StackPanel Margin="0,0,0,10">
+        <TextBlock Text="{Binding Label}" Style="{StaticResource Subtle}" FontSize="11" />
+        <ComboBox ItemsSource="{Binding Types}"
+                  SelectedItem="{Binding Selected, Mode=TwoWay}"
+                  DisplayMemberPath="Label"
+                  Margin="0,3,0,0" />
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:BranchFieldViewModel}">
+      <StackPanel Margin="0,0,0,10">
+        <TextBlock Text="{Binding Label}" Style="{StaticResource Subtle}" FontSize="11" />
+        <ComboBox ItemsSource="{Binding Branches}"
+                  SelectedItem="{Binding Selected, Mode=TwoWay}"
+                  DisplayMemberPath="Name"
+                  Margin="0,3,0,0" />
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:SelectFieldViewModel}">
+      <StackPanel Margin="0,0,0,10">
+        <TextBlock Text="{Binding Label}" Style="{StaticResource Subtle}" FontSize="11" />
+        <ComboBox ItemsSource="{Binding Options}"
+                  SelectedItem="{Binding Selected, Mode=TwoWay}"
+                  DisplayMemberPath="Label"
+                  Margin="0,3,0,0" />
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:TextFieldViewModel}">
+      <StackPanel Margin="0,0,0,10">
+        <TextBlock Text="{Binding Label}" Style="{StaticResource Subtle}" FontSize="11" />
+        <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,0" />
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:TextAreaFieldViewModel}">
+      <StackPanel Margin="0,0,0,10">
+        <TextBlock Text="{Binding Label}" Style="{StaticResource Subtle}" FontSize="11" />
+        <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 MinHeight="54"
+                 VerticalScrollBarVisibility="Auto"
+                 Margin="0,3,0,0" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- The number stays text until it is sent: a box that fights the agent as
+         they type "12." mid-thought is worse than one that says so after. -->
+    <DataTemplate DataType="{x:Type vm:NumberFieldViewModel}">
+      <StackPanel Margin="0,0,0,10">
+        <TextBlock Text="{Binding Label}" Style="{StaticResource Subtle}" FontSize="11" />
+        <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                 FontFamily="{StaticResource MonoFont}"
+                 Margin="0,3,0,0" />
+        <TextBlock Text="{Binding DataContext.Localizer[classification.notANumber],
+                          RelativeSource={RelativeSource AncestorType=Window}}"
+                   Foreground="{StaticResource Danger}"
+                   FontSize="11"
+                   Margin="0,3,0,0"
+                   Visibility="{Binding IsUnreadable, Converter={StaticResource BoolToVisibility}}" />
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:CheckboxFieldViewModel}">
+      <CheckBox Content="{Binding Label}"
+                IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                Margin="0,0,0,10" />
+    </DataTemplate>
+
+  </Window.Resources>
 
   <Border Style="{StaticResource Card}" Margin="0" Padding="24">
     <StackPanel>
@@ -75,6 +157,62 @@
                 MinWidth="120"
                 Margin="10,0,0,0"
                 Command="{Binding RejectCommand}" />
+      </StackPanel>
+
+
+      <!-- The classification form (A-40). On screen from the moment the call is
+           answered, because the agent is writing the order down while the
+           customer talks - not remembering it afterwards. It outlives the call:
+           the pop-up stays until this is saved or skipped, so a call that ends
+           mid-sentence does not take the agent's typing with it. -->
+      <StackPanel Margin="0,18,0,0"
+                  Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
+
+        <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
+
+        <TextBlock Text="{Binding Localizer[classification.heading]}"
+                   Foreground="{StaticResource Text}"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,12" />
+
+        <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding Classification.Fields}">
+            <ItemsControl.ItemContainerStyle>
+              <Style TargetType="ContentPresenter">
+                <!-- A field only asked for certain types hides itself rather
+                     than being rebuilt, so what the agent typed survives a
+                     change of mind about the type. -->
+                <Setter Property="Visibility"
+                        Value="{Binding AppliesNow, Converter={StaticResource BoolToVisibility}}" />
+              </Style>
+            </ItemsControl.ItemContainerStyle>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <Button Content="{Binding Localizer[classification.save]}"
+                  Style="{StaticResource PrimaryButton}"
+                  MinWidth="120"
+                  Command="{Binding Classification.SaveCommand}" />
+          <Button Content="{Binding Localizer[classification.skip]}"
+                  Style="{StaticResource GhostButton}"
+                  MinWidth="100"
+                  Margin="10,0,0,0"
+                  Command="{Binding Classification.SkipCommand}" />
+        </StackPanel>
+
+        <!-- Why Save is greyed out. A dead button with no explanation is the
+             worst version of this: the agent has a customer on the line. -->
+        <TextBlock Text="{Binding Classification.Missing}"
+                   Foreground="{StaticResource Warning}"
+                   FontSize="11"
+                   Margin="0,8,0,0"
+                   TextWrapping="Wrap" />
+
+        <TextBlock Text="{Binding Classification.Message}"
+                   Style="{StaticResource Subtle}"
+                   Margin="0,4,0,0"
+                   TextWrapping="Wrap" />
       </StackPanel>
 
       <!-- Connected: one way out. -->

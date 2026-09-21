@@ -25,10 +25,15 @@ public partial class CallViewModel : ObservableObject
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _timer;
 
-    public CallViewModel(CallService calls, Localizer localizer, Dispatcher dispatcher)
+    public CallViewModel(
+        CallService calls,
+        ClassificationFormViewModel classification,
+        Localizer localizer,
+        Dispatcher dispatcher)
     {
         _calls = calls;
         _dispatcher = dispatcher;
+        Classification = classification;
         Localizer = localizer;
 
         // One tick a second is enough for a timer showing whole seconds, and
@@ -41,9 +46,28 @@ public partial class CallViewModel : ObservableObject
 
         localizer.LanguageChanged += (_, _) => RefreshLabels();
         _calls.StateChanged += OnStateChanged;
+
+        // The pop-up outlives the call while the form is still unfinished, so
+        // what closes it is the form being dealt with, not the call ending.
+        Classification.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(ClassificationFormViewModel.IsUnfinished)
+                && !Classification.IsUnfinished
+                && !State.IsActive)
+            {
+                Classification.Close();
+                CallEnded?.Invoke(this, EventArgs.Empty);
+            }
+        };
     }
 
     public Localizer Localizer { get; }
+
+    /// <summary>
+    /// The classification form, on screen from the moment the call is answered
+    /// (A-40).
+    /// </summary>
+    public ClassificationFormViewModel Classification { get; }
 
     /// <summary>Raised when the pop-up should come to the front (A-10).</summary>
     public event EventHandler? CallArrived;
@@ -121,12 +145,21 @@ public partial class CallViewModel : ObservableObject
         _dispatcher.Invoke(() =>
         {
             var wasActive = State.IsActive;
+            var wasConnected = State.Status is CallStatus.Connected;
 
             State = state;
 
             if (state.Status is CallStatus.Connected)
             {
                 _timer.Start();
+
+                // A-40: the agent takes the order while the customer is
+                // speaking, so the form is there from the answer rather than
+                // appearing once they have gone.
+                if (!wasConnected)
+                {
+                    Classification.Begin(state.SipCallId, Classification.Extension);
+                }
             }
             else
             {
@@ -135,9 +168,13 @@ public partial class CallViewModel : ObservableObject
 
             if (state.IsActive && !wasActive)
             {
+                // A new call replaces whatever was still on screen. A form left
+                // untouched from the last call is a skip (A-41), not something
+                // to hold the next caller up over.
+                Classification.Close();
                 CallArrived?.Invoke(this, EventArgs.Empty);
             }
-            else if (!state.IsActive && wasActive)
+            else if (!state.IsActive && wasActive && !Classification.IsUnfinished)
             {
                 CallEnded?.Invoke(this, EventArgs.Empty);
             }

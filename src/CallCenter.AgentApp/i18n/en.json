@@ -136,5 +136,19 @@
     "offline": "The server could not be reached - the menu is unavailable right now.",
     "noPicture": "No picture",
     "pictureFailed": "Picture failed to load"
+  },
+  "classification": {
+    "heading": "Classify this call",
+    "save": "Save",
+    "skip": "Skip",
+    "saved": "Saved",
+    "saveFailed": "It could not be saved. Try again.",
+    "notANumber": "Enter a number",
+    "fieldType": "Call type",
+    "fieldBranch": "Branch",
+    "fieldOrderValue": "Order value",
+    "fieldNotes": "Notes",
+    "fieldFollowUp": "Follow-up required",
+    "stillNeeded": "Still needed:"
   }
 }

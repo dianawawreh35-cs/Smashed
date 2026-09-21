@@ -59,6 +59,19 @@ public class Localizer : INotifyPropertyChanged
     public bool IsArabic => Current == "ar";
 
     /// <summary>
+    /// The text for a key in a named language, rather than the current one.
+    /// </summary>
+    /// <remarks>
+    /// For the few places that need both languages at once — the classification
+    /// form keeps an Arabic and an English label per field, because the agent
+    /// can switch language mid-call and the fields must not have to be rebuilt.
+    /// </remarks>
+    public string? InLanguage(string key, string language) =>
+        _strings.TryGetValue(language, out var strings) && strings.TryGetValue(key, out var text)
+            ? text
+            : null;
+
+    /// <summary>
     /// The text for a key such as <c>login.heading</c>. An unknown key falls back
     /// to Arabic and then to the key itself, so a missing translation shows up as
     /// an obviously wrong label rather than an empty screen.

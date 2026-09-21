@@ -2233,6 +2233,101 @@ not repeat them: `DisplayMode` belongs to `Calendar`, not `CalendarItem` —
 `CalendarButton` is a month or a year, so it has `HasSelectedDays` rather than
 `IsSelected`.
 
+## 2026-09-21 — Classification, part 1: the server
+
+The biggest hole in the system, and the one that made everything else look
+finished when it was not. Four tables, four entities, six types and form
+version 1 were all designed, migrated and seeded on 14 September. The API folder
+was created the same day and left **empty**. So every call carried an
+"unclassified" chip, the Agent App had a filter to find them, and there was no
+way to classify a single one — **0 classifications recorded** across the whole
+database.
+
+It is also what the reports need. Nearly every number the supervisor asks for is
+a count of classifications, so until this existed the reports had nothing to
+count.
+
+### The form is versioned, never edited in place
+
+Publishing a change (S-40) writes a **new row** and moves the current flag. A
+complaint classified in January still reads back with the questions asked in
+January.
+
+The alternative — editing the definition in place — is less code and quietly
+rewrites history: a field removed today would erase what agents recorded under it
+last month, and a renamed field would relabel answers nobody gave. The schema
+already assumed versioning; this honours it. It also means a supervisor who
+breaks the form can be put back by re-publishing an older definition.
+
+The client sends back **the version it drew**, rather than the server assuming
+its own current one. A form filled in during the seconds a change is published
+is stored against the questions that were actually on screen.
+
+### The form is validated, not trusted
+
+A definition that cannot be drawn stops **every** agent classifying **every**
+call until somebody notices. So the server refuses one: every field needs a key
+and a kind the clients know, no two fields may share a key, and there must be a
+type field — without it a call is classified as nothing in particular and every
+report loses its grouping.
+
+### Name and label are different things
+
+The type's **name** (`Order`, `Complaint`) is the stable key the reports and the
+form's `showWhenType` rules are written against. The **labels** are what agents
+read, in both languages. A supervisor renaming "Complaint" to "Issue" changes
+the label and nothing else moves — the same rule S-41 states for branches.
+
+**Nothing in use is ever deleted.** A type any call carries can be hidden but not
+removed, or those calls would describe nothing and the history could not be
+rebuilt. The six the system was built around cannot be deleted at all. Same
+pattern as menu categories.
+
+### The edit window is the agent's day, not the server's
+
+A-42 lets agents edit their own classifications for the current day. Measured
+against the **call's start** and in **local time**: a call taken at 23:55 and
+classified at 00:05 belongs to the evening it happened, and a shift ending after
+midnight UTC is still the same evening in Hebron. Measuring in UTC would cut
+agents off mid-shift.
+
+### Classifying a call the server has never heard of
+
+The open question from earlier, now settled. A call taken while the server was
+down is queued on the laptop and has **no server id**, but the agent still
+classifies it at hang-up. `PUT /api/classifications/by-call` keys on the SIP
+Call-ID plus the extension — both already stored on the communication — so the
+classification can be queued beside the call and land correctly once both
+arrive. A 404 there is not an error an agent sees: it means the call has not
+synced yet, and the app keeps trying.
+
+The alternative was to refuse classification until the call had synced, which is
+simpler and tells an agent who just finished a call to come back later. Given
+A-04 promises the app keeps working with the server down, that was not a real
+option.
+
+### One thing the type check caught
+
+`[Required] Guid TypeId` does **not** refuse a missing type. A non-nullable Guid
+arrives as all-zeros when the client omits it, and the attribute sees a value
+rather than a gap — the call would have been "classified" as nothing and passed
+validation. It is `Guid?` now. A test covers it, because this is the sort of
+thing that is invisible until a report comes out wrong.
+
+### Verified against the real database, not just the tests
+
+Classified a real call, edited it, read the audit trail back (before and after,
+with who), published a version 2 of the form with a conditional complaint-reason
+field, and confirmed the four refusals: an undrawable form, a form with no type
+field, an unknown call, and deleting a system type. **The dev database is now on
+form version 2**, which is deliberate — it gives the Agent App work a form with
+a `select` and a `showWhenType` rule to draw.
+
+### Still to build
+
+Part 2, the Agent App: the form at hang-up (A-40) and classifying from the call
+log. Part 3, the supervisor's form editor (S-40).
+
 ---
 
 # How this project is tracked

@@ -1,6 +1,7 @@
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Seed;
 using CallCenter.Server.Features.Auth;
+using CallCenter.Server.Features.Classifications;
 using CallCenter.Server.Features.Communications;
 using CallCenter.Server.Features.Contacts;
 using CallCenter.Server.Features.Delivery;
@@ -65,6 +66,8 @@ try
         .ValidateDataAnnotations();
     builder.Services.AddSingleton<MenuImageStore>();
     builder.Services.AddScoped<MenuService>();
+    builder.Services.AddScoped<ClassificationService>();
+    builder.Services.AddScoped<ClassificationTypeService>();
     builder.Services.AddScoped<SettingsService>();
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()

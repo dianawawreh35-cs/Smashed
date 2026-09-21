@@ -384,6 +384,9 @@
   </Style>
 
   <Style TargetType="DatePicker">
+    <!-- DynamicResource because DarkCalendar is defined further down this file
+         and StaticResource resolves in parse order. -->
+    <Setter Property="CalendarStyle" Value="{DynamicResource DarkCalendar}" />
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
     <Setter Property="Foreground" Value="{StaticResource Text}" />
@@ -464,16 +467,37 @@
        unstyled WPF control does not inherit a dark theme, it falls back to a
        light one. -->
 
-  <Style TargetType="Calendar">
+  <!-- The styles below are handed down explicitly rather than left implicit,
+       and this is the whole reason the first attempt at theming the calendar
+       did nothing. WPF's Calendar template builds its inner parts with
+       Style="{TemplateBinding CalendarItemStyle}". With that property unset the
+       binding resolves to null - and a Style explicitly set to null suppresses
+       the implicit style that would otherwise apply. So the panel kept its
+       light chrome and our near-white day numbers were painted onto it.
+
+       The lesson generalises: when an implicit WPF style appears to be ignored,
+       look for a template handing the element a null Style through a property
+       like this one. -->
+  <Style x:Key="DarkCalendar" TargetType="Calendar">
     <Setter Property="Background" Value="{StaticResource Surface}" />
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <!-- DynamicResource, not StaticResource: all three are defined further
+         down this file, and StaticResource resolves in parse order - it would
+         hand the Calendar an unset value and the dropdown would throw the
+         moment it opened. -->
+    <Setter Property="CalendarItemStyle" Value="{DynamicResource DarkCalendarItem}" />
+    <Setter Property="CalendarDayButtonStyle" Value="{DynamicResource DarkCalendarDayButton}" />
+    <Setter Property="CalendarButtonStyle" Value="{DynamicResource DarkCalendarButton}" />
   </Style>
 
-  <Style TargetType="CalendarItem">
+  <!-- A Calendar dropped straight onto a view gets the same treatment. -->
+  <Style TargetType="Calendar" BasedOn="{StaticResource DarkCalendar}" />
+
+  <Style x:Key="DarkCalendarItem" TargetType="CalendarItem">
     <Setter Property="Background" Value="{StaticResource Surface}" />
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="Template">
@@ -581,7 +605,7 @@
 
   <!-- One day in the grid. Templated rather than set, for the same reason as
        CalendarItem: the default draws its own light background. -->
-  <Style TargetType="CalendarDayButton">
+  <Style x:Key="DarkCalendarDayButton" TargetType="CalendarDayButton">
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="MinWidth" Value="30" />
@@ -622,7 +646,7 @@
   </Style>
 
   <!-- A month or a year, in the view behind the header button. -->
-  <Style TargetType="CalendarButton">
+  <Style x:Key="DarkCalendarButton" TargetType="CalendarButton">
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="MinWidth" Value="52" />

@@ -43,6 +43,25 @@ public class SettingsService(CallCenterDbContext db, ILogger<SettingsService> lo
         return fallback;
     }
 
+    /// <summary>
+    /// A text setting, or <paramref name="fallback"/> when it is unset.
+    /// </summary>
+    /// <remarks>
+    /// Blank counts as unset. A row cleared on the settings screen should fall
+    /// back to the default rather than mean "no value at all", which for
+    /// something like the edit window would be a rule nobody could satisfy.
+    /// </remarks>
+    public async Task<string> GetStringAsync(
+        string key, string fallback, CancellationToken ct = default)
+    {
+        var value = await db.Settings
+            .Where(s => s.Key == key)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync(ct);
+
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
+    }
+
     public async Task<IReadOnlyList<SettingDto>> ListAsync(CancellationToken ct = default)
     {
         var stored = await db.Settings

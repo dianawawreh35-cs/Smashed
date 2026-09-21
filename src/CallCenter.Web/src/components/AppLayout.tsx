@@ -31,6 +31,7 @@ export default function AppLayout() {
     { to: '/contacts', label: t('nav.contacts') },
     { to: '/delivery', label: t('nav.delivery') },
     { to: '/menu', label: t('nav.menu') },
+    { to: '/classification', label: t('nav.classification') },
     { to: '/users', label: t('nav.users') },
     { to: '/settings', label: t('nav.settings') },
   ]

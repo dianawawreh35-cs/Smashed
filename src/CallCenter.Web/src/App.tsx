@@ -6,6 +6,7 @@ import SettingsPage from './pages/SettingsPage'
 import ContactsPage from './pages/ContactsPage'
 import DeliveryPage from './pages/DeliveryPage'
 import MenuPage from './pages/MenuPage'
+import ClassificationPage from './pages/ClassificationPage'
 import AppLayout from './components/AppLayout'
 import RequireAuth from './components/RequireAuth'
 
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
           <Route path="/menu" element={<MenuPage />} />
+          <Route path="/classification" element={<ClassificationPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

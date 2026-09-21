@@ -2428,6 +2428,55 @@ That is now the fourth separate way this project has demonstrated the same
 thing, and it is worth stating plainly in the record: **on this project, code
 that compiles and passes its tests is evidence of very little. Open the screen.**
 
+## 2026-09-21 — Classification, part 3: the supervisor's form editor (S-40)
+
+The half of the morning's request that was still missing. The server could
+already publish a form — it was done from a script that afternoon — but there was
+no screen to do it from, so the questions agents answer were whatever had been
+seeded.
+
+### Types and questions on one screen
+
+They are one decision, not two. A question asked only for complaints has to name
+the complaint type, so editing them apart would mean holding one in your head
+while changing the other.
+
+### What the screen refuses to let a supervisor do
+
+Each of these is a way to break the reports quietly, months later:
+
+- **The type's key cannot be edited.** It is shown, greyed, beside the labels.
+  Reports and every `showWhenType` rule are written against it; renaming is what
+  the labels are for. Same rule S-41 states for branches.
+- **A type in use cannot be deleted** — the row offers hiding instead, and says
+  why. Only an unused, non-system type shows a Remove button.
+- **The type and branch questions cannot be removed or retyped.** They have
+  their own columns and the reports group by them; the server would refuse a
+  form without a type field anyway, but a screen that offers something the
+  server refuses is a screen that wastes the supervisor's time.
+- **A field's key and a choice's value are generated, never typed.** Answers are
+  stored against them, so a supervisor editing a label must not silently orphan
+  every answer already given under it.
+
+### Publishing, and undoing
+
+Publish writes a new version; existing classifications keep theirs. The hint
+under the button says so, and says the way back: publish the old one again. A
+supervisor who has just broken the form for forty agents should not have to ask
+what to do.
+
+The button is disabled until something actually changes, and a Discard appears
+beside it once it has — so a half-finished edit is one click from gone rather
+than something to reload the page over.
+
+### Tests
+
+Five, all about what would corrupt data rather than what would look wrong: the
+key is shown and not editable, a type in use offers hiding rather than deletion,
+the built-in questions cannot be removed, publishing needs a change, and — the
+one that matters most — **the show-when rule is written against the type's name,
+not its label**.
+
 ---
 
 # How this project is tracked

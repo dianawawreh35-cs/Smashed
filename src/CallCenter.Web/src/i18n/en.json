@@ -14,7 +14,8 @@
     "logout": "Log out",
     "users": "Users",
     "delivery": "Delivery",
-    "menu": "Menu"
+    "menu": "Menu",
+    "classification": "Classification"
   },
   "login": {
     "heading": "Sign in",
@@ -325,5 +326,53 @@
     "noPicture": "No picture",
     "removePicture": "Remove the current picture",
     "pictureFailed": "Picture failed to load"
+  },
+  "classification": {
+    "heading": "Classification form",
+    "intro": "The call types, and the questions an agent answers about each call.",
+    "types": "Call types",
+    "typesHint": "Renaming is safe: reports are written against the stable key, not the label. A type in use can be hidden but not deleted.",
+    "fields": "Form questions",
+    "fieldsHint": "Reorder with the arrows. Publishing creates a new version and leaves existing classifications alone.",
+    "labelAr": "Arabic label",
+    "labelEn": "English label",
+    "key": "Key",
+    "shown": "Status",
+    "offered": "Offered",
+    "hidden": "Hidden",
+    "builtIn": "Built in",
+    "inUse": "In use",
+    "remove": "Remove",
+    "addType": "Add type",
+    "addField": "Add question",
+    "addOption": "Add choice",
+    "kind": "Kind",
+    "required": "Required",
+    "askedFor": "Asked for:",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "publish": "Publish form",
+    "discard": "Discard changes",
+    "publishHint": "Publishing creates a new version. Existing classifications keep the questions they were captured under, and a form that turns out wrong can be undone by publishing the old one again.",
+    "version": "Version {{version}}",
+    "unavailable": "The form could not be loaded.",
+    "kinds": {
+      "type": "Call type",
+      "branch": "Branch",
+      "text": "Short text",
+      "textarea": "Long text",
+      "number": "Number",
+      "select": "List",
+      "checkbox": "Checkbox"
+    },
+    "errors": {
+      "bad_form": "That form cannot be drawn. Every question needs a name and a kind, and there must be a call-type question.",
+      "bad_name": "A name is needed in both languages, and it must not already exist.",
+      "type_in_use": "Calls already use this type. Hide it instead of deleting it.",
+      "unknown_type": "No such type.",
+      "invalid_request": "It could not be saved.",
+      "server_error": "The server had a problem.",
+      "server_unreachable": "The server could not be reached."
+    }
   }
 }

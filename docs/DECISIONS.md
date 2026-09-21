@@ -1997,6 +1997,24 @@ new endpoint, which is supervisor-only like the rest.
 path was about to tell a supervisor renaming a category that "that category
 already has an item with this name".
 
+## 2026-09-21 — A list of what has never been run
+
+Dia asked how to test the things that were built but never opened. The honest
+answer was that quite a lot had accumulated: the call pop-up, the call log tab,
+contact history, the delivery tab, both menu screens and the offline buffer had
+all been written, tested and never once seen working.
+
+`docs/TESTING-checklist.md` is now the list, ordered so that the things needing
+nothing but a browser come first and the ones needing the PBX come last. Each
+item says what should happen **and what it means when it does not**, because on
+this project an unexpected result has usually been information rather than a
+dead end.
+
+Also deleted, again: four stale `net8.0` build folders under the Agent App. They
+come back whenever an old branch is built, and a stale folder means running
+yesterday's code and debugging a bug that was fixed — which has already cost one
+round trip here.
+
 ---
 
 # How this project is tracked

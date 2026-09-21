@@ -1,0 +1,168 @@
+# What still has to be tested by hand
+
+Everything in this list is **built, committed and passing its automated tests,
+and has never been seen running.** That is not the same as working. On this
+project the white contacts list, the login 500s, the timezone failure and the
+call-log "today" label all passed their tests and were all found by opening the
+app.
+
+The automated tests prove structure — that the right request goes to the right
+endpoint with the right body. They cannot tell you whether a screen looks right
+in Arabic, whether a phone rings, or whether a picture loads.
+
+Work top to bottom. Each item says **what to do**, **what should happen**, and
+**what it means if it doesn't** — the last one matters, because an unexpected
+result is usually information rather than a dead end.
+
+To start the three pieces, see `DEVELOPING.md` §3. Two reminders from §1 and §2,
+because they cost a round trip almost every time: **`dotnet run` does not work
+here** — run the DLL from its own output folder — and **close the server and the
+Agent App before building**, or the compiler cannot replace their files.
+
+---
+
+## Round 1 — the supervisor web app
+
+Nothing here needs the PBX or a phone. Start the database, the server and
+`npm run dev`, sign in as `supervisor`, and go to `http://localhost:5173`.
+
+### 1.1 The menu screen (S-59) — most recently changed, least seen
+
+- [ ] **The menu lists 44 items with photographs.**
+      *If the pictures are broken:* this is the first run since the pictures
+      moved from the database to files. The server reads them from
+      `data/menu-images` relative to wherever it was started. Check the folder
+      exists with 39 `.png` files in it, and that the terminal does not say
+      "recorded but missing".
+- [ ] **Prices read correctly.** A burger shows `26` and `36`. An add-on shows
+      `+2`, not `2`. The combination offer shows "not on the menu", not `0`.
+      *If an add-on shows a bare number:* an agent would quote it as a line of
+      its own instead of adding it to a burger.
+- [ ] **Edit an item, change its price, save.** The table shows the new price.
+- [ ] **Edit an item and choose a new photograph.** The chosen picture appears
+      in the form *before* you save.
+      *If it does not:* the preview is broken, and you are saving blind.
+- [ ] **Save it, and look at the row.** The new photograph must appear
+      **immediately**.
+      *If the old one is still there:* the cache stamp is not working. This is
+      the bug that would otherwise be reported as "the upload does not work" —
+      the picture did upload, the browser is showing yesterday's copy. It would
+      fix itself tomorrow, which is worse, not better.
+- [ ] **Tick "Remove the current picture" and save.** The row shows a blank
+      grey box.
+- [ ] **Add a new item** in an existing category, with a picture and a meal
+      price. It appears in the list.
+- [ ] **Manage categories → add a category**, then add an item to it.
+      *This is the one that was impossible before today.*
+- [ ] **Rename a category.** Click out of the box rather than pressing Enter —
+      it saves on leaving the field. The items' category column updates too.
+- [ ] **Move a category up and down** with the arrows.
+- [ ] **Untick "Shown" on a category.** Then check in Round 2 that an agent can
+      still *find* its items by searching — hiding a category is meant to
+      remove the heading, not the food.
+- [ ] **Try to delete a category that has items.** It must refuse, in Arabic,
+      saying to move or delete its items first.
+      *If it deletes:* stop and tell me. That would take the items with it.
+- [ ] **Delete an empty category.** It goes.
+- [ ] **Everything above, with the interface in Arabic and right-to-left.**
+      This is the real test. Numbers, the `+2`, the arrows and the table
+      alignment are all places where RTL goes wrong, and all the automated
+      tests run in English.
+
+### 1.2 The delivery areas (S-58)
+
+- [ ] 228 areas are listed, each with a branch and a price.
+- [ ] Search for an area by part of its name, in Arabic.
+- [ ] Add one area; add several at once.
+- [ ] Edit a price; delete an area.
+
+### 1.3 Contacts, flags and blocking (S-45)
+
+- [ ] Double-click a contact row — its details open.
+- [ ] Mark a contact VIP; the badge appears.
+- [ ] Block a contact, giving a reason. Unblock it again.
+      *You have already confirmed unblocking works end to end.*
+
+### 1.4 Settings
+
+- [ ] `agent.call_log_days` is there and can be changed.
+- [ ] `agent.idle_logout_minutes` reads **240**.
+- [ ] The two settings that did nothing (`callback.extension`,
+      `pbx.ami.enabled`) are **gone**.
+
+---
+
+## Round 2 — the Agent App, without a phone
+
+Sign in as `dia20`. None of this needs a call.
+
+- [ ] **Menu tab (A-66).** Search `سماشد`, then `ماشروم`, then a misspelling of
+      one. The folding is meant to find them all.
+- [ ] **Search by what is in an item** — "mushroom" in the contents, not the
+      name. "What has mushrooms in it?" is a real question agents get.
+- [ ] **Pictures load in the Agent App too.** Same disk-file change as 1.1.
+- [ ] **An item from the category you hid in 1.1 is still findable.**
+- [ ] **Delivery tab (A-65).** Search an area; it names the branch and price.
+- [ ] **Call log tab (A-14).** It lists past calls.
+- [ ] **Filter the log by a date older than the newest 100 calls.** This is the
+      bug that was fixed but never seen: filtering used to happen in the app
+      over one fetched page, so a date outside that page found nothing.
+      *If an old date finds nothing, the fix did not take.*
+- [ ] **Contact history.** Open a contact; its past calls are listed.
+- [ ] **Leave the app sitting idle.** With 240 minutes that is a four-hour test,
+      so do it on a day you are at the desk anyway rather than blocking on it.
+
+---
+
+## Round 3 — the telephone
+
+This needs the PBX at 192.168.0.27 and extension 2001. It is the part that
+cannot be faked, and the part most likely to find something.
+
+- [ ] **Call extension 2001 from another phone.** The pop-up appears, with the
+      caller's number.
+- [ ] **The ringing is audible.**
+- [ ] **The timer counts** once answered.
+- [ ] **The queue badge** is right when a second call arrives.
+- [ ] **Hang up from the agent side.** The customer's phone must actually end
+      the call — not keep playing a tone.
+      *This was a real bug: the call closed on our side only.*
+- [ ] **The log then says the agent hung up, not the caller.**
+- [ ] **Block a number, then call from it.** It must be **rejected
+      immediately** — no ringback, no hold tone. Then unblock it and call
+      again; it must ring.
+- [ ] **Call 2001 while it is already on a call.** Busy.
+- [ ] **Does taking a call reset the idle-logout timer?** Flagged and never
+      checked. If it does not, an agent on a long call gets logged out
+      mid-conversation.
+
+---
+
+## Round 4 — the things that only fail in production
+
+These cannot be checked on this laptop, and each has burned a project somewhere.
+
+- [ ] **Seed a genuinely empty database** and confirm you get 4 branches, 228
+      delivery areas, 44 menu items, 39 picture files and one supervisor.
+      *Done once on 21 September 2026 against a throwaway database. Worth
+      repeating on the real server, because that is a different machine.*
+- [ ] **Restore a backup onto a different machine and open it.** An untested
+      backup is a hope, not a backup. It is an acceptance item in the contract.
+- [ ] **Confirm the restored install has its menu pictures.** If the folder was
+      not copied, run `seed` again — it puts back any missing picture — and
+      then fix the backup script, because the folder should have been there.
+- [ ] **The offline buffer.** Pull the network cable mid-call, make a call, plug
+      it back in, and check the call reaches the server.
+- [ ] **`reset-password`** actually lets you back in after a lockout.
+- [ ] **The three CDR test calls**, and reading `Master.csv`. Needs Issabel
+      access you do not currently have.
+
+---
+
+## What is not on this list because it is not built
+
+Not testable yet, and listed so the gaps are not mistaken for failures:
+classification (A-40, S-40), branch management (S-41), opening a call from the
+log (A-51), caller identity in the pop-up (A-16, A-11), blacklist export
+(S-46), mute and hold, outbound calls, merging contacts, and contact import
+from Excel. `DECISIONS.md` holds the live list.

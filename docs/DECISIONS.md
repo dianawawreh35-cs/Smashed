@@ -1868,23 +1868,46 @@ here than anywhere. These are English words written in Arabic — سماشد, م
 as well as the name, because "what has mushrooms in it?" is a question agents
 are asked and the answer is in the contents.
 
-### The pictures are in the database
+### The pictures are files on disk — a decision reversed the same day
 
-39 photographs, 1.2 MB. Held as `bytea` rather than files on disk, for one
-reason that decides it: **the backup already covers the database** (runbook step
-9), and a folder of images is one more thing to back up separately and one more
-thing to forget. The seed is self-contained too — the pictures are embedded
-resources in the server assembly, so a fresh install needs the one DLL and no
-folder beside it.
+39 photographs, 1.2 MB. Built first as `bytea` in the row, on the reasoning that
+**the backup already covers the database** and a folder of images is one more
+thing to back up separately and forget. Dia asked "why not move to file from
+now?", and the answer is that the reasoning was wrong twice over.
+
+**The folder was already backed up.** Step 9 of the runbook has rsynced
+`data/recordings/` since it was written. Menu pictures beside them add a line to
+a script that already exists — there was never an extra thing to remember.
+
+**And this is the part that decides it: `rsync` is incremental, `pg_dump` is
+not.** Menu photographs never change. On disk the nightly backup copies them
+once, ever. In the database they were re-dumped and re-copied *every single
+night, for ever* — 1.2 MB a night now, and more as the menu grows. Postgres also
+carries the bytes through its write-ahead log and its vacuum, for data that is
+never read by a query and never joined to anything.
+
+The cost of switching was at its lowest the hour after it was written, which is
+the other half of why it was worth doing rather than noting as a future task.
+
+**What files cost, honestly.** A row and its file cannot be written in one
+transaction, so two things can go wrong. A file left behind after its item is
+deleted wastes a few kilobytes. A row whose file is missing shows without a
+picture and answers 404 for it. Neither loses anything an agent needs, which is
+what makes the trade acceptable — this would be a different argument for call
+recordings, which are evidence.
+
+The missing-file case has a fix rather than a shrug: the pictures still ship as
+embedded resources in the server assembly, and running `seed` again puts back
+any seeded picture whose file has gone. That covers both a restore that brought
+the database back without the folder and the migration that moved them out.
+Files are named after the item's id, never after anything typed, so there is no
+path to traverse.
 
 Served from their own endpoint rather than inside the list, and cached for a
-day. 44 items carrying 1.2 MB on every keystroke would make the search crawl
-over a VPN; a changed photograph taking a day to appear is a fair trade for a
-picture of a burger.
-
-**When this should change:** past a few tens of megabytes, move to files and
-stream them. At 40 KB an item that is several hundred items away, and the
-endpoint is already the seam to do it behind.
+day — unchanged, and now streamed from disk instead of buffered out of a query.
+44 items carrying 1.2 MB on every keystroke would make the search crawl over a
+VPN; a changed photograph taking a day to appear is a fair trade for a picture
+of a burger.
 
 ### What the spreadsheet needed
 

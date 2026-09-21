@@ -59,7 +59,9 @@ public class MenuController(MenuService menu) : ControllerBase
 
         Response.Headers.CacheControl = "private, max-age=86400";
 
-        return File(image.Value.Bytes, image.Value.ContentType);
+        // Streamed from disk rather than buffered: the bytes never pass through
+        // the database, and ASP.NET closes the stream.
+        return File(image.Value.Stream, image.Value.ContentType);
     }
 
     [HttpPost]

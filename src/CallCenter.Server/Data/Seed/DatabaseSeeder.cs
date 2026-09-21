@@ -16,7 +16,10 @@ namespace CallCenter.Server.Data.Seed;
 /// by hand during installation (runbook step 7) and is easy to repeat after a
 /// half-finished attempt.
 /// </remarks>
-public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logger)
+public class DatabaseSeeder(
+    CallCenterDbContext db,
+    Features.Menu.MenuImageStore images,
+    ILogger<DatabaseSeeder> logger)
 {
     /// <summary>What a run changed, so the caller can report it.</summary>
     public record Result(
@@ -151,6 +154,7 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
     {
         if (await db.MenuItems.AnyAsync(ct))
         {
+            await RestoreMenuImagesAsync(ct);
             return 0;
         }
 
@@ -187,10 +191,9 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
             position.TryGetValue(seed.Category, out var order);
             position[seed.Category] = order + 1;
 
-            var (image, contentType) = LoadMenuImage(seed.Image);
-
-            db.MenuItems.Add(new MenuItem
+            var item = new MenuItem
             {
+                Id = Guid.NewGuid(),
                 Category = category,
                 Name = seed.Name,
                 NameNormalised = NameNormalizer.Normalize(seed.Name),
@@ -199,39 +202,114 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
                 MealPrice = seed.MealPrice,
                 IsSurcharge = seed.IsSurcharge,
                 SortOrder = order,
-                Image = image,
-                ImageContentType = contentType,
-            });
+            };
 
+            // The id is assigned here rather than by the database, because the
+            // picture is written to a file named after it before the row is
+            // saved.
+            item.ImageFileName = await WriteMenuImageAsync(item.Id, seed.Image, ct);
+
+            db.MenuItems.Add(item);
             added++;
         }
 
         return added;
     }
 
-    /// <summary>Reads one embedded menu photograph, or nothing when it is absent.</summary>
-    private (byte[]? Image, string? ContentType) LoadMenuImage(string? fileName)
+    /// <summary>
+    /// Puts back any seeded photograph whose file is missing, for a menu that is
+    /// already in the database.
+    /// </summary>
+    /// <remarks>
+    /// The row and the file are separate things now, so they can be separated:
+    /// by a restore that brought the database back without the images folder, or
+    /// by the migration that moved the pictures out of the database in the first
+    /// place. Either way the fix is to run <c>seed</c> again, and this is what
+    /// makes that work.
+    ///
+    /// Only the items this seed knows about are touched, matched on category and
+    /// folded name. A picture a supervisor uploaded is not ours to recreate, and
+    /// an item that already has its file is left alone.
+    /// </remarks>
+    private async Task RestoreMenuImagesAsync(CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(fileName))
+        var known = SeedData.MenuItems
+            .Where(i => i.Image is not null)
+            .ToDictionary(
+                i => (NameNormalizer.Normalize(i.Category), NameNormalizer.Normalize(i.Name)),
+                i => i.Image!);
+
+        var items = await db.MenuItems
+            .Include(i => i.Category)
+            .ToListAsync(ct);
+
+        var restored = 0;
+
+        foreach (var item in items)
         {
-            return (null, null);
+            if (images.Open(item.ImageFileName) is { } open)
+            {
+                open.Stream.Dispose();
+                continue;
+            }
+
+            var key = (item.Category!.NameNormalised, item.NameNormalised);
+
+            if (!known.TryGetValue(key, out var resource))
+            {
+                continue;
+            }
+
+            var fileName = await WriteMenuImageAsync(item.Id, resource, ct);
+
+            if (fileName is not null)
+            {
+                item.ImageFileName = fileName;
+                restored++;
+            }
+        }
+
+        if (restored > 0)
+        {
+            logger.LogInformation("Restored {Count} menu pictures to disk", restored);
+        }
+    }
+
+    /// <summary>
+    /// Copies one embedded menu photograph out to the images folder, and returns
+    /// the file name to record on the row.
+    /// </summary>
+    /// <remarks>
+    /// The pictures ship inside the assembly so a fresh install needs the one
+    /// DLL and no folder beside it; the seed then writes them where the server
+    /// serves them from and the nightly backup copies them.
+    ///
+    /// A picture that cannot be written leaves the item without one rather than
+    /// failing the seed: a menu without a photograph is usable, and losing the
+    /// whole installation over one image would not be.
+    /// </remarks>
+    private async Task<string?> WriteMenuImageAsync(Guid itemId, string? resourceName, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(resourceName))
+        {
+            return null;
         }
 
         var assembly = typeof(DatabaseSeeder).Assembly;
-        var resource = $"CallCenter.Server.Data.Seed.MenuImages.{fileName}";
+        var resource = $"CallCenter.Server.Data.Seed.MenuImages.{resourceName}";
 
-        using var stream = assembly.GetManifestResourceStream(resource);
+        await using var stream = assembly.GetManifestResourceStream(resource);
 
         if (stream is null)
         {
-            logger.LogWarning("Menu picture {File} is not embedded in the assembly; skipped", fileName);
-            return (null, null);
+            logger.LogWarning("Menu picture {File} is not embedded in the assembly; skipped", resourceName);
+            return null;
         }
 
         using var buffer = new MemoryStream();
-        stream.CopyTo(buffer);
+        await stream.CopyToAsync(buffer, ct);
 
-        return (buffer.ToArray(), "image/png");
+        return await images.SaveAsync(itemId, buffer.ToArray(), "image/png", ct);
     }
 
     private async Task<int> SeedBranchesAsync(IReadOnlyList<string>? names, CancellationToken ct)

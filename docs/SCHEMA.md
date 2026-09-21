@@ -301,8 +301,7 @@ CREATE TABLE menu_items (
   price              numeric(10,2),               -- item alone, or the sandwich
   meal_price         numeric(10,2),               -- with fries and a drink
   is_surcharge       boolean NOT NULL DEFAULT false,
-  image              bytea,                       -- the menu photograph
-  image_content_type varchar(100),
+  image_file_name    varchar(200),                -- the photograph, under the menu-images folder
   sort_order         int NOT NULL DEFAULT 0,
   is_active          boolean NOT NULL DEFAULT true,
   created_by         uuid REFERENCES users(id),
@@ -330,12 +329,18 @@ CREATE INDEX ix_menu_item_order ON menu_items(category_id, sort_order);
   reads as a portion of cheese costing 2.
 - **The name is unique per category, not globally** — unlike delivery areas.
   Two categories may each legitimately hold a "كولا".
-- **The picture lives in the database.** The whole menu is 1.2 MB, the backup
-  already covers the database (runbook step 9), and a folder of images is one
-  more thing to back up separately and forget. It is served from its own
-  endpoint rather than inside the list, so a search does not carry megabytes.
-  Past a few tens of megabytes this should move to files; at 40 KB an item, that
-  is several hundred items away.
+- **The picture is a file, and this column is only its name.** The first
+  version stored the bytes here as `bytea`; that was wrong because **`rsync` is
+  incremental and `pg_dump` is not**. Menu photographs never change, so on disk
+  the nightly backup (runbook step 9) copies them once, while in the database
+  they were re-dumped and re-copied every night for ever. The backup already
+  rsyncs a data folder — the recordings — so files were never the extra thing to
+  remember they were assumed to be.
+  The name is the item's id plus an extension, never anything typed, so there is
+  no path to traverse. Storing it rather than deriving it lets the list say
+  whether an item has a picture without asking the disk once per row.
+  A row whose file is missing simply has no picture and answers 404 for it; the
+  pictures ship as embedded resources, so re-running `seed` puts them back.
 
 ---
 

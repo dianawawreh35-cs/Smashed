@@ -50,9 +50,14 @@ services:
       # Encrypts the agents' SIP secrets in the users table.
       Security__SipSecretKey: ${SIP_SECRET_KEY}
       Recordings__Path: /data/recordings
+      # The menu photographs (A-66). A folder rather than rows, because the
+      # nightly rsync copies unchanged files once and pg_dump re-dumps them
+      # every night.
+      MenuImages__Path: /data/menu-images
       TZ: ${TZ:-Asia/Hebron}
     volumes:
       - ./data/recordings:/data/recordings
+      - ./data/menu-images:/data/menu-images
       - ./data/logs:/app/logs
     depends_on:
       db:

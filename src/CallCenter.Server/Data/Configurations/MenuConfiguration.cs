@@ -38,7 +38,7 @@ public class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
         builder.Property(x => x.NameNormalised).IsRequired().HasMaxLength(200);
         builder.Property(x => x.Price).HasPrecision(10, 2);
         builder.Property(x => x.MealPrice).HasPrecision(10, 2);
-        builder.Property(x => x.ImageContentType).HasMaxLength(100);
+        builder.Property(x => x.ImageFileName).HasMaxLength(200);
         builder.Property(x => x.IsActive).HasDefaultValue(true);
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");

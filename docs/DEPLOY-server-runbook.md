@@ -116,11 +116,11 @@ docker compose version
 
 ## Step 5 — Application folder and settings
 
-**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, PBX address, the CDR pull account) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database or recordings.
+**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, PBX address, the CDR pull account) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database, the recordings or the menu photographs.
 
 **Work**
 ```bash
-sudo mkdir -p /opt/callcenter/data/postgres /opt/callcenter/data/recordings /opt/callcenter/backups
+sudo mkdir -p /opt/callcenter/data/postgres /opt/callcenter/data/recordings /opt/callcenter/data/menu-images /opt/callcenter/backups
 sudo chown -R smashed:smashed /opt/callcenter
 cd /opt/callcenter
 ```
@@ -184,8 +184,10 @@ services:
     environment:
       ConnectionStrings__Default: Host=127.0.0.1;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}
       Recordings__Path: /data/recordings
+      MenuImages__Path: /data/menu-images
     volumes:
       - ./data/recordings:/data/recordings
+      - ./data/menu-images:/data/menu-images
     depends_on:
       db:
         condition: service_healthy
@@ -421,7 +423,7 @@ Test: call the restaurant number and hang up while it is still ringing. It shoul
 
 ## Step 9 — Backups
 
-**What it does:** dumps the database to a file and copies recordings to a second disk or network share every night, scheduled by cron (Linux's scheduler). A backup you have never restored is a hope, not a backup — so you test a restore on your own PC before handover (it's an acceptance item in the contract).
+**What it does:** dumps the database to a file and copies the recordings and the menu photographs to a second disk or network share every night, scheduled by cron (Linux's scheduler). A backup you have never restored is a hope, not a backup — so you test a restore on your own PC before handover (it's an acceptance item in the contract).
 
 **Work**
 Mount the backup disk (example: second SSD/USB at `/mnt/backup`):
@@ -440,6 +442,7 @@ D=$(date +%F)
 cd /opt/callcenter
 docker compose exec -T db pg_dump -U callcenter callcenter | gzip > backups/db-$D.sql.gz
 rsync -a --delete data/recordings/ /mnt/backup/recordings/
+rsync -a --delete data/menu-images/ /mnt/backup/menu-images/
 cp backups/db-$D.sql.gz /mnt/backup/
 find backups -name 'db-*.sql.gz' -mtime +30 -delete
 find /mnt/backup -name 'db-*.sql.gz' -mtime +30 -delete
@@ -489,7 +492,7 @@ Point a local API at it and confirm calls and contacts are there.
 
 ## Updating later
 
-**What it does:** swaps the API container for the new version in seconds. Database and recordings are untouched; migrations bring the schema up to date; agent apps update themselves at next launch. Phones never stop because they don't depend on the server.
+**What it does:** swaps the API container for the new version in seconds. Database, recordings and menu photographs are untouched; migrations bring the schema up to date; agent apps update themselves at next launch. Phones never stop because they don't depend on the server.
 
 Use `update.sh` rather than doing this by hand — it backs up first, verifies the
 new version answers `/health`, and rolls back automatically if it does not.

@@ -19,14 +19,13 @@ namespace CallCenter.Server.Features.Menu;
 /// written in Arabic — سماشد, ماشروم, كرسبي — and nobody spells them the
 /// same way twice.
 /// </remarks>
-public class MenuService(CallCenterDbContext db, ILogger<MenuService> logger)
+public class MenuService(
+    CallCenterDbContext db,
+    MenuImageStore images,
+    ILogger<MenuService> logger)
 {
     /// <summary>The largest picture accepted, in bytes. Menu photographs, not posters.</summary>
     public const int MaxImageBytes = 2 * 1024 * 1024;
-
-    /// <summary>What a picture may be. Anything else is refused rather than stored.</summary>
-    public static readonly IReadOnlyList<string> AllowedImageTypes =
-        ["image/png", "image/jpeg", "image/webp"];
 
     public enum Failure
     {
@@ -94,7 +93,7 @@ public class MenuService(CallCenterDbContext db, ILogger<MenuService> logger)
                 i.Price,
                 i.MealPrice,
                 i.IsSurcharge,
-                i.Image != null,
+                i.ImageFileName != null,
                 i.IsActive))
             .ToListAsync(ct);
     }
@@ -118,25 +117,24 @@ public class MenuService(CallCenterDbContext db, ILogger<MenuService> logger)
     }
 
     /// <summary>
-    /// One item's picture, or null when it has none.
+    /// One item's picture, opened for streaming, or null when it has none.
     /// </summary>
     /// <remarks>
-    /// Fetched by itself so the list can stay small. Returns the bytes and the
-    /// media type together, because serving a PNG as a JPEG is the sort of thing
-    /// that works in one client and not another.
+    /// One small query for the file name, then the file itself — the bytes never
+    /// pass through the database. A row whose file is missing answers null and
+    /// the endpoint gives a 404, which is what a restore that brought the
+    /// database back without the folder would produce.
     /// </remarks>
-    public async Task<(byte[] Bytes, string ContentType)?> ImageAsync(
+    public async Task<(Stream Stream, string ContentType)?> ImageAsync(
         Guid id, CancellationToken ct = default)
     {
-        var row = await db.MenuItems
+        var fileName = await db.MenuItems
             .AsNoTracking()
-            .Where(i => i.Id == id && i.Image != null)
-            .Select(i => new { i.Image, i.ImageContentType })
+            .Where(i => i.Id == id)
+            .Select(i => i.ImageFileName)
             .FirstOrDefaultAsync(ct);
 
-        return row?.Image is null
-            ? null
-            : (row.Image, row.ImageContentType ?? "application/octet-stream");
+        return images.Open(fileName);
     }
 
     public async Task<(MenuItemDto? Item, Failure? Failure)> CreateAsync(
@@ -252,19 +250,30 @@ public class MenuService(CallCenterDbContext db, ILogger<MenuService> logger)
             return Failure.NotFound;
         }
 
-        if (bytes is not null)
+        if (bytes is null)
+        {
+            images.Delete(id);
+            item.ImageFileName = null;
+        }
+        else
         {
             if (bytes.Length == 0
                 || bytes.Length > MaxImageBytes
-                || contentType is null
-                || !AllowedImageTypes.Contains(contentType))
+                || !MenuImageStore.IsAllowed(contentType))
             {
                 return Failure.BadImage;
             }
+
+            var fileName = await images.SaveAsync(id, bytes, contentType!, ct);
+
+            if (fileName is null)
+            {
+                return Failure.BadImage;
+            }
+
+            item.ImageFileName = fileName;
         }
 
-        item.Image = bytes;
-        item.ImageContentType = bytes is null ? null : contentType;
         item.UpdatedBy = actingUserId;
         item.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -273,8 +282,25 @@ public class MenuService(CallCenterDbContext db, ILogger<MenuService> logger)
         return null;
     }
 
-    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default) =>
-        await db.MenuItems.Where(i => i.Id == id).ExecuteDeleteAsync(ct) > 0;
+    /// <summary>
+    /// Removes an item and its picture (S-59).
+    /// </summary>
+    /// <remarks>
+    /// The row goes first. A file left behind because the delete failed wastes a
+    /// few kilobytes; a row left behind pointing at a deleted file would show a
+    /// broken picture to every agent.
+    /// </remarks>
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var removed = await db.MenuItems.Where(i => i.Id == id).ExecuteDeleteAsync(ct) > 0;
+
+        if (removed)
+        {
+            images.Delete(id);
+        }
+
+        return removed;
+    }
 
     public async Task<MenuItemDto?> GetAsync(Guid id, CancellationToken ct = default) =>
         await db.MenuItems
@@ -282,7 +308,7 @@ public class MenuService(CallCenterDbContext db, ILogger<MenuService> logger)
             .Where(i => i.Id == id)
             .Select(i => new MenuItemDto(
                 i.Id, i.CategoryId, i.Category.Name, i.Name, i.Description,
-                i.Price, i.MealPrice, i.IsSurcharge, i.Image != null, i.IsActive))
+                i.Price, i.MealPrice, i.IsSurcharge, i.ImageFileName != null, i.IsActive))
             .FirstOrDefaultAsync(ct);
 
     public async Task<(MenuCategoryDto? Category, Failure? Failure)> CreateCategoryAsync(

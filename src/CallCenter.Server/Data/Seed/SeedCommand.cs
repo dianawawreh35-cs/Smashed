@@ -44,12 +44,11 @@ public static class SeedCommand
             await DatabaseInitialiser.MigrateAsync(app.Services);
 
             await using var scope = app.Services.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<CallCenterDbContext>();
-            var logger = scope.ServiceProvider
-                .GetRequiredService<ILoggerFactory>()
-                .CreateLogger<DatabaseSeeder>();
 
-            var seeder = new DatabaseSeeder(db, logger);
+            // Resolved rather than constructed by hand: the seeder now also
+            // writes the menu photographs to disk, and asking the container for
+            // it keeps this command from having to know what else it needs.
+            var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
 
             var result = await seeder.SeedAsync(
                 options.AdminLogin,

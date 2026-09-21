@@ -95,21 +95,23 @@ public class MenuItem
     public bool IsSurcharge { get; set; }
 
     /// <summary>
-    /// The picture, as it appears on the printed menu. Null where the menu has
-    /// none — the add-ons have no photographs.
+    /// The file holding this item's picture, under the menu-images folder. Null
+    /// where the menu has none — the add-ons have no photographs.
     /// </summary>
     /// <remarks>
-    /// Held in the database rather than on disk. The whole menu is 1.2 MB, the
-    /// backup already covers the database (runbook step 9), and a folder of
-    /// images is one more thing to back up separately and forget. If the menu
-    /// ever grows past a few tens of megabytes this should move to files and an
-    /// endpoint that streams them; at 40 KB an item that is several hundred
-    /// items away.
+    /// A file on disk, not bytes in this row. The first version stored the bytes
+    /// here; that was wrong because <b>rsync is incremental and
+    /// <c>pg_dump</c> is not</b>. Menu photographs never change, so on disk the
+    /// nightly backup copies them once, while in the database they were
+    /// re-dumped and re-copied every night for ever. The backup script already
+    /// covers a data folder — the recordings — so files were never the extra
+    /// thing to remember they were assumed to be.
+    ///
+    /// The name is the item's id plus an extension. Storing it rather than
+    /// deriving it means the list can say whether an item has a picture without
+    /// asking the disk once per row.
     /// </remarks>
-    public byte[]? Image { get; set; }
-
-    /// <summary>The image's media type, so the endpoint can serve it correctly.</summary>
-    public string? ImageContentType { get; set; }
+    public string? ImageFileName { get; set; }
 
     /// <summary>Position within the category, following the printed menu.</summary>
     public int SortOrder { get; set; }

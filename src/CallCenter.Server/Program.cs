@@ -60,6 +60,10 @@ try
     builder.Services.AddScoped<ContactFlagsService>();
     builder.Services.AddScoped<CommunicationsService>();
     builder.Services.AddScoped<DeliveryAreasService>();
+    builder.Services.AddOptions<MenuImageOptions>()
+        .Bind(builder.Configuration.GetSection(MenuImageOptions.SectionName))
+        .ValidateDataAnnotations();
+    builder.Services.AddSingleton<MenuImageStore>();
     builder.Services.AddScoped<MenuService>();
     builder.Services.AddScoped<SettingsService>();
 

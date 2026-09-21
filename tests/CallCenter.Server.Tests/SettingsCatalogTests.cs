@@ -52,9 +52,6 @@ public class SettingsCatalogTests
     [InlineData("agent.edit_window", "SameDay", true)]
     [InlineData("agent.edit_window", "Always", true)]
     [InlineData("agent.edit_window", "Whenever", false)]
-    [InlineData("pbx.ami.enabled", "true", true)]
-    [InlineData("pbx.ami.enabled", "false", true)]
-    [InlineData("pbx.ami.enabled", "yes", false)]
     public void Values_are_policed(string key, string value, bool expectedValid)
     {
         var definition = SettingsCatalog.Find(key);

@@ -32,9 +32,11 @@ public static class SettingsCatalog
         // unconfigured rather than failing.
         new("pbx.host", SettingKinds.Text, null, _ => null),
 
-        new("callback.extension", SettingKinds.Text, null, _ => null),
-
-        new("pbx.ami.enabled", SettingKinds.Boolean, null, ValidateBoolean),
+        // Removed 2026-09-21: callback.extension and pbx.ami.enabled. Both
+        // belonged to approaches ruled out in SRS 4.5 - AMI needs an inbound
+        // port to the PBX, and the call-back extension answered a waiting
+        // caller and hung up on them. A setting the supervisor can type into
+        // that changes nothing is worse than a missing one.
 
         // S-48: the other agents' and the branches' extension numbers, comma
         // separated. A call whose other party is on this list is internal -
@@ -92,6 +94,15 @@ public static class SettingsCatalog
             : $"must be numbers separated by commas; check {string.Join(", ", bad)}";
     }
 
+    /// <summary>
+    /// For a <see cref="SettingKinds.Boolean"/> setting.
+    /// </summary>
+    /// <remarks>
+    /// Nothing uses it since <c>pbx.ami.enabled</c> was removed on 2026-09-21.
+    /// Kept rather than deleted: the boolean kind is supported the whole way
+    /// through, including a proper control on the supervisor's screen, so the
+    /// next yes/no setting needs this line and not a rewrite.
+    /// </remarks>
     private static string? ValidateBoolean(string value) =>
         bool.TryParse(value, out _) ? null : "must be true or false";
 

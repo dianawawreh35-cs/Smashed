@@ -103,9 +103,7 @@ public class SeedDataTests
             "agent.idle_logout_minutes",
             "agent.edit_window",
             "sla.answer_seconds",
-            "callback.extension",
             "pbx.host",
-            "pbx.ami.enabled",
             "reports.internal_numbers",
             "agent.call_log_days",
         ]);
@@ -116,7 +114,6 @@ public class SeedDataTests
     [InlineData("agent.idle_logout_minutes", "30")]  // A-05
     [InlineData("agent.edit_window", "SameDay")]     // A-42
     [InlineData("sla.answer_seconds", "20")]         // R-21
-    [InlineData("pbx.ami.enabled", "false")]         // 4.5 - confirmed at installation
     [InlineData("agent.call_log_days", "7")]         // A-50
     public void Setting_defaults_match_the_schema(string key, string expected)
     {
@@ -129,7 +126,7 @@ public class SeedDataTests
         // Filled in during installation once the client's PBX person confirms them.
         // reports.internal_numbers too: blank means every call counts as a
         // customer call, which is the right default before S-48 is filled in.
-        foreach (var key in new[] { "callback.extension", "pbx.host", "reports.internal_numbers" })
+        foreach (var key in new[] { "pbx.host", "reports.internal_numbers" })
         {
             SeedData.Settings.Single(s => s.Key == key).Value.Should().BeEmpty();
         }

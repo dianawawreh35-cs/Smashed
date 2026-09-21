@@ -96,14 +96,6 @@
         "label": "PBX host (SIP)",
         "hint": "The address the Agent Apps register to over the VPN. Leave blank if it is not known yet."
       },
-      "callback.extension": {
-        "label": "Call-back extension",
-        "hint": "An extension the server uses for calls that never reached an agent."
-      },
-      "pbx.ami.enabled": {
-        "label": "Enable AMI",
-        "hint": "Deferred with section 4.5 - has no effect yet."
-      },
       "agent.idle_logout_minutes": {
         "label": "Automatic logout (minutes)",
         "hint": "Laptops are shared between shifts, so the previous agent must not stay signed in."

@@ -1799,6 +1799,28 @@ matched to an area, and address matching does not exist — A-13 matches phone
 numbers, not places. The agent looks it up on the Delivery tab, which is what
 was asked for.
 
+## 2026-09-21 — Two settings that did nothing are gone
+
+`callback.extension` and `pbx.ami.enabled` were still seeded and still on the
+supervisor's Settings page. Both belonged to approaches ruled out on 19
+September: AMI needs an inbound port to the PBX, and the call-back extension
+answered a waiting caller and hung up on them.
+
+Noticed by the developer reading the list of what a fresh server gets, and
+removed. **A setting somebody can type into that changes nothing is worse than a
+missing one** — a supervisor would enter a call-back extension, save, and wait
+for behaviour that no longer exists anywhere in the system.
+
+Removed from the catalogue, the seed, the seeded-settings tests, the schema
+document and both language files. `ValidateBoolean` is now unused and was kept
+with a note: the boolean kind is supported the whole way through, including a
+control on the supervisor's screen, so the next yes/no setting needs that line
+rather than a rewrite.
+
+This had been recorded twice as a follow-up "to be done with the CDR importer".
+It took five minutes and did not need the importer at all, which is the usual
+shape of a deferred tidy-up.
+
 ---
 
 # How this project is tracked

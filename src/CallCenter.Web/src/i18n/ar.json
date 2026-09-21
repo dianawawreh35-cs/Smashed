@@ -308,7 +308,21 @@
       "category_not_empty": "انقل أو احذف أصناف هذه الفئة أولاً.",
       "invalid_request": "تعذّر الحفظ. تحقّق من الحقول.",
       "server_unreachable": "تعذّر الوصول إلى الخادم.",
-      "server_error": "حدث خطأ في الخادم. حاول مرة أخرى."
-    }
+      "server_error": "حدث خطأ في الخادم. حاول مرة أخرى.",
+      "duplicate_category": "توجد فئة بهذا الاسم بالفعل.",
+      "category_not_found": "لا توجد فئة بهذا المعرّف."
+    },
+    "manageCategories": "إدارة الفئات",
+    "categories": "فئات القائمة",
+    "newCategory": "فئة جديدة",
+    "addCategory": "إضافة فئة",
+    "categoryName": "اسم الفئة",
+    "itemCount": "{{count}} صنف",
+    "moveUp": "تحريك للأعلى",
+    "moveDown": "تحريك للأسفل",
+    "shown": "ظاهرة",
+    "close": "إغلاق",
+    "noPicture": "بلا صورة",
+    "removePicture": "حذف الصورة الحالية"
   }
 }

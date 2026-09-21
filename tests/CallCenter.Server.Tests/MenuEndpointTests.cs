@@ -30,6 +30,7 @@ public class MenuEndpointTests(CallCenterApiFactory factory)
         { "PUT", SomeItem },
         { "DELETE", SomeItem },
         { "POST", "/api/menu/categories" },
+        { "PUT", "/api/menu/categories/11111111-1111-1111-1111-111111111111" },
         { "DELETE", "/api/menu/categories/11111111-1111-1111-1111-111111111111" },
     };
 
@@ -81,6 +82,16 @@ public class MenuEndpointTests(CallCenterApiFactory factory)
         // Zero is meant - a free extra - so only negatives are wrong.
         var response = await ClientFor(UserRoles.Supervisor).PostAsJsonAsync(
             "/api/menu", new { categoryId = Guid.NewGuid(), name = "Something", price = -5 });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task A_category_with_no_name_is_refused_before_the_database()
+    {
+        // A blank name would fold to nothing and collide with the next blank one.
+        var response = await ClientFor(UserRoles.Supervisor).PostAsJsonAsync(
+            "/api/menu/categories", new { name = "" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }

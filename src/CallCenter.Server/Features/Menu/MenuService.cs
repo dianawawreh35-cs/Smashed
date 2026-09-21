@@ -37,6 +37,16 @@ public class MenuService(
         /// <summary>The picture is too large, or not a picture.</summary>
         BadImage,
 
+        /// <summary>
+        /// Another category already has this name. Separate from
+        /// <see cref="DuplicateName"/> so the screen can say "category" rather
+        /// than telling a supervisor renaming a category about an item.
+        /// </summary>
+        DuplicateCategoryName,
+
+        /// <summary>No such category.</summary>
+        CategoryNotFound,
+
         /// <summary>A category still holding items cannot be removed.</summary>
         CategoryNotEmpty,
     }
@@ -324,7 +334,7 @@ public class MenuService(
 
         if (await db.MenuCategories.AnyAsync(c => c.NameNormalised == normalised, ct))
         {
-            return (null, Failure.DuplicateName);
+            return (null, Failure.DuplicateCategoryName);
         }
 
         var category = new MenuCategory
@@ -342,6 +352,57 @@ public class MenuService(
     }
 
     /// <summary>
+    /// Renames a category, moves it in the printed order, or hides it (S-59).
+    /// </summary>
+    /// <remarks>
+    /// Hiding rather than removing is the usual case: a category that held items
+    /// cannot be deleted, and "we do not sell these in Ramadan" is a thing a
+    /// supervisor needs to be able to say without losing the items.
+    ///
+    /// Hiding a category does not hide its items. An agent searching for
+    /// "كرسبي" should still find it; what the category controls is whether it
+    /// appears as a heading in the list read in printed order.
+    /// </remarks>
+    public async Task<(MenuCategoryDto? Category, Failure? Failure)> UpdateCategoryAsync(
+        Guid id, UpsertMenuCategoryRequest request, CancellationToken ct = default)
+    {
+        var category = await db.MenuCategories.FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (category is null)
+        {
+            return (null, Failure.CategoryNotFound);
+        }
+
+        var name = request.Name.Trim();
+        var normalised = NameNormalizer.Normalize(name);
+
+        if (normalised.Length == 0)
+        {
+            return (null, Failure.NoName);
+        }
+
+        // Folded, so "كولا" and "كولا " are the same name. The category being
+        // renamed is excluded, or saving it unchanged would collide with itself.
+        if (await db.MenuCategories.AnyAsync(
+                c => c.Id != id && c.NameNormalised == normalised, ct))
+        {
+            return (null, Failure.DuplicateCategoryName);
+        }
+
+        category.Name = name;
+        category.NameNormalised = normalised;
+        category.SortOrder = request.SortOrder;
+        category.IsActive = request.IsActive;
+
+        await db.SaveChangesAsync(ct);
+
+        var itemCount = await db.MenuItems.CountAsync(i => i.CategoryId == id, ct);
+
+        return (new MenuCategoryDto(
+            category.Id, category.Name, category.SortOrder, category.IsActive, itemCount), null);
+    }
+
+    /// <summary>
     /// Removes a category (S-59). Refused while it still holds items.
     /// </summary>
     /// <remarks>
@@ -356,7 +417,7 @@ public class MenuService(
         }
 
         var removed = await db.MenuCategories.Where(c => c.Id == id).ExecuteDeleteAsync(ct);
-        return removed > 0 ? null : Failure.NotFound;
+        return removed > 0 ? null : Failure.CategoryNotFound;
     }
 
     private static string? Trimmed(string? value) =>

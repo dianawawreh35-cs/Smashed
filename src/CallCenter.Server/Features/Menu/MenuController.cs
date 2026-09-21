@@ -130,6 +130,16 @@ public class MenuController(MenuService menu) : ControllerBase
         return failure is not null ? Problem(failure.Value) : Ok(category);
     }
 
+    [HttpPut("categories/{id:guid}")]
+    [Authorize(AuthPolicies.SupervisorOnly)]
+    [ProducesResponseType<MenuCategoryDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<MenuCategoryDto>> UpdateCategory(
+        Guid id, UpsertMenuCategoryRequest request, CancellationToken ct)
+    {
+        var (category, failure) = await menu.UpdateCategoryAsync(id, request, ct);
+        return failure is not null ? Problem(failure.Value) : Ok(category);
+    }
+
     [HttpDelete("categories/{id:guid}")]
     [Authorize(AuthPolicies.SupervisorOnly)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -156,6 +166,11 @@ public class MenuController(MenuService menu) : ControllerBase
             MenuService.Failure.BadImage =>
                 (StatusCodes.Status400BadRequest, "bad_image",
                     "The picture must be a PNG, JPEG or WebP under 2 MB."),
+            MenuService.Failure.DuplicateCategoryName =>
+                (StatusCodes.Status409Conflict, "duplicate_category",
+                    "A category with this name already exists."),
+            MenuService.Failure.CategoryNotFound =>
+                (StatusCodes.Status404NotFound, "category_not_found", "No such category."),
             MenuService.Failure.CategoryNotEmpty =>
                 (StatusCodes.Status409Conflict, "category_not_empty",
                     "Move or delete this category's items first."),

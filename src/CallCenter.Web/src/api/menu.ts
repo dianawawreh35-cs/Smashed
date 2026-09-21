@@ -54,8 +54,17 @@ export const updateMenuItem = (id: string, request: UpsertMenuItemRequest) =>
 
 export const deleteMenuItem = (id: string) => api.delete<void>(`/menu/${id}`)
 
-export const createMenuCategory = (name: string, sortOrder: number) =>
-  api.post<MenuCategory>('/menu/categories', { name, sortOrder, isActive: true })
+export interface UpsertMenuCategoryRequest {
+  name: string
+  sortOrder: number
+  isActive: boolean
+}
+
+export const createMenuCategory = (request: UpsertMenuCategoryRequest) =>
+  api.post<MenuCategory>('/menu/categories', request)
+
+export const updateMenuCategory = (id: string, request: UpsertMenuCategoryRequest) =>
+  api.put<MenuCategory>(`/menu/categories/${id}`, request)
 
 export const deleteMenuCategory = (id: string) => api.delete<void>(`/menu/categories/${id}`)
 
@@ -64,6 +73,17 @@ export const deleteMenuCategory = (id: string) => api.delete<void>(`/menu/catego
  * browser caches it — the server marks these good for a day.
  */
 export const menuImageUrl = (id: string) => `${API_BASE_URL}/menu/${id}/image`
+
+/**
+ * The same picture, but bypassing the cache.
+ *
+ * The server marks pictures good for a day, which is right for agents and wrong
+ * for the supervisor who has just replaced one: without this they would upload a
+ * new photograph and go on seeing the old one. The stamp changes on every save,
+ * so the browser is asked for a URL it has never seen.
+ */
+export const freshMenuImageUrl = (id: string, stamp: number) =>
+  `${menuImageUrl(id)}?v=${stamp}`
 
 /**
  * Replaces an item's picture, or removes it when `file` is null.

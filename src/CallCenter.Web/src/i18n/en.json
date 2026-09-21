@@ -308,7 +308,21 @@
       "category_not_empty": "Move or delete this category's items first.",
       "invalid_request": "It could not be saved. Check the fields.",
       "server_unreachable": "The server could not be reached.",
-      "server_error": "The server reported an error. Please try again."
-    }
+      "server_error": "The server reported an error. Please try again.",
+      "duplicate_category": "A category with this name already exists.",
+      "category_not_found": "No such category."
+    },
+    "manageCategories": "Manage categories",
+    "categories": "Menu categories",
+    "newCategory": "New category",
+    "addCategory": "Add category",
+    "categoryName": "Category name",
+    "itemCount": "{{count}} items",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "shown": "Shown",
+    "close": "Close",
+    "noPicture": "No picture",
+    "removePicture": "Remove the current picture"
   }
 }

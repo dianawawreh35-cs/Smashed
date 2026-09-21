@@ -1933,6 +1933,70 @@ customer without anybody blinking:
 The schema test caught the two new tables before anything else did, as it did
 for the delivery areas.
 
+## 2026-09-21 — The menu screen finishes: categories, and pictures that can be taken away
+
+Dia asked for the supervisor to be able to add and edit menu items — name,
+price, picture. Most of that was already built and had simply never been opened:
+the form adds, edits, hides and removes items, and uploads a picture. Three
+things were genuinely missing, and all three were missing in the same way — they
+only bite the second time you use the screen.
+
+### You could not add a category
+
+The form picked from a list of twelve seeded categories and there was no way to
+make a thirteenth. Adding "حلويات" to the menu was impossible from the screen,
+which makes "add a menu item" false for any item that does not fit what the
+spreadsheet happened to contain. The API had create and delete; renaming needed
+a new endpoint (`PUT /api/menu/categories/{id}`).
+
+Kept behind a **Manage categories** button rather than sitting on the page.
+Categories change once a season and items change weekly; a screen that shows
+both at once makes the rare thing as loud as the common one.
+
+**Hiding a category does not hide its items.** A category holding items cannot
+be deleted — the foreign key refuses it and so do we, with a message that says
+why — so hiding is what a supervisor actually reaches for. An agent searching
+"كرسبي" mid-call should still find it; what hiding controls is whether the
+category appears as a heading when the menu is read in printed order. Recorded
+in S-59 because it is the kind of thing that gets "fixed" later by someone who
+assumes the opposite.
+
+Order is nudged with arrows rather than dragged. Twelve categories reordered
+once a season does not justify a drag-and-drop library.
+
+### You could not tell whether an item already had a picture
+
+The edit form showed an empty file input and nothing else. So a supervisor
+opening an item could not tell whether they were adding a picture or replacing
+one, and **there was no way to remove a wrong picture at all** — only to cover it
+with another. The client already had `setMenuImage(id, null)`; nothing called it.
+
+The form now shows the current picture, shows the chosen file before saving, and
+offers a **Remove the current picture** box when there is one. Picking a file
+and asking to remove one are made mutually exclusive in the UI rather than left
+to whichever the save code checked first.
+
+### The new picture would not have appeared for a day
+
+This one would have been reported as "the upload does not work". Pictures are
+served with `Cache-Control: max-age=86400`, which is right for agents and wrong
+for the supervisor who just replaced one: the browser would go on showing
+yesterday's photograph. Every picture URL on this screen now carries a stamp
+that changes on each save, so the browser is asked for a URL it has never seen.
+The agents' day-long cache is untouched.
+
+### Tests
+
+Six on the screen, covering what would otherwise be quoted wrongly to a
+customer: a surcharge shown as "+2" and not "2", a blank price sent as **null**
+and not zero, the picture uploaded *after* the item exists (it needs the id),
+the picture removable, and categories renamed and added. Plus the door on the
+new endpoint, which is supervisor-only like the rest.
+
+`duplicate_category` and `category_not_found` are new error codes. The rename
+path was about to tell a supervisor renaming a category that "that category
+already has an item with this name".
+
 ---
 
 # How this project is tracked
@@ -1979,7 +2043,6 @@ and what comes after:
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
-| Menu category management on the supervisor screen | S-59 | nothing — the API exists, the screen only picks from them |
 | Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |
 
 **A-17 works against the real PBX**, confirmed by test calls, and since A-14 the

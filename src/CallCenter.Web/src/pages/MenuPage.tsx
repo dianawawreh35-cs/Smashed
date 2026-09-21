@@ -1,17 +1,20 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
+  createMenuCategory,
   createMenuItem,
+  deleteMenuCategory,
   deleteMenuItem,
+  freshMenuImageUrl,
   listMenuCategories,
-  menuImageUrl,
   searchMenu,
   setMenuImage,
+  updateMenuCategory,
   updateMenuItem,
 } from '../api/menu'
-import type { MenuItem } from '../api/menu'
+import type { MenuCategory, MenuItem } from '../api/menu'
 import { errorCodeOf } from '../api/users'
 
 /**
@@ -26,6 +29,12 @@ export default function MenuPage() {
   const [query, setQuery] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [editing, setEditing] = useState<MenuItem | 'new' | null>(null)
+  const [managingCategories, setManagingCategories] = useState(false)
+
+  // Bumped whenever an item is saved, and appended to every picture URL. The
+  // server marks pictures good for a day, so without this a supervisor who
+  // replaced a photograph would go on seeing the old one until tomorrow.
+  const [imageStamp, setImageStamp] = useState(() => Date.now())
 
   const { data: categories } = useQuery({
     queryKey: ['menu-categories'],
@@ -44,10 +53,21 @@ export default function MenuPage() {
           <h2 className="page-title">{t('menu.heading')}</h2>
           <p className="page-subtitle">{t('menu.intro')}</p>
         </div>
-        <button type="button" onClick={() => setEditing('new')} className="btn-primary">
-          {t('menu.add')}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setManagingCategories((open) => !open)}
+            className="btn-ghost"
+          >
+            {t('menu.manageCategories')}
+          </button>
+          <button type="button" onClick={() => setEditing('new')} className="btn-primary">
+            {t('menu.add')}
+          </button>
+        </div>
       </div>
+
+      {managingCategories && <CategoryManager onClose={() => setManagingCategories(false)} />}
 
       <div className="flex flex-wrap items-center gap-3">
         <input
@@ -77,18 +97,202 @@ export default function MenuPage() {
       </div>
 
       {editing && (
-        <ItemForm item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
+        <ItemForm
+          item={editing === 'new' ? null : editing}
+          imageStamp={imageStamp}
+          onSaved={() => setImageStamp(Date.now())}
+          onClose={() => setEditing(null)}
+        />
       )}
 
       {isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : items && items.length > 0 ? (
-        <ItemTable items={items} onEdit={setEditing} />
+        <ItemTable items={items} imageStamp={imageStamp} onEdit={setEditing} />
       ) : (
         <div className="card card-body text-center">
           <p className="text-slate-300">{query ? t('menu.noMatches') : t('menu.empty')}</p>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The categories that group the menu (S-59).
+ *
+ * Kept behind a button rather than on the page: categories change once a
+ * season, items change weekly, and a screen that shows both at once makes the
+ * rare thing as loud as the common one.
+ *
+ * Hiding is offered beside removing because removing is usually refused — a
+ * category holding items cannot be deleted, and "we are not selling these this
+ * month" is what the supervisor actually means.
+ */
+function CategoryManager({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
+  const [newName, setNewName] = useState('')
+
+  const { data: categories } = useQuery({
+    queryKey: ['menu-categories'],
+    queryFn: listMenuCategories,
+  })
+
+  // Both lists are invalidated on every change: an item's row prints its
+  // category's name, so renaming one leaves the table wrong until it refetches.
+  function refresh() {
+    void queryClient.invalidateQueries({ queryKey: ['menu-categories'] })
+    void queryClient.invalidateQueries({ queryKey: ['menu'] })
+  }
+
+  const fail = (e: unknown) => setError(t(`menu.errors.${errorCodeOf(e)}`))
+
+  const add = useMutation({
+    mutationFn: () =>
+      createMenuCategory({
+        name: newName.trim(),
+        // Added at the end of the printed order. There is no drag-and-drop
+        // here; the order is nudged with the arrows below.
+        sortOrder: (categories?.length ?? 0) * 10,
+        isActive: true,
+      }),
+    onSuccess: () => {
+      setNewName('')
+      refresh()
+    },
+    onError: fail,
+  })
+
+  const save = useMutation({
+    mutationFn: ({ id, ...request }: MenuCategory & { name: string }) =>
+      updateMenuCategory(id, {
+        name: request.name,
+        sortOrder: request.sortOrder,
+        isActive: request.isActive,
+      }),
+    onSuccess: refresh,
+    onError: fail,
+  })
+
+  const remove = useMutation({
+    mutationFn: deleteMenuCategory,
+    onSuccess: refresh,
+    onError: fail,
+  })
+
+  /** Swaps a category with its neighbour in the printed order. */
+  function move(index: number, by: number) {
+    const list = categories ?? []
+    const here = list[index]
+    const there = list[index + by]
+    if (!here || !there) return
+
+    save.mutate({ ...here, sortOrder: there.sortOrder })
+    save.mutate({ ...there, sortOrder: here.sortOrder })
+  }
+
+  const pending = add.isPending || save.isPending || remove.isPending
+
+  return (
+    <div className="card card-body space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-slate-100">{t('menu.categories')}</h3>
+        <button type="button" onClick={onClose} className="btn-ghost btn-sm">
+          {t('menu.close')}
+        </button>
+      </div>
+
+      {error && (
+        <div role="alert" className="notice-error">
+          {error}
+        </div>
+      )}
+
+      <ul className="divide-y divide-ink-800">
+        {categories?.map((category, index) => (
+          <li key={category.id} className="flex flex-wrap items-center gap-2 py-2">
+            <input
+              defaultValue={category.name}
+              aria-label={t('menu.categoryName')}
+              // Saved on leaving the field rather than on every keystroke: a
+              // rename is one edit, not one per letter.
+              onBlur={(e) => {
+                const name = e.target.value.trim()
+                if (name && name !== category.name) save.mutate({ ...category, name })
+              }}
+              className="input max-w-xs"
+            />
+
+            <span className="text-sm text-slate-500">
+              {t('menu.itemCount', { count: category.itemCount })}
+            </span>
+
+            <div className="ms-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => move(index, -1)}
+                disabled={index === 0 || pending}
+                aria-label={t('menu.moveUp')}
+                className="btn-ghost btn-sm"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => move(index, 1)}
+                disabled={index === (categories?.length ?? 0) - 1 || pending}
+                aria-label={t('menu.moveDown')}
+                className="btn-ghost btn-sm"
+              >
+                ↓
+              </button>
+
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={category.isActive}
+                  onChange={(e) => save.mutate({ ...category, isActive: e.target.checked })}
+                  className="accent-brand-500"
+                />
+                {t('menu.shown')}
+              </label>
+
+              <button
+                type="button"
+                onClick={() => remove.mutate(category.id)}
+                disabled={pending}
+                className="btn-ghost btn-sm"
+              >
+                {t('menu.remove')}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="field max-w-xs">
+          <span className="field-label">{t('menu.newCategory')}</span>
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="input"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null)
+            add.mutate()
+          }}
+          disabled={newName.trim().length === 0 || pending}
+          className="btn-primary"
+        >
+          {t('menu.addCategory')}
+        </button>
+      </div>
     </div>
   )
 }
@@ -100,7 +304,15 @@ function priceLabel(item: MenuItem, t: (key: string) => string): string {
   return String(item.price)
 }
 
-function ItemTable({ items, onEdit }: { items: MenuItem[]; onEdit: (item: MenuItem) => void }) {
+function ItemTable({
+  items,
+  imageStamp,
+  onEdit,
+}: {
+  items: MenuItem[]
+  imageStamp: number
+  onEdit: (item: MenuItem) => void
+}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
@@ -128,7 +340,7 @@ function ItemTable({ items, onEdit }: { items: MenuItem[]; onEdit: (item: MenuIt
               <td>
                 {item.hasImage ? (
                   <img
-                    src={menuImageUrl(item.id)}
+                    src={freshMenuImageUrl(item.id, imageStamp)}
                     alt=""
                     className="h-12 w-16 rounded object-cover"
                     loading="lazy"
@@ -170,7 +382,17 @@ function ItemTable({ items, onEdit }: { items: MenuItem[]; onEdit: (item: MenuIt
   )
 }
 
-function ItemForm({ item, onClose }: { item: MenuItem | null; onClose: () => void }) {
+function ItemForm({
+  item,
+  imageStamp,
+  onSaved,
+  onClose,
+}: {
+  item: MenuItem | null
+  imageStamp: number
+  onSaved: () => void
+  onClose: () => void
+}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -188,6 +410,30 @@ function ItemForm({ item, onClose }: { item: MenuItem | null; onClose: () => voi
   const [isSurcharge, setIsSurcharge] = useState(item?.isSurcharge ?? false)
   const [isActive, setIsActive] = useState(item?.isActive ?? true)
   const [error, setError] = useState<string | null>(null)
+
+  // The picture chosen but not yet saved, shown so the supervisor can see they
+  // picked the right photograph before committing to it.
+  const [preview, setPreview] = useState<string | null>(null)
+  const [removePicture, setRemovePicture] = useState(false)
+
+  // Revoked when it is replaced or the form closes: an object URL holds the
+  // file in memory until it is, and a supervisor editing twenty items would
+  // otherwise leave twenty photographs behind.
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview)
+  }, [preview])
+
+  function chooseFile() {
+    const file = fileInput.current?.files?.[0]
+
+    if (preview) URL.revokeObjectURL(preview)
+    setPreview(file ? URL.createObjectURL(file) : null)
+    setError(null)
+
+    // Picking a picture is the opposite of removing one; asking for both would
+    // save whichever the code happened to check first.
+    if (file) setRemovePicture(false)
+  }
 
   const save = useMutation({
     mutationFn: async () => {
@@ -207,13 +453,19 @@ function ItemForm({ item, onClose }: { item: MenuItem | null; onClose: () => voi
       // The picture goes second: it needs the item's id, and a new item has
       // none until it is saved.
       const file = fileInput.current?.files?.[0]
-      if (file) await setMenuImage(saved.id, file)
+
+      if (file) {
+        await setMenuImage(saved.id, file)
+      } else if (removePicture && item?.hasImage) {
+        await setMenuImage(saved.id, null)
+      }
 
       return saved
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['menu'] })
       void queryClient.invalidateQueries({ queryKey: ['menu-categories'] })
+      onSaved()
       onClose()
     },
     onError: (e) => setError(t(`menu.errors.${errorCodeOf(e)}`)),
@@ -292,16 +544,52 @@ function ItemForm({ item, onClose }: { item: MenuItem | null; onClose: () => voi
         </label>
       </div>
 
-      <label className="field max-w-md">
-        <span className="field-label">{t('menu.picture')}</span>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="input"
-        />
-        <span className="field-hint">{t('menu.pictureHint')}</span>
-      </label>
+      <div className="flex items-start gap-4">
+        {/* What the item looks like now, or will look like once saved. Without
+            it the supervisor cannot tell whether an item already has a picture,
+            and so cannot tell whether they are adding or replacing one. */}
+        {preview ? (
+          <img src={preview} alt="" className="h-24 w-32 rounded object-cover" />
+        ) : item?.hasImage && !removePicture ? (
+          <img
+            src={freshMenuImageUrl(item.id, imageStamp)}
+            alt=""
+            className="h-24 w-32 rounded object-cover"
+          />
+        ) : (
+          <div className="flex h-24 w-32 items-center justify-center rounded bg-ink-800 text-xs text-slate-500">
+            {t('menu.noPicture')}
+          </div>
+        )}
+
+        {/* A div, not a label, because the checkbox below needs its own and
+            labels do not nest. */}
+        <div className="field max-w-md">
+          <label className="field">
+            <span className="field-label">{t('menu.picture')}</span>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={chooseFile}
+              className="input"
+            />
+          </label>
+          <span className="field-hint">{t('menu.pictureHint')}</span>
+
+          {item?.hasImage && !preview && (
+            <label className="mt-2 flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={removePicture}
+                onChange={(e) => setRemovePicture(e.target.checked)}
+                className="accent-brand-500"
+              />
+              {t('menu.removePicture')}
+            </label>
+          )}
+        </div>
+      </div>
 
       <div className="space-y-2">
         <label className="flex items-start gap-2 text-sm text-slate-300">

@@ -106,6 +106,38 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return payload as T
 }
 
+/**
+ * Fetches a file rather than JSON — a picture, a report, an export.
+ *
+ * Needed because an `<img src>` cannot carry an `Authorization` header: the
+ * browser issues its own request with no headers of ours, so every protected
+ * image comes back 401 and renders as a broken box. Fetching it here attaches
+ * the token, and the caller turns the blob into a URL the tag can use.
+ *
+ * The browser's HTTP cache still applies — this is an ordinary GET — so a
+ * picture the server marked good for a day is still only fetched once.
+ */
+export async function requestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+  const { query, headers, ...rest } = options
+  const token = getToken()
+
+  const response = await fetch(buildUrl(path, query), {
+    credentials: 'include',
+    ...rest,
+    method: 'GET',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+  })
+
+  if (!response.ok) {
+    throw new ApiError(response.status, response.statusText, null)
+  }
+
+  return response.blob()
+}
+
 export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>

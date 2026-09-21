@@ -323,6 +323,7 @@
     "shown": "ظاهرة",
     "close": "إغلاق",
     "noPicture": "بلا صورة",
-    "removePicture": "حذف الصورة الحالية"
+    "removePicture": "حذف الصورة الحالية",
+    "pictureFailed": "تعذّر تحميل الصورة"
   }
 }

@@ -2015,6 +2015,66 @@ come back whenever an old branch is built, and a stale folder means running
 yesterday's code and debugging a bug that was fixed — which has already cost one
 round trip here.
 
+## 2026-09-21 — Every menu picture in the supervisor app was a blank box
+
+Found within a minute of Dia opening the screen for the first time, which is the
+whole argument for opening screens. The menu page was asked "why do not all
+photos show?" — the expected answer was "five add-ons have no photograph, the
+printed menu does not photograph a slice of cheese". The actual answer was
+**more than five**, and none of them were loading.
+
+### The cause
+
+`<img src="/api/menu/{id}/image">`. The endpoint requires a signed-in user; a
+browser loading an image tag issues its **own** request, carrying none of our
+headers, so the token never arrived and every picture came back **401**.
+
+The Agent App was never affected. It fetches pictures through its API client,
+which sends the token — so the same feature worked in one app and not the other,
+and the one it worked in was the one being demonstrated.
+
+### Why it was invisible
+
+A failed picture and an item with no picture rendered **the same empty grey
+box**. The screen looked entirely plausible while showing nothing. The tests
+passed because they checked that the right requests were sent, and this request
+was never sent by us at all — the browser sent it.
+
+Three lessons, all of which this project has now learnt twice:
+
+- A **green build proves structure, not that a screen looks right.** Same
+  category as the white contacts list and the call-log "today" label.
+- **Absence must look different from failure.** The box now says "بلا صورة" or
+  "تعذّر تحميل الصورة". Had it said either from the start, the bug would
+  have announced itself.
+- **Two clients, one feature, one of them wrong.** Worth checking both whenever
+  a feature spans them.
+
+### The fix, and the one that was rejected
+
+`MenuImage` fetches the bytes with the token attached and hands the tag an
+object URL. The browser's HTTP cache still applies — it is an ordinary GET — so
+a picture marked good for a day is still fetched once.
+
+**Rejected: putting the token in the query string.** There is a precedent for it
+in this codebase — SignalR cannot set headers either, and `/hubs` already accepts
+`?access_token=`. It would have been one line. But a hub is one connection per
+session, while this is 44 image URLs per page load, each carrying a twelve-hour
+token into the browser history, the server access log and any proxy in between.
+Not worth it for pictures of burgers.
+
+**Also rejected: making the endpoint anonymous.** Simplest of all, and the
+pictures are not secret. But it quietly loosens an access rule, which is not a
+thing to do to fix a display bug.
+
+Two tests now cover it: the picture request must carry the token, and an item
+with no picture must not be asked for one — 44 pointless 404s on every keystroke
+is the other way to get this wrong.
+
+**Where this will bite again:** call recording playback (not yet built) is the
+same shape — a protected file, in a media tag that cannot authenticate. Use
+`requestBlob`.
+
 ---
 
 # How this project is tracked

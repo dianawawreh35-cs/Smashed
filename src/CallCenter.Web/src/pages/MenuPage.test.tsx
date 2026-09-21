@@ -50,6 +50,7 @@ function jsonResponse(body: unknown, status = 200) {
     headers: new Headers({ 'content-type': 'application/json' }),
     json: async () => body,
     text: async () => JSON.stringify(body),
+    blob: async () => new Blob(['bytes'], { type: 'image/png' }),
   } as unknown as Response
 }
 
@@ -108,7 +109,7 @@ beforeEach(async () => {
   setToken('supervisor-token')
   await i18n.changeLanguage('en')
 
-  // jsdom has neither, and the picture preview uses both.
+  // jsdom has neither, and both the preview and the stored picture use them.
   URL.createObjectURL = vi.fn(() => 'blob:preview')
   URL.revokeObjectURL = vi.fn()
 })
@@ -198,6 +199,38 @@ describe('menu page', () => {
         ),
       ).toBe(true),
     )
+  })
+
+  it('sends the token when fetching a picture', async () => {
+    // The regression that made every picture in this app a blank grey box: an
+    // <img src> issues its own request with none of our headers, so the
+    // protected endpoint answered 401 and the row looked like an item with no
+    // photograph rather than like a fault.
+    const fetchMock = stubApi()
+    renderPage()
+
+    await screen.findByText('Smashed')
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url]) => String(url).includes('/menu/i1/image'))
+      expect(call).toBeDefined()
+
+      const headers = (call![1] as RequestInit).headers as Record<string, string>
+      expect(headers.Authorization).toBe('Bearer supervisor-token')
+    })
+  })
+
+  it('does not ask for a picture an item does not have', async () => {
+    // 44 items asking for photographs that are not there would be 44 pointless
+    // 404s on every keystroke of a search.
+    const fetchMock = stubApi()
+    renderPage()
+
+    await screen.findByText('Extra cheese')
+
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/menu/i2/image')),
+    ).toBe(false)
   })
 
   it('renames a category and refreshes the items that print its name', async () => {

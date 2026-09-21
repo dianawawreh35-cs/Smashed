@@ -323,6 +323,7 @@
     "shown": "Shown",
     "close": "Close",
     "noPicture": "No picture",
-    "removePicture": "Remove the current picture"
+    "removePicture": "Remove the current picture",
+    "pictureFailed": "Picture failed to load"
   }
 }

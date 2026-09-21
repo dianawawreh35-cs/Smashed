@@ -2,7 +2,7 @@
  * The menu (A-66, S-59). Mirrors `CallCenter.Shared.Contracts.Menu` —
  * hand-written, so a change on the server has to be copied across.
  */
-import { api, API_BASE_URL } from './client'
+import { api, requestBlob } from './client'
 
 export interface MenuCategory {
   id: string
@@ -69,21 +69,19 @@ export const updateMenuCategory = (id: string, request: UpsertMenuCategoryReques
 export const deleteMenuCategory = (id: string) => api.delete<void>(`/menu/categories/${id}`)
 
 /**
- * Where a picture is fetched from. A plain URL rather than a download, so the
- * browser caches it — the server marks these good for a day.
- */
-export const menuImageUrl = (id: string) => `${API_BASE_URL}/menu/${id}/image`
-
-/**
- * The same picture, but bypassing the cache.
+ * One item's picture, as bytes.
  *
- * The server marks pictures good for a day, which is right for agents and wrong
- * for the supervisor who has just replaced one: without this they would upload a
- * new photograph and go on seeing the old one. The stamp changes on every save,
- * so the browser is asked for a URL it has never seen.
+ * Fetched rather than pointed at with an `<img src>`, because the endpoint
+ * requires a signed-in user and an image tag cannot send the token — see
+ * `requestBlob`. `MenuImage` turns the result into something a tag can show.
+ *
+ * `stamp` changes whenever an item is saved. The server marks pictures good for
+ * a day, which is right for agents and wrong for the supervisor who has just
+ * replaced one: without it they would upload a new photograph and go on seeing
+ * the old one until tomorrow.
  */
-export const freshMenuImageUrl = (id: string, stamp: number) =>
-  `${menuImageUrl(id)}?v=${stamp}`
+export const fetchMenuImage = (id: string, stamp: number) =>
+  requestBlob(`/menu/${id}/image`, { query: { v: stamp } })
 
 /**
  * Replaces an item's picture, or removes it when `file` is null.

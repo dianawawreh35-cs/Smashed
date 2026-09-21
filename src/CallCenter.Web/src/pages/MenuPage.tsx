@@ -7,7 +7,6 @@ import {
   createMenuItem,
   deleteMenuCategory,
   deleteMenuItem,
-  freshMenuImageUrl,
   listMenuCategories,
   searchMenu,
   setMenuImage,
@@ -16,6 +15,7 @@ import {
 } from '../api/menu'
 import type { MenuCategory, MenuItem } from '../api/menu'
 import { errorCodeOf } from '../api/users'
+import MenuImage from '../components/MenuImage'
 
 /**
  * The menu (S-59).
@@ -338,16 +338,7 @@ function ItemTable({
           {items.map((item) => (
             <tr key={item.id}>
               <td>
-                {item.hasImage ? (
-                  <img
-                    src={freshMenuImageUrl(item.id, imageStamp)}
-                    alt=""
-                    className="h-12 w-16 rounded object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="h-12 w-16 rounded bg-ink-800" />
-                )}
+                <MenuImage itemId={item.id} hasImage={item.hasImage} stamp={imageStamp} />
               </td>
               <td className="font-medium text-slate-100">
                 {item.name}
@@ -550,16 +541,13 @@ function ItemForm({
             and so cannot tell whether they are adding or replacing one. */}
         {preview ? (
           <img src={preview} alt="" className="h-24 w-32 rounded object-cover" />
-        ) : item?.hasImage && !removePicture ? (
-          <img
-            src={freshMenuImageUrl(item.id, imageStamp)}
-            alt=""
-            className="h-24 w-32 rounded object-cover"
-          />
         ) : (
-          <div className="flex h-24 w-32 items-center justify-center rounded bg-ink-800 text-xs text-slate-500">
-            {t('menu.noPicture')}
-          </div>
+          <MenuImage
+            itemId={item?.id ?? ''}
+            hasImage={(item?.hasImage ?? false) && !removePicture}
+            stamp={imageStamp}
+            className="h-24 w-32"
+          />
         )}
 
         {/* A div, not a label, because the checkbox below needs its own and

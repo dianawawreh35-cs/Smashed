@@ -26,6 +26,7 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
         bool FormAdded,
         int SettingsAdded,
         int DeliveryAreasAdded,
+        int MenuItemsAdded,
         bool UserCreated,
         string? UserSkippedReason);
 
@@ -52,6 +53,7 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
         // After the branches, and after their save: each area needs a branch id.
         await db.SaveChangesAsync(cancellationToken);
         var areasAdded = await SeedDeliveryAreasAsync(cancellationToken);
+        var menuAdded = await SeedMenuAsync(cancellationToken);
 
         var (userCreated, skipped) = await SeedFirstUserAsync(
             adminLogin, adminPassword, adminDisplayName, cancellationToken);
@@ -60,14 +62,15 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
 
         var result = new Result(
             branchesAdded, channelsAdded, typesAdded, formAdded, settingsAdded,
-            areasAdded, userCreated, skipped);
+            areasAdded, menuAdded, userCreated, skipped);
 
         logger.LogInformation(
             "Seed complete: {Branches} branches, {Channels} channels, {Types} types, "
-            + "form v1 {Form}, {Settings} settings, {Areas} delivery areas, user {User}",
+            + "form v1 {Form}, {Settings} settings, {Areas} delivery areas, "
+            + "{Menu} menu items, user {User}",
             branchesAdded, channelsAdded, typesAdded,
             formAdded ? "created" : "already present",
-            settingsAdded, areasAdded,
+            settingsAdded, areasAdded, menuAdded,
             userCreated ? "created" : skipped ?? "not requested");
 
         return result;
@@ -130,6 +133,105 @@ public class DatabaseSeeder(CallCenterDbContext db, ILogger<DatabaseSeeder> logg
         }
 
         return added;
+    }
+
+    /// <summary>
+    /// The menu, with its pictures (A-66).
+    /// </summary>
+    /// <remarks>
+    /// Skipped once any item exists, like everything else here: a supervisor who
+    /// has since changed a price must not have it put back on the next run.
+    ///
+    /// The pictures are embedded resources, so a fresh install needs the one DLL
+    /// and no folder beside it. An item whose picture is missing from the
+    /// assembly is still created — a menu without a photograph is usable, and
+    /// failing the whole seed over one image would not be.
+    /// </remarks>
+    private async Task<int> SeedMenuAsync(CancellationToken ct)
+    {
+        if (await db.MenuItems.AnyAsync(ct))
+        {
+            return 0;
+        }
+
+        var categories = new Dictionary<string, MenuCategory>();
+
+        for (var i = 0; i < SeedData.MenuCategories.Length; i++)
+        {
+            var name = SeedData.MenuCategories[i];
+
+            var category = new MenuCategory
+            {
+                Name = name,
+                NameNormalised = NameNormalizer.Normalize(name),
+                SortOrder = i,
+            };
+
+            categories[name] = category;
+            db.MenuCategories.Add(category);
+        }
+
+        var added = 0;
+        var position = new Dictionary<string, int>();
+
+        foreach (var seed in SeedData.MenuItems)
+        {
+            if (!categories.TryGetValue(seed.Category, out var category))
+            {
+                logger.LogWarning(
+                    "Menu item {Name} names category {Category}, which is not seeded; skipped",
+                    seed.Name, seed.Category);
+                continue;
+            }
+
+            position.TryGetValue(seed.Category, out var order);
+            position[seed.Category] = order + 1;
+
+            var (image, contentType) = LoadMenuImage(seed.Image);
+
+            db.MenuItems.Add(new MenuItem
+            {
+                Category = category,
+                Name = seed.Name,
+                NameNormalised = NameNormalizer.Normalize(seed.Name),
+                Description = seed.Description,
+                Price = seed.Price,
+                MealPrice = seed.MealPrice,
+                IsSurcharge = seed.IsSurcharge,
+                SortOrder = order,
+                Image = image,
+                ImageContentType = contentType,
+            });
+
+            added++;
+        }
+
+        return added;
+    }
+
+    /// <summary>Reads one embedded menu photograph, or nothing when it is absent.</summary>
+    private (byte[]? Image, string? ContentType) LoadMenuImage(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return (null, null);
+        }
+
+        var assembly = typeof(DatabaseSeeder).Assembly;
+        var resource = $"CallCenter.Server.Data.Seed.MenuImages.{fileName}";
+
+        using var stream = assembly.GetManifestResourceStream(resource);
+
+        if (stream is null)
+        {
+            logger.LogWarning("Menu picture {File} is not embedded in the assembly; skipped", fileName);
+            return (null, null);
+        }
+
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+
+        return (buffer.ToArray(), "image/png");
     }
 
     private async Task<int> SeedBranchesAsync(IReadOnlyList<string>? names, CancellationToken ct)

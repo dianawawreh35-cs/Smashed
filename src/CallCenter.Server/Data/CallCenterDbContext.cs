@@ -37,6 +37,12 @@ public partial class CallCenterDbContext(DbContextOptions<CallCenterDbContext> o
 
     /// <summary>Where the restaurant delivers, which branch covers it, and the price (A-65, S-58).</summary>
     public DbSet<DeliveryArea> DeliveryAreas => Set<DeliveryArea>();
+
+    /// <summary>The menu, grouped as the printed one is (A-66, S-59).</summary>
+    public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
+
+    /// <summary>What is on the menu, with its price and picture (A-66, S-59).</summary>
+    public DbSet<MenuItem> MenuItems => Set<MenuItem>();
     public DbSet<ClassificationHistory> ClassificationHistory => Set<ClassificationHistory>();
 
     // Follow-up

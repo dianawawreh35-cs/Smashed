@@ -31,4 +31,11 @@
     <InternalsVisibleTo Include="CallCenter.Server.Tests" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <!-- The menu photographs, embedded so the seed is self-contained: a fresh
+         install needs the one DLL and nothing beside it. 1.2 MB. -->
+    <EmbeddedResource Include="Data\Seed\MenuImages\*.png" />
+  </ItemGroup>
+
 </Project>

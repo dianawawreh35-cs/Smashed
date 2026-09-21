@@ -277,6 +277,68 @@ CREATE INDEX ix_delivery_area_branch ON delivery_areas(branch_id);
 
 ---
 
+## 4b. Menu
+
+What the restaurant sells, what is in it, what it costs and a picture of it
+(A-66, S-59). Read by agents mid-call; maintained by the supervisor.
+
+```sql
+CREATE TABLE menu_categories (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             varchar(200) NOT NULL,
+  name_normalised  varchar(200) NOT NULL,
+  sort_order       int NOT NULL DEFAULT 0,       -- the order the printed menu reads
+  is_active        boolean NOT NULL DEFAULT true
+);
+CREATE UNIQUE INDEX ux_menu_category_name ON menu_categories(name_normalised);
+
+CREATE TABLE menu_items (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  category_id        uuid NOT NULL REFERENCES menu_categories(id),
+  name               varchar(200) NOT NULL,
+  name_normalised    varchar(200) NOT NULL,
+  description        text,                        -- contents, as the menu prints them
+  price              numeric(10,2),               -- item alone, or the sandwich
+  meal_price         numeric(10,2),               -- with fries and a drink
+  is_surcharge       boolean NOT NULL DEFAULT false,
+  image              bytea,                       -- the menu photograph
+  image_content_type varchar(100),
+  sort_order         int NOT NULL DEFAULT 0,
+  is_active          boolean NOT NULL DEFAULT true,
+  created_by         uuid REFERENCES users(id),
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_by         uuid REFERENCES users(id),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_menu_items_price      CHECK (price IS NULL OR price >= 0),
+  CONSTRAINT ck_menu_items_meal_price CHECK (meal_price IS NULL OR meal_price >= 0)
+);
+CREATE UNIQUE INDEX ux_menu_item_name_in_category ON menu_items(category_id, name_normalised);
+CREATE INDEX ix_menu_item_name  ON menu_items(name_normalised);
+CREATE INDEX ix_menu_item_order ON menu_items(category_id, sort_order);
+```
+
+- **Arabic only.** The source spreadsheet carries English names and contents as
+  well; they are deliberately not stored. The menu is Arabic, agents speak
+  Arabic to customers, and a second set of names is a second thing to keep
+  correct.
+- **`price NULL` and `price = 0` mean different things.** Null is "the menu
+  prints no price" — there is one such item, a combination offer. Zero is the
+  price of a free extra. An agent must be able to tell "free" from "ask the
+  branch".
+- **`is_surcharge`** marks the add-ons, which the menu writes as "+2": an amount
+  added to another item, not a price of its own. Without it, "إضافة الجبنة — 2"
+  reads as a portion of cheese costing 2.
+- **The name is unique per category, not globally** — unlike delivery areas.
+  Two categories may each legitimately hold a "كولا".
+- **The picture lives in the database.** The whole menu is 1.2 MB, the backup
+  already covers the database (runbook step 9), and a folder of images is one
+  more thing to back up separately and forget. It is served from its own
+  endpoint rather than inside the list, so a search does not carry megabytes.
+  Past a few tens of megabytes this should move to files; at 40 KB an item, that
+  is several hundred items away.
+
+---
+
 ## 5. Follow-up tasks
 
 ```sql
@@ -350,6 +412,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 
 - branches: رافات, بطن الهوى, ايكون, نابلس (renameable by the supervisor; the delivery areas hold a branch id, not a name)
 - delivery_areas: 228 rows from the branches' own price lists (A-65)
+- menu_categories / menu_items: 12 categories and 44 items with 39 pictures, from the printed menu (A-66)
 - channels: Phone (system), WhatsApp, Facebook, Instagram, Wheels
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)
 - form_definitions v1: the JSON above without the `reason` field

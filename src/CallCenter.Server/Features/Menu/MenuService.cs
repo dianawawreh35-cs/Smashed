@@ -1,0 +1,338 @@
+using CallCenter.Server.Data;
+using CallCenter.Server.Data.Entities;
+using CallCenter.Shared.Contracts.Menu;
+using CallCenter.Shared.Text;
+using Microsoft.EntityFrameworkCore;
+
+namespace CallCenter.Server.Features.Menu;
+
+/// <summary>
+/// The menu: what is on it, what is in it, what it costs (A-66, S-59).
+/// </summary>
+/// <remarks>
+/// Agents read it mid-call — "what comes in the Overdose?", "how much is a
+/// double as a meal?" — which today means a printed sheet beside the laptop that
+/// goes stale the moment a price changes. Supervisors maintain it.
+///
+/// Names are folded by <see cref="NameNormalizer"/>, as contacts and delivery
+/// areas are. It matters more here than anywhere: these are English words
+/// written in Arabic — سماشد, ماشروم, كرسبي — and nobody spells them the
+/// same way twice.
+/// </remarks>
+public class MenuService(CallCenterDbContext db, ILogger<MenuService> logger)
+{
+    /// <summary>The largest picture accepted, in bytes. Menu photographs, not posters.</summary>
+    public const int MaxImageBytes = 2 * 1024 * 1024;
+
+    /// <summary>What a picture may be. Anything else is refused rather than stored.</summary>
+    public static readonly IReadOnlyList<string> AllowedImageTypes =
+        ["image/png", "image/jpeg", "image/webp"];
+
+    public enum Failure
+    {
+        NotFound,
+        UnknownCategory,
+        DuplicateName,
+        NoName,
+
+        /// <summary>The picture is too large, or not a picture.</summary>
+        BadImage,
+
+        /// <summary>A category still holding items cannot be removed.</summary>
+        CategoryNotEmpty,
+    }
+
+    /// <summary>
+    /// Items matching what was typed, newest categories first (A-66).
+    /// </summary>
+    /// <remarks>
+    /// With no search text this returns the whole menu in printed order, so the
+    /// screen is useful before anything is typed — an agent who cannot spell
+    /// "ماشروم" can scroll to it.
+    ///
+    /// The description is searched as well as the name: "what has mushrooms in
+    /// it?" is a question agents are asked, and the answer is in the contents.
+    /// </remarks>
+    public async Task<IReadOnlyList<MenuItemDto>> SearchAsync(
+        string? query, Guid? categoryId = null, bool includeInactive = false,
+        CancellationToken ct = default)
+    {
+        var items = db.MenuItems.AsNoTracking().AsQueryable();
+
+        if (!includeInactive)
+        {
+            items = items.Where(i => i.IsActive && i.Category.IsActive);
+        }
+
+        if (categoryId is { } category)
+        {
+            items = items.Where(i => i.CategoryId == category);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var normalised = NameNormalizer.Normalize(query);
+            var raw = query.Trim();
+
+            if (normalised.Length > 0)
+            {
+                items = items.Where(i =>
+                    EF.Functions.ILike(i.NameNormalised, $"%{normalised}%")
+                    || (i.Description != null && EF.Functions.ILike(i.Description, $"%{raw}%")));
+            }
+        }
+
+        return await items
+            .OrderBy(i => i.Category.SortOrder)
+            .ThenBy(i => i.SortOrder)
+            .Select(i => new MenuItemDto(
+                i.Id,
+                i.CategoryId,
+                i.Category.Name,
+                i.Name,
+                i.Description,
+                i.Price,
+                i.MealPrice,
+                i.IsSurcharge,
+                i.Image != null,
+                i.IsActive))
+            .ToListAsync(ct);
+    }
+
+    /// <summary>Every category, in menu order, with how many items each holds.</summary>
+    public async Task<IReadOnlyList<MenuCategoryDto>> CategoriesAsync(
+        bool includeInactive = false, CancellationToken ct = default)
+    {
+        var categories = db.MenuCategories.AsNoTracking();
+
+        if (!includeInactive)
+        {
+            categories = categories.Where(c => c.IsActive);
+        }
+
+        return await categories
+            .OrderBy(c => c.SortOrder)
+            .Select(c => new MenuCategoryDto(
+                c.Id, c.Name, c.SortOrder, c.IsActive, c.Items.Count(i => i.IsActive)))
+            .ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// One item's picture, or null when it has none.
+    /// </summary>
+    /// <remarks>
+    /// Fetched by itself so the list can stay small. Returns the bytes and the
+    /// media type together, because serving a PNG as a JPEG is the sort of thing
+    /// that works in one client and not another.
+    /// </remarks>
+    public async Task<(byte[] Bytes, string ContentType)?> ImageAsync(
+        Guid id, CancellationToken ct = default)
+    {
+        var row = await db.MenuItems
+            .AsNoTracking()
+            .Where(i => i.Id == id && i.Image != null)
+            .Select(i => new { i.Image, i.ImageContentType })
+            .FirstOrDefaultAsync(ct);
+
+        return row?.Image is null
+            ? null
+            : (row.Image, row.ImageContentType ?? "application/octet-stream");
+    }
+
+    public async Task<(MenuItemDto? Item, Failure? Failure)> CreateAsync(
+        UpsertMenuItemRequest request, Guid actingUserId, CancellationToken ct = default)
+    {
+        var name = request.Name.Trim();
+        var normalised = NameNormalizer.Normalize(name);
+
+        if (normalised.Length == 0)
+        {
+            return (null, Failure.NoName);
+        }
+
+        if (!await db.MenuCategories.AnyAsync(c => c.Id == request.CategoryId, ct))
+        {
+            return (null, Failure.UnknownCategory);
+        }
+
+        if (await db.MenuItems.AnyAsync(
+                i => i.CategoryId == request.CategoryId && i.NameNormalised == normalised, ct))
+        {
+            return (null, Failure.DuplicateName);
+        }
+
+        // Appended to its category rather than dropped at the top: the order
+        // follows the printed menu, and a new item belongs at the end of its
+        // section until somebody says otherwise.
+        var next = await db.MenuItems
+            .Where(i => i.CategoryId == request.CategoryId)
+            .Select(i => (int?)i.SortOrder)
+            .MaxAsync(ct) ?? 0;
+
+        var item = new MenuItem
+        {
+            CategoryId = request.CategoryId,
+            Name = name,
+            NameNormalised = normalised,
+            Description = Trimmed(request.Description),
+            Price = request.Price,
+            MealPrice = request.MealPrice,
+            IsSurcharge = request.IsSurcharge,
+            IsActive = request.IsActive,
+            SortOrder = next + 1,
+            CreatedBy = actingUserId,
+            UpdatedBy = actingUserId,
+        };
+
+        db.MenuItems.Add(item);
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Menu item {Name} added", name);
+
+        return (await GetAsync(item.Id, ct), null);
+    }
+
+    public async Task<(MenuItemDto? Item, Failure? Failure)> UpdateAsync(
+        Guid id, UpsertMenuItemRequest request, Guid actingUserId, CancellationToken ct = default)
+    {
+        var item = await db.MenuItems.FirstOrDefaultAsync(i => i.Id == id, ct);
+        if (item is null)
+        {
+            return (null, Failure.NotFound);
+        }
+
+        var name = request.Name.Trim();
+        var normalised = NameNormalizer.Normalize(name);
+
+        if (normalised.Length == 0)
+        {
+            return (null, Failure.NoName);
+        }
+
+        if (!await db.MenuCategories.AnyAsync(c => c.Id == request.CategoryId, ct))
+        {
+            return (null, Failure.UnknownCategory);
+        }
+
+        if (await db.MenuItems.AnyAsync(
+                i => i.CategoryId == request.CategoryId
+                     && i.NameNormalised == normalised
+                     && i.Id != id, ct))
+        {
+            return (null, Failure.DuplicateName);
+        }
+
+        item.CategoryId = request.CategoryId;
+        item.Name = name;
+        item.NameNormalised = normalised;
+        item.Description = Trimmed(request.Description);
+        item.Price = request.Price;
+        item.MealPrice = request.MealPrice;
+        item.IsSurcharge = request.IsSurcharge;
+        item.IsActive = request.IsActive;
+        item.UpdatedBy = actingUserId;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return (await GetAsync(id, ct), null);
+    }
+
+    /// <summary>
+    /// Replaces an item's picture, or removes it when <paramref name="bytes"/>
+    /// is null (S-59).
+    /// </summary>
+    public async Task<Failure?> SetImageAsync(
+        Guid id, byte[]? bytes, string? contentType, Guid actingUserId,
+        CancellationToken ct = default)
+    {
+        var item = await db.MenuItems.FirstOrDefaultAsync(i => i.Id == id, ct);
+        if (item is null)
+        {
+            return Failure.NotFound;
+        }
+
+        if (bytes is not null)
+        {
+            if (bytes.Length == 0
+                || bytes.Length > MaxImageBytes
+                || contentType is null
+                || !AllowedImageTypes.Contains(contentType))
+            {
+                return Failure.BadImage;
+            }
+        }
+
+        item.Image = bytes;
+        item.ImageContentType = bytes is null ? null : contentType;
+        item.UpdatedBy = actingUserId;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return null;
+    }
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default) =>
+        await db.MenuItems.Where(i => i.Id == id).ExecuteDeleteAsync(ct) > 0;
+
+    public async Task<MenuItemDto?> GetAsync(Guid id, CancellationToken ct = default) =>
+        await db.MenuItems
+            .AsNoTracking()
+            .Where(i => i.Id == id)
+            .Select(i => new MenuItemDto(
+                i.Id, i.CategoryId, i.Category.Name, i.Name, i.Description,
+                i.Price, i.MealPrice, i.IsSurcharge, i.Image != null, i.IsActive))
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<(MenuCategoryDto? Category, Failure? Failure)> CreateCategoryAsync(
+        UpsertMenuCategoryRequest request, CancellationToken ct = default)
+    {
+        var name = request.Name.Trim();
+        var normalised = NameNormalizer.Normalize(name);
+
+        if (normalised.Length == 0)
+        {
+            return (null, Failure.NoName);
+        }
+
+        if (await db.MenuCategories.AnyAsync(c => c.NameNormalised == normalised, ct))
+        {
+            return (null, Failure.DuplicateName);
+        }
+
+        var category = new MenuCategory
+        {
+            Name = name,
+            NameNormalised = normalised,
+            SortOrder = request.SortOrder,
+            IsActive = request.IsActive,
+        };
+
+        db.MenuCategories.Add(category);
+        await db.SaveChangesAsync(ct);
+
+        return (new MenuCategoryDto(category.Id, category.Name, category.SortOrder, category.IsActive, 0), null);
+    }
+
+    /// <summary>
+    /// Removes a category (S-59). Refused while it still holds items.
+    /// </summary>
+    /// <remarks>
+    /// The foreign key would refuse it anyway, with an error nobody can read.
+    /// Checking first lets the screen say "move or delete its items" instead.
+    /// </remarks>
+    public async Task<Failure?> DeleteCategoryAsync(Guid id, CancellationToken ct = default)
+    {
+        if (await db.MenuItems.AnyAsync(i => i.CategoryId == id, ct))
+        {
+            return Failure.CategoryNotEmpty;
+        }
+
+        var removed = await db.MenuCategories.Where(c => c.Id == id).ExecuteDeleteAsync(ct);
+        return removed > 0 ? null : Failure.NotFound;
+    }
+
+    private static string? Trimmed(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

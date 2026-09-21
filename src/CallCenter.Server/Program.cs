@@ -4,6 +4,7 @@ using CallCenter.Server.Features.Auth;
 using CallCenter.Server.Features.Communications;
 using CallCenter.Server.Features.Contacts;
 using CallCenter.Server.Features.Delivery;
+using CallCenter.Server.Features.Menu;
 using CallCenter.Server.Features.Settings;
 using CallCenter.Server.Features.Users;
 using CallCenter.Server.Hubs;
@@ -59,6 +60,7 @@ try
     builder.Services.AddScoped<ContactFlagsService>();
     builder.Services.AddScoped<CommunicationsService>();
     builder.Services.AddScoped<DeliveryAreasService>();
+    builder.Services.AddScoped<MenuService>();
     builder.Services.AddScoped<SettingsService>();
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()

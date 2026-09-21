@@ -46,6 +46,7 @@ public class SchemaTests
         "classification_types", "form_definitions", "classifications", "classification_history",
         "follow_up_tasks",
         "delivery_areas",
+        "menu_categories", "menu_items",
         "pbx_events_raw", "agent_sessions", "audit_log", "outbox_sync",
     ];
 

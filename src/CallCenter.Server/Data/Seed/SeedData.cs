@@ -25,6 +25,113 @@ public static class SeedData
     ];
 
     /// <summary>
+    /// The menu's categories, in the order the printed menu reads (A-66).
+    /// </summary>
+    public static readonly string[] MenuCategories =
+    [
+        "كلاسيك سماشد برغر",
+        "ماشروم سويس سماشد برغر",
+        "رويال سماشد برغر",
+        "روست بيف سماشد برغر",
+        "فلات برغر",
+        "وجبات الأطفال",
+        "وجبات",
+        "عروض خاصة",
+        "المقبلات",
+        "بطاطا",
+        "مشروبات",
+        "إضافات",
+    ];
+
+    /// <summary>One line of the printed menu (A-66).</summary>
+    /// <param name="Category">Matched by name against <see cref="MenuCategories"/>.</param>
+    /// <param name="Price">
+    /// The item alone, or the sandwich price where a meal is also offered. Null
+    /// where the menu prints none — which is not the same as zero, the price of a
+    /// free extra.
+    /// </param>
+    /// <param name="MealPrice">With fries and a drink, where the menu offers it.</param>
+    /// <param name="IsSurcharge">
+    /// The menu writes these as "+2": an amount added to another item, not a
+    /// price of its own.
+    /// </param>
+    /// <param name="Image">
+    /// A file under <c>Data/Seed/MenuImages</c>, embedded in the assembly. Null
+    /// for the add-ons, which the printed menu does not photograph.
+    /// </param>
+    public record MenuSeedItem(
+        string Category,
+        string Name,
+        string? Description,
+        decimal? Price,
+        decimal? MealPrice,
+        bool IsSurcharge,
+        string? Image);
+
+    /// <summary>
+    /// The menu as printed, transcribed from <c>docs/smashed_menu.xlsx</c>
+    /// (A-66).
+    /// </summary>
+    /// <remarks>
+    /// <b>Arabic only.</b> The spreadsheet carries English names and contents as
+    /// well and they are deliberately not stored: the menu is Arabic, the agents
+    /// speak Arabic to customers, and a second set of names is a second thing to
+    /// keep correct. The English is still in the spreadsheet if it is ever
+    /// wanted.
+    ///
+    /// Prices come from the menu in four shapes and each means something
+    /// different — see <see cref="MenuSeedItem"/>. The one item with no price is
+    /// a combination offer the printed menu does not price.
+    /// </remarks>
+    public static readonly MenuSeedItem[] MenuItems =
+    [
+        new("كلاسيك سماشد برغر", "سنجل سماشد برغر", "لحمة 150 غم، سبيشل صوص، خس، بندورة، بصل، جبنة شيدر. الوجبة تشمل بطاطا وكولا.", 26m, 36m, false, "item00.png"),
+        new("كلاسيك سماشد برغر", "دبل سماشد برغر", "لحمة 200 غم، سبيشل صوص، خس، بندورة، بصل، جبنة شيدر. الوجبة تشمل بطاطا وكولا.", 30m, 40m, false, "item01.png"),
+        new("كلاسيك سماشد برغر", "جريلد تشيز بن", "طبقتين من الخبز المحمص المحشو بالجبنة، 250 غم لحمة، سبيشل صوص، خس، بندورة، بصل. الوجبة تشمل بطاطا وكولا.", 37m, 47m, false, "item02.png"),
+        new("كلاسيك سماشد برغر", "اوفردوز سماشد برغر", "لحمة 300 غم، سبيشل صوص، خس، بندورة، بصل، جبنة شيدر. الوجبة تشمل بطاطا وكولا.", 37m, 47m, false, "item03.png"),
+        new("ماشروم سويس سماشد برغر", "سنجل ماشروم سويس", "لحمة 150 غم، ماشروم صوص، خس، بندورة، جبنة ايمنتال. الوجبة تشمل بطاطا وكولا.", 30m, 40m, false, "item04.png"),
+        new("ماشروم سويس سماشد برغر", "دبل ماشروم سويس", "لحمة 200 غم، ماشروم صوص، خس، بندورة، جبنة ايمنتال. الوجبة تشمل بطاطا وكولا.", 36m, 46m, false, "item05.png"),
+        new("رويال سماشد برغر", "سنجل رويال برغر", "لحمة 150 غم، كاتشب، مايونيز، ماسترد، خس، بندورة، بصل، مخلل، جبنة شيدر. الوجبة تشمل بطاطا وكولا.", 27m, 37m, false, "item06.png"),
+        new("رويال سماشد برغر", "دبل رويال برغر", "لحمة 200 غم، كاتشب، مايونيز، ماسترد، خس، بندورة، بصل، مخلل، جبنة شيدر. الوجبة تشمل بطاطا وكولا.", 31m, 41m, false, "item07.png"),
+        new("روست بيف سماشد برغر", "سنجل روست بيف برغر", "150 غم لحمة، مخلل، ماسترد، بصل مكرمل، صوص الروست بيف الخاص، شرائح الروست بيف، جبنة ايمنتال. الوجبة تشمل بطاطا وكولا.", 31m, 41m, false, "item08.png"),
+        new("روست بيف سماشد برغر", "دبل روست بيف برغر", "200 غم لحمة، مخلل، ماسترد، بصل مكرمل، صوص الروست بيف الخاص، شرائح الروست بيف، جبنة ايمنتال. الوجبة تشمل بطاطا وكولا.", 36m, 46m, false, "item09.png"),
+        new("روست بيف سماشد برغر", "شيكن راب", "المكونات غير مذكورة في المنيو. الوجبة تشمل بطاطا وكولا.", 26m, 36m, false, "item10.png"),
+        new("فلات برغر", "سنجل فلات برغر", "لحمة 150 غم، سبيشل صوص، خس، بندورة، بصل، جبنة شيدر، خبزة مكبوسة عالجريل. الوجبة تشمل بطاطا ومشروب.", 27m, 37m, false, "item11.png"),
+        new("فلات برغر", "دبل فلات برغر", "لحمة 200 غم، سبيشل صوص، خس، بندورة، بصل، جبنة شيدر، خبزة مكبوسة عالجريل. الوجبة تشمل بطاطا ومشروب.", 30m, 40m, false, "item12.png"),
+        new("وجبات الأطفال", "سماشد برغر (وجبة أطفال)", "لحمة 100 غم، خس، بندورة، سبيشل صوص، جبنة، بطاطا، عصير، هدية.", 25m, null, false, "item13.png"),
+        new("وجبات الأطفال", "كرسبي برغر (وجبة أطفال)", "دجاج كرسبي مقلي و مقرمش، خس، مايونيز، جبنة، بطاطا، عصير، هدية.", 25m, null, false, "item14.png"),
+        new("وجبات الأطفال", "وجبة كرسبي (وجبة أطفال)", "قطع دجاج كرسبي مقلي و مقرمش، بطاطا، عصير، هدية.", 25m, null, false, "item15.png"),
+        new("وجبات", "وجبة كرسبي الدجاج", "5 قطع كرسبي، بطاطا، كولا، خبزة.", 35m, null, false, "item16.png"),
+        new("عروض خاصة", "2 ميني برجر (أي نوع)", "مع بطاطا وكولا وصوصات.", 43m, null, false, "item17.png"),
+        new("عروض خاصة", "4 لقيمات سماشد", "مع بطاطا وكولا وصوصات.", 40m, null, false, "item18.png"),
+        new("عروض خاصة", "عرض لقيمات سماشد (لقيمات + بطاطا + كولا)", "ظاهر في صورة العروض الخاصة، لكن لا يوجد اسم أو سعر مكتوب بجانبه.", null, null, false, "item19.png"),
+        new("المقبلات", "قطع كرسبي", "5 قطع.", 25m, null, false, "item20.png"),
+        new("المقبلات", "حلقات البصل", "5 قطع.", 10m, null, false, "item21.png"),
+        new("المقبلات", "اصابع موزاريلا", "4 قطع.", 20m, null, false, "item22.png"),
+        new("المقبلات", "أجنحة دجاج", "10 قطع.", 25m, null, false, "item23.png"),
+        new("المقبلات", "قطع كرسبي مع بطاطا بالجبنة", "قطع كرسبي مع بطاطا بالجبنة. عدد القطع غير مذكور.", 25m, null, false, "item24.png"),
+        new("المقبلات", "تشكن بوب كورن", "12 قطعة.", 20m, null, false, "item25.png"),
+        new("المقبلات", "كرات الجبنة مع الهالبينو", "5 قطع.", 15m, null, false, "item26.png"),
+        new("بطاطا", "بطاطا عادية (صغير)", "بطاطا عادية، حجم صغير.", 8m, null, false, "item27.png"),
+        new("بطاطا", "بطاطا عادية (كبير)", "بطاطا عادية، حجم كبير.", 16m, null, false, "item28.png"),
+        new("بطاطا", "بطاطا عادية مع جبنة وهالبينو", "بطاطا عادية مع جبنة وهالبينو.", 18m, null, false, "item29.png"),
+        new("بطاطا", "بطاطا كيرلي (صغير)", "بطاطا كيرلي، حجم صغير.", 12m, null, false, "item30.png"),
+        new("بطاطا", "بطاطا كيرلي (كبير)", "بطاطا كيرلي، حجم كبير.", 20m, null, false, "item31.png"),
+        new("بطاطا", "بطاطا كيرلي مع جبنة وهالبينو", "بطاطا كيرلي مع جبنة وهالبينو.", 25m, null, false, "item32.png"),
+        new("بطاطا", "بطاطا ويدجز (صغير)", "بطاطا ويدجز، حجم صغير.", 10m, null, false, "item33.png"),
+        new("بطاطا", "بطاطا ويدجز (كبير)", "بطاطا ويدجز، حجم كبير.", 18m, null, false, "item34.png"),
+        new("بطاطا", "بطاطا ويدجز مع جبنة وهالبينو", "بطاطا ويدجز مع جبنة وهالبينو.", 25m, null, false, "item35.png"),
+        new("مشروبات", "ماء", "مياه معبأة.", 3m, null, false, "item36.png"),
+        new("مشروبات", "عصير", "عصير معبأ.", 3m, null, false, "item37.png"),
+        new("مشروبات", "شات كولا", "كولا علبة.", 3m, null, false, "item38.png"),
+        new("إضافات", "إضافة الجبنة على البرجر", "جبنة إضافية على أي برجر.", 2m, null, true, null),
+        new("إضافات", "تبديل إلى كيرلي", "تبديل بطاطا الوجبة إلى كيرلي.", 4m, null, true, null),
+        new("إضافات", "تبديل إلى ويدجز", "تبديل بطاطا الوجبة إلى ويدجز.", 2m, null, true, null),
+        new("إضافات", "إضافة صلصة جبنة شيدر سائلة", "صلصة جبنة شيدر سائلة إضافية.", 3m, null, true, null),
+        new("إضافات", "إضافة هالبينو", "هالبينو إضافي.", 0m, null, true, null),
+    ];
+
+    /// <summary>
     /// Where the restaurant delivers, which branch covers it and what it costs
     /// (A-65, S-58). Imported from the branches' own price lists.
     /// </summary>

@@ -345,7 +345,7 @@ public static class SeedData
         ("agent.call_log_days", "7"),
 
         // Idle logout, so a shared laptop does not leave the previous shift signed in (A-05).
-        ("agent.idle_logout_minutes", "30"),
+        ("agent.idle_logout_minutes", "240"),
 
         // How long an agent may still edit their own classification (A-42).
         ("agent.edit_window", "SameDay"),

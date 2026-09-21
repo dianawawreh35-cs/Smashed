@@ -111,7 +111,7 @@ public class SeedDataTests
 
     [Theory]
     [InlineData("recording.retention_days", "90")]   // A-33 / S-43
-    [InlineData("agent.idle_logout_minutes", "30")]  // A-05
+    [InlineData("agent.idle_logout_minutes", "240")] // A-05, raised from 30 on 2026-09-21
     [InlineData("agent.edit_window", "SameDay")]     // A-42
     [InlineData("sla.answer_seconds", "20")]         // R-21
     [InlineData("agent.call_log_days", "7")]         // A-50

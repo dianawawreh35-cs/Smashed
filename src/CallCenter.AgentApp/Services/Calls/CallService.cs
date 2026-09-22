@@ -927,16 +927,26 @@ public class CallService(
             _pending = null;
             _callId = null;
             _hangingUpLocally = false;
+
+            // The call is marked finished HERE, inside the lock that read the
+            // state, and not at the end of this method.
+            //
+            // Two things finish the same call within the same millisecond. An
+            // outgoing call that the PBX refuses raises the failure this method
+            // was called for *and* a hang-up from the library, and the check
+            // below used to let both through: each read "not idle" before
+            // either had written "idle". The call was then reported twice, two
+            // flushes of the upload queue raced, and the server refused the
+            // second copy with a duplicate key - visible as a 500 in the log on
+            // 22 September, from a call that had otherwise gone fine.
+            _state = CallState.Idle;
         }
 
         CloseMedia();
 
         if (state.Status is CallStatus.Idle)
         {
-            // Nothing was in progress - a second Finish for the same call, which
-            // happens when both ends hang up at once. Reporting twice would be
-            // harmless, but there is nothing to report.
-            Set(CallState.Idle);
+            // Whoever got here first has already reported this call.
             return;
         }
 
@@ -957,7 +967,8 @@ public class CallService(
             DateTimeOffset.Now,
             state.IsOutbound));
 
-        Set(CallState.Idle);
+        // The state was set inside the lock above; this is only the event.
+        StateChanged?.Invoke(this, CallState.Idle);
     }
 
     /// <summary>

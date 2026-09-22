@@ -227,13 +227,21 @@ cannot be faked, and the part most likely to find something.
       "Calling", with the number and a Cancel. Your phone rings. Answer it and
       the pop-up says "Connected", the timer starts, and the classification form
       opens exactly as it does on an incoming call (A-21).
-      *If your phone never rings and the log shows 404:* the PBX did not
-      recognise the number in that format. **This is the expected first
-      failure.** Look at what the app sent — the log prints the full destination
-      — and try `Dialing:Prefix` in the Agent App's `appsettings.json`, or tell
-      me what the dialplan wants.
+      *Tried once on 22 September and it got as far as the PBX:* the number
+      format is right, and the call was refused with **503 Service
+      Unavailable** after about eight seconds of ringing tone. That is the
+      PBX's outbound route, not the app. **Make this call with the speaker up**
+      — Asterisk almost certainly announces the reason during those eight
+      seconds, and nobody has listened yet.
+      *If the log shows 404:* the PBX did not recognise the number in that
+      format after all. Try `Dialing:Prefix` in the Agent App's
+      `appsettings.json`.
       *If the log shows 401 or 407 repeatedly:* the PBX is challenging the call
       and the credentials are not satisfying it. That is a different fix.
+- [ ] **One call, one log entry.** After any outgoing call that fails, the log
+      must say "Call finished" **once**, and the server must not answer 500.
+      *Two lines in the same millisecond was a real bug on 22 September:* a
+      failed outgoing call ended twice and was reported twice.
 - [ ] **The call appears in the call log as outgoing**, not incoming.
 - [ ] **Dial, then press Cancel before answering.** Your phone must stop
       ringing. The log entry says NoAnswer.

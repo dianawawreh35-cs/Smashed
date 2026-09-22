@@ -2771,6 +2771,76 @@ actually shown today: the call log, a contact, and the dial box. Making every
 piece of number-shaped text clickable is a larger and vaguer job with no user
 asking for it.
 
+## 2026-09-22 — The first outbound test call: the app was right, the PBX refused
+
+Dia dialled his own mobile. Three things came back, and only one of them is ours.
+
+### The number format was never the problem
+
+The expectation was a 404 and an argument about dialling rules. Instead:
+
+```
+10:43:42 Dialling sip:0569498581@192.168.0.27
+10:43:43 The far end is ringing: "SessionProgress"
+10:43:50 The outgoing call did not connect: "ServiceUnavailable"
+```
+
+The PBX **accepted the number**, answered 183 Session Progress and started early
+media, then gave up after eight seconds with 503. So the dialplan understands
+`0569498581` perfectly well and `Dialing:Prefix` stays empty.
+
+**503 after early media is an outbound route that did not complete** — no trunk,
+a trunk that refused, or extension 2001 not permitted to use one. Those eight
+seconds of early media are almost certainly Asterisk *saying the reason out
+loud*, so the next test call should be made with the speaker up: the PBX is
+likely announcing what is wrong before it hangs up.
+
+This is a PBX question, not an app one, and it is now question 3c for whoever
+administers Issabel.
+
+### Cancel works
+
+```
+10:44:06 Dialling sip:00970569498581@192.168.0.27
+10:44:11 SIP OUT "CANCEL"
+10:44:11 The agent gave up on the outgoing call
+10:44:11 Call finished: nobody answered
+```
+
+CANCEL rather than BYE, logged NoAnswer, one report. Exactly as designed.
+
+### And a bug of mine, which only an outgoing call could have found
+
+```
+10:43:50.674 Call finished: the PBX answered ServiceUnavailable
+10:43:50.674 Call finished: the caller hung up
+```
+
+**The same call was finished twice, in the same millisecond**, and so reported
+twice. The server refused the second copy on `ux_comm_sip_call` and the agent's
+log showed a 500 from a call that had otherwise behaved.
+
+A failed outgoing call raises two things at once: the failure that `DialAsync`
+is waiting for, and a hang-up from SIPSorcery. `Finish` guarded against that
+with "return if the call is already idle" — but it marked the call idle at the
+*end* of the method, after reporting. Both threads read "not idle" before either
+wrote it, so both went through. The guard read like a lock and was a suggestion.
+
+Fixed by claiming the call inside the same lock that reads it: the state goes to
+Idle there, and whoever arrives second returns having done nothing.
+
+**This existed before outbound calls and could not be reached.** Inbound has one
+path in: either the agent hangs up, which sets a flag that silences the library's
+event, or the caller does, which raises only that event. Adding a second way for
+a call to end turned a latent race into a reproducible one — and it took a real
+PBX refusing a real call to produce it, because it needs two endings inside the
+same millisecond.
+
+Two flushes of the upload queue also ran concurrently, which is how the duplicate
+reached the server rather than being absorbed. That the queue can be flushed
+twice at once is a **separate** weakness, related to the unresolved concurrency
+item below, and is not fixed here.
+
 ---
 
 # How this project is tracked
@@ -2901,11 +2971,15 @@ describe**:
    the S-46 export?
 3. What **VPN uptime and support hours** are agreed, and who is called when the
    tunnel drops?
-3b. **What does the dialplan expect an agent to dial?** A local mobile as
-   `0569498581`, with the country code, or behind a digit for an outside line?
-   The Agent App sends the digits as held with a configurable prefix
-   (`Dialing:Prefix`), so the answer is a settings change rather than a build —
-   but until a real outbound call is made, nobody knows which it is.
+3b. ~~What does the dialplan expect an agent to dial?~~ **Answered 22 Sep by
+   the first test call:** plain `0569498581` is accepted and routed.
+   `Dialing:Prefix` stays empty.
+3c. **Can extension 2001 place external calls at all, and through which trunk?**
+   The first outbound test was answered 183 Session Progress, given about eight
+   seconds of early media, then **503 Service Unavailable**. That is an outbound
+   route that did not complete. Listening to those eight seconds should say why,
+   because Asterisk usually announces it. **Outbound calling (A-20) cannot be
+   signed off until this is settled**, and nothing in the app can fix it.
 4. Can a **recording announcement** be added before ringing agents, if the
    client wants one?
 

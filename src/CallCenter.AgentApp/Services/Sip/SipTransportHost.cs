@@ -92,6 +92,17 @@ public sealed class SipTransportHost(ILogger<SipTransportHost> logger) : IDispos
                 "SIP IN  {Status} {Reason} from {Remote}",
                 (int)response.Status, response.ReasonPhrase, remote);
 
+        // The replies this app sends: the ringing, the answer, the decline.
+        // Missing until 22 September, which made "the agent pressed Reject and
+        // the caller stayed" impossible to diagnose from a log: the decline we
+        // send was the one message in the whole conversation that left no
+        // trace, and the only evidence it had gone at all was the PBX's ACK
+        // arriving afterwards.
+        transport.SIPResponseOutTraceEvent += (local, remote, response) =>
+            logger.LogInformation(
+                "SIP OUT {Status} {Reason} to {Remote}",
+                (int)response.Status, response.ReasonPhrase, remote);
+
         // Something arrived that could not be parsed as SIP at all. Rare, and
         // the sort of thing that otherwise looks exactly like silence.
         transport.SIPBadRequestInTraceEvent += (local, remote, message, error, raw) =>

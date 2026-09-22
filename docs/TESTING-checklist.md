@@ -190,6 +190,13 @@ cannot be faked, and the part most likely to find something.
       immediately** — no ringback, no hold tone. Then unblock it and call
       again; it must ring.
 - [ ] **Call 2001 while it is already on a call.** Busy.
+- [ ] **Press Reject, and watch what the caller hears.** The log now prints the
+      response the app sends, so look for `SIP OUT 603 Decline`.
+      *If the caller is offered again a few seconds later:* the app rejected it
+      correctly and the **queue put the customer back and rang the only member
+      again**. That is a dialplan question, and it is what "Reject does nothing"
+      looked like on 22 September. See the DECISIONS entry of that date on 603
+      versus 486.
 - [ ] **Does taking a call reset the idle-logout timer?** Flagged and never
       checked. If it does not, an agent on a long call gets logged out
       mid-conversation.

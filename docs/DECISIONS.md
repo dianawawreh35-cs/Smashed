@@ -2841,6 +2841,61 @@ reached the server rather than being absorbed. That the queue can be flushed
 twice at once is a **separate** weakness, related to the unresolved concurrency
 item below, and is not fixed here.
 
+## 2026-09-22 — "Reject does not work", and the one message the log never showed
+
+Dia reported that Reject does nothing. The log says otherwise, and the
+interesting part is what it could not say.
+
+```
+11:51:20.918  SIP IN  "INVITE" from 0569498581
+11:51:26.103  Call ended: rejected by the agent
+11:51:26.110  SIP IN  "ACK"
+```
+
+**The app did reject it.** An ACK arrives only in answer to a final response, so
+one went out. The call was reported once, with status Rejected, and the server
+took it.
+
+**But the response itself is invisible.** The trace wired up
+`SIPRequestIn`, `SIPRequestOut` and `SIPResponseIn` — and not
+`SIPResponseOut`. So every message in the conversation is logged except the ones
+this app sends in reply: the 180 Ringing, the 200 OK on answer, and the 603
+Decline on a reject. The one message the complaint is about was the one message
+with no line in the log, and the only evidence it existed at all was the PBX
+acknowledging something.
+
+That is now fixed — three lines — and the docstring that claimed to log "every
+SIP message in and out" is true again. **This is the second time on this project
+that a missing log line, rather than a bug, was what cost the time**; the first
+was the trace itself being absent when a call never arrived.
+
+### What is probably actually happening
+
+Rejecting is not the same as getting rid of the caller, and with a queue it
+usually is not. `Reject` sends **603 Decline**, chosen for A-17 because 6xx is a
+global failure that asks a proxy to stop trying anywhere. What Asterisk does with
+it for a **queue** call is its own business: the normal behaviour is to keep the
+customer in the queue and offer them to the next available member — which, with
+one agent, is the agent who just declined. From that seat it looks exactly like a
+button that does nothing.
+
+Two things follow, and neither can be settled without one more test call now that
+the response is logged:
+
+1. **Is 603 the right answer for an agent reject at all?** 603 says "do not try
+   anywhere else", which for a queue arguably means hanging up on a customer who
+   has been waiting. **486 Busy Here** says "not this extension, try another",
+   which is what a call centre with more than one agent would want. The reasoning
+   for 603 is written down for *blocked* callers (A-17) and was never revisited
+   for A-12's Reject — the two were given the same answer because the same method
+   sends both.
+2. **What the caller should hear after a reject is a dialplan decision**, exactly
+   as it is for a hang-up. The app can only choose which refusal it sends.
+
+Nothing is changed in what Reject sends yet. Guessing at a SIP response code
+against a live PBX, with no log of what was sent, is how the last three telephony
+bugs happened.
+
 ---
 
 # How this project is tracked

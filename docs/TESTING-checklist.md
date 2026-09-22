@@ -205,6 +205,21 @@ cannot be faked, and the part most likely to find something.
       and is described in the DECISIONS entry for Mute.
 - [ ] **Hang up while muted, then take the next call.** The next call must not
       start muted.
+- [ ] **Hold (A-12).** Answer, press Hold. The status line must say "On hold"
+      and the button "Resume". The other phone must hear the PBX's hold music
+      and you must hear nothing. Press Resume: both ways again, status back to
+      "Connected".
+      *If the other phone hears silence instead of music:* the hold worked and
+      Issabel simply has no music class on that extension — a PBX setting, not
+      a bug here.
+      *If the pop-up says "On hold" but the other phone still hears you:* the
+      PBX refused the re-INVITE. Look in the Agent App log for a 488 or a
+      warning from SIPSorcery. That would need the PBX administrator.
+- [ ] **Hang up while on hold.** The other phone's call must end.
+- [ ] **Hold, then have the other side hang up.** The pop-up must clear as it
+      does on any hang-up.
+- [ ] **Mute, then Hold, then Resume.** You must still be muted after the
+      resume: status "Muted", button "Unmute".
 
 ---
 
@@ -244,5 +259,5 @@ These cannot be checked on this laptop, and each has burned a project somewhere.
 Not testable yet, and listed so the gaps are not mistaken for failures:
 classification (A-40, S-40), branch management (S-41), opening a call from the
 log (A-51), caller identity in the pop-up (A-16, A-11), blacklist export
-(S-46), hold, outbound calls, merging contacts, and contact import
+(S-46), outbound calls, merging contacts, and contact import
 from Excel. `DECISIONS.md` holds the live list.

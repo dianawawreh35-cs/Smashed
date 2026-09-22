@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:CallCenter.AgentApp.ViewModels"
-        Title="{Binding Localizer[call.incoming]}"
+        Title="{Binding StatusText}"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
         Background="{StaticResource Bg}"
@@ -135,21 +135,27 @@
                    TextWrapping="Wrap" />
       </StackPanel>
 
-      <!-- Connected: mute, and one way out (A-12). Mute is a toggle whose
-           label says what pressing it does next; the muted state itself is
-           shown in the status line at the top, where the agent looks. -->
+      <!-- Connected: mute, hold, and one way out (A-12). Mute and Hold are
+           toggles whose label says what pressing it does next; the state
+           itself is shown in the status line at the top, where the agent
+           looks. -->
       <StackPanel Orientation="Horizontal"
                   HorizontalAlignment="Center"
                   Margin="0,22,0,0"
                   Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
         <Button Content="{Binding MuteLabel}"
                 Style="{StaticResource GhostButton}"
-                MinWidth="110"
+                MinWidth="100"
                 Command="{Binding ToggleMuteCommand}" />
+        <Button Content="{Binding HoldLabel}"
+                Style="{StaticResource GhostButton}"
+                MinWidth="100"
+                Margin="8,0,0,0"
+                Command="{Binding ToggleHoldCommand}" />
         <Button Content="{Binding Localizer[call.hangUp]}"
                 Style="{StaticResource DangerButton}"
-                MinWidth="150"
-                Margin="10,0,0,0"
+                MinWidth="130"
+                Margin="8,0,0,0"
                 Command="{Binding HangUpCommand}" />
       </StackPanel>
 

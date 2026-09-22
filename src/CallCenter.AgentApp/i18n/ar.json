@@ -79,11 +79,14 @@
     "answer": "رد",
     "connected": "متّصل",
     "hangUp": "إنهاء",
+    "hold": "تعليق",
     "incoming": "مكالمة واردة",
     "mute": "كتم",
     "muted": "الميكروفون مكتوم",
     "numberWithheld": "رقم محجوب",
+    "onHold": "المكالمة معلّقة",
     "reject": "رفض",
+    "resume": "استئناف",
     "unmute": "إلغاء الكتم"
   },
   "callLog": {

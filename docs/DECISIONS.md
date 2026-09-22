@@ -2638,6 +2638,71 @@ answered.
 
 ---
 
+## 2026-09-21 — Hold (A-12): the first re-INVITE
+
+The second call control, and the first time this app changes a call after it
+has been answered. Mute never spoke to the PBX; Hold does.
+
+**What a hold is on the wire.** A second INVITE inside the same call — a
+*re-INVITE* — carrying a media description marked `a=sendonly`: "I will send but
+not receive". That is the standard way (RFC 3264) and every real PBX understands
+it. Asterisk, which Issabel runs on, reads it as hold: it plays its hold music to
+the customer and stops sending us their voice. Resume is another re-INVITE with
+`a=sendrecv`. SIPSorcery does both in `PutOnHold()` and `TakeOffHold()`, so the
+change in `CallService` is small; the risk was never the size of the code but
+that it is the first message sent into a live dialogue.
+
+**The microphone is paused too.** `sendonly` still allows sending, and SIPSorcery
+keeps transmitting the microphone during a hold. Asterisk ignores it, but the
+room's audio should not leave the laptop while the agent believes nobody can
+hear. On resume the microphone comes back **only if the agent had not muted
+before the hold** — mute and hold are separate flags, and a mute survives a hold.
+Pressing Mute while on hold flips the flag alone; the microphone is paused
+regardless, and Resume reads the flag to decide.
+
+**The PBX's answer is not waited for.** The re-INVITE is sent and its response
+handled inside SIPSorcery, on another thread, so the app cannot know at the
+moment of pressing Hold whether the PBX accepted. The state is shown as on hold
+at once. If the PBX ever refused (a 488), the library logs it and the call
+carries on unchanged, and the pop-up would be wrong until Resume is pressed.
+Accepted rather than engineered around: hold is in the SIP standard, a PBX that
+refuses it is misconfigured, and the log is where that would be found. This is
+one of the two risks named before the work started and the test call is what
+retires it.
+
+**Remote hold is logged, not shown.** The PBX can hold *us* — it does during a
+transfer — and SIPSorcery raises an event for it. The pop-up has nothing to
+offer the agent about a hold they did not choose, so it is a log line only.
+
+**Status line priority: on hold, then muted, then connected.** Hold is the larger
+fact — nobody hears anybody — so it wins. The buttons read the next action, Hold
+then Resume, as Mute does.
+
+**Hang up while on hold** needs nothing special: the BYE goes inside the same
+dialogue whether or not a re-INVITE preceded it. The other side hanging up while
+on hold is the same BYE as ever. Both on the checklist regardless, because "needs
+nothing special" is a claim about the library and not about this PBX.
+
+**Both worked first time on a real call to 2001** — mute, hold, hold music,
+resume. The 488 refusal and the RTP-timeout drop, the two risks named before the
+work started, did not happen. Hold is in the SIP standard and Issabel is
+configured normally; the caution was worth having and cost nothing.
+
+### And the screenshot found a fifth thing, again
+
+The pop-up's **window title was a fixed "Incoming call"** for the whole life of
+the call, so the title bar and the taskbar button announced an arriving call
+while it had been connected, and muted, for over a minute. Bound to the status
+line now, so it reads Incoming call, Connected, Muted or On hold like the card
+does.
+
+Nothing could have caught this but a human looking at the window: it compiles, it
+has no test that could fail, and the card in the middle of the screen was right
+all along. **That is five defects from three screenshots on this project.** The
+rule stands — when UI work is finished, ask for a screenshot before committing.
+
+---
+
 # How this project is tracked
 
 Three files, each with one job. Kept current as part of doing the work, not
@@ -2677,7 +2742,6 @@ and what comes after:
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
 | The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
-| Hold | A-12 | nothing — Mute is done |
 | Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |

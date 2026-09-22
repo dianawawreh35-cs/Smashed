@@ -79,11 +79,14 @@
     "answer": "Answer",
     "connected": "Connected",
     "hangUp": "Hang up",
+    "hold": "Hold",
     "incoming": "Incoming call",
     "mute": "Mute",
     "muted": "Muted",
     "numberWithheld": "Number withheld",
+    "onHold": "On hold",
     "reject": "Reject",
+    "resume": "Resume",
     "unmute": "Unmute"
   },
   "callLog": {

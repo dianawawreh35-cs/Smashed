@@ -87,6 +87,8 @@ public partial class CallViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasCallerName))]
     [NotifyPropertyChangedFor(nameof(IsMuted))]
     [NotifyPropertyChangedFor(nameof(MuteLabel))]
+    [NotifyPropertyChangedFor(nameof(IsOnHold))]
+    [NotifyPropertyChangedFor(nameof(HoldLabel))]
     private CallState _state = CallState.Idle;
 
     public bool IsRinging => State.Status is CallStatus.Ringing;
@@ -111,13 +113,29 @@ public partial class CallViewModel : ObservableObject
     /// </summary>
     public string MuteLabel => Localizer[IsMuted ? "call.unmute" : "call.mute"];
 
+    /// <summary>The customer is on hold (A-12).</summary>
+    public bool IsOnHold => State.IsOnHold;
+
+    /// <summary>Hold, then Resume: the action, as with <see cref="MuteLabel"/>.</summary>
+    public string HoldLabel => Localizer[IsOnHold ? "call.resume" : "call.hold"];
+
     /// <summary>
-    /// Ringing, connected, or muted — the line above the number. Muted takes
-    /// the line over: an agent who has forgotten they are muted is talking to
-    /// nobody, and this is the one place they look.
+    /// Ringing, connected, muted or on hold — the line above the number. Hold
+    /// outranks mute because it is the larger fact: nobody hears anybody. Both
+    /// take the line over from "Connected" because an agent who has forgotten
+    /// either is talking to nobody, and this is the one place they look.
+    /// <para>
+    /// The pop-up's window title binds to this too, rather than to a fixed
+    /// "Incoming call" as it used to: the title bar and the taskbar button are
+    /// what an agent with the pop-up behind something else can see, and they
+    /// announced an arriving call while it had been connected for two minutes.
+    /// </para>
     /// </summary>
     public string StatusText => Localizer[
-        IsMuted ? "call.muted" : IsConnected ? "call.connected" : "call.incoming"];
+        IsOnHold ? "call.onHold"
+        : IsMuted ? "call.muted"
+        : IsConnected ? "call.connected"
+        : "call.incoming"];
 
     /// <summary>
     /// The queue this call came through, above the number, because it changes
@@ -156,6 +174,9 @@ public partial class CallViewModel : ObservableObject
 
     [RelayCommand]
     private void ToggleMute() => _calls.ToggleMute();
+
+    [RelayCommand]
+    private void ToggleHold() => _calls.ToggleHold();
 
     /// <summary>
     /// Brings the call onto the screen, or takes it away. Marshalled: this
@@ -205,5 +226,6 @@ public partial class CallViewModel : ObservableObject
         OnPropertyChanged(nameof(Number));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(MuteLabel));
+        OnPropertyChanged(nameof(HoldLabel));
     }
 }

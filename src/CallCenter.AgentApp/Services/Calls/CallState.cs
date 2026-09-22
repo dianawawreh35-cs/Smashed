@@ -58,6 +58,11 @@ public enum CallStatus
 /// own, so everything that asks "is the call connected" — the timer, the
 /// classification form, the outcome at hang-up — is untouched by it.
 /// </param>
+/// <param name="IsOnHold">
+/// The customer is on the PBX's hold music (A-12) and neither side hears the
+/// other. Independent of <paramref name="IsMuted"/>: a mute set before the hold
+/// is still there when the hold ends.
+/// </param>
 public record CallState(
     CallStatus Status,
     string? Number,
@@ -66,7 +71,8 @@ public record CallState(
     DateTimeOffset? StartedAt,
     DateTimeOffset? ConnectedAt,
     string? SipCallId = null,
-    bool IsMuted = false)
+    bool IsMuted = false,
+    bool IsOnHold = false)
 {
     /// <summary>No call in progress.</summary>
     public static readonly CallState Idle = new(CallStatus.Idle, null, null, null, null, null);

@@ -108,6 +108,12 @@ public class CallService(
             _agent.OnCallHungup += OnCallHungup;
             _agent.ServerCallCancelled += (_, _) => Finish("the caller gave up");
 
+            // The far end can hold us too - a PBX does it during a transfer.
+            // Logged only: A-12 is about the agent's controls, and the pop-up
+            // has nothing to offer the agent about a hold they did not choose.
+            _agent.RemotePutOnHold += () => logger.LogInformation("Put on hold by the other side");
+            _agent.RemoteTookOffHold += () => logger.LogInformation("Taken off hold by the other side");
+
             transport.Transport.SIPTransportRequestReceived += OnTransportRequest;
         }
 
@@ -269,9 +275,113 @@ public class CallService(
 
         var mute = !state.IsMuted;
 
+        // On hold the microphone is paused regardless, so only the flag moves;
+        // Resume reads it to decide whether the microphone comes back.
+        if (!state.IsOnHold && !SetMicrophone(paused: mute))
+        {
+            return;
+        }
+
+        logger.LogInformation("Microphone {Action}", mute ? "muted" : "unmuted");
+        Set(State with { IsMuted = mute });
+    }
+
+    /// <summary>
+    /// Puts the customer on hold, or takes them off it (A-12).
+    /// </summary>
+    /// <remarks>
+    /// Hold is the first thing in this app to change a call after it is
+    /// answered. It is a <b>re-INVITE</b>: a second INVITE inside the same
+    /// dialogue, carrying an SDP marked <c>a=sendonly</c>, which is the standard
+    /// way (RFC 3264) a phone says "I will send but not receive". Asterisk reads
+    /// that as hold, plays its hold music to the customer and stops sending us
+    /// their voice. Taking off hold is another re-INVITE with <c>a=sendrecv</c>.
+    /// SIPSorcery does both in <see cref="SIPUserAgent.PutOnHold"/> and
+    /// <see cref="SIPUserAgent.TakeOffHold"/>.
+    ///
+    /// <b>The microphone is paused as well.</b> <c>sendonly</c> still permits
+    /// sending, and SIPSorcery keeps transmitting the microphone; Asterisk
+    /// ignores it, but there is no reason for the room's audio to leave the
+    /// laptop while the agent thinks nobody can hear them. On resume the
+    /// microphone comes back only if the agent had not muted before the hold.
+    ///
+    /// <b>The PBX's answer arrives later.</b> The re-INVITE is sent here and its
+    /// response handled inside SIPSorcery on another thread, so this method
+    /// cannot know whether the PBX accepted. A refusal (488) is logged by the
+    /// library and the call carries on as it was; the state shown here would
+    /// then be wrong until Resume is pressed. Accepted, because hold is in the
+    /// SIP standard and a PBX that refuses it is misconfigured - the log is
+    /// where that would be found.
+    ///
+    /// Same rule as mute: a failure is logged and the state left alone. Hold
+    /// must never end a call.
+    /// </remarks>
+    public void ToggleHold()
+    {
+        SIPUserAgent? agent;
+        CallState state;
+
+        lock (_gate)
+        {
+            agent = _agent;
+            state = _state;
+        }
+
+        if (agent is null || state.Status is not CallStatus.Connected)
+        {
+            return;
+        }
+
+        var hold = !state.IsOnHold;
+
         try
         {
-            if (mute)
+            if (hold)
+            {
+                agent.PutOnHold();
+            }
+            else
+            {
+                agent.TakeOffHold();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The call could not be {Action}", hold ? "put on hold" : "taken off hold");
+            return;
+        }
+
+        // The re-INVITE is away; the microphone follows. A microphone failure
+        // here is logged inside SetMicrophone and does not undo the hold: the
+        // customer is on hold music either way, and that is what the agent
+        // asked for.
+        SetMicrophone(paused: hold || state.IsMuted);
+
+        logger.LogInformation("Call {Action}", hold ? "put on hold" : "taken off hold");
+        Set(State with { IsOnHold = hold });
+    }
+
+    /// <summary>
+    /// Pauses or resumes the microphone. False if it could not be done, and the
+    /// reason is already in the log.
+    /// </summary>
+    private bool SetMicrophone(bool paused)
+    {
+        WindowsAudioEndPoint? audio;
+
+        lock (_gate)
+        {
+            audio = _audio;
+        }
+
+        if (audio is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (paused)
             {
                 audio.PauseAudio().GetAwaiter().GetResult();
             }
@@ -279,15 +389,14 @@ public class CallService(
             {
                 audio.ResumeAudio().GetAwaiter().GetResult();
             }
+
+            return true;
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "The microphone could not be {Action}", mute ? "muted" : "unmuted");
-            return;
+            logger.LogWarning(ex, "The microphone could not be {Action}", paused ? "paused" : "resumed");
+            return false;
         }
-
-        logger.LogInformation("Microphone {Action}", mute ? "muted" : "unmuted");
-        Set(State with { IsMuted = mute });
     }
 
     /// <summary>

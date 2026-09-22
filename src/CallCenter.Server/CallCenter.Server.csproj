@@ -36,6 +36,11 @@
     <!-- The menu photographs, embedded so the seed is self-contained: a fresh
          install needs the one DLL and nothing beside it. 1.2 MB. -->
     <EmbeddedResource Include="Data\Seed\MenuImages\*.png" />
+
+    <!-- The customer book carried over from the old ordering system, embedded
+         for the same reason. 393 KB gzipped, 15,358 contacts. Regenerated from
+         docs/Contacts.xlsx by tools/contacts-import/convert.py. -->
+    <EmbeddedResource Include="Data\Seed\Contacts\contacts.csv.gz" />
   </ItemGroup>
 
 </Project>

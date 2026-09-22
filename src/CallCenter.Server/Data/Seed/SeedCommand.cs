@@ -64,6 +64,7 @@ public static class SeedCommand
             Console.WriteLine($"  settings   {Describe(result.SettingsAdded)}");
             Console.WriteLine($"  delivery   {Describe(result.DeliveryAreasAdded)}");
             Console.WriteLine($"  menu       {Describe(result.MenuItemsAdded)}");
+            Console.WriteLine($"  contacts   {Describe(result.ContactsAdded)}");
 
             if (result.UserCreated)
             {
@@ -100,10 +101,13 @@ public static class SeedCommand
         Usage: dotnet CallCenter.Server.dll seed [options]
 
         Creates the starting data for a new database: branches, channels,
-        classification types, form version 1, default settings, and the first
-        supervisor account. Applies any pending migrations first.
+        classification types, form version 1, default settings, the delivery
+        price lists, the menu, the 15,358 customers carried over from the old
+        ordering system, and the first supervisor account. Applies any pending
+        migrations first.
 
-        Safe to run twice - nothing existing is changed or overwritten.
+        Safe to run twice - nothing existing is changed or overwritten. The
+        contacts add about ten seconds to the first run.
 
         Options:
           --admin-user <login>        create the first supervisor with this login

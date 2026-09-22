@@ -113,6 +113,19 @@ cd "src\CallCenter.Server\bin\Debug\net10.0"
 dotnet CallCenter.Server.dll seed
 ```
 
+The same command fills an empty database with the branches, the delivery price
+lists, the menu and the 15,289 customers carried over from the old ordering
+system - about ten seconds, almost all of it the contacts. It is idempotent, so
+running it against a database that already has them changes nothing.
+
+That customer book is embedded in the server assembly. It is regenerated from
+`docs/Contacts.xlsx` only when a newer export arrives:
+
+```powershell
+py -m pip install openpyxl
+py tools\contacts-import\convert.py   # writes Data\Seed\Contacts\contacts.csv.gz - commit it
+```
+
 The seed command refuses to run once any user exists, so it cannot be used to
 recover a forgotten supervisor password. There is no self-service reset either;
 a lockout currently needs direct database access. Also on the list.

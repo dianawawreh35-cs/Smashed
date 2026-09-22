@@ -246,7 +246,7 @@ Either way, wait for lines like `Migrations applied` and `Now listening on: http
 
 ## Step 7 — First-run seed
 
-**What it does:** an empty database has no users. This one-time command creates the supervisor account, the four branches, the default classification types and the channels list. Then you confirm the web app works and set a real password.
+**What it does:** an empty database has no users. This one-time command creates the supervisor account, the four branches, the default classification types, the channels list, the delivery price lists, the menu, and the 15,289 customers carried over from the old ordering system. Then you confirm the web app works and set a real password.
 
 **Work**
 ```bash
@@ -260,9 +260,13 @@ It prints what it created:
   channels   5 created
   types      6 created
   form v1    created
-  settings   7 created
+  settings   6 created
+  delivery   228 created
+  menu       44 created
+  contacts   15289 created
   supervisor supervisor created
 ```
+The contacts are the slow part - about ten seconds; everything else is instant.
 Safe to run twice - anything already there is left alone, and it refuses to
 create a second supervisor once the users table has rows. `--branches` is
 optional (it defaults to Branch 1-4) and is ignored if branches already exist.
@@ -271,7 +275,7 @@ optional (it defaults to Branch 1-4) and is ignored if branches already exist.
 **Change the password immediately after logging in** - it was typed on the
 command line and is in this machine's shell history.
 
-From a laptop browser: `http://192.168.1.100` → log in → **change the password** → check Settings shows the branches, types and channels.
+From a laptop browser: `http://192.168.1.100` → log in → **change the password** → check Settings shows the branches, types and channels, and that the contacts list is not empty.
 
 ### If the supervisor password is ever lost
 

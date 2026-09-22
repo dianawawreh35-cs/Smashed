@@ -2861,6 +2861,84 @@ retry interval is what stops someone "tidying it up" a year from now.
 **Anything finished is recorded here or in the SRS, not left in a conversation.**
 Chat is not a record.
 
+## 2026-09-22 — The old system's 15,000 customers ship inside the server
+
+The shop has been taking orders for two years, and the customer book from the
+old ordering system is the most valuable thing it has: a call from a number
+nobody recognises is a call where the agent asks for the address again. So the
+export — `docs/Contacts.xlsx`, 15,358 rows — is now part of the seed. A server
+installed from scratch answers its first call with the customer's name already
+on the screen.
+
+**Where the data lives.** A gzipped CSV, embedded in `CallCenter.Server.dll` as
+`Data/Seed/Contacts/contacts.csv.gz`. 393 KB, against 3.2 MB of plain CSV and
+11 MB of spreadsheet. This is the same choice as the menu photographs and for
+the same reason: installing the server is one image and nothing beside it, so a
+file that has to be copied to the right folder before seeding is a step that
+will be forgotten at two in the morning.
+
+Nothing in the server reads Excel. `tools/contacts-import/convert.py` does the
+conversion once, by hand, and its output is committed — the alternative was a
+spreadsheet parser as a permanent dependency of the API for something that runs
+once per installation.
+
+**What was kept, and what was dropped.** Five columns of fifteen: name, both
+numbers, address and the shop's note. The order statistics the export carries
+(first order, last order, number of orders, totals) have nowhere to live in this
+schema, and inventing a place for numbers that stop being true the moment the
+new system takes a call would be worse than losing them. The `BL` and `Reason`
+columns are empty in every row of this export, so nothing arrives blocked.
+
+The city was its own column and this schema has no such field, so it is appended
+to the address: `الماصيون - رام الله`. 1,369 of these customers are in
+Jerusalem, and an address that does not say so is not deliverable. Known
+misspellings are folded to one form each — `Ramallah`, `رامالله`, `را م الله`
+all become `رام الله` — and anything unrecognised is passed through as the shop
+typed it rather than guessed at.
+
+**The numbers go through `PhoneNormalizer`, at seed time, in C#.** The export
+stores `598214351`; the PBX announces `+970598214351`. Had the converter done
+the normalising there would be two implementations of the rules — one in Python
+for these rows, one in C# for every number an agent types — and the day they
+disagreed, caller matching would quietly stop finding the oldest customers.
+Confirmed against a real database: a lookup on `last9` for `+970598214351`
+returns the contact the first exported row describes.
+
+**Duplicates.** `ux_contact_phones_normalised` refuses the same number twice,
+and the export has 110 repeats — the same customer entered once in Arabic and
+once in English, `Adam Sadaqa` and `ادم صدقة`. The seeder drops the repeated
+number rather than failing the install. When that leaves a row with no number at
+all, and 69 rows are like that, the row is skipped: it is a duplicate of a
+contact that has already been inserted, and a nameless, numberless contact would
+only be clutter in the search. A fresh database ends with **15,289 contacts and
+15,529 numbers**.
+
+This is a merge that could be done properly — matching those 69 against the
+contact that took their number, and filling in an address or a note the other
+one lacks. That is A-63's job, and doing a rough version of it here would leave
+a second implementation to keep honest.
+
+**It is the same seed as everything else: skipped entirely once any contact
+exists.** These are starting contents, not a sync. A supervisor who has fixed an
+address, or flagged a caller, must not have it undone by somebody running `seed`
+again after a half-finished install.
+
+Inserted in batches of 500 with EF's change tracking off. Tracking thirty
+thousand entities in order to insert them once costs more than the inserts do;
+as it stands the contacts add about eight seconds to a run that was instant.
+
+**What is tested, and what is not.** The suite has no PostgreSQL, so what is
+checked is the file: that it is in the assembly and parses, that every row has a
+name and a number that normalises, that virtually all the numbers still look
+Palestinian, and that the duplicate counts are exactly the 110 and the 69 the
+seeder's remarks claim. That last one is the one that matters — it is what will
+notice when a newer export is converted and the numbers move.
+
+The seed itself was run end to end against a scratch database on the development
+machine: 15,289 contacts in about eight seconds, the right counts in
+`contacts` and `contact_phones`, `last9` generated, and a second run creating
+nothing.
+
 ---
 
 # Open items (live)
@@ -2885,7 +2963,7 @@ and what comes after:
 | Click-to-call from the log and from a contact | A-20 | dialling — **done**, needs its test call |
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
-| Excel/CSV import | A-64 | nothing |
+| Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |
 | **Concurrency: authenticated requests collapse when they arrive together** | — | **unresolved.** Reproduced locally, cause not found, production impact unknown. Test `EnableRetryOnFailure()` first. Settle before handover. |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |

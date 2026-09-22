@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CallCenter.Server.Data.Entities;
+using CallCenter.Shared.Phone;
 using CallCenter.Shared.Text;
 using CallCenter.Shared;
 using Microsoft.EntityFrameworkCore;
@@ -30,8 +31,16 @@ public class DatabaseSeeder(
         int SettingsAdded,
         int DeliveryAreasAdded,
         int MenuItemsAdded,
+        int ContactsAdded,
         bool UserCreated,
         string? UserSkippedReason);
+
+    /// <summary>
+    /// Contacts inserted per round trip to the database. Large enough that the
+    /// fifteen thousand rows are not fifteen thousand round trips, small enough
+    /// that a failure is reported before the process has been quiet for a minute.
+    /// </summary>
+    private const int ContactBatchSize = 500;
 
     /// <summary>
     /// Seeds reference data, and creates the first user when
@@ -63,17 +72,22 @@ public class DatabaseSeeder(
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // Last, and saving itself in batches: it is fifteen thousand rows, and
+        // keeping them out of the change tracker above keeps every other step
+        // as quick as it was.
+        var contactsAdded = await SeedContactsAsync(cancellationToken);
+
         var result = new Result(
             branchesAdded, channelsAdded, typesAdded, formAdded, settingsAdded,
-            areasAdded, menuAdded, userCreated, skipped);
+            areasAdded, menuAdded, contactsAdded, userCreated, skipped);
 
         logger.LogInformation(
             "Seed complete: {Branches} branches, {Channels} channels, {Types} types, "
             + "form v1 {Form}, {Settings} settings, {Areas} delivery areas, "
-            + "{Menu} menu items, user {User}",
+            + "{Menu} menu items, {Contacts} contacts, user {User}",
             branchesAdded, channelsAdded, typesAdded,
             formAdded ? "created" : "already present",
-            settingsAdded, areasAdded, menuAdded,
+            settingsAdded, areasAdded, menuAdded, contactsAdded,
             userCreated ? "created" : skipped ?? "not requested");
 
         return result;
@@ -310,6 +324,148 @@ public class DatabaseSeeder(
         await stream.CopyToAsync(buffer, ct);
 
         return await images.SaveAsync(itemId, buffer.ToArray(), "image/png", ct);
+    }
+
+    /// <summary>
+    /// The customer book from the old ordering system (A-61).
+    /// </summary>
+    /// <remarks>
+    /// Skipped entirely once any contact exists, like every other part of this
+    /// seeder. These are starting contents, not a sync: a number an agent has
+    /// since edited, or a contact they flagged, must not be overwritten by a
+    /// second run, and re-inserting fifteen thousand rows on every start would
+    /// be a slow way to do nothing.
+    ///
+    /// Two rules turn the export into rows this schema will accept:
+    ///
+    /// <list type="bullet">
+    ///   <item>Every number goes through <see cref="PhoneNormalizer"/>, the same
+    ///     one the Agent App uses on an incoming call. That is what makes caller
+    ///     matching (A-13) find these contacts — a stored <c>598214351</c> would
+    ///     never match an inbound <c>+970598214351</c>.</item>
+    ///   <item>A number already taken by an earlier contact is dropped: 110 of
+    ///     them, mostly the same customer entered once in Arabic and once in
+    ///     English, and the unique index on <c>normalised</c> would refuse the
+    ///     second. When that leaves a row with no number at all — 69 of them —
+    ///     the row is skipped, because it is a duplicate of a contact already
+    ///     being inserted. A fresh install gets 15,289 contacts and 15,529
+    ///     numbers from the 15,358 exported rows.</item>
+    /// </list>
+    ///
+    /// Inserted in batches with change tracking off. EF is not a bulk loader,
+    /// and tracking thirty thousand entities to insert them once costs more than
+    /// the inserts.
+    /// </remarks>
+    private async Task<int> SeedContactsAsync(CancellationToken ct)
+    {
+        if (await db.Contacts.AnyAsync(ct))
+        {
+            return 0;
+        }
+
+        var autoDetect = db.ChangeTracker.AutoDetectChangesEnabled;
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+
+        var added = 0;
+        var pending = 0;
+        var duplicateNumbers = 0;
+        var skippedRows = 0;
+        var taken = new HashSet<string>(StringComparer.Ordinal);
+
+        try
+        {
+            foreach (var row in ContactSeedData.Read())
+            {
+                var phones = new List<ContactPhone>(2);
+
+                foreach (var raw in new[] { row.Phone, row.Phone2 })
+                {
+                    if (string.IsNullOrWhiteSpace(raw))
+                    {
+                        continue;
+                    }
+
+                    var normalised = PhoneNormalizer.Normalize(raw);
+
+                    if (normalised.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    if (!taken.Add(normalised))
+                    {
+                        duplicateNumbers++;
+                        continue;
+                    }
+
+                    phones.Add(new ContactPhone
+                    {
+                        Raw = raw.Trim(),
+                        Normalised = normalised,
+                        IsPrimary = phones.Count == 0,
+                    });
+                }
+
+                if (phones.Count == 0)
+                {
+                    skippedRows++;
+                    continue;
+                }
+
+                var contact = new Contact
+                {
+                    Name = Blank(row.Name),
+                    NameNormalised = NameNormalizer.Normalize(row.Name) is { Length: > 0 } n ? n : null,
+                    Address = Blank(row.Address),
+                    Notes = Blank(row.Notes),
+                };
+
+                foreach (var phone in phones)
+                {
+                    contact.Phones.Add(phone);
+                }
+
+                db.Contacts.Add(contact);
+                added++;
+                pending++;
+
+                if (pending >= ContactBatchSize)
+                {
+                    await db.SaveChangesAsync(ct);
+                    db.ChangeTracker.Clear();
+                    pending = 0;
+                }
+            }
+
+            if (pending > 0)
+            {
+                await db.SaveChangesAsync(ct);
+                db.ChangeTracker.Clear();
+            }
+        }
+        finally
+        {
+            db.ChangeTracker.AutoDetectChangesEnabled = autoDetect;
+        }
+
+        if (added == 0)
+        {
+            logger.LogWarning(
+                "No contacts were seeded. The export is embedded as "
+                + "Data/Seed/Contacts/contacts.csv.gz; check it is in the assembly.");
+        }
+        else
+        {
+            logger.LogInformation(
+                "Seeded {Added} contacts; {Duplicates} repeated number(s) dropped, "
+                + "{Skipped} row(s) skipped as duplicates of a contact already inserted",
+                added, duplicateNumbers, skippedRows);
+        }
+
+        return added;
+
+        static string? Blank(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private async Task<int> SeedBranchesAsync(IReadOnlyList<string>? names, CancellationToken ct)

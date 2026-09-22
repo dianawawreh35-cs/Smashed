@@ -1,0 +1,57 @@
+<UserControl x:Class="CallCenter.AgentApp.Views.DialView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="{Binding Localizer.FlowDirection}"
+             Background="{StaticResource Bg}">
+
+  <Grid Margin="28">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Text="{Binding Localizer[dial.heading]}" Style="{StaticResource Heading}" />
+      <TextBlock Text="{Binding Localizer[dial.intro]}"
+                 Style="{StaticResource Subtle}"
+                 Margin="0,6,0,0"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Border Grid.Row="1"
+            Style="{StaticResource Card}"
+            VerticalAlignment="Top"
+            HorizontalAlignment="Left"
+            MinWidth="380">
+      <StackPanel>
+
+        <TextBlock Text="{Binding Localizer[dial.number]}" Style="{StaticResource FieldLabel}" />
+
+        <!-- Left to right even in Arabic. A phone number is not text: read
+             right to left it is a different number, and the agent is about to
+             ring it. -->
+        <TextBox Text="{Binding Number, UpdateSourceTrigger=PropertyChanged}"
+                 FontFamily="{StaticResource MonoFont}"
+                 FontSize="20"
+                 Padding="10,8"
+                 FlowDirection="LeftToRight" />
+
+        <Button Content="{Binding Localizer[dial.call]}"
+                Style="{StaticResource PrimaryButton}"
+                HorizontalAlignment="Left"
+                MinWidth="140"
+                Margin="0,16,0,0"
+                Command="{Binding DialCommand}" />
+
+        <!-- Why the button is dead. The agent has a reason to be dialling. -->
+        <TextBlock Text="{Binding Hint}"
+                   Foreground="{StaticResource Warning}"
+                   FontSize="11"
+                   Margin="0,10,0,0"
+                   TextWrapping="Wrap" />
+
+      </StackPanel>
+    </Border>
+
+  </Grid>
+</UserControl>

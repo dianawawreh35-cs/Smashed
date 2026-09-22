@@ -128,8 +128,8 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 
 | ID | Requirement | Priority |
 |---|---|---|
-| A-20 | Dial from a dial box, from any phone number shown in the app (click-to-call) or from a contact. All calls use the agent's one extension (see 2.3). | Must |
-| A-21 | Outbound calls are recorded and classified exactly like inbound calls. | Must |
+| A-20 | Dial from a dial box, from any phone number shown in the app (click-to-call) or from a contact. All calls use the agent's one extension (see 2.3). One call at a time, so dialling is refused while any call is in progress and until the extension is registered. A call being placed shows the same pop-up as an incoming one, with the number and a Cancel; there is no Answer or Reject on a call the agent made. **What the PBX expects dialled is a dialplan matter, not an application one**: the app sends the number's digits as they are held, behind a configurable prefix, and does not rewrite them into international form. | Must |
+| A-21 | Outbound calls are recorded and classified exactly like inbound calls: the same log entry with direction Out, and the classification form opening on answer. An outbound call the customer did not pick up is logged **NoAnswer**, never Missed — Missed means a customer rang and nobody here answered, and it is the service figure the supervisor's reports are built on. A number that could not be reached at all is logged Failed, which is a different thing an agent does something different about. | Must |
 | A-22 | Redial last number; call back from a missed-call entry with one click. | Should |
 
 ### 3.4 Call recording

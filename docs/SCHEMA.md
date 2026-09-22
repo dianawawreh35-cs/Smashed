@@ -111,8 +111,12 @@ CREATE TABLE communications (
   channel_id         uuid NOT NULL REFERENCES channels(id),       -- Phone for calls
   direction          text NOT NULL CHECK (direction IN ('In','Out','None')), -- None for App entries
   status             text NOT NULL CHECK (status IN
-                       ('Ringing','Answered','Missed','Rejected','Blocked','Abandoned','Overflowed','Failed','Logged')),
-                     -- Logged = App entry or manually logged item
+                       ('Ringing','Answered','Missed','Rejected','Blocked','Abandoned','Overflowed','NoAnswer','Failed','Logged')),
+                     -- Logged   = App entry or manually logged item
+                     -- NoAnswer = an OUTBOUND call the customer did not pick up.
+                     --            Never Missed: Missed means a customer rang and
+                     --            nobody here answered, which is the service
+                     --            failure the reports count (A-20, A-21).
   agent_id           uuid REFERENCES users(id),                   -- NULL for Abandoned/Overflowed
   contact_id         uuid REFERENCES contacts(id),
   branch_id          uuid REFERENCES branches(id),

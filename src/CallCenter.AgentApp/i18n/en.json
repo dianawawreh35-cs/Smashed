@@ -4,80 +4,11 @@
     "subtitle": "Smashed Burger",
     "language": "Language"
   },
-  "login": {
-    "heading": "Sign in",
-    "username": "Username",
-    "password": "Password",
-    "submit": "Sign in",
-    "connecting": "Contacting the server…",
-    "errors": {
-      "empty_fields": "Enter your username and password.",
-      "invalid_credentials": "The username or password is not correct.",
-      "account_disabled": "This account has been disabled. Ask your supervisor to re-enable it.",
-      "server_unreachable": "The server could not be reached. Check the network.",
-      "server_error": "The server reported an error. Please try again."
-    }
-  },
-  "home": {
-    "signOut": "Log out",
-    "extension": "Extension:",
-    "noExtension": "No extension configured — ask your supervisor"
-  },
-  "status": {
-    "notSignedIn": "Not signed in",
-    "signedIn": "Signed in",
-    "registering": "Registering extensions…",
-    "registered": "Phone ready",
-    "registrationFailed": "Extensions refused — ask your supervisor",
-    "retrying": "Cannot reach the PBX — retrying",
-    "noExtension": "Signed in — no extension configured"
-  },
-  "sip": {
-    "idle": "Not registered",
-    "registering": "Registering…",
-    "registered": "Registered",
-    "failed": "Registration refused — ask your supervisor",
-    "retrying": "Cannot reach the PBX — retrying"
-  },
-  "nav": {
-    "contacts": "Contacts",
-    "callLog": "Call log",
-    "delivery": "Delivery",
-    "menu": "Menu"
-  },
-  "contacts": {
-    "search": "Search",
-    "searchHint": "Search by name, address or phone number",
-    "new": "New contact",
-    "name": "Name",
-    "phone": "Phone number",
-    "address": "Address",
-    "deliveryNotes": "Delivery notes",
-    "notes": "Notes",
-    "edit": "Edit",
-    "save": "Save",
-    "cancel": "Cancel",
-    "saved": "Saved.",
-    "noMatches": "Nothing matched that search.",
-    "offline": "The server could not be reached - contacts are unavailable right now.",
-    "sameName": "There are already contacts with this name",
-    "addToThem": "Add this number to them",
-    "errors": {
-      "duplicate_number": "That number already belongs to another contact.",
-      "no_usable_number": "Enter a valid phone number.",
-      "contact_not_found": "That contact no longer exists.",
-      "server_error": "Could not save. Please try again."
-    },
-    "intro": "Find a customer, or add one. The list is shared by every agent.",
-    "emptyTitle": "Nothing to show",
-    "emptyHint": "Search by name or number, or add a new contact.",
-    "vip": "VIP",
-    "blocked": "Blocked",
-    "flagSetBySupervisor": "Set by the supervisor."
-  },
   "call": {
     "answer": "Answer",
+    "cancel": "Cancel",
     "connected": "Connected",
+    "dialling": "Calling",
     "hangUp": "Hang up",
     "hold": "Hold",
     "incoming": "Incoming call",
@@ -122,27 +53,6 @@
     "to": "To",
     "clearFilters": "Clear filters"
   },
-  "delivery": {
-    "intro": "Which branch delivers to a place, and what delivery costs. Set by your supervisor.",
-    "searchHint": "Type part of the place name",
-    "emptyTitle": "Nothing to show",
-    "emptyHint": "Type part of a place name to see its branch and delivery price.",
-    "noMatches": "That place is not on the list.",
-    "offline": "The server could not be reached - delivery prices are unavailable right now."
-  },
-  "menu": {
-    "intro": "What is on the menu, what is in it and what it costs. Set by your supervisor.",
-    "searchHint": "Type part of an item name, or something in it",
-    "meal": "meal",
-    "free": "Free",
-    "priceNotShown": "Ask the branch",
-    "emptyTitle": "Nothing to show",
-    "emptyHint": "Type part of an item name to see its price and contents.",
-    "noMatches": "Nothing on the menu matches that.",
-    "offline": "The server could not be reached - the menu is unavailable right now.",
-    "noPicture": "No picture",
-    "pictureFailed": "Picture failed to load"
-  },
   "classification": {
     "heading": "Classify this call",
     "save": "Save",
@@ -159,5 +69,106 @@
     "tooOld": "This call can no longer be changed. Ask a supervisor.",
     "notYours": "That call belongs to another agent.",
     "classifyHeading": "Classify an earlier call"
+  },
+  "contacts": {
+    "search": "Search",
+    "searchHint": "Search by name, address or phone number",
+    "new": "New contact",
+    "name": "Name",
+    "phone": "Phone number",
+    "address": "Address",
+    "deliveryNotes": "Delivery notes",
+    "notes": "Notes",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Saved.",
+    "noMatches": "Nothing matched that search.",
+    "offline": "The server could not be reached - contacts are unavailable right now.",
+    "sameName": "There are already contacts with this name",
+    "addToThem": "Add this number to them",
+    "errors": {
+      "duplicate_number": "That number already belongs to another contact.",
+      "no_usable_number": "Enter a valid phone number.",
+      "contact_not_found": "That contact no longer exists.",
+      "server_error": "Could not save. Please try again."
+    },
+    "intro": "Find a customer, or add one. The list is shared by every agent.",
+    "emptyTitle": "Nothing to show",
+    "emptyHint": "Search by name or number, or add a new contact.",
+    "vip": "VIP",
+    "blocked": "Blocked",
+    "flagSetBySupervisor": "Set by the supervisor."
+  },
+  "delivery": {
+    "intro": "Which branch delivers to a place, and what delivery costs. Set by your supervisor.",
+    "searchHint": "Type part of the place name",
+    "emptyTitle": "Nothing to show",
+    "emptyHint": "Type part of a place name to see its branch and delivery price.",
+    "noMatches": "That place is not on the list.",
+    "offline": "The server could not be reached - delivery prices are unavailable right now."
+  },
+  "dial": {
+    "call": "Call",
+    "callInProgress": "Another call is in progress.",
+    "heading": "Dial a number",
+    "intro": "Ring a customer directly. The call is logged and classified like any other.",
+    "number": "Number",
+    "phoneNotReady": "The phone is not registered, so no call can be placed."
+  },
+  "home": {
+    "signOut": "Log out",
+    "extension": "Extension:",
+    "noExtension": "No extension configured — ask your supervisor"
+  },
+  "login": {
+    "heading": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "connecting": "Contacting the server…",
+    "errors": {
+      "empty_fields": "Enter your username and password.",
+      "invalid_credentials": "The username or password is not correct.",
+      "account_disabled": "This account has been disabled. Ask your supervisor to re-enable it.",
+      "server_unreachable": "The server could not be reached. Check the network.",
+      "server_error": "The server reported an error. Please try again."
+    }
+  },
+  "menu": {
+    "intro": "What is on the menu, what is in it and what it costs. Set by your supervisor.",
+    "searchHint": "Type part of an item name, or something in it",
+    "meal": "meal",
+    "free": "Free",
+    "priceNotShown": "Ask the branch",
+    "emptyTitle": "Nothing to show",
+    "emptyHint": "Type part of an item name to see its price and contents.",
+    "noMatches": "Nothing on the menu matches that.",
+    "offline": "The server could not be reached - the menu is unavailable right now.",
+    "noPicture": "No picture",
+    "pictureFailed": "Picture failed to load"
+  },
+  "nav": {
+    "callLog": "Call log",
+    "contacts": "Contacts",
+    "delivery": "Delivery",
+    "dial": "Dial",
+    "menu": "Menu"
+  },
+  "sip": {
+    "idle": "Not registered",
+    "registering": "Registering…",
+    "registered": "Registered",
+    "failed": "Registration refused — ask your supervisor",
+    "retrying": "Cannot reach the PBX — retrying"
+  },
+  "status": {
+    "notSignedIn": "Not signed in",
+    "signedIn": "Signed in",
+    "registering": "Registering extensions…",
+    "registered": "Phone ready",
+    "registrationFailed": "Extensions refused — ask your supervisor",
+    "retrying": "Cannot reach the PBX — retrying",
+    "noExtension": "Signed in — no extension configured"
   }
 }

@@ -65,7 +65,10 @@ public class SignInService(
         {
             // The phone comes up as soon as the agent is in, rather than waiting
             // for them to do something (A-02).
-            calls.Start();
+            // The extensions go to the call service too, not just to
+            // registration: placing a call needs the PBX address and the
+            // credentials to answer its challenge (A-20).
+            calls.Start(extensions);
             sip.Start(extensions);
         }
 

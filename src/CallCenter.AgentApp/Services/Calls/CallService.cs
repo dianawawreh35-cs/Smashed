@@ -1,5 +1,8 @@
 using CallCenter.AgentApp.Services.Sip;
+using CallCenter.Shared.Contracts.Auth;
+using CallCenter.Shared.Phone;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SIPSorcery.Media;
 using SIPSorcery.SIP;
 using SIPSorcery.SIP.App;
@@ -44,6 +47,7 @@ namespace CallCenter.AgentApp.Services.Calls;
 public class CallService(
     SipTransportHost transport,
     BlockListCache blockList,
+    IOptions<DialingOptions> dialing,
     ILogger<CallService> logger) : IDisposable
 {
     private readonly Lock _gate = new();
@@ -59,6 +63,21 @@ public class CallService(
     /// </summary>
     private WindowsAudioEndPoint? _audio;
     private CallState _state = CallState.Idle;
+
+    /// <summary>
+    /// Where the PBX is and who this extension says it is, for placing calls
+    /// (A-20). Taking a call needs none of this — the PBX has already
+    /// authenticated us by then — but making one does: Asterisk challenges an
+    /// outgoing INVITE exactly as it challenges a REGISTER.
+    /// </summary>
+    private AgentExtensionsDto? _extensions;
+
+    /// <summary>
+    /// Why the last outgoing call attempt failed, as the PBX put it. Read once
+    /// the call returns, to tell "nobody picked up" from "that number does not
+    /// work" — two things an agent does completely different things about.
+    /// </summary>
+    private SIPResponseStatusCodesEnum? _lastDialFailure;
 
     /// <summary>
     /// The Call-ID of the call in progress, so a re-INVITE for it can be told
@@ -97,12 +116,13 @@ public class CallService(
     /// Starts listening for calls. Called once the extension is registered —
     /// before that there is nothing to listen for.
     /// </summary>
-    public void Start()
+    public void Start(AgentExtensionsDto? extensions = null)
     {
         Stop();
 
         lock (_gate)
         {
+            _extensions = extensions;
             _agent = new SIPUserAgent(transport.Transport, null);
             _agent.OnIncomingCall += OnIncomingCall;
             _agent.OnCallHungup += OnCallHungup;
@@ -113,6 +133,23 @@ public class CallService(
             // has nothing to offer the agent about a hold they did not choose.
             _agent.RemotePutOnHold += () => logger.LogInformation("Put on hold by the other side");
             _agent.RemoteTookOffHold += () => logger.LogInformation("Taken off hold by the other side");
+
+            // Outgoing calls (A-20). Ringing is worth a line because it is the
+            // proof the PBX accepted the number at all; the failure is kept so
+            // the outcome can say which kind of failure it was.
+            _agent.ClientCallRinging += (_, response) =>
+                logger.LogInformation("The far end is ringing: {Status}", response?.Status);
+
+            _agent.ClientCallFailed += (_, error, response) =>
+            {
+                lock (_gate)
+                {
+                    _lastDialFailure = response?.Status;
+                }
+
+                logger.LogInformation(
+                    "The outgoing call did not connect: {Status} {Error}", response?.Status, error);
+            };
 
             transport.Transport.SIPTransportRequestReceived += OnTransportRequest;
         }
@@ -152,6 +189,162 @@ public class CallService(
         CloseMedia();
         Set(CallState.Idle);
     }
+
+    /// <summary>
+    /// Places a call (A-20). Returns once it has been answered or has failed.
+    /// </summary>
+    /// <remarks>
+    /// <b>The number is sent as it is held, with only a configured prefix in
+    /// front.</b> What the PBX wants dialled is a dialplan question that cannot
+    /// be answered from here — see <see cref="DialingOptions"/> — so nothing is
+    /// rewritten into international form on the way out. Only the digits are
+    /// kept, because a number typed or displayed as <c>059-949-8581</c> is not
+    /// something a switch will route.
+    ///
+    /// <b>One call at a time (SRS 2.3).</b> The slot is claimed before anything
+    /// slow happens, so two clicks on a call button cannot both get through.
+    ///
+    /// The classification form needs the call's SIP Call-ID, and for an outgoing
+    /// call that does not exist until the dialogue does — so it is read off the
+    /// dialogue at the moment of answer, not before (A-21, A-40).
+    /// </remarks>
+    public async Task DialAsync(string? number)
+    {
+        var digits = PhoneNormalizer.DigitsOnly(number);
+
+        if (string.IsNullOrEmpty(digits))
+        {
+            logger.LogInformation("Nothing to dial");
+            return;
+        }
+
+        SIPUserAgent? agent;
+        AgentExtensionsDto? extensions;
+
+        lock (_gate)
+        {
+            agent = _agent;
+            extensions = _extensions;
+
+            if (agent is null || extensions is null)
+            {
+                logger.LogWarning("Cannot dial: the phone is not ready");
+                return;
+            }
+
+            if (_state.Status is not CallStatus.Idle)
+            {
+                // One extension, one call. The button is disabled for this, so
+                // reaching here means two clicks landed together.
+                logger.LogInformation("Cannot dial {Number}: another call is in progress", digits);
+                return;
+            }
+
+            _lastDialFailure = null;
+
+            // The slot is claimed here, inside the lock, rather than after the
+            // media is built: everything below takes long enough for a second
+            // click to arrive.
+            _state = new CallState(
+                CallStatus.Dialling, digits, null, null, DateTimeOffset.Now, null,
+                SipCallId: null, IsMuted: false, IsOnHold: false, IsOutbound: true);
+        }
+
+        StateChanged?.Invoke(this, State);
+
+        var dialled = dialing.Value.Prefix + digits;
+        var destination = $"sip:{dialled}@{extensions.SipServer}";
+
+        logger.LogInformation("Dialling {Destination}", destination);
+
+        try
+        {
+            var (media, audio) = CreateMedia();
+
+            lock (_gate)
+            {
+                _media = media;
+                _audio = audio;
+            }
+
+            var answered = await agent.Call(
+                destination,
+                extensions.Extension,
+                extensions.Secret,
+                media,
+                dialing.Value.RingTimeoutSeconds);
+
+            if (!answered)
+            {
+                SIPResponseStatusCodesEnum? failure;
+
+                lock (_gate)
+                {
+                    failure = _lastDialFailure;
+                }
+
+                Finish(Explain(failure), OutcomeFor(failure));
+                return;
+            }
+
+            lock (_gate)
+            {
+                // The dialogue exists now, and with it the call's own reference.
+                // The classification form is keyed on this (A-40), so without it
+                // the call would work and be unclassifiable.
+                _callId = agent.Dialogue?.CallId;
+            }
+
+            Set(State with
+            {
+                Status = CallStatus.Connected,
+                ConnectedAt = DateTimeOffset.Now,
+                SipCallId = _callId,
+            });
+
+            logger.LogInformation("Outgoing call answered");
+        }
+        catch (Exception ex)
+        {
+            // A missing microphone is the usual cause, and it must not take the
+            // app down.
+            logger.LogError(ex, "The call to {Number} could not be placed", digits);
+            Finish("the call could not be placed", CallOutcome.Failed);
+        }
+    }
+
+    /// <summary>
+    /// What a failed dial attempt should be recorded as. The question it answers
+    /// is whether trying again is worth anything.
+    /// </summary>
+    private static CallOutcome OutcomeFor(SIPResponseStatusCodesEnum? status) => status switch
+    {
+        // The far end was reached and did not take the call. Ringing out, busy,
+        // declined, or the agent giving up - all worth another try later.
+        SIPResponseStatusCodesEnum.BusyHere => CallOutcome.NoAnswer,
+        SIPResponseStatusCodesEnum.BusyEverywhere => CallOutcome.NoAnswer,
+        SIPResponseStatusCodesEnum.TemporarilyUnavailable => CallOutcome.NoAnswer,
+        SIPResponseStatusCodesEnum.RequestTimeout => CallOutcome.NoAnswer,
+        SIPResponseStatusCodesEnum.RequestTerminated => CallOutcome.NoAnswer,
+        SIPResponseStatusCodesEnum.Decline => CallOutcome.NoAnswer,
+
+        // Nothing came back at all: the ring timeout ran out. Nobody picked up.
+        null => CallOutcome.NoAnswer,
+
+        // Anything else is the number or the PBX, and repeating it will repeat
+        // the result until somebody looks at it.
+        _ => CallOutcome.Failed,
+    };
+
+    private static string Explain(SIPResponseStatusCodesEnum? status) => status switch
+    {
+        null => "nobody answered",
+        SIPResponseStatusCodesEnum.BusyHere => "the line was busy",
+        SIPResponseStatusCodesEnum.BusyEverywhere => "the line was busy",
+        SIPResponseStatusCodesEnum.TemporarilyUnavailable => "the number was unavailable",
+        SIPResponseStatusCodesEnum.NotFound => "the PBX does not know that number",
+        _ => $"the PBX answered {status}",
+    };
 
     /// <summary>Answers the ringing call (A-12).</summary>
     public async Task AnswerAsync()
@@ -224,11 +417,34 @@ public class CallService(
     public void HangUp()
     {
         SIPUserAgent? agent;
+        CallState state;
 
         lock (_gate)
         {
             agent = _agent;
+            state = _state;
             _hangingUpLocally = true;
+        }
+
+        // A call that is still being placed has no dialogue to end, so there is
+        // no BYE to send: it is cancelled instead. Hangup() is documented as
+        // ending an *established* call, and calling it here would leave the PBX
+        // ringing a customer nobody is waiting for.
+        if (state.Status is CallStatus.Dialling)
+        {
+            try
+            {
+                agent?.Cancel();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "The outgoing call did not cancel cleanly");
+            }
+
+            // DialAsync is still waiting on Call(), and finishes the call when
+            // it returns. Finishing here as well would report it twice.
+            logger.LogInformation("The agent gave up on the outgoing call");
+            return;
         }
 
         try
@@ -731,10 +947,15 @@ public class CallService(
             state.Number,
             state.CallerName,
             state.Queue,
-            outcome ?? (state.Status is CallStatus.Connected ? CallOutcome.Answered : CallOutcome.Missed),
+            outcome ?? (state.Status is CallStatus.Connected
+                ? CallOutcome.Answered
+                // An unanswered call this agent placed is a customer who was
+                // out, not a call this call centre missed (A-21).
+                : state.IsOutbound ? CallOutcome.NoAnswer : CallOutcome.Missed),
             state.StartedAt ?? DateTimeOffset.Now,
             state.ConnectedAt,
-            DateTimeOffset.Now));
+            DateTimeOffset.Now,
+            state.IsOutbound));
 
         Set(CallState.Idle);
     }

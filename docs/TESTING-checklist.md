@@ -221,6 +221,35 @@ cannot be faked, and the part most likely to find something.
 - [ ] **Mute, then Hold, then Resume.** You must still be muted after the
       resume: status "Muted", button "Unmute".
 
+### Outbound dialling (A-20, A-21) — never run
+
+- [ ] **Dial your own mobile from the Dial screen.** The pop-up appears saying
+      "Calling", with the number and a Cancel. Your phone rings. Answer it and
+      the pop-up says "Connected", the timer starts, and the classification form
+      opens exactly as it does on an incoming call (A-21).
+      *If your phone never rings and the log shows 404:* the PBX did not
+      recognise the number in that format. **This is the expected first
+      failure.** Look at what the app sent — the log prints the full destination
+      — and try `Dialing:Prefix` in the Agent App's `appsettings.json`, or tell
+      me what the dialplan wants.
+      *If the log shows 401 or 407 repeatedly:* the PBX is challenging the call
+      and the credentials are not satisfying it. That is a different fix.
+- [ ] **The call appears in the call log as outgoing**, not incoming.
+- [ ] **Dial, then press Cancel before answering.** Your phone must stop
+      ringing. The log entry says NoAnswer.
+- [ ] **Dial and let it ring out without answering.** After 45 seconds it gives
+      up by itself and logs NoAnswer.
+- [ ] **Dial a number that does not exist** (say 999999999). It should fail
+      quickly and log Failed, not NoAnswer.
+- [ ] **Mute and Hold on an outgoing call.** Both should behave exactly as they
+      do on an incoming one. They act on the call, not on who started it, but
+      that is a claim worth one test.
+- [ ] **Try to dial while already on a call.** The Call button is disabled and
+      says why.
+- [ ] **Sign in with the phone unregistered** (stop the VPN) and open the Dial
+      screen. The button is disabled and says the phone is not registered —
+      rather than failing silently when pressed.
+
 ---
 
 ## Round 3b — before any deployment
@@ -259,5 +288,5 @@ These cannot be checked on this laptop, and each has burned a project somewhere.
 Not testable yet, and listed so the gaps are not mistaken for failures:
 classification (A-40, S-40), branch management (S-41), opening a call from the
 log (A-51), caller identity in the pop-up (A-16, A-11), blacklist export
-(S-46), outbound calls, merging contacts, and contact import
+(S-46), click-to-call, merging contacts, and contact import
 from Excel. `DECISIONS.md` holds the live list.

@@ -25,6 +25,9 @@ public partial class HomeView : UserControl
         AddSection("nav.callLog", new CallLogView(services.GetRequiredService<CallLogViewModel>()));
         AddSection("nav.contacts", new ContactsView(services.GetRequiredService<ContactsViewModel>()));
 
+        // A-20: ringing a number that is not already on a screen somewhere.
+        AddSection("nav.dial", new DialView(services.GetRequiredService<DialViewModel>()));
+
         // A-65: which branch delivers where, and for how much. Read-only.
         AddSection("nav.delivery", new DeliveryView(services.GetRequiredService<DeliveryViewModel>()));
 

@@ -29,7 +29,7 @@ public class EnumStringsTests
     {
         CommunicationStatuses.All.Should().Equal(
             "Ringing", "Answered", "Missed", "Rejected", "Blocked",
-            "Abandoned", "Overflowed", "Failed", "Logged");
+            "Abandoned", "Overflowed", "NoAnswer", "Failed", "Logged");
     }
 
     [Fact]

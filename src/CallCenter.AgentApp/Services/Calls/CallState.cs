@@ -9,6 +9,14 @@ public enum CallStatus
     /// <summary>Ringing, not yet answered. Answer and Reject are offered.</summary>
     Ringing,
 
+    /// <summary>
+    /// A call this agent placed, not yet answered (A-20). Its own status rather
+    /// than a reuse of <see cref="Ringing"/>: there is nothing to answer or
+    /// reject on a call you made, only to give up on, and sharing the status
+    /// would put an Answer button on screen for it.
+    /// </summary>
+    Dialling,
+
     /// <summary>Answered and talking. Hang up is offered, and the timer runs.</summary>
     Connected,
 }
@@ -63,6 +71,11 @@ public enum CallStatus
 /// other. Independent of <paramref name="IsMuted"/>: a mute set before the hold
 /// is still there when the hold ends.
 /// </param>
+/// <param name="IsOutbound">
+/// This agent placed the call (A-20). Carried all the way to the call log,
+/// where it is the difference between a customer who rang us and one we rang
+/// (A-21).
+/// </param>
 public record CallState(
     CallStatus Status,
     string? Number,
@@ -72,7 +85,8 @@ public record CallState(
     DateTimeOffset? ConnectedAt,
     string? SipCallId = null,
     bool IsMuted = false,
-    bool IsOnHold = false)
+    bool IsOnHold = false,
+    bool IsOutbound = false)
 {
     /// <summary>No call in progress.</summary>
     public static readonly CallState Idle = new(CallStatus.Idle, null, null, null, null, null);
@@ -102,11 +116,30 @@ public enum CallOutcome
 
     /// <summary>It rang and nobody answered — the caller gave up, or the PBX moved on.</summary>
     Missed,
+
+    /// <summary>
+    /// An outbound call the customer never picked up, or that the agent gave up
+    /// on while it rang (A-20).
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not <see cref="Missed"/>, which means a customer rang and
+    /// nobody here answered. Mixing the two would count a customer who was out
+    /// as this call centre failing to answer its phone.
+    /// </remarks>
+    NoAnswer,
+
+    /// <summary>
+    /// The call could not be placed at all: the number is not routable, or the
+    /// PBX refused it. Distinct from <see cref="NoAnswer"/>, because trying
+    /// again is pointless until somebody looks at the number.
+    /// </summary>
+    Failed,
 }
 
 /// <summary>
 /// A call that is over, as reported to the server (A-14).
 /// </summary>
+/// <param name="IsOutbound">This agent placed the call (A-20, A-21).</param>
 /// <remarks>
 /// Separate from <see cref="CallState"/>, which describes a call in progress and
 /// is what the pop-up binds to. A finished call is a different thing with
@@ -125,4 +158,5 @@ public record FinishedCall(
     CallOutcome Outcome,
     DateTimeOffset StartedAt,
     DateTimeOffset? AnsweredAt,
-    DateTimeOffset EndedAt);
+    DateTimeOffset EndedAt,
+    bool IsOutbound = false);

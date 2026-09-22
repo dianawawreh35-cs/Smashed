@@ -2701,6 +2701,76 @@ has no test that could fail, and the card in the middle of the screen was right
 all along. **That is five defects from three screenshots on this project.** The
 rule stands — when UI work is finished, ask for a screenshot before committing.
 
+## 2026-09-22 — Outbound dialling (A-20, A-21), part 1: placing the call
+
+Until today the app could only answer. An agent who needed to ring a customer
+back had to use a desk phone or their own mobile, and nothing about that call
+reached the system.
+
+**Dialling is its own state, not a reuse of Ringing.** `CallStatus.Dialling`
+sits beside `Ringing` and `Connected`. Reusing Ringing would have been fewer
+lines and would have put **Answer and Reject on screen for a call the agent
+placed**, which is nonsense the first time an agent sees it. A call being placed
+offers one thing: Cancel.
+
+**Cancel is not Hang up.** A call still being set up has no dialogue, so there is
+no BYE to send — SIPSorcery's `Hangup()` is documented as ending an *established*
+call. It is `Cancel()`, which sends a SIP CANCEL. Getting this wrong would have
+left the PBX ringing a customer nobody was waiting for, and it would have looked
+like it worked from inside the app.
+
+**The number is sent as it is held.** What Issabel wants dialled is a dialplan
+question that cannot be answered from the code: a Palestinian mobile might want
+`0569498581`, or the country code, or a digit in front to reach an outside line.
+Every wrong guess fails identically, with a 404 and no ring. So the app strips
+everything that is not a digit — a number displayed as `059-949-8581` is not
+routable — puts a configurable prefix in front, and sends that.
+`Dialing:Prefix` in `appsettings.json`, empty by default. **This is the one
+thing about outbound calls that a test call had to settle rather than a
+review**, and it is now a question for the provider below.
+
+### NoAnswer, and why it was worth a migration
+
+An outbound call nobody picks up needed a status. The obvious choice was the
+existing **Missed**, and it would have been wrong.
+
+Missed means *a customer rang this call centre and nobody answered*. It is the
+service failure the supervisor's reports exist to count. A customer who was out
+when an agent rang them is not that, and recording the two as the same thing
+would have quietly made the most important number in the system meaningless —
+and it would have looked correct in every test, because it is a valid value in a
+valid column.
+
+So `NoAnswer` is a new status, which cost one migration to widen a CHECK
+constraint. **Failed** keeps its own meaning: the call could not be placed at
+all. The difference is not pedantry — it is what tells an agent whether trying
+again is worth anything, which is exactly what A-22's call-back needs.
+
+Dia was asked and chose the migration over reusing a value.
+
+**Two guard tests caught what the compiler could not.** The status list is tied
+to a C# enum and to the database constraint by tests in `CallCenter.Shared`, and
+both failed the moment the string was added and the enum was not. That is the
+first time on this project that a test found something before a screenshot did,
+and it is worth saying so: the guard was written by someone who had been bitten.
+
+### What is deliberately not in this commit
+
+**Click-to-call from the call log and from contacts** (the rest of A-20) is the
+next commit. Dialling itself had to be known to work against the real PBX first;
+adding buttons that call code nobody has proved is how a small failure arrives in
+three places at once.
+
+**Dialling a blocked number is allowed.** A-17 is about calls *arriving*. An
+agent ringing a blocked customer is far more likely to be resolving the complaint
+that got them blocked than making a mistake, and a phone that silently refuses to
+dial would be worse than one that does as it is told.
+
+**"Any phone number shown in the app"** is read as the places a number is
+actually shown today: the call log, a contact, and the dial box. Making every
+piece of number-shaped text clickable is a larger and vaguer job with no user
+asking for it.
+
 ---
 
 # How this project is tracked
@@ -2742,7 +2812,8 @@ and what comes after:
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
 | The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
-| Outbound calls, click-to-call, redial | A-20 to A-22 | nothing |
+| Click-to-call from the log and from a contact | A-20 | dialling — **done**, needs its test call |
+| Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import | A-64 | nothing |
 | **Concurrency: authenticated requests collapse when they arrive together** | — | **unresolved.** Reproduced locally, cause not found, production impact unknown. Test `EnableRetryOnFailure()` first. Settle before handover. |
@@ -2830,6 +2901,11 @@ describe**:
    the S-46 export?
 3. What **VPN uptime and support hours** are agreed, and who is called when the
    tunnel drops?
+3b. **What does the dialplan expect an agent to dial?** A local mobile as
+   `0569498581`, with the country code, or behind a digit for an outside line?
+   The Agent App sends the digits as held with a configurable prefix
+   (`Dialing:Prefix`), so the answer is a settings change rather than a build —
+   but until a real outbound call is made, nobody knows which it is.
 4. Can a **recording announcement** be added before ringing agents, if the
    client wants one?
 

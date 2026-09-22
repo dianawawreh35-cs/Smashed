@@ -43,6 +43,7 @@
                  FontSize="26"
                  Foreground="{StaticResource Text}"
                  HorizontalAlignment="Center"
+                 FlowDirection="LeftToRight"
                  Margin="0,8,0,0" />
 
       <!-- Whatever name the PBX sent, small, because it is not a contact and
@@ -133,6 +134,17 @@
                    Style="{StaticResource Subtle}"
                    Margin="0,4,0,0"
                    TextWrapping="Wrap" />
+      </StackPanel>
+
+      <!-- Dialling out (A-20). No Answer and no Reject: there is nothing to
+           accept on a call the agent placed, only to give up on. -->
+      <StackPanel HorizontalAlignment="Center"
+                  Margin="0,22,0,0"
+                  Visibility="{Binding IsDialling, Converter={StaticResource BoolToVisibility}}">
+        <Button Content="{Binding Localizer[call.cancel]}"
+                Style="{StaticResource DangerButton}"
+                MinWidth="150"
+                Command="{Binding HangUpCommand}" />
       </StackPanel>
 
       <!-- Connected: mute, hold, and one way out (A-12). Mute and Hold are

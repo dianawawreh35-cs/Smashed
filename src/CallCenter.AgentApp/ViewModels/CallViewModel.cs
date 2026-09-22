@@ -78,6 +78,7 @@ public partial class CallViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRinging))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
+    [NotifyPropertyChangedFor(nameof(IsDialling))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(Duration))]
     [NotifyPropertyChangedFor(nameof(Number))]
@@ -94,6 +95,13 @@ public partial class CallViewModel : ObservableObject
     public bool IsRinging => State.Status is CallStatus.Ringing;
 
     public bool IsConnected => State.Status is CallStatus.Connected;
+
+    /// <summary>
+    /// A call this agent placed, not yet answered (A-20). Kept apart from
+    /// <see cref="IsRinging"/> so the pop-up never offers Answer and Reject for
+    /// a call the agent made.
+    /// </summary>
+    public bool IsDialling => State.Status is CallStatus.Dialling;
 
     /// <summary>
     /// The caller's number, or a label when it was withheld. A blank line would
@@ -135,6 +143,7 @@ public partial class CallViewModel : ObservableObject
         IsOnHold ? "call.onHold"
         : IsMuted ? "call.muted"
         : IsConnected ? "call.connected"
+        : IsDialling ? "call.dialling"
         : "call.incoming"];
 
     /// <summary>

@@ -100,6 +100,7 @@ public partial class App : Application
     private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
     {
         services.Configure<ServerOptions>(context.Configuration.GetSection(ServerOptions.SectionName));
+        services.Configure<DialingOptions>(context.Configuration.GetSection(DialingOptions.SectionName));
 
         // One session object for the process: every view model asks it who is
         // signed in, rather than passing the answer around.
@@ -110,6 +111,7 @@ public partial class App : Application
         services.AddSingleton<SipRegistrationService>();
         services.AddSingleton<BlockListCache>();
         services.AddSingleton<CallService>();
+        services.AddSingleton<DialViewModel>();
         // A factory, not a scoped context: the queue is used from SIP threads
         // and from the UI, and a DbContext is not safe to share between them.
         services.AddDbContextFactory<AgentBufferDbContext>(options =>

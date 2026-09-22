@@ -224,13 +224,21 @@ public class CallLogReporter(
     public static LogCallRequest Describe(FinishedCall call, string extension) => new(
         SipCallId: call.SipCallId,
         Extension: extension,
-        Direction: Directions.In,
+        // A-21: an outbound call is logged exactly like an inbound one, and the
+        // only thing that differs is which way it went.
+        Direction: call.IsOutbound ? Directions.Out : Directions.In,
         Status: call.Outcome switch
         {
             CallOutcome.Answered => CommunicationStatuses.Answered,
             CallOutcome.RejectedByAgent => CommunicationStatuses.Rejected,
             CallOutcome.Blocked => CommunicationStatuses.Blocked,
             CallOutcome.Busy => CommunicationStatuses.Missed,
+
+            // NoAnswer, not Missed: Missed is a customer this call centre
+            // failed to answer, and counting a customer who was out as one of
+            // those would spoil the number the reports exist to produce.
+            CallOutcome.NoAnswer => CommunicationStatuses.NoAnswer,
+            CallOutcome.Failed => CommunicationStatuses.Failed,
             _ => CommunicationStatuses.Missed,
         },
         RemoteNumber: call.Number,

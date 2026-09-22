@@ -54,13 +54,30 @@ public static class CommunicationStatuses
     public const string Blocked = "Blocked";
     public const string Abandoned = "Abandoned";
     public const string Overflowed = "Overflowed";
+
+    /// <summary>
+    /// An outbound call the far end never picked up (A-20, A-21).
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not <see cref="Missed"/>. Missed means a <b>customer</b>
+    /// rang and nobody here answered — the service failure the supervisor's
+    /// reports are built on. A customer who was out when an agent rang them is
+    /// not that, and counting the two together would make the one number this
+    /// system exists to produce meaningless.
+    ///
+    /// Also not <see cref="Failed"/>, which means the call could not be placed
+    /// at all: a wrong number, or a PBX refusal. The difference matters to an
+    /// agent deciding whether it is worth trying again (A-22).
+    /// </remarks>
+    public const string NoAnswer = "NoAnswer";
+
     public const string Failed = "Failed";
 
     /// <summary>An App entry or a manually logged item.</summary>
     public const string Logged = "Logged";
 
     public static readonly IReadOnlyList<string> All =
-        new[] { Ringing, Answered, Missed, Rejected, Blocked, Abandoned, Overflowed, Failed, Logged };
+        new[] { Ringing, Answered, Missed, Rejected, Blocked, Abandoned, Overflowed, NoAnswer, Failed, Logged };
 }
 
 /// <summary><c>communications.source</c>.</summary>
@@ -145,6 +162,10 @@ public enum CommunicationStatus
     Blocked,
     Abandoned,
     Overflowed,
+
+    /// <summary>An outbound call the far end never picked up (A-20, A-21).</summary>
+    NoAnswer,
+
     Failed,
     Logged,
 }
@@ -244,6 +265,7 @@ public static class EnumStrings
         CommunicationStatus.Blocked => CommunicationStatuses.Blocked,
         CommunicationStatus.Abandoned => CommunicationStatuses.Abandoned,
         CommunicationStatus.Overflowed => CommunicationStatuses.Overflowed,
+        CommunicationStatus.NoAnswer => CommunicationStatuses.NoAnswer,
         CommunicationStatus.Failed => CommunicationStatuses.Failed,
         CommunicationStatus.Logged => CommunicationStatuses.Logged,
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),

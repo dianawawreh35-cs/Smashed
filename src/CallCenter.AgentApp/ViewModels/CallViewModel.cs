@@ -28,12 +28,14 @@ public partial class CallViewModel : ObservableObject
     public CallViewModel(
         CallService calls,
         ClassificationFormViewModel classification,
+        CallerViewModel caller,
         Localizer localizer,
         Dispatcher dispatcher)
     {
         _calls = calls;
         _dispatcher = dispatcher;
         Classification = classification;
+        Caller = caller;
         Localizer = localizer;
 
         // One tick a second is enough for a timer showing whole seconds, and
@@ -47,6 +49,16 @@ public partial class CallViewModel : ObservableObject
         localizer.LanguageChanged += (_, _) => RefreshLabels();
         _calls.StateChanged += OnStateChanged;
 
+        // The PBX's name hides itself once the real contact arrives, and that
+        // arrives on another object, so this view model has to be told.
+        Caller.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(CallerViewModel.IsKnown))
+            {
+                OnPropertyChanged(nameof(HasCallerName));
+            }
+        };
+
         // The pop-up outlives the call while the form is still unfinished, so
         // what closes it is the form being dealt with, not the call ending.
         Classification.PropertyChanged += (_, e) =>
@@ -56,6 +68,7 @@ public partial class CallViewModel : ObservableObject
                 && !State.IsActive)
             {
                 Classification.Close();
+                Caller.Clear();
                 CallEnded?.Invoke(this, EventArgs.Empty);
             }
         };
@@ -68,6 +81,12 @@ public partial class CallViewModel : ObservableObject
     /// (A-40).
     /// </summary>
     public ClassificationFormViewModel Classification { get; }
+
+    /// <summary>
+    /// Who is calling — the contact behind the number (A-10, A-11, A-16). Fills
+    /// in underneath the pop-up rather than holding it up.
+    /// </summary>
+    public CallerViewModel Caller { get; }
 
     /// <summary>Raised when the pop-up should come to the front (A-10).</summary>
     public event EventHandler? CallArrived;
@@ -159,9 +178,15 @@ public partial class CallViewModel : ObservableObject
     /// whatever the switch felt like sending, not a contact, and it will be
     /// replaced by the real customer lookup (A-11).
     /// </summary>
+    /// <summary>
+    /// The name the PBX sent. Hidden once the real contact is known: two names
+    /// for one caller, one of them whatever the switch felt like sending, is
+    /// worse than either alone.
+    /// </summary>
     public string CallerName => State.CallerName ?? string.Empty;
 
-    public bool HasCallerName => !string.IsNullOrWhiteSpace(State.CallerName);
+    public bool HasCallerName =>
+        !string.IsNullOrWhiteSpace(State.CallerName) && !Caller.IsKnown;
 
     /// <summary>
     /// How long the agent has been talking, as <c>m:ss</c>. Empty before the
@@ -222,10 +247,16 @@ public partial class CallViewModel : ObservableObject
                 // untouched from the last call is a skip (A-41), not something
                 // to hold the next caller up over.
                 Classification.Close();
+
+                // Who it is (A-10). Started here, not awaited: the pop-up is on
+                // screen and the phone is ringing whatever the server does.
+                Caller.Begin(state.Number);
+
                 CallArrived?.Invoke(this, EventArgs.Empty);
             }
             else if (!state.IsActive && wasActive && !Classification.IsUnfinished)
             {
+                Caller.Clear();
                 CallEnded?.Invoke(this, EventArgs.Empty);
             }
         });

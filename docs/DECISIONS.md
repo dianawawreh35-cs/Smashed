@@ -5,6 +5,52 @@ chosen and why, so a later reader does not have to re-derive it.
 
 ---
 
+## 2026-09-22 — Do not disturb and auto answer (A-18)
+
+Two check boxes in the agent's rail, beside sign-out and language.
+
+**486 Busy for do not disturb, not the 603 Decline a block gets.** 6xx is a
+global failure: RFC 3261 has the proxy stop trying other branches, which is
+right for a caller a supervisor has blocked and wrong for an agent stepping away
+from their desk — it would take the call away from every other agent too. 486
+says "not this line", so the queue offers the call to somebody else.
+
+**Logged Busy, not Rejected.** From the caller's side a do-not-disturb refusal
+and a second call arriving mid-call are the same event, and the service figures
+the supervisor reads should not show an agent who went to lunch as having
+rejected customers. Rejected stays what it is: the agent saw the call and
+pressed Reject.
+
+**Do not disturb wins over auto answer.** Both set is a contradiction, and the
+safe reading is the one that does not connect a live customer to an empty chair.
+The auto-answer box is disabled rather than hidden while do not disturb is on,
+so the agent can see why it is not doing anything.
+
+**Remembered per laptop, in `settings.json` beside the language and the audio
+devices.** A phone silently un-silencing itself at the next sign-in is its own
+kind of surprise; the state survives a restart and is visible in the rail, which
+is what makes it recoverable.
+
+**The state lives in `PhonePreferences`, not on the view model.** The call
+service reads it on a SIP thread while an INVITE is waiting for an answer, and
+the check boxes write it on the UI thread. One locked object owns both switches;
+the view model is a pass-through, so there is no second copy that could disagree
+about whether the phone is off.
+
+**A default `CheckBox` style was added to the theme.** Check boxes were
+unstyled, so Windows drew their labels in its own near-black on our near-black
+surface — the fifth control to fall into that hole after the contacts list, the
+DatePicker, its calendar and the ComboBox. Only the label is taken over; the
+Windows box itself reads fine on a dark background. This also fixes the
+classification form's checkbox fields, which had the same problem.
+
+**Not verified in the running app.** The build is clean and the behaviour is
+reasoned from the SIP paths that A-17 already uses, but nobody has watched a
+call arrive with either box ticked. Worth a pass with a real PBX before it is
+called done.
+
+---
+
 ## 2026-09-14 — Initial repository scaffold
 
 ### Stack (given, not chosen here)
@@ -2896,6 +2942,334 @@ Nothing is changed in what Reject sends yet. Guessing at a SIP response code
 against a live PBX, with no log of what was sent, is how the last three telephony
 bugs happened.
 
+## 2026-09-22 — The pop-up finally says who is calling (A-10, A-16)
+
+Until today an agent answering saw a phone number and nothing else, which is
+most of what the pop-up exists for. The lookup was the oldest open item on the
+list and everything it needed was already built: `FindContactByPhoneAsync` has
+been sitting in the Agent App's API client since the contacts work, with a
+comment saying "the lookup the incoming-call pop-up will use", and nothing ever
+called it.
+
+What is on the pop-up now: the **VIP badge and its reason** at the very top
+(A-16), then the queue, the number, the **customer's name** at the size of a
+name rather than a footnote, their **address**, and their **notes** in a box of
+their own. The name the PBX sent hides itself once the real contact is known —
+two names for one caller, one of them whatever the switch felt like sending, is
+worse than either alone.
+
+### "New customer" and "could not check" are not the same thing
+
+The one real decision here. The API client folded every non-2xx answer into
+`ServerError`, so a 404 — *this number belongs to nobody* — was indistinguishable
+from the server being unwell.
+
+Left alone, that would have put **"New customer"** on the screen whenever the
+server was down, in front of an agent talking to a regular. The agent types the
+customer in again, and now there are two records for one person, each with half
+a history. That is not a display bug; it is data loss that takes a merge (A-63)
+to undo.
+
+So `ApiStatus.NotFound` is now its own thing, and the pop-up says one of three
+things: **looking**, **not on file**, or **could not check**. Never blank, and
+never the wrong one of the three.
+
+### It fills in underneath the call, and never holds it up
+
+The lookup starts when the call appears and is not awaited. The number, the
+queue and the Answer button are on screen from the first moment whatever the
+server is doing — A-04 requires the phone to work with the server unreachable,
+and a ringing phone does not wait for HTTP. A failure is a log line and a
+message, never an exception that reaches the pop-up.
+
+**The lookup is cancelled when its call goes away.** Without that, a slow answer
+for the last caller lands on the next caller's pop-up and the agent greets
+somebody by a stranger's name. Rare, horrible, and almost impossible to
+reproduce on purpose, which is why it is handled rather than waited for.
+
+### Outbound calls get it too
+
+A-10 says "on an incoming call", but the same lookup runs when the agent dials
+out (A-20): knowing who you are ringing is not less useful than knowing who is
+ringing you, and it is the same code path. Recorded here because it is slightly
+more than A-10 asks for.
+
+### And then the rest of it: the history and the totals
+
+A-10 asks for more than a name — the **last five communications with type and
+notes**, and **totals** for orders, complaints and cancellations. Both are in
+now, under the name.
+
+**A new endpoint rather than the existing history one.**
+`GET /api/communications/by-contact/{id}` already returns a contact's calls, and
+it was not enough: `CommunicationDto` carries no classification, and A-10 asks
+for the type and the notes. Those are the whole point. "Three calls last week"
+tells an agent nothing; "complaint, cold food, unresolved" tells them how to
+open their mouth. So `GET /api/contacts/{id}/card` returns the three counts and
+the last few calls, each with what it was about and what the agent wrote.
+
+**Two requests, not one.** The name, address and VIP badge come back from the
+small, cheap lookup and appear first; the card joins classifications and fills
+in behind them. A single combined endpoint would have been one round trip and
+would have made the agent wait for the slower half to see the customer's name,
+which is the one thing they need before they speak.
+
+**The counts are of classified calls only, and they only ever understate.** A
+call nobody wrote up is not an order that did not happen; it is a call nobody
+wrote up. Counting it as anything would invent history. A customer with nothing
+counted shows **no totals at all** rather than three noughts, because three
+noughts read as a verdict on the customer instead of on our records.
+
+**An unclassified call still appears in the list**, labelled "not written up".
+Hiding it would hide the fact that somebody did not do the paperwork, and that
+is worth an agent seeing.
+
+**Direction is not filtered.** A customer this branch rang and one who rang in
+are the same relationship, and an agent about to speak wants the last five times
+anybody spoke to them (A-21). Outbound rows are marked.
+
+### Two things the language-file check caught
+
+`NoAnswer` went into the statuses this morning **with no label in either
+language file**, so the call log would have shown a missing key the first time
+an outbound call was not answered. Added. And the history rows needed a label
+for an unclassified call. Both found by the key-parity check between `ar.json`
+and `en.json` — the throwaway script that DECISIONS has been complaining about
+not being part of the build. It has now earned its place twice.
+
+### Not in this commit
+
+**The inline "new customer" form** (A-11) is its own piece: the pop-up now says
+a number is not on file, and cannot yet do anything about it.
+
+## 2026-09-22 — "Why is 10:44 above 16:40?" — the grid was sorting itself
+
+Dia sent a screenshot of the call log with one row visibly out of order, and
+separately that **the refresh button sometimes did nothing and only signing out
+and back in showed recent calls**. Two complaints, one cause.
+
+**The data was never wrong.** Checked against PostgreSQL directly: every row is
+stored correctly and the server's query orders by `started_at` descending on the
+index built for exactly that. The server would have returned them newest first.
+
+**WPF makes every column header a sort button unless told otherwise**, and
+`CanUserSortColumns` had never been set, so it defaulted to true. One click on
+the Number header — easy to do by accident while reaching for a row — sorted the
+grid by number. And since every column here binds to a **formatted string**, not
+a value, that sorted the *text*: `00970569498581` sorts above `0569498581`,
+because the third character is `0` against `5`. Every other row carried the same
+number, tied, and kept its newest-first order underneath. Which is precisely the
+screenshot: one outbound call on top, everything else in time order.
+
+Sorting by the time column would have been no better. `"21/09 21:00"` and
+`"16:40"` compared as text put yesterday above today.
+
+**And the sort survives a refresh**, because it lives on the collection *view*
+rather than the collection. `Calls.Clear()` and re-add does not touch it. So
+every later refresh quietly dropped its new rows into that old order — the
+refresh worked perfectly and looked broken. Signing out and in built a new grid,
+which is the only thing that cleared it. That is the whole of "I have to log out
+and log in".
+
+Sorting is now off on this grid. Not a simplification: the list is **the last
+100 calls, newest first**, chosen by the server, and re-sorting a truncated page
+presents a ranking of the page as a ranking of everything.
+
+### The second half: a cancellation source disposed underneath its own run
+
+Hunting the first one turned up a real intermittent fault beside it. `Refresh`
+replaces a slower in-flight request with a newer one — correct, and there for a
+good reason — but it **disposed** the previous `CancellationTokenSource` the
+instant it cancelled it. The run that owned that source was still inside the
+method and about to read `current.Token`, and reading `.Token` on a disposed
+source throws `ObjectDisposedException` — which is not an
+`OperationCanceledException`, so it sailed straight past the catch written for
+exactly this moment.
+
+Each run now disposes its own source, and the token is read once at the top,
+before anybody can take it away. This one fires only when two refreshes overlap,
+which is why it was "sometimes".
+
+### The same trap is in three other grids
+
+Contacts, menu and delivery all bind formatted strings to sortable columns over
+a server-truncated list. Nobody has reported it and it is the same defect.
+**Left for a commit of its own** rather than folded in here, because the fix
+belongs in the DataGrid style in `Theme.xaml`, which another session is editing
+right now.
+
+## 2026-09-22 — `callLog.unclassified` on a chip, and the guard that should have existed
+
+Dia's screenshot showed the call log's "Not classified" chip reading
+**`callLog.unclassified`** — the key, not the label — and said it was happening
+in more than one place.
+
+**Why it showed the key.** `Localizer` is built to do exactly that. When a label
+is missing it writes a warning and returns the key itself, so the app carries on
+and the agent sees something rather than nothing. Right at runtime, and the
+reason nothing else ever caught it: the compiler cannot see a JSON key and the
+type checker cannot see a XAML binding. A missing label is invisible to every
+automated check this project had, and visible to anyone who opens the screen.
+
+**Why it was missing.** The list of last calls was removed from the pop-up
+earlier today (entry above), and with it its label, `caller.unclassified`. The
+call log's chip uses `callLog.unclassified` — same last word, different section,
+nothing to do with the list — and it went too. Removing one label took a
+same-named neighbour with it. The DECISIONS entry for that change lists what was
+removed and this key is not on it, so it was collateral, not intent.
+
+**"More than one place."** Today's log has the warnings, and there are exactly
+two keys that ever rendered raw: `callLog.unclassified`, 38 times, and
+`callLog.status.NoAnswer`, 22 times. The second was mine — `NoAnswer` went into
+the statuses this morning with no label in either language, fixed this afternoon
+— and the running app in the screenshot predates that fix. Both are the same
+class of defect: a label file that drifted from the code that reads it.
+
+**This is the fourth time.** The key-parity check has existed since the redesign
+as a throwaway script, and this file has asked three times for it to be in the
+test project. It now is — `AgentAppLabelsTests` in `CallCenter.Shared.Tests` —
+and it checks more than parity:
+
+- Arabic and English carry the same keys.
+- No label is blank in either language.
+- **Every label the app asks for exists**, by scanning the Agent App's XAML and
+  C# for `Localizer[section.key]` references. A dot is required in the key,
+  which is what tells a literal apart from a variable such as
+  `Localizer[StatusKey]`.
+- Every value in `CommunicationStatuses.All` has a `callLog.status.*` label,
+  because the call log builds that key at runtime and the scan cannot see it.
+  This is the check that would have caught `NoAnswer` this morning.
+
+**The guard was seen to fail before it was trusted.** The label was removed on
+purpose, two of the four tests failed naming `callLog.unclassified` and the file
+that asks for it, the label was restored, all four passed. A guard that has only
+ever passed proves nothing — the same reason a screenshot is asked for after UI
+work.
+
+The test reads the app's source tree, which a unit test normally would not. It is
+a check on data files rather than code, and the alternative was a fifth incident.
+The two remaining throwaway checks — every `StaticResource` a view names exists,
+and every control a view uses has a style — are still scripts, and are the ones
+that would have caught the white contacts list.
+
+## 2026-09-22 — The last column arrived cut off, and only a resize fixed it
+
+The call log's "Not classified" chip came up clipped to "Not cl". Widening the
+window and pulling it back fixed it, and it was wrong again on the next start.
+"Wrong until something forces a second layout" is a shape worth recognising: it
+is almost never the thing that looks wrong.
+
+**A star-width column cannot be measured against infinite space.** The theme
+gives every DataGrid `HorizontalScrollBarVisibility="Auto"`, which lets the
+grid's own ScrollViewer offer unlimited width on the first layout pass. The
+"Customer" column is `Width="*"` — a share of what is available — and there is
+no share of infinity. So it could not be resolved, the columns after it were
+laid out against a width nobody had settled, the total came out wider than the
+card, and the rightmost column was the one pushed over the edge. Dragging the
+window forced a second pass with a real width, which is why resizing appeared to
+repair it.
+
+It was never the chip, and never the label — the label was a separate fault
+fixed an hour earlier, and this one had been waiting behind it.
+
+**Disabled, not Auto, for this grid.** The columns now have to fit the space
+that exists, so the star column yields instead of the last column being pushed
+out. Two `MinWidth`s keep that honest: the chip always has room for its longest
+label in either language, and Customer cannot be squeezed to nothing paying for
+it.
+
+### Where this really belongs, and why it is not there yet
+
+The setting is in the shared DataGrid style in `Theme.xaml`, and **Contacts has
+exactly the same shape** — two `Width="Auto"` template columns of flag chips
+sitting after star columns. Nobody has reported it and it is the same defect
+waiting.
+
+The one-line fix in the theme would settle every grid at once. It is not in this
+commit because another session has `Theme.xaml` open for the do-not-disturb
+work, and quietly changing a file somebody else is editing is how the menu
+pictures got swept up this morning. **Left as its own commit, deliberately**,
+for the moment that session is finished.
+
+### The pattern, for next time
+
+Three faults today were invisible to the build, the tests and the type checker,
+and every one showed itself the moment somebody looked at a screen: the window
+title that never changed, the grid that sorted itself, and this. The count of
+defects found by screenshot on this project is now eight.
+
+## 2026-09-23 — CI gets a database, because one test always needed one
+
+CI went red on `A_missing_picture_is_a_404_rather_than_an_empty_body`: 500 where
+the test wanted 404, after a 32-minute run.
+
+**It was never about pictures.** Before the endpoint can decide a picture is
+missing it looks the item up in the database. CI has no database, the query
+cannot connect, and the request dies as a 500. The picture code is fine and does
+return 404 for a genuinely missing file.
+
+**It passed locally for the worst possible reason:** Docker happened to be
+running on the developer's laptop. Reproduced both ways before changing
+anything — the same test fails in 73 seconds against an unreachable database and
+passes in 4 seconds against a live one. CI's failure took 1m25s, which matches.
+
+**And that is where the 32 minutes went.** The connection is configured with
+`EnableRetryOnFailure`, which is right on a real server where the database might
+be restarting, and pure cost here: every test that touches the database waits
+out the full retry schedule before failing. The run was mostly waiting for
+something that was never coming.
+
+### Two jobs where there was one, and the split is forced
+
+GitHub can attach a database to a job for its lifetime, **but only on Linux** —
+service containers do not run on Windows machines. The Agent App is
+`net10.0-windows` and builds nowhere else. So:
+
+* **build (Windows)** — `dotnet build CallCenter.sln`. Its only job is to prove
+  the Agent App still compiles.
+* **test (Linux)** — a `postgres:16` service, and the two test projects by name
+  rather than the solution, because the solution contains the Agent App.
+  Neither test project references it, which is what makes this possible at all.
+
+A health check on the service is not decoration: without it the steps can start
+before PostgreSQL is accepting connections, and the first test to touch it fails
+for a reason that has nothing to do with the code. That is a worse failure than
+the one being fixed, because it is intermittent.
+
+### The schema, which is the part that is easy to miss
+
+The database GitHub provides is **empty**. The test host had migrations turned
+off — correctly, while there was never a database — so pointing it at a fresh
+PostgreSQL would have replaced "cannot connect" with "relation does not exist".
+
+`CallCenterApiFactory` now runs migrations **when, and only when, a connection
+string is present in the environment**, by the same configuration key production
+uses. No connection string, no migrations, and the suite behaves exactly as it
+always has. That keeps one switch rather than a test-only flag that could drift
+from what the server actually does.
+
+### Verified, not assumed
+
+Against a throwaway database created empty for the purpose, so nothing of the
+developer's own was touched: 21 tables and 9 migrations built from nothing, all
+236 server tests and all 124 shared tests green, then the database dropped. The
+workflow itself was parsed rather than eyeballed, and nothing depended on the
+old job name.
+
+### What this does not fix
+
+**A laptop with no PostgreSQL at all still fails those few tests**, exactly as
+before — unchanged, not improved. The standing claim that "the suite runs
+without PostgreSQL by design" was already untrue for a handful of endpoint tests
+that reach the database before they can answer; CI is now the place that runs
+them honestly. Making them skip themselves when no database is reachable is a
+separate, smaller job.
+
+**The four gaps this unblocks are still gaps.** Login, call logging, the contact
+flags and the classification write path all have "no database-backed test" next
+to them in the list below, and the reason given each time was that CI has no
+database. That reason has gone. The tests themselves still have to be written.
+
 ---
 
 # How this project is tracked
@@ -2915,6 +3289,41 @@ retry interval is what stops someone "tidying it up" a year from now.
 
 **Anything finished is recorded here or in the SRS, not left in a conversation.**
 Chat is not a record.
+
+## 2026-09-22 — The pop-up drops the list of last calls (A-10)
+
+Later the same day, with the pop-up running against real numbers, the client
+asked for the **"Last few calls" list to go**, leaving the caller card above it
+(number, name, address, notes, the three totals) and the classification form
+below.
+
+Their screenshot made the case better than the argument for the panel did. Five
+rows, every one "Not written up — Missed" or "Not written up — Rejected", each
+row taller than the counts above it, and the classification form pushed below
+the fold. In practice most of a customer's history is calls nobody classified,
+so the list was mostly telling the agent about gaps in our own records while
+costing them the form they actually have to fill in.
+
+**What changed.** The `ItemsControl` and its heading are out of
+`CallPopupWindow.xaml`; `CallerViewModel` no longer keeps a `Recent`
+collection; `CallerHistoryRow` is deleted; the `caller.recent` and
+`caller.unclassified` strings are gone from both language files. The SRS row
+for A-10 is amended rather than rewritten, so the original ask stays on record.
+
+**What did not change, and why.** `GET /api/contacts/{id}/card` still returns
+the last few calls in `CallerCardDto.Recent`, and the server-side join that
+builds them stays. The app simply ignores that part of the response. Removing
+it would have meant touching the shared contract and the server tests for a
+list the client may yet want back somewhere quieter — a "history" tab, say, or
+the contact's page in the admin panel. Dropping a field from a response is
+cheap later; putting one back is a redeploy of both halves.
+
+**Open.** Whether the notes from past calls belong anywhere on the pop-up. The
+argument for them ("complaint, cold food" tells the agent how to open) has not
+gone away; it just lost to the form. If the client wants them back, one line
+showing only the most recent *classified* call's type and note, with the
+missed and unwritten ones filtered out, would carry most of the value in a
+tenth of the height.
 
 ## 2026-09-22 — The old system's 15,000 customers ship inside the server
 
@@ -3014,7 +3423,7 @@ and what comes after:
 | Opening a call from the log: details, classify | A-51 | classification (A-40) |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
-| The caller's identity in the pop-up, VIP badge | A-11, A-16 | nothing |
+| The inline "new customer" form on the pop-up | A-11 | identity — **done** |
 | Click-to-call from the log and from a contact | A-20 | dialling — **done**, needs its test call |
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
@@ -3123,9 +3532,11 @@ there at all. See the 19 September CDR entry.
 
 ## Known gaps in what is built
 
-- **Login has no database-backed test.** The suite runs without PostgreSQL by
-  design, so token validation and encryption are covered and the actual login
-  path is not.
+- **Login has no database-backed test.** Token validation and encryption are
+  covered and the actual login path is not. **The reason has now gone**: since
+  23 September CI runs the server tests on Linux against a real `postgres:16`
+  service, so a database-backed test is possible. It has not been written yet.
+  The same applies to every "no database-backed test" note below.
 - **The call path has met a PBX and works.** Confirmed on 2026-09-20: a call
   arrives through queue `smashed-002`, the pop-up appears, Answer connects
   two-way audio, and Hang up ends the leg cleanly. The automatic rejection of a
@@ -3161,14 +3572,14 @@ there at all. See the 19 September CDR entry.
   `Server`, `Username` or `Password`; they arrive in the login response (A-01).
   Misleading, because it looks like where the PBX is configured.
   `RtpPortMin`/`RtpPortMax` are real and should stay.
-- **The UI checks are throwaway scripts, not part of the build.** Three things
-  were verified by hand during the redesign and none of them are reproducible by
-  anyone else: that both Agent App language files carry the same keys, that
-  every `StaticResource` a view names is defined, and that every control a view
-  uses has a style in the theme. **The last of those is what would have caught
-  the white contacts list** — a `ListView` left with no style falls back to
-  WPF's default white, and nothing in the build complains. These belong in the
-  test project.
+- **Two of the three UI checks are still throwaway scripts.** The label check
+  became a real test on 22 September (`AgentAppLabelsTests`), after the fourth
+  label to reach the screen as a raw key. The other two are not reproducible by
+  anyone else yet: that every `StaticResource` a view names is defined, and that
+  every control a view uses has a style in the theme. **The last of those is what
+  would have caught the white contacts list** — a `ListView` left with no style
+  falls back to WPF's default white, and nothing in the build complains. Both
+  belong beside the label test.
 
 ## What running the apps has caught that the checks did not
 

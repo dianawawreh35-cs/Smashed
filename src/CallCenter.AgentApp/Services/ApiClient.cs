@@ -32,6 +32,19 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
         /// <summary>The server could not be reached, or did not answer in time.</summary>
         Unreachable,
 
+        /// <summary>
+        /// The server looked and there is no such thing.
+        /// </summary>
+        /// <remarks>
+        /// Separate from <see cref="ServerError"/> because for the caller
+        /// lookup the two mean opposite things: 404 is "this number belongs to
+        /// nobody, offer to add them" (A-11), and a server error is "we do not
+        /// know". Folding them together told an agent that a regular customer
+        /// was new whenever the server was unwell, which is how a second record
+        /// for the same person gets typed.
+        /// </remarks>
+        NotFound,
+
         /// <summary>The server answered with an error.</summary>
         ServerError,
     }
@@ -104,6 +117,18 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
         SendAsync<ContactDto>(
             () => new HttpRequestMessage(
                 HttpMethod.Get, $"api/contacts/by-phone?number={Uri.EscapeDataString(number)}"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// A customer's totals and last few calls, for the pop-up (A-10). Asked for
+    /// after the contact itself, so the name is never waiting on this.
+    /// </summary>
+    public Task<Result<CallerCardDto>> GetCallerCardAsync(
+        Guid contactId, int recent = 5, CancellationToken ct = default) =>
+        SendAsync<CallerCardDto>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get, $"api/contacts/{contactId}/card?recent={recent}"),
             authenticated: true,
             ct);
 
@@ -384,6 +409,16 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
                 return Result<T>.Failed(
                     ApiStatus.Unauthorized,
                     await ReadErrorCodeAsync(response, LoginErrorCodes.InvalidCredentials, ct));
+            }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Not logged as a failure: for the caller lookup and the
+                // classification of an unclassified call, "there is none" is a
+                // normal answer rather than something that went wrong.
+                return Result<T>.Failed(
+                    ApiStatus.NotFound,
+                    await ReadErrorCodeAsync(response, LoginErrorCodes.ServerError, ct));
             }
 
             if (!response.IsSuccessStatusCode)

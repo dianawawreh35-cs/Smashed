@@ -22,6 +22,28 @@
                  Style="{StaticResource Subtle}"
                  HorizontalAlignment="Center" />
 
+      <!-- A-16: the VIP badge, above everything else, because its whole job is
+           to change how the agent speaks before they have spoken. -->
+      <Border Background="{StaticResource Warning}"
+              CornerRadius="{StaticResource CornerSmall}"
+              Padding="12,4"
+              Margin="0,10,0,0"
+              HorizontalAlignment="Center"
+              Visibility="{Binding Caller.IsVip, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Text="{Binding Localizer[caller.vip]}"
+                   FontSize="13"
+                   FontWeight="Bold"
+                   Foreground="#1A1200" />
+      </Border>
+
+      <TextBlock Text="{Binding Caller.FlagReason}"
+                 Style="{StaticResource Subtle}"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"
+                 Margin="0,4,0,0"
+                 TextWrapping="Wrap"
+                 Visibility="{Binding Caller.HasFlagReason, Converter={StaticResource BoolToVisibility}}" />
+
       <!-- Which queue rang, above the number: it changes how the agent answers,
            and they read it before they have said anything. -->
       <Border Background="#1F2A37"
@@ -46,8 +68,82 @@
                  FlowDirection="LeftToRight"
                  Margin="0,8,0,0" />
 
-      <!-- Whatever name the PBX sent, small, because it is not a contact and
-           will be replaced by the real lookup (A-11). -->
+      <!-- Who it is (A-10). The name is the size of a name, not a footnote:
+           it is what the agent greets them by. -->
+      <TextBlock Text="{Binding Caller.Name}"
+                 FontSize="18"
+                 FontWeight="SemiBold"
+                 Foreground="{StaticResource Text}"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"
+                 TextWrapping="Wrap"
+                 Margin="0,8,0,0"
+                 Visibility="{Binding Caller.HasName, Converter={StaticResource BoolToVisibility}}" />
+
+      <TextBlock Text="{Binding Caller.Address}"
+                 Style="{StaticResource Subtle}"
+                 HorizontalAlignment="Center"
+                 TextAlignment="Center"
+                 TextWrapping="Wrap"
+                 Margin="0,4,0,0"
+                 Visibility="{Binding Caller.HasAddress, Converter={StaticResource BoolToVisibility}}" />
+
+      <!-- A-16 asks for the notes at the top, so the agent adjusts immediately.
+           Boxed rather than another grey line: it is the one thing here that
+           somebody wrote on purpose about this customer. -->
+      <Border Background="{StaticResource SurfaceAlt}"
+              CornerRadius="{StaticResource CornerSmall}"
+              Padding="10,6"
+              Margin="0,8,0,0"
+              Visibility="{Binding Caller.HasNotes, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Text="{Binding Caller.Notes}"
+                   Foreground="{StaticResource Text}"
+                   FontSize="12"
+                   TextWrapping="Wrap" />
+      </Border>
+
+      <!-- Totals (A-10): how many orders, complaints and cancellations this
+           customer has. Hidden entirely when all three are zero — three
+           noughts read as a verdict on the customer rather than on our
+           records. -->
+      <StackPanel Orientation="Horizontal"
+                  HorizontalAlignment="Center"
+                  Margin="0,10,0,0"
+                  Visibility="{Binding Caller.HasTotals, Converter={StaticResource BoolToVisibility}}">
+
+        <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding Caller.Orders}" FontWeight="Bold" Foreground="{StaticResource Success}" />
+            <TextBlock Text="{Binding Localizer[caller.orders]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding Caller.Complaints}" FontWeight="Bold" Foreground="{StaticResource Danger}" />
+            <TextBlock Text="{Binding Localizer[caller.complaints]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Pill}">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding Caller.Cancellations}" FontWeight="Bold" Foreground="{StaticResource Warning}" />
+            <TextBlock Text="{Binding Localizer[caller.cancellations]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
+      <!-- Looking, nobody on file (A-11), or could not ask. Never blank: each
+           one means something different for the agent to do. -->
+      <TextBlock Text="{Binding Caller.StatusText}"
+                 Style="{StaticResource Subtle}"
+                 FontStyle="Italic"
+                 HorizontalAlignment="Center"
+                 Margin="0,8,0,0"
+                 Visibility="{Binding Caller.HasStatus, Converter={StaticResource BoolToVisibility}}" />
+
+      <!-- Whatever name the PBX sent, small, and only while the real contact is
+           unknown (A-11). -->
       <TextBlock Text="{Binding CallerName}"
                  Style="{StaticResource Subtle}"
                  HorizontalAlignment="Center"

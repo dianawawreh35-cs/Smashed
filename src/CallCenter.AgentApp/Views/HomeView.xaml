@@ -50,6 +50,23 @@
                   Command="{Binding ToggleLanguageCommand}" />
         </StackPanel>
 
+        <!-- How this phone should treat an arriving call (A-18). Beside the
+             sign-out row rather than buried in a settings screen: both of these
+             stop the agent's phone behaving normally, so the one place that
+             says what the phone is doing is where they belong. Do not disturb
+             is the one an agent must be able to see at a glance and turn off
+             again without hunting for it. -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="16,0,16,12">
+          <CheckBox Content="{Binding Localizer[home.doNotDisturb]}"
+                    IsChecked="{Binding DoNotDisturb, Mode=TwoWay}"
+                    ToolTip="{Binding Localizer[home.doNotDisturbHint]}" />
+          <CheckBox Content="{Binding Localizer[home.autoAnswer]}"
+                    IsChecked="{Binding AutoAnswer, Mode=TwoWay}"
+                    IsEnabled="{Binding DoNotDisturb, Converter={StaticResource InverseBool}}"
+                    ToolTip="{Binding Localizer[home.autoAnswerHint]}"
+                    Margin="0,8,0,0" />
+        </StackPanel>
+
         <!-- The phone, always visible. An agent should never have to go looking
              for whether calls can reach them (A-02, N-04a). -->
         <Border DockPanel.Dock="Bottom"

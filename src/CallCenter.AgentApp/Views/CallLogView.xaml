@@ -91,7 +91,50 @@
                      HorizontalAlignment="Center" />
         </StackPanel>
 
+        <!--
+          CanUserSortColumns is off, and that is a fix rather than a
+          simplification. WPF turns every column header into a sort button by
+          default, and two things make that actively wrong here:
+
+          * Every column binds to a **formatted string** - the time is "10:44"
+            or "21/09 21:00", the duration is "0:16", the result is translated.
+            Sorting them sorts text, so "21/09 21:00" lands above "16:40" and a
+            sort by time produces an order that is not a time order at all.
+
+          * This grid holds **the last 100 calls, newest first**, chosen by the
+            server. Re-sorting a truncated page looks like a ranking of
+            everything and is a ranking of the page.
+
+          The sort also survived a refresh, because it lives on the collection
+          view rather than the collection: one click on a header, and every
+          later refresh quietly dropped its rows into that old order. That is
+          what "the refresh button does not work, I have to sign out and in"
+          was - signing in built a new grid, which is the only thing that
+          cleared it.
+        -->
+        <!--
+          HorizontalScrollBarVisibility is Disabled here, overriding the theme's
+          Auto, and that is what fixes the last column arriving cut off.
+
+          A star-width column cannot be measured against infinite space. With
+          horizontal scrolling allowed, the DataGrid's own ScrollViewer offers
+          exactly that on the first layout pass, so "Customer" could not be
+          resolved from the available width and the columns after it were laid
+          out against a width nobody had yet. Total came out wider than the
+          card, and the rightmost column - the "Not classified" chip - was the
+          one pushed off the edge. Resizing the window forced a second pass with
+          a real width, which is why dragging the edge appeared to repair it and
+          why it was only ever wrong on startup.
+
+          Disabled means the columns must fit what is there, so the star column
+          gives up its space instead of the last column being pushed out. The
+          MinWidths below keep that honest: the chip always has room for its
+          longest label in either language, and Customer cannot be squeezed to
+          nothing to pay for it.
+        -->
         <DataGrid ItemsSource="{Binding Calls}"
+                  CanUserSortColumns="False"
+                  HorizontalScrollBarVisibility="Disabled"
                   Margin="6"
                   Visibility="{Binding HasCalls, Converter={StaticResource BoolToVisibility}}">
           <DataGrid.InputBindings>
@@ -105,7 +148,7 @@
           <DataGrid.Columns>
             <DataGridTextColumn x:Name="WhenColumn" Width="Auto" Binding="{Binding When}"
                                 FontFamily="{StaticResource MonoFont}" />
-            <DataGridTextColumn x:Name="WhoColumn" Width="*" Binding="{Binding Who}" />
+            <DataGridTextColumn x:Name="WhoColumn" Width="*" MinWidth="90" Binding="{Binding Who}" />
             <DataGridTextColumn x:Name="NumberColumn" Width="Auto" Binding="{Binding Number}"
                                 FontFamily="{StaticResource MonoFont}" />
             <DataGridTextColumn x:Name="QueueColumn" Width="Auto" Binding="{Binding Queue}" />
@@ -116,7 +159,7 @@
             <!-- A-41: highlighted until classified. A chip rather than a column
                  of ticks and blanks, so a glance down the list shows the work
                  left rather than the work done. -->
-            <DataGridTemplateColumn Width="Auto">
+            <DataGridTemplateColumn Width="Auto" MinWidth="110">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Border Padding="7,2"

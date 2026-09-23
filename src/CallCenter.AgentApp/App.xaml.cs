@@ -110,8 +110,10 @@ public partial class App : Application
         services.AddSingleton<SipTransportHost>();
         services.AddSingleton<SipRegistrationService>();
         services.AddSingleton<BlockListCache>();
+        services.AddSingleton<PhonePreferences>();
         services.AddSingleton<CallService>();
         services.AddSingleton<DialViewModel>();
+        services.AddSingleton<CallerViewModel>();
         // A factory, not a scoped context: the queue is used from SIP threads
         // and from the UI, and a DbContext is not safe to share between them.
         services.AddDbContextFactory<AgentBufferDbContext>(options =>

@@ -177,8 +177,16 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _typingTimer.Stop();
-        _inFlight?.Cancel();
-        _inFlight?.Dispose();
+
+        try
+        {
+            // The run that owns this disposes it too; cancelling one that has
+            // already gone is not worth taking the app down for.
+            _inFlight?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     /// <summary>Everything the last fetch returned, kept only to re-render labels.</summary>
@@ -196,9 +204,19 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
         // screen - and it looks exactly like the filter not working.
         var previous = _inFlight;
         var current = new CancellationTokenSource();
+
+        // Read once, here. Reading .Token later would throw if this source had
+        // been disposed in the meantime by whoever replaced us.
+        var token = current.Token;
         _inFlight = current;
+
+        // Cancelled, and deliberately NOT disposed. The run that owns it is
+        // still inside this method and about to look at its own token; a source
+        // disposed underneath it throws ObjectDisposedException, which is not
+        // an OperationCanceledException and so escaped the catch below. That is
+        // the intermittent half of "the refresh button does not always work".
+        // Each run disposes its own source in the finally.
         previous?.Cancel();
-        previous?.Dispose();
 
         IsBusy = true;
         StatusKey = null;
@@ -211,9 +229,9 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
                 to: To is { } to ? new DateTimeOffset(to.Date) : null,
                 query: Query,
                 unclassifiedOnly: UnclassifiedOnly,
-                ct: current.Token);
+                ct: token);
 
-            if (current.Token.IsCancellationRequested)
+            if (token.IsCancellationRequested)
             {
                 return;
             }
@@ -246,7 +264,10 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
             if (ReferenceEquals(_inFlight, current))
             {
                 IsBusy = false;
+                _inFlight = null;
             }
+
+            current.Dispose();
         }
     }
 

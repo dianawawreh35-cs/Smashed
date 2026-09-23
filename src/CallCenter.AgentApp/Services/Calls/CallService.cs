@@ -47,6 +47,7 @@ namespace CallCenter.AgentApp.Services.Calls;
 public class CallService(
     SipTransportHost transport,
     BlockListCache blockList,
+    PhonePreferences preferences,
     IOptions<DialingOptions> dialing,
     ILogger<CallService> logger) : IDisposable
 {
@@ -768,6 +769,32 @@ public class CallService(
             return;
         }
 
+        // A-18: do not disturb, checked here for the same reason as the block
+        // list — nothing may ring or appear on screen before the answer is
+        // known.
+        if (preferences.DoNotDisturb)
+        {
+            logger.LogInformation(
+                "Call from {Caller} turned away: do not disturb is on (A-18), queue {Queue}",
+                caller ?? "withheld", queue ?? "none");
+
+            // 486 Busy here, not 603 Decline as a block gets: a 6xx tells the
+            // PBX to stop trying anywhere, and this agent stepping away must
+            // not take the call away from the rest of the queue. 486 means
+            // "not this line", which is precisely what is being said.
+            Decline(request, SIPResponseStatusCodesEnum.BusyHere, "do not disturb");
+
+            // Reported as Busy, like a second call: from the caller's side the
+            // two are the same event, and the reports should not show an agent
+            // who stepped away as having rejected a customer.
+            var refusedAt = DateTimeOffset.Now;
+            Report(new FinishedCall(
+                request.Header?.CallId ?? Guid.NewGuid().ToString(),
+                caller, identity.DisplayName, queue, CallOutcome.Busy, refusedAt, null, refusedAt));
+
+            return;
+        }
+
         // Busy is handled in OnTransportRequest: the user agent never raises
         // this event for a second call.
 
@@ -817,6 +844,18 @@ public class CallService(
         Set(new CallState(
             CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null,
             _callId));
+
+        // A-18: auto answer. The state goes out first, so the pop-up is already
+        // on screen showing who this is by the time the line opens — an agent
+        // whose headset simply starts talking still has to see the number.
+        //
+        // Off this thread: answering opens the microphone and speaker, and this
+        // is a SIPSorcery callback that the transport is waiting on.
+        if (preferences.AutoAnswer)
+        {
+            logger.LogInformation("Answering automatically: auto answer is on (A-18)");
+            _ = Task.Run(AnswerAsync);
+        }
     }
 
     /// <summary>

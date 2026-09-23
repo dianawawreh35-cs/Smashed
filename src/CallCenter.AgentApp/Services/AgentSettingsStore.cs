@@ -6,7 +6,8 @@ namespace CallCenter.AgentApp.Services;
 
 /// <summary>
 /// The handful of choices that belong to the laptop rather than to the agent
-/// (A-03, A-05): audio devices, the UI language, and the username to pre-fill.
+/// (A-03, A-05): audio devices, the UI language, the phone's own switches, and
+/// the username to pre-fill.
 /// </summary>
 /// <remarks>
 /// Deliberately not a password store. Every agent has their own credentials, and
@@ -30,6 +31,12 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
         public string? SpeakerDeviceId { get; init; }
 
         public string? RingDeviceId { get; init; }
+
+        /// <summary>Turn calls away without ringing (A-18).</summary>
+        public bool DoNotDisturb { get; init; }
+
+        /// <summary>Pick up an incoming call without pressing Answer (A-18).</summary>
+        public bool AutoAnswer { get; init; }
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };

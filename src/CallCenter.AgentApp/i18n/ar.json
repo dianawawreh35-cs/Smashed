@@ -25,7 +25,6 @@
     "refresh": "تحديث",
     "searchHint": "تصفية بالرقم أو الاسم",
     "unclassifiedOnly": "بحاجة إلى تصنيف",
-    "unclassified": "غير مصنّفة",
     "when": "الوقت",
     "who": "الزبون",
     "number": "الرقم",
@@ -47,11 +46,22 @@
       "Ringing": "ترنّ",
       "Abandoned": "متروكة",
       "Overflowed": "محوّلة",
-      "Logged": "مسجّلة"
+      "Logged": "مسجّلة",
+      "NoAnswer": "لم يُرد"
     },
     "from": "من",
     "to": "إلى",
-    "clearFilters": "مسح التصفية"
+    "clearFilters": "مسح التصفية",
+    "unclassified": "غير مصنّفة"
+  },
+  "caller": {
+    "cancellations": "إلغاءات",
+    "checking": "جارٍ البحث عن الرقم…",
+    "complaints": "شكاوى",
+    "newCustomer": "زبون جديد — غير مسجَّل",
+    "notChecked": "تعذّر التحقق من هوية المتصل",
+    "orders": "طلبات",
+    "vip": "زبون مميّز"
   },
   "classification": {
     "heading": "تصنيف المكالمة",
@@ -118,6 +128,10 @@
   },
   "home": {
     "signOut": "تسجيل الخروج",
+    "doNotDisturb": "عدم الإزعاج",
+    "doNotDisturbHint": "تُرفض المكالمات دون رنين، وتُحوَّل إلى موظف آخر.",
+    "autoAnswer": "ردّ تلقائي",
+    "autoAnswerHint": "يُردّ على المكالمة فور وصولها دون الضغط على «ردّ».",
     "extension": "التحويلة:",
     "noExtension": "لم تُضبط التحويلة — راجع المشرف"
   },

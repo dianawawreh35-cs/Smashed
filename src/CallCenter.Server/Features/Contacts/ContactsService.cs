@@ -467,6 +467,62 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
         contact.CreatedAt,
         contact.UpdatedAt);
 
+    /// <summary>
+    /// The rest of what the incoming-call pop-up shows about a customer: their
+    /// totals and their last few calls, with what each one was about (A-10).
+    /// </summary>
+    /// <remarks>
+    /// <b>Counts are of classified calls only.</b> A call nobody classified is
+    /// not an order that did not happen; it is a call nobody wrote down.
+    /// Counting it as anything would invent history, so it is counted as
+    /// nothing and the agent sees totals that only ever understate.
+    ///
+    /// Three counts in one grouped query rather than three round trips, and the
+    /// recent list in a second: both ride the <c>ix_comm_contact</c> index, and
+    /// one customer's calls are few enough that no time window is needed.
+    ///
+    /// Direction is not filtered. A customer this branch rang and a customer
+    /// who rang in are the same relationship, and an agent about to speak wants
+    /// the last five times anybody spoke to them (A-21).
+    /// </remarks>
+    public async Task<CallerCardDto> CardAsync(
+        Guid contactId, int recent = 5, CancellationToken ct = default)
+    {
+        var counts = await db.Classifications
+            .AsNoTracking()
+            .Where(c => c.Communication.ContactId == contactId)
+            .GroupBy(c => c.Type.Name)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        int Count(string name) =>
+            counts.FirstOrDefault(c => c.Name == name)?.Count ?? 0;
+
+        var history = await db.Communications
+            .AsNoTracking()
+            .Where(c => c.ContactId == contactId)
+            .OrderByDescending(c => c.StartedAt)
+            .Take(recent)
+            .Select(c => new CallerHistoryDto(
+                c.StartedAt,
+                c.Direction,
+                c.Status,
+                c.DurationSec,
+                // Left-joined: a call nobody classified still belongs in the
+                // list. "Three calls, none written up" is itself worth knowing.
+                c.Classification == null ? null : c.Classification.Type.Name,
+                c.Classification == null ? null : c.Classification.Type.LabelAr,
+                c.Classification == null ? null : c.Classification.Type.LabelEn,
+                c.Classification == null ? null : c.Classification.Notes))
+            .ToListAsync(ct);
+
+        return new CallerCardDto(
+            Orders: Count("Order"),
+            Complaints: Count("Complaint"),
+            Cancellations: Count("Cancellation"),
+            Recent: history);
+    }
+
     private static JsonDocument Snapshot(Contact contact) => JsonSerializer.SerializeToDocument(new
     {
         contact.Name,

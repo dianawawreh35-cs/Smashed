@@ -25,7 +25,6 @@
     "refresh": "Refresh",
     "searchHint": "Filter by number or name",
     "unclassifiedOnly": "Needs classifying",
-    "unclassified": "Not classified",
     "when": "Time",
     "who": "Customer",
     "number": "Number",
@@ -47,11 +46,22 @@
       "Ringing": "Ringing",
       "Abandoned": "Abandoned",
       "Overflowed": "Overflowed",
-      "Logged": "Logged"
+      "Logged": "Logged",
+      "NoAnswer": "No answer"
     },
     "from": "From",
     "to": "To",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "unclassified": "Not classified"
+  },
+  "caller": {
+    "cancellations": "cancelled",
+    "checking": "Looking this number up…",
+    "complaints": "complaints",
+    "newCustomer": "New customer — not on file",
+    "notChecked": "Could not check who this is",
+    "orders": "orders",
+    "vip": "VIP CUSTOMER"
   },
   "classification": {
     "heading": "Classify this call",
@@ -118,6 +128,10 @@
   },
   "home": {
     "signOut": "Log out",
+    "doNotDisturb": "Do not disturb",
+    "doNotDisturbHint": "Calls are turned away without ringing, and offered to another agent.",
+    "autoAnswer": "Auto answer",
+    "autoAnswerHint": "Calls are picked up as soon as they arrive, without pressing Answer.",
     "extension": "Extension:",
     "noExtension": "No extension configured — ask your supervisor"
   },

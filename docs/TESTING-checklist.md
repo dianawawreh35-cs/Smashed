@@ -179,6 +179,48 @@ cannot be faked, and the part most likely to find something.
 
 - [ ] **Call extension 2001 from another phone.** The pop-up appears, with the
       caller's number.
+- [ ] **The caller's name, address and notes appear (A-10).** Call from a
+      number saved as a contact. The number shows immediately and the name
+      fills in a moment later.
+      *If it says "New customer" for somebody who is on file:* the number is
+      stored in a format that did not match (A-13). Compare the contact's saved
+      number with what the pop-up showed.
+- [ ] **A VIP caller shows the badge (A-16).** Flag a contact VIP in the
+      supervisor app with a reason, then call from that number. The badge and
+      the reason sit above everything else.
+- [ ] **An unknown number says "New customer — not on file".**
+- [ ] **Stop the server, then call.** The pop-up must still appear with the
+      number and Answer, and must say **"Could not check who this is"** — not
+      "New customer". Telling an agent a regular is new is how a second record
+      for the same person gets typed.
+- [ ] **Two calls in a row from different numbers.** The second pop-up must
+      never show the first caller's name.
+- [ ] **A customer with history shows their totals (A-10).** Classify a few
+      calls from one number as orders and complaints, then ring in from it. The
+      pop-up shows the three counts under the name. No list of past calls
+      follows them: that was removed on 2026-09-22.
+      *If the totals are missing but the name is there:* the second request
+      failed. The counts come separately from the name, on purpose, so this
+      fails on its own. Check the log for "history could not be fetched".
+- [ ] **A customer with no classified calls shows no totals at all** — not
+      three zeroes.
+- [ ] **An unclassified call in the list says "Not written up"**, rather than
+      being left out.
+- [ ] **The call log stays newest first, and column headers do nothing.**
+      Click every header in the call log. Nothing should re-order.
+      *A click used to sort the grid by that column's text and the sort
+      survived every later refresh*, which read as the refresh button being
+      broken and was fixed only by signing out and in (22 September).
+- [ ] **Press Refresh twice quickly, then once more.** The list must update
+      every time and the button must come back enabled.
+- [ ] **Open the call log at the default window size and read the last
+      column.** The "Not classified" chip must be whole, without resizing the
+      window first.
+      *It used to arrive clipped and repair itself when the window was dragged*
+      (22 September). Check it in Arabic too, where the label is a different
+      width.
+- [ ] **Make the window as narrow as it will go.** The columns must still fit,
+      with Customer giving up the space rather than the chip disappearing.
 - [ ] **The ringing is audible.**
 - [ ] **The timer counts** once answered.
 - [ ] **The queue badge** is right when a second call arrives.

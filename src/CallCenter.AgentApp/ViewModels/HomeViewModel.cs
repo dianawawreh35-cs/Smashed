@@ -1,5 +1,6 @@
 using System.Windows.Media;
 using CallCenter.AgentApp.Services;
+using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.AgentApp.Services.Sip;
 using CallCenter.Shared.Contracts.Auth;
@@ -9,24 +10,40 @@ using CommunityToolkit.Mvvm.Input;
 namespace CallCenter.AgentApp.ViewModels;
 
 /// <summary>
-/// The signed-in shell: who is here, whether the phone works, and the way out.
+/// The signed-in shell: who is here, whether the phone works, how it should
+/// treat an arriving call (A-18), and the way out.
 /// </summary>
 public partial class HomeViewModel : ObservableObject
 {
     private readonly SignInService _signIn;
     private readonly AgentSession _session;
     private readonly SipRegistrationService _sip;
+    private readonly PhonePreferences _preferences;
 
     public HomeViewModel(
-        SignInService signIn, AgentSession session, SipRegistrationService sip, Localizer localizer)
+        SignInService signIn,
+        AgentSession session,
+        SipRegistrationService sip,
+        PhonePreferences preferences,
+        Localizer localizer)
     {
         _signIn = signIn;
         _session = session;
         _sip = sip;
+        _preferences = preferences;
         Localizer = localizer;
 
         localizer.LanguageChanged += (_, _) => RefreshPhone();
         _sip.Changed += (_, _) => RefreshPhone();
+
+        // The switches are also read from a SIP thread and could be set from
+        // elsewhere later; the rail follows whatever the preferences say rather
+        // than assuming it is the only thing that touches them.
+        _preferences.Changed += (_, _) =>
+        {
+            OnPropertyChanged(nameof(DoNotDisturb));
+            OnPropertyChanged(nameof(AutoAnswer));
+        };
     }
 
     public Localizer Localizer { get; }
@@ -92,6 +109,43 @@ public partial class HomeViewModel : ObservableObject
                 RegistrationStatus.Failed => Color.FromRgb(0xF8, 0x51, 0x49),
                 _ => Color.FromRgb(0xD2, 0x99, 0x22),
             };
+        }
+    }
+
+    /// <summary>
+    /// Turn calls away without ringing (A-18). Kept as a pass-through rather
+    /// than a copy: the call service reads the same object from a SIP thread,
+    /// and two fields that could disagree about whether the phone is off is
+    /// exactly the bug that would be blamed on the PBX.
+    /// </summary>
+    public bool DoNotDisturb
+    {
+        get => _preferences.DoNotDisturb;
+        set
+        {
+            if (_preferences.DoNotDisturb == value)
+            {
+                return;
+            }
+
+            _preferences.DoNotDisturb = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Pick a call up without pressing Answer (A-18).</summary>
+    public bool AutoAnswer
+    {
+        get => _preferences.AutoAnswer;
+        set
+        {
+            if (_preferences.AutoAnswer == value)
+            {
+                return;
+            }
+
+            _preferences.AutoAnswer = value;
+            OnPropertyChanged();
         }
     }
 

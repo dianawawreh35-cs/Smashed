@@ -58,6 +58,22 @@ public class ContactsController(ContactsService contacts) : ControllerBase
     }
 
     /// <summary>
+    /// A customer's totals and last few calls, for the incoming-call pop-up
+    /// (A-10).
+    /// </summary>
+    /// <remarks>
+    /// Separate from the contact lookup on purpose. The name and the VIP badge
+    /// are what an agent needs in the second before they speak and come back
+    /// from the cheaper query; this one joins classifications and arrives a
+    /// moment later without holding that up.
+    /// </remarks>
+    [HttpGet("{id:guid}/card")]
+    [ProducesResponseType<CallerCardDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<CallerCardDto>> Card(
+        Guid id, [FromQuery] int recent, CancellationToken ct) =>
+        Ok(await contacts.CardAsync(id, recent is <= 0 or > 20 ? 5 : recent, ct));
+
+    /// <summary>
     /// Contacts that already carry this name (A-63). The screen calls this
     /// before saving a new contact, so the agent can be told rather than
     /// discovering a second Ahmad six months later.

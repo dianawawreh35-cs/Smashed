@@ -96,6 +96,9 @@ Nothing here needs the PBX or a phone. Start the database, the server and
       then the form), with no jump to the top and no column changing width.
       **Edit** does the same; **Flag…** opens its dialog under the row too.
       *Reported 24 Sep:* both opened above the table, a moment late.
+- [ ] **In an open contact, double-click a call in its history.** The call's
+      details and recording open **under that call**, the same panel as on the
+      Calls page, and **nothing scrolls**. Its **Open** button does the same.
 - [ ] Mark a contact VIP; the badge appears.
 - [ ] Block a contact, giving a reason. Unblock it again.
       *You have already confirmed unblocking works end to end.*

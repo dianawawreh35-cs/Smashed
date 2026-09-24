@@ -1,17 +1,28 @@
+import { Fragment, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import type { CallRow } from '../api/calls'
 import { communicationsForContact } from '../api/communications'
 import type { Communication } from '../api/communications'
+import CallDetails from './CallDetails'
 
 /**
  * A contact's history of calls, newest first (A-62).
  *
  * Every agent's calls, not only the viewer's: the panel exists to show the
  * customer's whole relationship with the restaurant, and half of it would be
- * misleading. Recordings are the part A-62 restricts, and they are not here yet.
+ * misleading.
+ *
+ * **Any call opens under its own row**, by double-click or its Open button, in
+ * the same panel as the call search: facts, classification, history, and the
+ * recording with its holds marked. It opens where it is, without scrolling the
+ * page, as every list in the app now does (24 Sep). This is the supervisor app,
+ * so every agent's recording plays here; A-62's restriction on recordings is
+ * the Agent App's.
  */
 export default function ContactHistory({ contactId }: { contactId: string }) {
   const { t } = useTranslation()
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const { data: calls, isLoading } = useQuery({
     queryKey: ['communications', 'by-contact', contactId],
@@ -39,11 +50,29 @@ export default function ContactHistory({ contactId }: { contactId: string }) {
             <th>{t('history.duration')}</th>
             <th>{t('history.queue')}</th>
             <th>{t('history.agent')}</th>
+            <th />
           </tr>
         </thead>
         <tbody>
           {calls.map((call) => (
-            <HistoryRow key={call.id} call={call} />
+            <Fragment key={call.id}>
+              <HistoryRow
+                call={call}
+                open={call.id === openId}
+                onToggle={() => setOpenId(call.id === openId ? null : call.id)}
+              />
+              {call.id === openId && (
+                <tr>
+                  <td colSpan={6} className="bg-ink-950/60 p-3">
+                    {/* w-0 min-w-full: as wide as the table and never wider,
+                        so opening a call cannot make every column jump. */}
+                    <div className="w-0 min-w-full">
+                      <CallDetails row={asCallRow(call)} onClose={() => setOpenId(null)} />
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>
@@ -51,11 +80,13 @@ export default function ContactHistory({ contactId }: { contactId: string }) {
   )
 }
 
-function HistoryRow({ call }: { call: Communication }) {
+function HistoryRow({ call, open, onToggle }: { call: Communication; open: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation()
 
   return (
-    <tr>
+    // Double-click is a shortcut, never the only way in: the Open button does
+    // the same, and is what a keyboard reaches.
+    <tr onDoubleClick={onToggle} className={`cursor-pointer ${open ? 'bg-ink-800/40' : ''}`}>
       <td className="whitespace-nowrap text-slate-300">
         {new Date(call.startedAt).toLocaleString(i18n.language)}
       </td>
@@ -80,8 +111,46 @@ function HistoryRow({ call }: { call: Communication }) {
       </td>
       <td className="text-slate-400">{call.queueName}</td>
       <td className="text-slate-400">{call.agentDisplayName}</td>
+      {/* The double-click stops here, so a quick double press of the button
+          does not open the call and shut it again. */}
+      <td className="text-end" onDoubleClick={(e) => e.stopPropagation()}>
+        <button type="button" className="btn-ghost btn-sm" aria-expanded={open} onClick={onToggle}>
+          {open ? t('calls.details.close') : t('calls.open')}
+        </button>
+      </td>
     </tr>
   )
+}
+
+/**
+ * What the history already knows about a call, in the shape the call panel
+ * draws from at once. Branch, type and order value are left for the panel to
+ * fetch with the classification, which it does whenever the call is classified.
+ */
+function asCallRow(call: Communication): CallRow {
+  return {
+    id: call.id,
+    kind: call.kind,
+    startedAt: call.startedAt,
+    direction: call.direction,
+    status: call.status,
+    agentId: null,
+    agentDisplayName: call.agentDisplayName,
+    contactId: call.contactId,
+    contactName: call.contactName,
+    remoteNumberRaw: call.remoteNumberRaw,
+    branchId: null,
+    branchName: null,
+    typeName: null,
+    typeLabelAr: null,
+    typeLabelEn: null,
+    orderValue: null,
+    durationSec: call.durationSec,
+    notes: call.notes,
+    isClassified: call.isClassified,
+    hasRecording: call.hasRecording ?? false,
+    recordingExpired: call.recordingExpired ?? false,
+  }
 }
 
 const formatDuration = (seconds: number) =>

@@ -230,6 +230,45 @@ describe('contacts page', () => {
     expect(within(row).getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('opens a call from the contact history under its own row', async () => {
+    const CALL = {
+      id: 'h1', kind: 'Call', direction: 'In', status: 'Answered', contactId: 'c1', contactName: 'Ahmad',
+      remoteNumberRaw: '0599123456', remoteName: null, startedAt: '2026-09-24T09:00:00Z',
+      answeredAt: '2026-09-24T09:00:05Z', endedAt: '2026-09-24T09:02:00Z', durationSec: 115,
+      queueName: 'smashed-002', extension: '2001', agentDisplayName: 'Sara', isClassified: false,
+      notes: null, hasRecording: false, recordingExpired: false,
+    }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) => {
+      if (url === '/api/contacts/c1') {
+        return jsonResponse({
+          ...AHMAD, notes: null, deliveryNotes: null,
+          phones: [{ id: 'p1', raw: '0599123456', normalised: '970599123456', isPrimary: true }],
+          createdByDisplayName: null, createdAt: '', updatedAt: '',
+        })
+      }
+      if (url.startsWith('/api/communications/by-contact/c1')) return jsonResponse([CALL])
+      if (url === '/api/communications/h1') {
+        return jsonResponse({
+          summary: CALL, remoteName: null, answeredAt: CALL.answeredAt, endedAt: CALL.endedAt,
+          waitSec: null, queueName: 'smashed-002', extension: '2001', callNotes: null,
+        })
+      }
+      return jsonResponse([AHMAD])
+    }))
+
+    renderPage()
+    fireEvent.doubleClick((await screen.findByText('Ahmad')).closest('tr')!)
+
+    // The contact's history, inside its editor; then one of its calls opened.
+    const historyRow = (await screen.findByText('Sara')).closest('tr')!
+    fireEvent.doubleClick(historyRow)
+
+    const details = await screen.findByRole('region', { name: 'Call details' })
+    expect(historyRow.nextElementSibling).toContainElement(details)
+    expect(await within(details).findByText('smashed-002')).toBeInTheDocument()
+    expect(within(historyRow).getByRole('button', { name: 'Close' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('opens the flag dialog under its row too', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([AHMAD])))
 

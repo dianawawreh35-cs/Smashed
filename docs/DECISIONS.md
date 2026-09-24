@@ -4511,6 +4511,30 @@ contacts tests check the editor and the flag dialog sit in the next row. 65 web
 tests, the build and lint pass. **How it feels can only be judged by eye:
 checklist 1.3 and 1.7.**
 
+---
+
+## 2026-09-24 — Nothing scrolls when a row opens, and the contact history opens too
+
+Two follow-ups from the same evening.
+
+**Opening still scrolled.** Opened under its row, the panel scrolled itself into
+view when it opened near the bottom of the window, and that movement was what
+still felt wrong. The scroll is gone from calls and contacts: a row opens where
+it is, and the supervisor scrolls if they want to see more. The flag dialog's
+`autoFocus` scrolled the page to the reason box too. It now focuses with
+`preventScroll`, once, when the box appears.
+
+**The contact history's calls open.** They couldn't before. A call in a
+contact's history now opens under its row, by double-click or its Open button,
+in the same panel as the call search: facts, classification, changes, and the
+recording with its holds. The history's rows already carry most of what the
+panel draws at once. Branch, type and order value come with the classification,
+which the panel fetches for a classified call. `hasRecording` and
+`recordingExpired` were already sent by the server and are now read.
+
+66 web tests, build and lint pass; a new test opens a contact, then a call in
+its history, and checks the panel sits in the next row.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

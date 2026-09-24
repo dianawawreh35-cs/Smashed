@@ -30,6 +30,10 @@ export interface Communication {
   isClassified: boolean
   /** Why a missed or rejected call went that way, in the agent's words. */
   notes: string | null
+  /** The audio is on the server and can be played (S-04). */
+  hasRecording: boolean
+  /** Recorded, and retention has since deleted the audio (A-33). */
+  recordingExpired: boolean
 }
 
 /**

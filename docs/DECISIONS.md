@@ -3732,6 +3732,67 @@ closes them. The stray `.env` lines do no harm.
 **Still stale, and not touched here:** step 10 of the runbook still describes two
 extensions per agent and a default branch. Both went on 17 September.
 
+## 2026-09-24 — Login, call logging and flags are tested against a real database
+
+Three "Known gaps" said the same thing: the behaviour that matters was untested,
+because the suite ran without PostgreSQL. CI has had a database since 23
+September, so the tests could be written, and now they are. There are 37, in
+three files, all through the HTTP endpoints as the apps call them.
+
+**Login (`LoginTests`, 13 tests).** Agent, supervisor and web-app sign-ins, and
+what each gets back: an agent in the Agent App gets a session and their decrypted
+SIP secret, while a supervisor, or an agent in the web app, gets neither. Also
+covered: a login typed in any case; a wrong password and an unknown login getting
+the same answer; a disabled account being told so only when the password is
+right; the returned token working on `/me`; logout closing the session; and
+`reset-password` doing all three of its jobs. It sets the new password (and the
+old one stops working), re-enables a disabled account, and closes every open
+session. `reset-password` took the whole `WebApplication` but used only its
+services, so it now takes an `IServiceProvider`, which a test can pass.
+
+**Call logging (`CallLoggingTests`, 17 cases).** A contact saved as
+`059 xxx xxxx` is matched to calls arriving as `0599…`, `+970…`, `00970…`, the
+bare nine digits, `+972…` (on the last nine digits), and Arabic-Indic digits. A
+number nobody has is stored with no contact. A deleted contact is never matched.
+A resend with the same Call-ID and extension updates the row, and the later
+report wins. The same Call-ID on another extension is another call. All six
+outcomes the app reports are stored as sent, against the agent in the token. A
+call that was never answered has no duration.
+
+**Flags (`ContactFlagsDatabaseTests`, 7 tests).** Flagging a number, in the
+PBX's form, lands on the contact that has it, without creating a second one. A
+number nobody has becomes a nameless contact. Every change writes an audit row
+with who and when, and the history endpoint reads the same rows back, newest
+first. Clearing the flags clears the reason. A blocked contact puts every one of
+its numbers on the list the Agent App caches, and unblocking takes them off.
+A VIP isn't on it.
+
+### How they stay honest
+
+- **Skipped, not passed, without a database.** `[DatabaseFact]` and
+  `[DatabaseTheory]` mark them. A plain `dotnet test` on a laptop reports them as
+  skipped, so a green run never quietly means "didn't run".
+- **No shared state.** Each test makes its own users, contacts and Call-IDs under
+  random names (`TestData`), and nothing is cleaned up. So order doesn't matter,
+  and a database that has seen a hundred runs answers like a fresh one. The one
+  thing shared is the Phone channel, which a migrated database lacks until
+  `seed`, so `EnsurePhoneChannelAsync` adds it if it is missing.
+- **Each was made to fail once.** Turning off last-nine-digit matching fails
+  exactly the `+972` case. Putting back the pre-fix login fails the web-app case.
+- A test was drafted for "a call on an unseeded database is refused plainly". It
+  was dropped: it could only run before any other test created the channel, and
+  otherwise it would have passed by doing nothing.
+
+Run locally against a scratch database: `docs/DEVELOPING.md` section 5.
+
+### Found on the way, not fixed
+
+**A token outlives `reset-password`.** The command closes the account's sessions
+"so the old tokens stop working", and they don't. Nothing checks a session
+when a request arrives, so a token lasts its full 12 hours. It's recorded under
+"Known gaps". Fixing it means a session lookup on every request, which should be
+decided together with the concurrency item rather than slipped in here.
+
 ---
 
 # Open items (live)
@@ -3861,11 +3922,13 @@ there at all. See the 19 September CDR entry.
 
 ## Known gaps in what is built
 
-- **Login has no database-backed test.** Token validation and encryption are
-  covered and the actual login path is not. **The reason has now gone**: since
-  23 September CI runs the server tests on Linux against a real `postgres:16`
-  service, so a database-backed test is possible. It has not been written yet.
-  The same applies to every "no database-backed test" note below.
+- **A token outlives `reset-password`.** The command closes the account's
+  sessions, and its comment says that stops the old tokens working. It doesn't.
+  Nothing checks a session when a request arrives, so a token stays good until
+  it expires, up to 12 hours (`Jwt:Lifetime`). If a password was reset because
+  it leaked, whoever holds a token keeps it. The fix is to check the session on
+  each request (on `OnTokenValidated`), which puts a query on every call. Decide
+  that together with the concurrency item, which is about exactly that cost.
 - **The call path has met a PBX and works.** Confirmed on 2026-09-20: a call
   arrives through queue `smashed-002`, the pop-up appears, Answer connects
   two-way audio, and Hang up ends the leg cleanly. The automatic rejection of a
@@ -3879,21 +3942,9 @@ there at all. See the 19 September CDR entry.
   command that works is
   `Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'"` and reading the
   command line.
-- **Call logging has no database-backed test either.** The new tests cover the
-  door (a supervisor is 403, an agent is not), that every outcome the app
-  reports is accepted — including Blocked, which A-17 needs — and the refusals
-  that answer before any query. What it then does with the row, including the
-  contact matching and the update-rather-than-insert on a repeat, is untested
-  for the same reason as login: the suite runs without PostgreSQL.
 - **Nothing displays the calls being recorded.** The rows accumulate and no
   screen reads them, so a mistake in what is stored would not be visible to
   anybody until the reports are built.
-- **The flags have no database-backed test either.** The new tests cover the
-  door (an agent is 403 on every write, and gets through on the two reads the
-  pop-up needs) and the three refusals that answer before any query. What the
-  flags then do — finding the contact a number belongs to, creating a nameless
-  one when nothing matches, and the audit rows — is untested for the same reason
-  as login: the suite runs without PostgreSQL.
 - **Step 10 of the server runbook still describes the old agent setup**: two
   extensions per agent and a default branch. One extension per agent came in on
   17 September, and `users.default_branch_id` has been dropped. Rewrite it

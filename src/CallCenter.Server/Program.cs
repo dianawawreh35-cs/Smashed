@@ -179,7 +179,7 @@ try
     // the supervisor password is lost. Runs against the database and exits.
     if (ResetPasswordCommand.IsRequested(args))
     {
-        return await ResetPasswordCommand.RunAsync(app, args);
+        return await ResetPasswordCommand.RunAsync(app.Services, args);
     }
 
     // Bring the schema up to date before serving. This is what makes the

@@ -22,3 +22,15 @@ public sealed class DatabaseFactAttribute : FactAttribute
         }
     }
 }
+
+/// <summary>The <see cref="DatabaseFactAttribute"/> rule, for a test with cases.</summary>
+public sealed class DatabaseTheoryAttribute : TheoryAttribute
+{
+    public DatabaseTheoryAttribute()
+    {
+        if (!CallCenterApiFactory.HasDatabase)
+        {
+            Skip = "Needs PostgreSQL: set ConnectionStrings__Default to run it.";
+        }
+    }
+}

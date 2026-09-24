@@ -41,7 +41,11 @@ public static class ResetPasswordCommand
         args.Length > 0 && args[0].Equals(Verb, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Runs the command. Returns the process exit code.</summary>
-    public static async Task<int> RunAsync(WebApplication app, string[] args)
+    /// <remarks>
+    /// Takes the service provider rather than the application, so the tests can
+    /// run it against a real database with the same code path as the server.
+    /// </remarks>
+    public static async Task<int> RunAsync(IServiceProvider services, string[] args)
     {
         var options = ParseArguments(args);
 
@@ -61,7 +65,7 @@ public static class ResetPasswordCommand
 
         try
         {
-            await using var scope = app.Services.CreateAsyncScope();
+            await using var scope = services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<CallCenterDbContext>();
 
             var user = await db.Users

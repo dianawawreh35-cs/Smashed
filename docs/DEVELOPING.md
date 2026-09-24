@@ -126,21 +126,45 @@ py tools\contacts-import\convert.py   # writes Data\Seed\Contacts\contacts.csv.g
 ```
 
 The seed command refuses to run once any user exists, so it cannot be used to
-recover a forgotten supervisor password. There is no self-service reset either;
-a lockout currently needs direct database access. Also on the list.
+recover a forgotten supervisor password. `reset-password` is the way back in,
+from the same folder:
+
+```powershell
+dotnet CallCenter.Server.dll reset-password --user supervisor --password 'NewPass!2026'
+```
+
+It also re-enables the account and closes its sessions. See runbook step 7.
 
 ## 5. Building and testing
 
 ```powershell
 dotnet build CallCenter.sln      # apps stopped first - see section 2
-dotnet test                      # xUnit, no database needed
+dotnet test                      # xUnit; the database tests are skipped
 cd "src\CallCenter.Web" ; npm test   # Vitest
 ```
 
-`dotnet test` deliberately runs without PostgreSQL: the test host is started
-with migrations turned off, so CI needs no database service. That is also its
-limit — the tests cover validation, authorization and pure logic, and anything
-that reads a table is not covered.
+Plain `dotnet test` needs no database. The tests that do need one are marked
+`[DatabaseFact]`/`[DatabaseTheory]`, and they are reported as **skipped**, not
+passed, when none was given. CI gives them one: a `postgres:16` service on Linux.
+
+**Running the database tests on this machine**, against a scratch database in
+the dev container, so your own dev data is never touched:
+
+```powershell
+# once: a database of its own, beside the dev one
+docker exec callcenter-db-dev psql -U callcenter -d callcenter -c "CREATE DATABASE callcenter_test"
+
+# every time
+$env:ConnectionStrings__Default = "Host=127.0.0.1;Port=5432;Database=callcenter_test;Username=callcenter;Password=callcenter"
+dotnet test tests\CallCenter.Server.Tests
+Remove-Item Env:ConnectionStrings__Default
+```
+
+The test host migrates that database on startup. Every test makes its own
+users, contacts and calls under random names, so running the suite a hundred
+times against the same database gives the same answers as a fresh one. Nothing
+needs clearing between runs. **Never point it at `callcenter`**: the tests would
+fill your dev data with test agents.
 
 ## 6. What a green build does not prove
 

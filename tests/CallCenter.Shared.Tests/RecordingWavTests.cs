@@ -80,6 +80,49 @@ public class RecordingWavTests
         RecordingWav.Parse(Wav(audioBytes: 0)).Should().BeNull();
     }
 
+    [Fact]
+    public void Reads_back_the_holds_written_after_the_audio()
+    {
+        // 10 s of audio, held from 2 s to 5 s and from 7 s to 7.5 s. Written in
+        // the wrong order on purpose: the reader puts them in order.
+        var holds = RecordingWav.HoldChunk([(56_000, 4_000), (16_000, 24_000)]);
+        var file = Wav(audioBytes: 160_000, trailing: holds);
+
+        var wav = RecordingWav.Parse(file);
+
+        wav.Should().NotBeNull();
+        wav!.DataOffset.Should().Be(58, "the marks go after the audio, so the audio has not moved");
+        wav.DataLength.Should().Be(160_000);
+        wav.Holds.Should().Equal(
+            new HoldPeriod(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3)),
+            new HoldPeriod(TimeSpan.FromSeconds(7), TimeSpan.FromSeconds(0.5)));
+    }
+
+    [Fact]
+    public void A_hold_that_outlasts_the_audio_is_cut_to_it()
+    {
+        // Hung up while on hold: the hold runs to the hang-up, the audio stops
+        // at the last frame that arrived. And one hold starts after the audio
+        // has ended altogether.
+        var holds = RecordingWav.HoldChunk([(64_000, 40_000), (90_000, 1_000)]);
+        var file = Wav(audioBytes: 160_000, trailing: holds);
+
+        RecordingWav.Parse(file)!.Holds.Should().Equal(
+            new HoldPeriod(TimeSpan.FromSeconds(8), TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
+    public void A_recording_from_before_holds_were_marked_has_none()
+    {
+        RecordingWav.Parse(Wav(audioBytes: 16_000))!.Holds.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_call_never_held_writes_no_hold_chunk()
+    {
+        RecordingWav.HoldChunk([]).Should().BeEmpty("a file without holds is byte for byte what it was before");
+    }
+
     /// <summary>
     /// A mu-law WAV laid out exactly as <c>CallRecorder.WriteWavHeader</c>
     /// writes one, with the audio filled with mu-law silence.
@@ -88,7 +131,8 @@ public class RecordingWavTests
         int audioBytes,
         ushort formatTag = RecordingWav.MuLawFormat,
         ushort bitsPerSample = 8,
-        (string Id, int Size)? extraChunk = null)
+        (string Id, int Size)? extraChunk = null,
+        byte[]? trailing = null)
     {
         const ushort channels = 2;
         const uint sampleRate = 8000;
@@ -124,6 +168,7 @@ public class RecordingWavTests
         writer.Write("data"u8);
         writer.Write((uint)audioBytes);
         writer.Write(Enumerable.Repeat((byte)0xFF, audioBytes).ToArray());
+        writer.Write(trailing ?? []);
 
         writer.Flush();
         return stream.ToArray();

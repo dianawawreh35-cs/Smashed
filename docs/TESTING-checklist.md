@@ -370,6 +370,19 @@ audio plays, the Windows default output device.*
       matches. Drag the dot: it follows, and plays from where you let go.
 - [ ] **Let it play to the end.** The button returns to **Play**; pressing it
       starts again from the beginning.
+- [ ] **Holds are marked.** Take a call, talk, press **Hold** for about 20
+      seconds, **Resume**, talk again, hang up. Open it in the call log: under
+      the seek bar an amber mark sits where the hold was, and a line below says
+      "On hold: m:ss–m:ss" with times close to when you pressed the buttons.
+      Seek into the mark: the silence plays, and "On hold" shows beside the
+      time.
+      *No mark, but the silence is there:* the recording was made by an Agent
+      App from before 24 Sep evening, or the hold was put on by the PBX rather
+      than by the Hold button. Only the agent's own holds are marked.
+      *The mark is in the wrong place:* note how far off it is and tell me.
+      It should be within a fraction of a second.
+- [ ] **The same held call opens in any other player** (VLC, Windows Media
+      Player) and plays normally. The marks are extra data those players skip.
 - [ ] **A call rings while a recording is playing.** The recording **pauses at
       once**, the card says it is paused while you are on a call, and Play is
       greyed out until the call ends. Afterwards Play works again.

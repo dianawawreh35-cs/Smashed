@@ -564,11 +564,13 @@ public class CallService(
     {
         SIPUserAgent? agent;
         CallState state;
+        CallRecorder? recorder;
 
         lock (_gate)
         {
             agent = _agent;
             state = _state;
+            recorder = _recorder;
         }
 
         if (agent is null || state.Status is not CallStatus.Connected)
@@ -600,6 +602,11 @@ public class CallService(
         // customer is on hold music either way, and that is what the agent
         // asked for.
         SetMicrophone(paused: hold || state.IsMuted);
+
+        // A-51: the recording notes where the hold is. The PBX plays its music
+        // to the customer, not to us, so without this the stretch is just
+        // silence on both sides.
+        recorder?.MarkHold(hold);
 
         logger.LogInformation("Call {Action}", hold ? "put on hold" : "taken off hold");
         Set(State with { IsOnHold = hold });

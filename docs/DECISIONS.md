@@ -4078,6 +4078,40 @@ audio. `CommunicationDto.CanHaveRecording` states that beside `CanBeClassified`,
 with a test over every status, and the card says nothing about audio for any
 other call.
 
+### Holds are marked in the recording
+
+Asked on 24 September: why is the hold music not in the recording? Because it
+never reaches the laptop. On hold, the Agent App re-INVITEs with `sendonly`,
+Issabel plays its music **to the customer** and stops sending their voice to us,
+and the microphone is paused. Both feeds the recorder taps are empty, so a hold
+records as silence of its real length. That was always the design (part 1), and
+the silence rather than the room is the point.
+
+Silence alone reads as a dead line, though. So the recorder now **notes when
+each hold began and ended** and writes the times into the WAV itself, as a
+`hold` chunk after the audio. The player draws the holds as marks under the seek
+bar, lists them ("On hold: 1:10–1:52"), and says "On hold" while playback is
+inside one.
+
+**In the file, not the database.** The file already travels through the offline
+queue and is stored untouched by the server, so the marks go with it: no
+migration, no change to the upload, nothing to reconcile if the call and its
+marks arrived apart. It goes **after** the audio, so the audio still starts at
+byte 58 and every player still plays it. The cost is that anything wanting the
+holds has to read the file. The supervisor's player will fetch the file anyway,
+and a report on time on hold would need the database; it can be moved there if
+that report is ever asked for. The layout is in `SCHEMA.md`.
+
+**Only the agent's own hold is marked.** When the PBX holds the laptop (during a
+transfer), it plays its music *to* the laptop, so that is recorded already.
+
+Checked with tests on the reader and writer: four new, covering the round
+trip, a hold cut to the audio when the call was hung up while on hold, and older
+recordings without the chunk. Also checked by driving the real `CallRecorder`
+through 1 s of audio, a 1.5 s hold and 1 s more: the file's RIFF size matched its
+length, the audio started at byte 58, and the hold came back as 1.02–2.52 s.
+Shared tests: 143 pass. **Not yet heard on a real call.**
+
 **Not seen running.** Nobody has yet heard a recording through the app, or seen
 the card in either language. The seek bar follows the layout direction, so in
 Arabic it fills from the right. That is a choice to confirm on the screenshot,

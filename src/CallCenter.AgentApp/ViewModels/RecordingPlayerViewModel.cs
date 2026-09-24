@@ -69,6 +69,7 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
         {
             OnPropertyChanged(nameof(Message));
             OnPropertyChanged(nameof(PlayPauseLabel));
+            OnPropertyChanged(nameof(HoldsText));
         };
     }
 
@@ -116,8 +117,31 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
 
     /// <summary>Where playback is, in seconds. Bound both ways to the seek bar.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PositionText))]
+    [NotifyPropertyChangedFor(nameof(PositionText), nameof(IsAtHold))]
     private double _positionSeconds;
+
+    /// <summary>
+    /// When the call was on hold, read from the recording (A-51). Empty for a
+    /// call never held, and for recordings made before holds were marked.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasHolds), nameof(HoldsText), nameof(IsAtHold))]
+    private IReadOnlyList<HoldPeriod> _holds = [];
+
+    public bool HasHolds => Holds.Count > 0;
+
+    /// <summary>"On hold: 1:10–1:52, 2:30–2:45" — the silences that are holds.</summary>
+    public string HoldsText => HasHolds
+        ? $"{Localizer["callLog.recording.onHold"]} "
+          + string.Join(", ", Holds.Select(h => $"{Format(h.Start.TotalSeconds)}–{Format(h.End.TotalSeconds)}"))
+        : string.Empty;
+
+    /// <summary>
+    /// Playback is inside a hold, so the silence being heard is the hold and
+    /// not a fault.
+    /// </summary>
+    public bool IsAtHold => Holds.Any(h =>
+        PositionSeconds >= h.Start.TotalSeconds && PositionSeconds < h.End.TotalSeconds);
 
     public string PlayPauseLabel => IsPlaying
         ? Localizer["callLog.recording.pause"]
@@ -212,6 +236,7 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
 
             _stream = new MuLawPlaybackStream(result.Value, wav);
             DurationSeconds = wav.Duration.TotalSeconds;
+            Holds = wav.Holds;
             MoveTo(0);
             IsPlayable = true;
         }
@@ -313,6 +338,7 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
         IsPlayable = false;
         Problem = PlaybackProblem.None;
         DurationSeconds = 0;
+        Holds = [];
         MoveTo(0);
     }
 

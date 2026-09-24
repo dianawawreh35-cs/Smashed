@@ -1,4 +1,5 @@
 using System.IO;
+using CallCenter.AgentApp.Audio;
 using Microsoft.Extensions.Logging;
 using SIPSorcery.Media;
 using SIPSorceryMedia.Abstractions;
@@ -73,6 +74,16 @@ public sealed class CallRecorder : IDisposable
 
     private bool _failed;
     private bool _stopped;
+
+    /// <summary>
+    /// When the agent held the call, as frames from the start of the recording
+    /// (A-51). Written after the audio so the player can mark the silence as a
+    /// hold rather than leave it looking like a dead line.
+    /// </summary>
+    private readonly List<(long StartFrame, long Frames)> _holds = [];
+
+    /// <summary>Where the hold now in progress began, or null when there is none.</summary>
+    private long? _holdStartFrame;
 
     private CallRecorder(string folder, string name, ILogger<CallRecorder> logger)
     {
@@ -151,6 +162,41 @@ public sealed class CallRecorder : IDisposable
     }
 
     /// <summary>
+    /// The agent put the call on hold, or took it off (A-12). Marked so the
+    /// recording can say where the silence is a hold (A-51).
+    /// </summary>
+    /// <remarks>
+    /// Only the agent's own hold is marked. When the PBX holds the laptop — a
+    /// transfer, say — it plays its music <i>to</i> the laptop, so that music is
+    /// in the recording already and needs no explaining.
+    ///
+    /// Timed from the same clock the padding in <see cref="Write"/> uses, so a
+    /// mark lands on the same place in the file as the silence it describes.
+    /// </remarks>
+    public void MarkHold(bool onHold)
+    {
+        lock (_gate)
+        {
+            if (_stopped)
+            {
+                return;
+            }
+
+            var frame = FramesSoFar();
+
+            if (onHold)
+            {
+                _holdStartFrame ??= frame;
+            }
+            else if (_holdStartFrame is { } start)
+            {
+                _holds.Add((start, frame - start));
+                _holdStartFrame = null;
+            }
+        }
+    }
+
+    /// <summary>
     /// Finishes the file and returns it, or null if there is nothing usable.
     /// Never throws.
     /// </summary>
@@ -161,6 +207,13 @@ public sealed class CallRecorder : IDisposable
             if (_stopped)
             {
                 return null;
+            }
+
+            // Hung up while on hold: the hold ends with the call.
+            if (_holdStartFrame is { } start)
+            {
+                _holds.Add((start, FramesSoFar() - start));
+                _holdStartFrame = null;
             }
 
             _stopped = true;
@@ -361,11 +414,16 @@ public sealed class CallRecorder : IDisposable
     {
         var length = Math.Max(_remoteBytes, _localBytes);
 
+        // After the audio, not before it, so the audio still starts at byte 58
+        // and anything that assumed so keeps working. Holds past the end of
+        // the audio are trimmed by the reader.
+        var holdChunk = RecordingWav.HoldChunk(_holds);
+
         using var remote = File.OpenRead(_remoteScratch);
         using var local = File.OpenRead(_localScratch);
         using var output = new FileStream(FilePath, FileMode.Create, FileAccess.Write, FileShare.None);
 
-        WriteWavHeader(output, length * 2);
+        WriteWavHeader(output, length * 2, holdChunk.Length);
 
         var remoteBuffer = new byte[4096];
         var localBuffer = new byte[4096];
@@ -395,9 +453,17 @@ public sealed class CallRecorder : IDisposable
             done += chunk;
         }
 
+        // Two channels of one byte each, so the data is always even and needs
+        // no pad byte before the next chunk.
+        output.Write(holdChunk);
+
         output.Flush();
         return output.Length;
     }
+
+    /// <summary>How far into the call it is now, in frames of the recording.</summary>
+    private long FramesSoFar() =>
+        (long)((DateTimeOffset.Now - _startedAt).TotalSeconds * SampleRate);
 
     private static int ReadFully(Stream stream, byte[] buffer, int count)
     {
@@ -422,7 +488,8 @@ public sealed class CallRecorder : IDisposable
     /// with a library: it is 58 bytes of well-documented structure, and the
     /// alternative is a dependency for one file format.
     /// </summary>
-    private static void WriteWavHeader(Stream stream, long dataBytes)
+    /// <param name="trailingBytes">Chunks written after the audio: the hold marks, if any.</param>
+    private static void WriteWavHeader(Stream stream, long dataBytes, int trailingBytes)
     {
         const short muLaw = 7;
         const short channels = 2;
@@ -434,7 +501,7 @@ public sealed class CallRecorder : IDisposable
         using var writer = new BinaryWriter(stream, System.Text.Encoding.ASCII, leaveOpen: true);
 
         writer.Write("RIFF"u8);
-        writer.Write((uint)(50 + dataBytes));
+        writer.Write((uint)(50 + dataBytes + trailingBytes));
         writer.Write("WAVE"u8);
 
         // 18-byte fmt chunk, not 16: anything other than plain PCM needs the

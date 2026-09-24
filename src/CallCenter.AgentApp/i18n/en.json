@@ -76,7 +76,9 @@
       "offline": "The recording could not be fetched - the server could not be reached.",
       "unreadable": "The recording arrived but could not be played. Tell your supervisor.",
       "noDevice": "The recording could not be played - no speaker or headset was found.",
-      "onCall": "Paused while you are on a call. Play it again once the call ends."
+      "onCall": "Paused while you are on a call. Play it again once the call ends.",
+      "onHold": "On hold:",
+      "holdNow": "On hold"
     }
   },
   "caller": {

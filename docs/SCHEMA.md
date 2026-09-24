@@ -163,6 +163,17 @@ CREATE TABLE recordings (
 );
 ```
 
+**The file itself** (written by the Agent App's `CallRecorder`, stored by the
+server untouched): a WAV of 8 kHz G.711 mu-law, two channels (customer left,
+agent right). The header is 58 bytes (`RIFF`, an 18-byte `fmt `, `fact`,
+`data`), so the audio starts at byte 58. **When the agent held the call, a
+`hold` chunk follows the audio** (added 24 Sep 2026, A-51): one pair of
+little-endian `uint32` per hold, the frame it began at and how many frames it
+lasted, where a frame is 1/8000 s. A call never held has no such chunk, so
+recordings before that date read as never held. Every WAV reader skips a chunk it
+does not know, so the file plays anywhere. The reader is `RecordingWav` in the
+Agent App; the supervisor's player (S-02) should read the same chunk.
+
 Notes
 - One table for phone and app makes every report one query (`kind`/`channel_id` splits them).
 - Reconciliation: an AMI/CDR record and an Agent App record for the same call are joined on `pbx_unique_id` when the app can see it, otherwise on `remote_normalised` + time window; the reconciler merges wait_sec/queue_name into the agent's row.

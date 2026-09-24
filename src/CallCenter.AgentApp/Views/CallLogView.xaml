@@ -368,24 +368,57 @@
                   MinWidth="90"
                   Command="{Binding Player.PlayPauseCommand}" />
 
-          <Slider Grid.Column="1"
-                  Style="{StaticResource SeekBar}"
-                  Margin="14,0"
-                  VerticalAlignment="Center"
-                  Minimum="0"
-                  Maximum="{Binding Player.DurationSeconds}"
-                  Value="{Binding Player.PositionSeconds, Mode=TwoWay}"
-                  LargeChange="5"
-                  SmallChange="1" />
+          <Grid Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-          <!-- Digits read left to right in both languages. -->
-          <TextBlock Grid.Column="2"
-                     Text="{Binding Player.PositionText}"
-                     FontFamily="{StaticResource MonoFont}"
-                     Foreground="{StaticResource TextMuted}"
-                     FlowDirection="LeftToRight"
-                     VerticalAlignment="Center" />
+            <Slider Style="{StaticResource SeekBar}"
+                    Minimum="0"
+                    Maximum="{Binding Player.DurationSeconds}"
+                    Value="{Binding Player.PositionSeconds, Mode=TwoWay}"
+                    LargeChange="5"
+                    SmallChange="1" />
+
+            <!-- A-51: where the call was on hold, under the bar. Inset by half
+                 the thumb, which is where the track itself starts and ends. -->
+            <local:HoldBand Grid.Row="1"
+                            Height="4"
+                            Margin="6,2,6,0"
+                            Holds="{Binding Player.Holds}"
+                            DurationSeconds="{Binding Player.DurationSeconds}"
+                            Fill="{StaticResource Warning}"
+                            Visibility="{Binding Player.HasHolds, Converter={StaticResource BoolToVisibility}}" />
+          </Grid>
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- Said while playback is inside a hold, so the silence is not
+                 mistaken for a dead line. -->
+            <TextBlock Text="{Binding Localizer[callLog.recording.holdNow]}"
+                       Foreground="{StaticResource Warning}"
+                       FontSize="11"
+                       VerticalAlignment="Center"
+                       Margin="0,0,10,0"
+                       Visibility="{Binding Player.IsAtHold, Converter={StaticResource BoolToVisibility}}" />
+
+            <!-- Digits read left to right in both languages. -->
+            <TextBlock Text="{Binding Player.PositionText}"
+                       FontFamily="{StaticResource MonoFont}"
+                       Foreground="{StaticResource TextMuted}"
+                       FlowDirection="LeftToRight"
+                       VerticalAlignment="Center" />
+          </StackPanel>
         </Grid>
+
+        <!-- Every hold, as times: the marks under the bar say where, this says
+             exactly when. -->
+        <TextBlock Text="{Binding Player.HoldsText}"
+                   Style="{StaticResource Subtle}"
+                   Foreground="{StaticResource Warning}"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Visibility="{Binding Player.HasHolds, Converter={StaticResource BoolToVisibility}}" />
 
         <!-- Loading, or why there is nothing to play - or, under the player,
              that it is waiting for a live call to end. -->

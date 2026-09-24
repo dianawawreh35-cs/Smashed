@@ -3,7 +3,8 @@ using System.Buffers.Binary;
 namespace CallCenter.AgentApp.Audio;
 
 /// <summary>
-/// Where the audio is inside a recording the server sent back (A-51).
+/// Where the audio is inside a recording the server sent back (A-51), and when
+/// the call was on hold.
 /// </summary>
 /// <remarks>
 /// The files are the ones <c>CallRecorder</c> writes: 8 kHz G.711 mu-law,
@@ -14,6 +15,14 @@ namespace CallCenter.AgentApp.Audio;
 /// that has been through anything else (a supervisor's editor, a restored
 /// backup) may carry a <c>LIST</c> chunk or put <c>fact</c> elsewhere. Reading
 /// the data from a fixed offset would play the header as noise.
+///
+/// <b>The hold chunk.</b> While a call is on hold the PBX plays its music to
+/// the customer and sends the laptop nothing, so that stretch of the recording
+/// is silence on both sides. The recorder writes when each hold began and how
+/// long it lasted in a <c>hold</c> chunk after the audio, so a player can say
+/// "on hold" rather than leave a silence that looks like a dead line. Every
+/// WAV reader skips a chunk it does not know, so the file still plays anywhere.
+/// The layout is <see cref="HoldChunk"/>'s.
 ///
 /// Deliberately free of WPF and of the audio library, so the test project can
 /// compile this one file and check it without the app.
@@ -30,8 +39,46 @@ public sealed record RecordingWav(int Channels, int SampleRate, int DataOffset, 
     /// <summary><c>WAVE_FORMAT_MULAW</c>, the format tag of every recording.</summary>
     public const ushort MuLawFormat = 7;
 
+    /// <summary>
+    /// When the call was on hold, in order, trimmed to the audio. Empty for a
+    /// call never held, and for a recording made before holds were marked.
+    /// </summary>
+    public IReadOnlyList<HoldPeriod> Holds { get; init; } = [];
+
     /// <summary>How long it plays for. One byte is one sample of one channel.</summary>
     public TimeSpan Duration => TimeSpan.FromSeconds((double)DataLength / (SampleRate * Channels));
+
+    /// <summary>
+    /// The <c>hold</c> chunk for a recording, ready to append after its audio,
+    /// or nothing when the call was never held.
+    /// </summary>
+    /// <remarks>
+    /// Chunk id <c>hold</c>, then one pair of little-endian unsigned 32-bit
+    /// numbers per hold: the frame it began at and how many frames it lasted. A
+    /// frame is one sample of every channel, 1/8000 of a second here, so the
+    /// numbers are positions in the audio rather than clock times and cannot
+    /// drift from it.
+    /// </remarks>
+    public static byte[] HoldChunk(IReadOnlyList<(long StartFrame, long Frames)> holds)
+    {
+        if (holds.Count == 0)
+        {
+            return [];
+        }
+
+        var chunk = new byte[8 + (holds.Count * 8)];
+        "hold"u8.CopyTo(chunk);
+        BinaryPrimitives.WriteUInt32LittleEndian(chunk.AsSpan(4), (uint)(holds.Count * 8));
+
+        for (var i = 0; i < holds.Count; i++)
+        {
+            var at = chunk.AsSpan(8 + (i * 8));
+            BinaryPrimitives.WriteUInt32LittleEndian(at, (uint)Math.Clamp(holds[i].StartFrame, 0, uint.MaxValue));
+            BinaryPrimitives.WriteUInt32LittleEndian(at[4..], (uint)Math.Clamp(holds[i].Frames, 0, uint.MaxValue));
+        }
+
+        return chunk;
+    }
 
     /// <summary>
     /// Finds the audio in a mu-law WAV, or returns null for anything this app
@@ -48,6 +95,9 @@ public sealed record RecordingWav(int Channels, int SampleRate, int DataOffset, 
 
         int? channels = null;
         int? sampleRate = null;
+        int? dataOffset = null;
+        var dataLength = 0;
+        var holds = new List<(long StartFrame, long Frames)>();
         var position = 12;
 
         while (position + 8 <= file.Length)
@@ -85,23 +135,70 @@ public sealed record RecordingWav(int Channels, int SampleRate, int DataOffset, 
                 // A file cut short in transfer still plays up to where it stops,
                 // rather than being refused for the part that is missing.
                 var length = (int)Math.Min(size, (uint)(file.Length - body));
-                length -= length % channels.Value;
+                dataOffset = body;
+                dataLength = length - (length % channels.Value);
+            }
+            else if (id.SequenceEqual("hold"u8))
+            {
+                var pairs = file.Slice(body, (int)Math.Min(size, (uint)(file.Length - body)));
 
-                return length > 0
-                    ? new RecordingWav(channels.Value, sampleRate.Value, body, length)
-                    : null;
+                for (var at = 0; at + 8 <= pairs.Length; at += 8)
+                {
+                    holds.Add((
+                        BinaryPrimitives.ReadUInt32LittleEndian(pairs.Slice(at, 4)),
+                        BinaryPrimitives.ReadUInt32LittleEndian(pairs.Slice(at + 4, 4))));
+                }
             }
 
-            // Chunks are padded to an even length.
+            // Chunks are padded to an even length. One that runs past the end
+            // is where a file was cut short; whatever came before it stands.
             var next = body + (long)size + (size % 2);
             if (next > file.Length)
             {
-                return null;
+                break;
             }
 
             position = (int)next;
         }
 
-        return null;
+        if (dataOffset is not { } offset || dataLength <= 0)
+        {
+            return null;
+        }
+
+        return new RecordingWav(channels!.Value, sampleRate!.Value, offset, dataLength)
+        {
+            Holds = Trim(holds, frames: dataLength / channels.Value, sampleRate.Value),
+        };
     }
+
+    /// <summary>
+    /// Holds as times, in order, cut to the audio there is. A call hung up
+    /// while on hold has a hold that outlasts its audio, because nothing
+    /// arrived to pad the file out to the end.
+    /// </summary>
+    private static List<HoldPeriod> Trim(List<(long StartFrame, long Frames)> holds, long frames, int sampleRate)
+    {
+        var trimmed = new List<HoldPeriod>();
+
+        foreach (var (start, length) in holds.OrderBy(h => h.StartFrame))
+        {
+            var end = Math.Min(start + length, frames);
+
+            if (start < frames && end > start)
+            {
+                trimmed.Add(new HoldPeriod(
+                    TimeSpan.FromSeconds((double)start / sampleRate),
+                    TimeSpan.FromSeconds((double)(end - start) / sampleRate)));
+            }
+        }
+
+        return trimmed;
+    }
+}
+
+/// <summary>One stretch of a recording during which the call was on hold.</summary>
+public readonly record struct HoldPeriod(TimeSpan Start, TimeSpan Length)
+{
+    public TimeSpan End => Start + Length;
 }

@@ -78,6 +78,21 @@ function Player({ communicationId }: { communicationId: string }) {
     }
   }, [communicationId])
 
+  // While playing, the bar follows the audio on every frame. The browser's
+  // timeupdate event fires only about four times a second, so a bar driven by
+  // it moves in visible jumps, and "On hold" appears up to a quarter of a
+  // second late. timeupdate still covers the paused case: a seek, or the end.
+  useEffect(() => {
+    if (!playing) return
+    let frame = 0
+    const follow = () => {
+      if (audio.current) setPosition(audio.current.currentTime)
+      frame = requestAnimationFrame(follow)
+    }
+    frame = requestAnimationFrame(follow)
+    return () => cancelAnimationFrame(frame)
+  }, [playing])
+
   if (state.kind === 'loading') return <p className="field-hint">{t('calls.recording.loading')}</p>
   if (state.kind === 'unreadable') return <p className="notice-error">{t('calls.recording.unreadable')}</p>
   if (state.kind === 'failed') return <p className="notice-error">{t('calls.recording.failed')}</p>
@@ -113,7 +128,7 @@ function Player({ communicationId }: { communicationId: string }) {
         ref={audio}
         src={url}
         preload="auto"
-        onTimeUpdate={(e) => setPosition(e.currentTarget.currentTime)}
+        onTimeUpdate={(e) => !playing && setPosition(e.currentTarget.currentTime)}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
@@ -131,7 +146,7 @@ function Player({ communicationId }: { communicationId: string }) {
             className="w-full accent-brand-500"
             min={0}
             max={duration}
-            step={0.1}
+            step="any"
             value={Math.min(position, duration)}
             onChange={(e) => seek(Number(e.target.value))}
           />

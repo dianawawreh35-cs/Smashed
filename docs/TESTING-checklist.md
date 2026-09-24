@@ -159,7 +159,8 @@ Needs a second supervisor account; add one in Users if there is only one.
 - [ ] **Open a recorded call.** The details show the agent, extension, queue,
       times, and (if classified) type, branch, order value, notes, answers and
       who changed it when. **Play** the recording: the customer and the agent
-      are both heard, the bar moves, and it seeks when dragged.
+      are both heard, the bar **glides** rather than stepping (reported 24 Sep:
+      it jumped four times a second), and it seeks when dragged.
       *If there is no sound but the bar moves:* the mu-law decoding is wrong.
       Stop and tell me.
 - [ ] **Open a call that was put on hold** (put a test call on hold for ten

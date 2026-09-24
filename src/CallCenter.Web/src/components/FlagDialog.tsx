@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -36,6 +36,14 @@ export default function FlagDialog({
   onClose: () => void
 }) {
   const { t } = useTranslation()
+
+  // The cursor goes straight to the reason, as autoFocus did, but without the
+  // browser scrolling the page to it: the dialog opens under its row, and the
+  // page is not to move (24 Sep). Stable, so it runs once when the box appears
+  // rather than stealing focus back on every keystroke elsewhere.
+  const focusWithoutScrolling = useCallback((box: HTMLInputElement | null) => {
+    box?.focus({ preventScroll: true })
+  }, [])
   const queryClient = useQueryClient()
 
   const current: Choice =
@@ -122,7 +130,7 @@ export default function FlagDialog({
             onChange={(e) => setReason(e.target.value)}
             aria-label={t('flags.reason')}
             className="input"
-            autoFocus
+            ref={focusWithoutScrolling}
           />
           <span className="field-hint">{t('flags.reasonHint')}</span>
         </label>

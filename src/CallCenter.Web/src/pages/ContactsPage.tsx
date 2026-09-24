@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -229,19 +229,12 @@ function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
 }
 
 /**
- * Fades in and, opened near the bottom of the window, slides itself into view.
- * "Nearest", so a panel already on screen does not move at all.
+ * Fades in where it opens, and nothing else. **The page does not scroll.** It
+ * used to scroll to show the whole panel when it opened near the bottom of the
+ * window, and that movement was the part that still felt wrong (24 Sep).
  */
 function InPlace({ children }: { children: ReactNode }) {
-  const box = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    box.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
-  }, [])
-  return (
-    <div ref={box} className="animate-fade-in">
-      {children}
-    </div>
-  )
+  return <div className="animate-fade-in">{children}</div>
 }
 
 /**

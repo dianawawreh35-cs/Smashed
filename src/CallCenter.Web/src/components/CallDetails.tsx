@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { callClassification, callDetails, classificationHistory } from '../api/calls'
@@ -22,18 +21,16 @@ import RecordingPlayer from './RecordingPlayer'
  * the list row it was opened from supplies everything it already knows, so
  * the panel draws at once; the rest is fetched in parallel; and what is still
  * coming holds its space.
+ *
+ * **The page does not scroll when it opens.** It used to scroll to show the
+ * whole panel when opened near the bottom of the window, and that movement was
+ * the part that still felt wrong (24 Sep). It opens where it is, and the
+ * supervisor scrolls if they want to see more.
  */
 export default function CallDetails({ row, onClose }: { row: CallRow; onClose: () => void }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
   const id = row.id
-  const panel = useRef<HTMLElement>(null)
-
-  // Opened near the bottom of the window, it slides into view rather than
-  // opening off-screen. Nearest, so a panel already visible does not move.
-  useEffect(() => {
-    panel.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
-  }, [])
 
   const details = useQuery({ queryKey: ['calls', 'details', id], queryFn: () => callDetails(id) })
   const classified = row.isClassified
@@ -61,7 +58,7 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
   const when = (at: string | null | undefined) => (at ? new Date(at).toLocaleString(i18n.language) : '')
 
   return (
-    <section ref={panel} className="card animate-fade-in" aria-label={t('calls.details.heading')}>
+    <section className="card animate-fade-in" aria-label={t('calls.details.heading')}>
       <div className="card-header">
         <div>
           <h2 className="font-semibold text-slate-100">

@@ -287,6 +287,11 @@ cannot be faked, and the part most likely to find something.
 - [ ] **Type a name that already exists.** Leaving the box shows the matching
       contacts with **Add this number to them**. Pressing it puts the number
       on that contact, and the pop-up shows them.
+- [ ] **Open the new-customer form on an answered call**, so it sits above the
+      classification. The middle of the pop-up **scrolls**, and the caller's
+      name at the top and **Mute / Hold / Hang up** at the bottom stay on
+      screen while it does. *Reported 24 Sep:* the window was cut off, with no
+      way to reach what was below.
 - [ ] **Open the form, hang up, keep typing.** The pop-up stays until Save or
       Cancel. **Stop the server and Save:** it says the server could not be
       reached and keeps what was typed; start the server and Save again.

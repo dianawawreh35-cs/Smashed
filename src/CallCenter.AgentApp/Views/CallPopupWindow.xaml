@@ -14,371 +14,391 @@
         WindowStartupLocation="CenterScreen">
 
     <Border Style="{StaticResource Card}" Margin="0" Padding="24">
-    <StackPanel>
+    <!-- Three rows, so the pop-up can grow without losing its buttons (A-12).
+         The caller and the timer stay at the top and the call's buttons at the
+         bottom, always on screen; only the middle scrolls: the new-customer
+         form, the classification and the note. Reported 24 Sep: with the
+         new-customer form open above the classification, the window reached
+         its height limit and cut off whatever was lower, Hang up included. -->
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
 
-      <!-- Ringing, or connected. The state first, because the agent reads this
-           in the second before they decide. -->
-      <TextBlock Text="{Binding StatusText}"
-                 Style="{StaticResource Subtle}"
-                 HorizontalAlignment="Center" />
+      <StackPanel Grid.Row="0">
 
-      <!-- A-16: the VIP badge, above everything else, because its whole job is
-           to change how the agent speaks before they have spoken. -->
-      <Border Background="{StaticResource Warning}"
-              CornerRadius="{StaticResource CornerSmall}"
-              Padding="12,4"
-              Margin="0,10,0,0"
-              HorizontalAlignment="Center"
-              Visibility="{Binding Caller.IsVip, Converter={StaticResource BoolToVisibility}}">
-        <TextBlock Text="{Binding Localizer[caller.vip]}"
-                   FontSize="13"
-                   FontWeight="Bold"
-                   Foreground="#1A1200" />
-      </Border>
-
-      <TextBlock Text="{Binding Caller.FlagReason}"
-                 Style="{StaticResource Subtle}"
-                 HorizontalAlignment="Center"
-                 TextAlignment="Center"
-                 Margin="0,4,0,0"
-                 TextWrapping="Wrap"
-                 Visibility="{Binding Caller.HasFlagReason, Converter={StaticResource BoolToVisibility}}" />
-
-      <!-- Which queue rang, above the number: it changes how the agent answers,
-           and they read it before they have said anything. -->
-      <Border Background="#1F2A37"
-              CornerRadius="{StaticResource CornerSmall}"
-              Padding="10,3"
-              Margin="0,10,0,0"
-              HorizontalAlignment="Center"
-              Visibility="{Binding HasQueue, Converter={StaticResource BoolToVisibility}}">
-        <TextBlock Text="{Binding Queue}"
-                   FontSize="12"
-                   FontWeight="SemiBold"
-                   Foreground="{StaticResource Text}" />
-      </Border>
-
-      <!-- The number, large: it is the only thing identifying the caller until
-           the contact lookup arrives (A-11, A-16). -->
-      <TextBlock Text="{Binding Number}"
-                 FontFamily="{StaticResource MonoFont}"
-                 FontSize="26"
-                 Foreground="{StaticResource Text}"
-                 HorizontalAlignment="Center"
-                 FlowDirection="LeftToRight"
-                 Margin="0,8,0,0" />
-
-      <!-- Who it is (A-10). The name is the size of a name, not a footnote:
-           it is what the agent greets them by. -->
-      <TextBlock Text="{Binding Caller.Name}"
-                 FontSize="18"
-                 FontWeight="SemiBold"
-                 Foreground="{StaticResource Text}"
-                 HorizontalAlignment="Center"
-                 TextAlignment="Center"
-                 TextWrapping="Wrap"
-                 Margin="0,8,0,0"
-                 Visibility="{Binding Caller.HasName, Converter={StaticResource BoolToVisibility}}" />
-
-      <TextBlock Text="{Binding Caller.Address}"
-                 Style="{StaticResource Subtle}"
-                 HorizontalAlignment="Center"
-                 TextAlignment="Center"
-                 TextWrapping="Wrap"
-                 Margin="0,4,0,0"
-                 Visibility="{Binding Caller.HasAddress, Converter={StaticResource BoolToVisibility}}" />
-
-      <!-- A-16 asks for the notes at the top, so the agent adjusts immediately.
-           Boxed rather than another grey line: it is the one thing here that
-           somebody wrote on purpose about this customer. -->
-      <Border Background="{StaticResource SurfaceAlt}"
-              CornerRadius="{StaticResource CornerSmall}"
-              Padding="10,6"
-              Margin="0,8,0,0"
-              Visibility="{Binding Caller.HasNotes, Converter={StaticResource BoolToVisibility}}">
-        <TextBlock Text="{Binding Caller.Notes}"
-                   Foreground="{StaticResource Text}"
-                   FontSize="12"
-                   TextWrapping="Wrap" />
-      </Border>
-
-      <!-- Totals (A-10): how many orders, complaints and cancellations this
-           customer has. Hidden entirely when all three are zero — three
-           noughts read as a verdict on the customer rather than on our
-           records. -->
-      <StackPanel Orientation="Horizontal"
-                  HorizontalAlignment="Center"
-                  Margin="0,10,0,0"
-                  Visibility="{Binding Caller.HasTotals, Converter={StaticResource BoolToVisibility}}">
-
-        <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock Text="{Binding Caller.Orders}" FontWeight="Bold" Foreground="{StaticResource Success}" />
-            <TextBlock Text="{Binding Localizer[caller.orders]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
-          </StackPanel>
-        </Border>
-
-        <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock Text="{Binding Caller.Complaints}" FontWeight="Bold" Foreground="{StaticResource Danger}" />
-            <TextBlock Text="{Binding Localizer[caller.complaints]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
-          </StackPanel>
-        </Border>
-
-        <Border Style="{StaticResource Pill}">
-          <StackPanel Orientation="Horizontal">
-            <TextBlock Text="{Binding Caller.Cancellations}" FontWeight="Bold" Foreground="{StaticResource Warning}" />
-            <TextBlock Text="{Binding Localizer[caller.cancellations]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
-          </StackPanel>
-        </Border>
-      </StackPanel>
-
-      <!-- Looking, nobody on file (A-11), or could not ask. Never blank: each
-           one means something different for the agent to do. -->
-      <TextBlock Text="{Binding Caller.StatusText}"
-                 Style="{StaticResource Subtle}"
-                 FontStyle="Italic"
-                 HorizontalAlignment="Center"
-                 Margin="0,8,0,0"
-                 Visibility="{Binding Caller.HasStatus, Converter={StaticResource BoolToVisibility}}" />
-
-      <!-- A-11: a number nobody has can be saved as a customer from here. A
-           button until asked for, so the classification form below is never
-           pushed down for a caller the agent does not mean to save. -->
-      <Button Content="{Binding Localizer[caller.saveAsNew]}"
-              Style="{StaticResource SmallButton}"
-              HorizontalAlignment="Center"
-              Margin="0,8,0,0"
-              Command="{Binding Caller.OpenNewCustomerCommand}"
-              Visibility="{Binding Caller.CanOfferNewCustomer, Converter={StaticResource BoolToVisibility}}" />
-
-      <!-- The form. The number is the caller's, never typed. -->
-      <StackPanel Margin="0,12,0,0"
-                  Visibility="{Binding Caller.IsFormOpen, Converter={StaticResource BoolToVisibility}}">
-        <TextBlock Text="{Binding Localizer[contacts.name]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
-        <TextBox Text="{Binding Caller.FormName, UpdateSourceTrigger=PropertyChanged}"
-                 LostFocus="OnNewCustomerNameLostFocus" />
-
-        <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
-        <Border Margin="0,8,0,0"
-                Padding="10,8"
-                Background="#2A2412"
-                BorderBrush="{StaticResource Warning}"
-                BorderThickness="1"
-                CornerRadius="{StaticResource CornerSmall}"
-                Visibility="{Binding Caller.SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
-          <StackPanel>
-            <TextBlock Text="{Binding Caller.SameNameMessage}" FontSize="11" Foreground="#E8C56B" TextWrapping="Wrap" />
-            <ItemsControl ItemsSource="{Binding Caller.SameName}" Margin="0,6,0,0">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <StackPanel Margin="0,0,0,6">
-                    <TextBlock FontSize="11" Text="{Binding Name}" Foreground="{StaticResource Text}" />
-                    <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
-                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                            Style="{StaticResource SmallButton}"
-                            HorizontalAlignment="Left"
-                            Margin="0,3,0,0"
-                            Command="{Binding DataContext.Caller.AddToExistingCommand,
-                                      RelativeSource={RelativeSource AncestorType=Window}}"
-                            CommandParameter="{Binding}" />
-                  </StackPanel>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-        </Border>
-
-        <TextBlock Text="{Binding Localizer[contacts.address]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
-        <TextBox Text="{Binding Caller.FormAddress, UpdateSourceTrigger=PropertyChanged}" />
-
-        <TextBlock Text="{Binding Localizer[contacts.notes]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
-        <TextBox Text="{Binding Caller.FormNotes, UpdateSourceTrigger=PropertyChanged}"
-                 AcceptsReturn="True"
-                 TextWrapping="Wrap"
-                 MinHeight="44" />
-
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-          <Button Content="{Binding Localizer[caller.saveCustomer]}"
-                  Style="{StaticResource PrimaryButton}"
-                  MinWidth="120"
-                  Command="{Binding Caller.SaveNewCustomerCommand}" />
-          <Button Content="{Binding Localizer[contacts.cancel]}"
-                  Style="{StaticResource GhostButton}"
-                  MinWidth="90"
-                  Margin="10,0,0,0"
-                  Command="{Binding Caller.CancelNewCustomerCommand}" />
-        </StackPanel>
-
-        <!-- Why it was not saved: offline, a number already on someone. What
-             was typed stays, so the agent only presses Save again. -->
-        <TextBlock Text="{Binding Caller.FormMessage}"
-                   Foreground="{StaticResource Warning}"
-                   FontSize="11"
-                   Margin="0,6,0,0"
-                   TextWrapping="Wrap"
-                   Visibility="{Binding Caller.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
-      </StackPanel>
-
-      <!-- Whatever name the PBX sent, small, and only while the real contact is
-           unknown (A-11). -->
-      <TextBlock Text="{Binding CallerName}"
-                 Style="{StaticResource Subtle}"
-                 HorizontalAlignment="Center"
-                 Margin="0,4,0,0"
-                 Visibility="{Binding HasCallerName, Converter={StaticResource BoolToVisibility}}" />
-
-      <!-- Only while connected, and empty before then, so a ring is never
-           mistaken for a call that has been running for two minutes. -->
-      <TextBlock Text="{Binding Duration}"
-                 FontFamily="{StaticResource MonoFont}"
-                 FontSize="15"
-                 Foreground="{StaticResource TextMuted}"
-                 HorizontalAlignment="Center"
-                 Margin="0,6,0,0"
-                 Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}" />
-
-      <!-- Ringing: answer or refuse. -->
-      <StackPanel Orientation="Horizontal"
-                  HorizontalAlignment="Center"
-                  Margin="0,22,0,0"
-                  Visibility="{Binding IsRinging, Converter={StaticResource BoolToVisibility}}">
-        <Button Content="{Binding Localizer[call.answer]}"
-                Style="{StaticResource PrimaryButton}"
-                MinWidth="120"
-                Command="{Binding AnswerCommand}" />
-        <Button Content="{Binding Localizer[call.reject]}"
-                Style="{StaticResource DangerButton}"
-                MinWidth="120"
-                Margin="10,0,0,0"
-                Command="{Binding RejectCommand}" />
-      </StackPanel>
-
-
-      <!-- The classification form (A-40). On screen from the moment the call is
-           answered, because the agent is writing the order down while the
-           customer talks - not remembering it afterwards. It outlives the call:
-           the pop-up stays until this is saved or skipped, so a call that ends
-           mid-sentence does not take the agent's typing with it. -->
-      <StackPanel Margin="0,18,0,0"
-                  Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
-
-        <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
-
-        <TextBlock Text="{Binding Localizer[classification.heading]}"
-                   Foreground="{StaticResource Text}"
-                   FontWeight="SemiBold"
-                   Margin="0,0,0,12" />
-
-        <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
-          <ItemsControl ItemsSource="{Binding Classification.Fields}">
-            <ItemsControl.ItemContainerStyle>
-              <Style TargetType="ContentPresenter">
-                <!-- A field only asked for certain types hides itself rather
-                     than being rebuilt, so what the agent typed survives a
-                     change of mind about the type. -->
-                <Setter Property="Visibility"
-                        Value="{Binding AppliesNow, Converter={StaticResource BoolToVisibility}}" />
-              </Style>
-            </ItemsControl.ItemContainerStyle>
-          </ItemsControl>
-        </ScrollViewer>
-
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-          <Button Content="{Binding Localizer[classification.save]}"
-                  Style="{StaticResource PrimaryButton}"
-                  MinWidth="120"
-                  Command="{Binding Classification.SaveCommand}" />
-          <Button Content="{Binding Localizer[classification.skip]}"
-                  Style="{StaticResource GhostButton}"
-                  MinWidth="100"
-                  Margin="10,0,0,0"
-                  Command="{Binding Classification.SkipCommand}" />
-        </StackPanel>
-
-        <!-- Why Save is greyed out. A dead button with no explanation is the
-             worst version of this: the agent has a customer on the line. -->
-        <TextBlock Text="{Binding Classification.Missing}"
-                   Foreground="{StaticResource Warning}"
-                   FontSize="11"
-                   Margin="0,8,0,0"
-                   TextWrapping="Wrap" />
-
-        <TextBlock Text="{Binding Classification.Message}"
+        <!-- Ringing, or connected. The state first, because the agent reads this
+             in the second before they decide. -->
+        <TextBlock Text="{Binding StatusText}"
                    Style="{StaticResource Subtle}"
+                   HorizontalAlignment="Center" />
+
+        <!-- A-16: the VIP badge, above everything else, because its whole job is
+             to change how the agent speaks before they have spoken. -->
+        <Border Background="{StaticResource Warning}"
+                CornerRadius="{StaticResource CornerSmall}"
+                Padding="12,4"
+                Margin="0,10,0,0"
+                HorizontalAlignment="Center"
+                Visibility="{Binding Caller.IsVip, Converter={StaticResource BoolToVisibility}}">
+          <TextBlock Text="{Binding Localizer[caller.vip]}"
+                     FontSize="13"
+                     FontWeight="Bold"
+                     Foreground="#1A1200" />
+        </Border>
+
+        <TextBlock Text="{Binding Caller.FlagReason}"
+                   Style="{StaticResource Subtle}"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
                    Margin="0,4,0,0"
-                   TextWrapping="Wrap" />
+                   TextWrapping="Wrap"
+                   Visibility="{Binding Caller.HasFlagReason, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- Which queue rang, above the number: it changes how the agent answers,
+             and they read it before they have said anything. -->
+        <Border Background="#1F2A37"
+                CornerRadius="{StaticResource CornerSmall}"
+                Padding="10,3"
+                Margin="0,10,0,0"
+                HorizontalAlignment="Center"
+                Visibility="{Binding HasQueue, Converter={StaticResource BoolToVisibility}}">
+          <TextBlock Text="{Binding Queue}"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource Text}" />
+        </Border>
+
+        <!-- The number, large: it is the only thing identifying the caller until
+             the contact lookup arrives (A-11, A-16). -->
+        <TextBlock Text="{Binding Number}"
+                   FontFamily="{StaticResource MonoFont}"
+                   FontSize="26"
+                   Foreground="{StaticResource Text}"
+                   HorizontalAlignment="Center"
+                   FlowDirection="LeftToRight"
+                   Margin="0,8,0,0" />
+
+        <!-- Who it is (A-10). The name is the size of a name, not a footnote:
+             it is what the agent greets them by. -->
+        <TextBlock Text="{Binding Caller.Name}"
+                   FontSize="18"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource Text}"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Visibility="{Binding Caller.HasName, Converter={StaticResource BoolToVisibility}}" />
+
+        <TextBlock Text="{Binding Caller.Address}"
+                   Style="{StaticResource Subtle}"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Margin="0,4,0,0"
+                   Visibility="{Binding Caller.HasAddress, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- A-16 asks for the notes at the top, so the agent adjusts immediately.
+             Boxed rather than another grey line: it is the one thing here that
+             somebody wrote on purpose about this customer. -->
+        <Border Background="{StaticResource SurfaceAlt}"
+                CornerRadius="{StaticResource CornerSmall}"
+                Padding="10,6"
+                Margin="0,8,0,0"
+                Visibility="{Binding Caller.HasNotes, Converter={StaticResource BoolToVisibility}}">
+          <TextBlock Text="{Binding Caller.Notes}"
+                     Foreground="{StaticResource Text}"
+                     FontSize="12"
+                     TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Totals (A-10): how many orders, complaints and cancellations this
+             customer has. Hidden entirely when all three are zero — three
+             noughts read as a verdict on the customer rather than on our
+             records. -->
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0,10,0,0"
+                    Visibility="{Binding Caller.HasTotals, Converter={StaticResource BoolToVisibility}}">
+
+          <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding Caller.Orders}" FontWeight="Bold" Foreground="{StaticResource Success}" />
+              <TextBlock Text="{Binding Localizer[caller.orders]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
+            </StackPanel>
+          </Border>
+
+          <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding Caller.Complaints}" FontWeight="Bold" Foreground="{StaticResource Danger}" />
+              <TextBlock Text="{Binding Localizer[caller.complaints]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
+            </StackPanel>
+          </Border>
+
+          <Border Style="{StaticResource Pill}">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding Caller.Cancellations}" FontWeight="Bold" Foreground="{StaticResource Warning}" />
+              <TextBlock Text="{Binding Localizer[caller.cancellations]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- Looking, nobody on file (A-11), or could not ask. Never blank: each
+             one means something different for the agent to do. -->
+        <TextBlock Text="{Binding Caller.StatusText}"
+                   Style="{StaticResource Subtle}"
+                   FontStyle="Italic"
+                   HorizontalAlignment="Center"
+                   Margin="0,8,0,0"
+                   Visibility="{Binding Caller.HasStatus, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- Whatever name the PBX sent, small, and only while the real contact is
+             unknown (A-11). -->
+        <TextBlock Text="{Binding CallerName}"
+                   Style="{StaticResource Subtle}"
+                   HorizontalAlignment="Center"
+                   Margin="0,4,0,0"
+                   Visibility="{Binding HasCallerName, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- Only while connected, and empty before then, so a ring is never
+             mistaken for a call that has been running for two minutes. -->
+        <TextBlock Text="{Binding Duration}"
+                   FontFamily="{StaticResource MonoFont}"
+                   FontSize="15"
+                   Foreground="{StaticResource TextMuted}"
+                   HorizontalAlignment="Center"
+                   Margin="0,6,0,0"
+                   Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}" />
       </StackPanel>
 
-      <!-- An outbound call the customer did not pick up (A-41). Never
-           classified - nobody spoke - but the agent knows right now what the
-           next person to ring them should know: "tried twice, call after 6".
-           The pop-up stays until this is saved or skipped. -->
-      <StackPanel Margin="0,18,0,0"
-                  Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">
+      <ScrollViewer x:Name="Body"
+                    Grid.Row="1"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <!-- A-11: a number nobody has can be saved as a customer from here. A
+               button until asked for, so the classification form below is never
+               pushed down for a caller the agent does not mean to save. -->
+          <Button Content="{Binding Localizer[caller.saveAsNew]}"
+                  Style="{StaticResource SmallButton}"
+                  HorizontalAlignment="Center"
+                  Margin="0,8,0,0"
+                  Command="{Binding Caller.OpenNewCustomerCommand}"
+                  Visibility="{Binding Caller.CanOfferNewCustomer, Converter={StaticResource BoolToVisibility}}" />
 
-        <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
+          <!-- The form. The number is the caller's, never typed. -->
+          <StackPanel Margin="0,12,0,0"
+                      Visibility="{Binding Caller.IsFormOpen, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding Localizer[contacts.name]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+            <TextBox Text="{Binding Caller.FormName, UpdateSourceTrigger=PropertyChanged}"
+                     LostFocus="OnNewCustomerNameLostFocus" />
 
-        <TextBlock Text="{Binding Localizer[call.notesHeading]}"
-                   Foreground="{StaticResource Text}"
-                   FontWeight="SemiBold"
-                   Margin="0,0,0,12" />
+            <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
+            <Border Margin="0,8,0,0"
+                    Padding="10,8"
+                    Background="#2A2412"
+                    BorderBrush="{StaticResource Warning}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CornerSmall}"
+                    Visibility="{Binding Caller.SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
+              <StackPanel>
+                <TextBlock Text="{Binding Caller.SameNameMessage}" FontSize="11" Foreground="#E8C56B" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding Caller.SameName}" Margin="0,6,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Margin="0,0,0,6">
+                        <TextBlock FontSize="11" Text="{Binding Name}" Foreground="{StaticResource Text}" />
+                        <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
+                                          RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                Style="{StaticResource SmallButton}"
+                                HorizontalAlignment="Left"
+                                Margin="0,3,0,0"
+                                Command="{Binding DataContext.Caller.AddToExistingCommand,
+                                          RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
 
-        <TextBox Text="{Binding NotesText, UpdateSourceTrigger=PropertyChanged}"
-                 AcceptsReturn="True"
-                 TextWrapping="Wrap"
-                 MinHeight="70"
-                 MaxLength="4000"
-                 VerticalScrollBarVisibility="Auto" />
+            <TextBlock Text="{Binding Localizer[contacts.address]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
+            <TextBox Text="{Binding Caller.FormAddress, UpdateSourceTrigger=PropertyChanged}" />
 
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-          <Button Content="{Binding Localizer[callLog.notesSave]}"
+            <TextBlock Text="{Binding Localizer[contacts.notes]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
+            <TextBox Text="{Binding Caller.FormNotes, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MinHeight="44" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+              <Button Content="{Binding Localizer[caller.saveCustomer]}"
+                      Style="{StaticResource PrimaryButton}"
+                      MinWidth="120"
+                      Command="{Binding Caller.SaveNewCustomerCommand}" />
+              <Button Content="{Binding Localizer[contacts.cancel]}"
+                      Style="{StaticResource GhostButton}"
+                      MinWidth="90"
+                      Margin="10,0,0,0"
+                      Command="{Binding Caller.CancelNewCustomerCommand}" />
+            </StackPanel>
+
+            <!-- Why it was not saved: offline, a number already on someone. What
+                 was typed stays, so the agent only presses Save again. -->
+            <TextBlock Text="{Binding Caller.FormMessage}"
+                       Foreground="{StaticResource Warning}"
+                       FontSize="11"
+                       Margin="0,6,0,0"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding Caller.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
+          </StackPanel>
+
+          <!-- The classification form (A-40). On screen from the moment the call is
+               answered, because the agent is writing the order down while the
+               customer talks - not remembering it afterwards. It outlives the call:
+               the pop-up stays until this is saved or skipped, so a call that ends
+               mid-sentence does not take the agent's typing with it. -->
+          <StackPanel Margin="0,18,0,0"
+                      Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
+
+            <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
+
+            <TextBlock Text="{Binding Localizer[classification.heading]}"
+                       Foreground="{StaticResource Text}"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,12" />
+
+            <ItemsControl ItemsSource="{Binding Classification.Fields}">
+              <ItemsControl.ItemContainerStyle>
+                <Style TargetType="ContentPresenter">
+                  <!-- A field only asked for certain types hides itself rather
+                       than being rebuilt, so what the agent typed survives a
+                       change of mind about the type. -->
+                  <Setter Property="Visibility"
+                          Value="{Binding AppliesNow, Converter={StaticResource BoolToVisibility}}" />
+                </Style>
+              </ItemsControl.ItemContainerStyle>
+            </ItemsControl>
+
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Content="{Binding Localizer[classification.save]}"
+                      Style="{StaticResource PrimaryButton}"
+                      MinWidth="120"
+                      Command="{Binding Classification.SaveCommand}" />
+              <Button Content="{Binding Localizer[classification.skip]}"
+                      Style="{StaticResource GhostButton}"
+                      MinWidth="100"
+                      Margin="10,0,0,0"
+                      Command="{Binding Classification.SkipCommand}" />
+            </StackPanel>
+
+            <!-- Why Save is greyed out. A dead button with no explanation is the
+                 worst version of this: the agent has a customer on the line. -->
+            <TextBlock Text="{Binding Classification.Missing}"
+                       Foreground="{StaticResource Warning}"
+                       FontSize="11"
+                       Margin="0,8,0,0"
+                       TextWrapping="Wrap" />
+
+            <TextBlock Text="{Binding Classification.Message}"
+                       Style="{StaticResource Subtle}"
+                       Margin="0,4,0,0"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+
+          <!-- An outbound call the customer did not pick up (A-41). Never
+               classified - nobody spoke - but the agent knows right now what the
+               next person to ring them should know: "tried twice, call after 6".
+               The pop-up stays until this is saved or skipped. -->
+          <StackPanel Margin="0,18,0,0"
+                      Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">
+
+            <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
+
+            <TextBlock Text="{Binding Localizer[call.notesHeading]}"
+                       Foreground="{StaticResource Text}"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,12" />
+
+            <TextBox Text="{Binding NotesText, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MinHeight="70"
+                     MaxLength="4000"
+                     VerticalScrollBarVisibility="Auto" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Content="{Binding Localizer[callLog.notesSave]}"
+                      Style="{StaticResource PrimaryButton}"
+                      MinWidth="120"
+                      Command="{Binding SaveNotesCommand}" />
+              <Button Content="{Binding Localizer[classification.skip]}"
+                      Style="{StaticResource GhostButton}"
+                      MinWidth="100"
+                      Margin="10,0,0,0"
+                      Command="{Binding SkipNotesCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="2">
+        <!-- Ringing: answer or refuse. -->
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0,22,0,0"
+                    Visibility="{Binding IsRinging, Converter={StaticResource BoolToVisibility}}">
+          <Button Content="{Binding Localizer[call.answer]}"
                   Style="{StaticResource PrimaryButton}"
                   MinWidth="120"
-                  Command="{Binding SaveNotesCommand}" />
-          <Button Content="{Binding Localizer[classification.skip]}"
+                  Command="{Binding AnswerCommand}" />
+          <Button Content="{Binding Localizer[call.reject]}"
+                  Style="{StaticResource DangerButton}"
+                  MinWidth="120"
+                  Margin="10,0,0,0"
+                  Command="{Binding RejectCommand}" />
+        </StackPanel>
+
+
+        <!-- Dialling out (A-20). No Answer and no Reject: there is nothing to
+             accept on a call the agent placed, only to give up on. -->
+        <StackPanel HorizontalAlignment="Center"
+                    Margin="0,22,0,0"
+                    Visibility="{Binding IsDialling, Converter={StaticResource BoolToVisibility}}">
+          <Button Content="{Binding Localizer[call.cancel]}"
+                  Style="{StaticResource DangerButton}"
+                  MinWidth="150"
+                  Command="{Binding HangUpCommand}" />
+        </StackPanel>
+
+        <!-- Connected: mute, hold, and one way out (A-12). Mute and Hold are
+             toggles whose label says what pressing it does next; the state
+             itself is shown in the status line at the top, where the agent
+             looks. -->
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0,22,0,0"
+                    Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+          <Button Content="{Binding MuteLabel}"
                   Style="{StaticResource GhostButton}"
                   MinWidth="100"
-                  Margin="10,0,0,0"
-                  Command="{Binding SkipNotesCommand}" />
+                  Command="{Binding ToggleMuteCommand}" />
+          <Button Content="{Binding HoldLabel}"
+                  Style="{StaticResource GhostButton}"
+                  MinWidth="100"
+                  Margin="8,0,0,0"
+                  Command="{Binding ToggleHoldCommand}" />
+          <Button Content="{Binding Localizer[call.hangUp]}"
+                  Style="{StaticResource DangerButton}"
+                  MinWidth="130"
+                  Margin="8,0,0,0"
+                  Command="{Binding HangUpCommand}" />
         </StackPanel>
       </StackPanel>
-
-      <!-- Dialling out (A-20). No Answer and no Reject: there is nothing to
-           accept on a call the agent placed, only to give up on. -->
-      <StackPanel HorizontalAlignment="Center"
-                  Margin="0,22,0,0"
-                  Visibility="{Binding IsDialling, Converter={StaticResource BoolToVisibility}}">
-        <Button Content="{Binding Localizer[call.cancel]}"
-                Style="{StaticResource DangerButton}"
-                MinWidth="150"
-                Command="{Binding HangUpCommand}" />
-      </StackPanel>
-
-      <!-- Connected: mute, hold, and one way out (A-12). Mute and Hold are
-           toggles whose label says what pressing it does next; the state
-           itself is shown in the status line at the top, where the agent
-           looks. -->
-      <StackPanel Orientation="Horizontal"
-                  HorizontalAlignment="Center"
-                  Margin="0,22,0,0"
-                  Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
-        <Button Content="{Binding MuteLabel}"
-                Style="{StaticResource GhostButton}"
-                MinWidth="100"
-                Command="{Binding ToggleMuteCommand}" />
-        <Button Content="{Binding HoldLabel}"
-                Style="{StaticResource GhostButton}"
-                MinWidth="100"
-                Margin="8,0,0,0"
-                Command="{Binding ToggleHoldCommand}" />
-        <Button Content="{Binding Localizer[call.hangUp]}"
-                Style="{StaticResource DangerButton}"
-                MinWidth="130"
-                Margin="8,0,0,0"
-                Command="{Binding HangUpCommand}" />
-      </StackPanel>
-
-    </StackPanel>
+    </Grid>
   </Border>
 </Window>

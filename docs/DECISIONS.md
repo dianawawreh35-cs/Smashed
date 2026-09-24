@@ -4631,6 +4631,32 @@ on a contact is not moved; a short number matches exactly, never on its tail.
 and the Agent App builds. **The pop-up form has no automated test**, because the
 Agent App has no test project. It is on the checklist, Round 3.
 
+---
+
+## 2026-09-24 — The call pop-up scrolls, and its buttons never scroll away
+
+Reported the same evening: the pop-up could not be scrolled. It grew with its
+content up to 760 pixels, and then simply cut off the rest. Open the new-customer
+form above the classification on an answered call, and the cut-off part included
+**Hang up**.
+
+A scroll bar on the whole window would have been the wrong fix: it could scroll
+the call's buttons out of sight mid-call. So the pop-up is three rows now:
+
+- **Top, always on screen:** the state, VIP badge, queue, number, who it is,
+  their notes and totals, and the timer.
+- **Middle, the only part that scrolls:** the new-customer form, the
+  classification, and the note on an unanswered outbound call.
+- **Bottom, always on screen:** Answer / Reject, Cancel, and Mute / Hold / Hang up.
+
+The classification's own scroll box (360 pixels) went. A scroll box inside a
+scroll box traps the mouse wheel at its ends. The window's height is also capped
+at the screen's working area, so on a small laptop it no longer runs under the
+taskbar. A new call starts scrolled to the top.
+
+Agent App builds; 143 shared tests (labels) pass. Layout is for the eye:
+checklist Round 3.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

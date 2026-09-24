@@ -24,6 +24,11 @@ public partial class CallPopupWindow : Window
     {
         InitializeComponent();
 
+        // Never taller than the screen it opens on, less the taskbar: on a
+        // small laptop the 760 in the XAML would run off the bottom, and the
+        // middle row could not scroll what it could not see.
+        MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 16);
+
         DataContext = viewModel;
 
         viewModel.CallArrived += (_, _) => BringToFront();
@@ -45,6 +50,10 @@ public partial class CallPopupWindow : Window
     private void BringToFront()
     {
         Show();
+
+        // A new caller starts at the top, not where the last one's form was
+        // scrolled to.
+        Body.ScrollToTop();
 
         if (WindowState == WindowState.Minimized)
         {

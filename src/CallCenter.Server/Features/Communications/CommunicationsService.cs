@@ -153,7 +153,28 @@ public class CommunicationsService(
             db.Communications.Add(call);
         }
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (existing is null
+            && ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation } pg
+            && pg.ConstraintName == "ux_comm_sip_call")
+        {
+            // A-14: the same call arrived twice at the same moment. Both looked,
+            // neither found it, both inserted, and the index let one through.
+            // That is the promise at the top of this class being kept by the
+            // database rather than broken: the other request's row is the call,
+            // so this one becomes the update it would have been a moment later.
+            // Answering 500 left the Agent App's queue stuck behind it, with the
+            // call's recording still on the laptop (24 September).
+            logger.LogInformation(
+                "Call {SipCallId} was reported twice at once; the second is applied as an update",
+                request.SipCallId);
+
+            db.ChangeTracker.Clear();
+            return await LogCallAsync(request, agentId, ct);
+        }
 
         logger.LogInformation(
             "Call {Status} logged for extension {Extension} ({Existing})",

@@ -370,6 +370,14 @@ audio plays, the Windows default output device.*
       matches. Drag the dot: it follows, and plays from where you let go.
 - [ ] **Let it play to the end.** The button returns to **Play**; pressing it
       starts again from the beginning.
+- [ ] **Every recorded call's recording reaches the server.** Make three
+      short answered calls in a row: hang up yourself on one and let the
+      customer hang up on another. After each, `%LOCALAPPDATA%\CallCenter\recordings`
+      should empty again within a few seconds, and the call log shows the
+      speaker on all three.
+      *If a file stays behind:* search the Agent App log for "still waiting"
+      and send me the lines around it. It should also clear by itself within a
+      minute, because the queue is now retried every minute.
 - [ ] **Holds are marked.** Take a call, talk, press **Hold** for about 20
       seconds, **Resume**, talk again, hang up. Open it in the call log: under
       the seek bar an amber mark sits where the hold was, and a line below says

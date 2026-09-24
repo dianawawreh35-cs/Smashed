@@ -90,6 +90,10 @@ public partial class App : Application
         reporter.Listen(calls);
         reporter.ListenForRecordings(calls);
 
+        // A report or recording that failed is retried without waiting for the
+        // next call (A-04, A-31).
+        reporter.RetryEvery(TimeSpan.FromMinutes(1));
+
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();

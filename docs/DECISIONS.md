@@ -4314,6 +4314,51 @@ never applied there. Nothing here was measured on the production server. When
 it is installed, run the probe against it once (`--base http://<server>:5000`),
 signed in, and write the numbers here.
 
+## 2026-09-24 — A call reported twice at once lost its recording (A-14, A-31)
+
+Reported as "the latest call has no recording; the client hung up, not me". Who
+hung up had nothing to do with it. The call was recorded (47 s, written at the
+moment of the BYE); it never left the laptop.
+
+**What happened, from both logs.** A call and its recording finish at the same
+instant, and each queued itself and started a pass over the queue. The two passes
+ran side by side:
+
+1. The first pass saw only the call, sent it, and got 200.
+2. The second saw the call and the recording, sent the same call again in the
+   same millisecond, and got **500**. On the server both requests had looked for
+   the call, neither found it, both inserted, and `ux_comm_sip_call` refused the
+   second (`23505`). The pass stops on a 500 to keep the queue in order, so the
+   recording behind the call was never tried.
+3. Nothing retried until the next call ended or somebody signed in.
+
+**Three fixes, each enough alone for this case:**
+
+* **One pass at a time** (`CallLogReporter`). A second flush waits for the first
+  and then makes its own pass, reading the queue afresh, so it finds what arrived
+  meanwhile. The extra pass for a deferred classification calls the pass
+  directly, since it already holds the lock.
+* **A retry every minute** while the app runs. A failed item used to wait for the
+  next call or sign-in, so a server restarted at lunch left the morning's last
+  recording on the laptop until somebody's phone rang.
+* **The server keeps its own promise** (`CommunicationsService.LogCallAsync`).
+  The class says reporting a call twice is harmless, and it was, one after the
+  other. At the same instant it answered 500. A unique violation on
+  `ux_comm_sip_call` now clears the context and runs again as the update it would
+  have been a moment later. It cannot loop: the second attempt finds the row the
+  other request committed.
+
+**Tested.** `CallReportedTwiceTests` fires four copies of one call at once, five
+times over, and expects every answer 200 and one row. It was run against the
+server **without** the fix first and failed, so it catches the race rather than
+passing by luck. With the fix, **320 server tests pass** against a real database.
+Shared tests 143 pass.
+
+The stuck recording from 18:27 is still on the laptop and in the queue. Its call
+did reach the server, so it uploads on the first pass of the new app, at sign-in
+or within a minute. The server fix needs a server restart to take effect; the
+app fixes alone are enough to stop this happening again.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

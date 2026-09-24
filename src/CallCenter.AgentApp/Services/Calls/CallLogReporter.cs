@@ -133,11 +133,71 @@ public class CallLogReporter(
     }
 
     /// <summary>
-    /// Sends everything waiting. Called after each call and at sign-in, so a
-    /// laptop that was offline for a shift catches up as soon as somebody logs
-    /// in on it.
+    /// One pass over the queue at a time.
+    /// </summary>
+    /// <remarks>
+    /// A call and its recording finish at the same instant, and each queued
+    /// itself and flushed. Two passes then ran side by side: the first saw only
+    /// the call and sent it; the second saw the call <i>and</i> the recording,
+    /// sent the call again in the same millisecond, was refused as a duplicate,
+    /// and stopped before the recording. The audio sat on the laptop until the
+    /// next call (24 September).
+    ///
+    /// Now a second flush waits for the first and then makes its own pass, so
+    /// it reads the queue afresh and finds what arrived meanwhile.
+    /// </remarks>
+    private readonly SemaphoreSlim _flushing = new(1, 1);
+
+    /// <summary>
+    /// Sends everything waiting. Called after each call, at sign-in and once a
+    /// minute (<see cref="RetryEvery"/>), so a laptop that was offline for a
+    /// shift catches up as soon as it can.
     /// </summary>
     public async Task FlushAsync(CancellationToken ct = default)
+    {
+        await _flushing.WaitAsync(ct);
+
+        try
+        {
+            await FlushPassAsync(ct);
+        }
+        finally
+        {
+            _flushing.Release();
+        }
+    }
+
+    /// <summary>
+    /// Retries whatever is waiting, on a timer, for as long as the app runs.
+    /// </summary>
+    /// <remarks>
+    /// Without it a failed item waited for the next call or the next sign-in.
+    /// A server that was restarted at lunch would leave the morning's last
+    /// recording on the laptop until somebody's phone rang. A pass over an
+    /// empty queue is one read of a small local file, so once a minute costs
+    /// nothing.
+    /// </remarks>
+    public void RetryEvery(TimeSpan interval) =>
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(interval);
+
+            while (await timer.WaitForNextTickAsync())
+            {
+                try
+                {
+                    await FlushAsync();
+                }
+                catch (Exception ex)
+                {
+                    // The next tick tries again; a timer that dies here would
+                    // quietly end every retry for the rest of the shift.
+                    logger.LogWarning(ex, "Retrying the queued call reports failed");
+                }
+            }
+        });
+
+    private async Task FlushPassAsync(CancellationToken ct)
     {
         if (!session.IsSignedIn)
         {
@@ -272,8 +332,10 @@ public class CallLogReporter(
         {
             try
             {
+                // The pass itself, not FlushAsync: this pass already holds the
+                // lock, and asking for it again would wait on itself forever.
                 _retrying = true;
-                await FlushAsync(ct);
+                await FlushPassAsync(ct);
             }
             finally
             {

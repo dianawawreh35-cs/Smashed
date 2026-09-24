@@ -179,7 +179,7 @@ Needs a second supervisor account; add one in Users if there is only one.
       it jumped four times a second), and it seeks when dragged.
       *If there is no sound but the bar moves:* the mu-law decoding is wrong.
       Stop and tell me.
-- [ ] **Open a call that was put on hold** (put a test call on hold for ten
+- [x] **Open a call that was put on hold** *Signed off by Dia 24 September.* (put a test call on hold for ten
       seconds first). Under the bar there is an **amber mark** where the hold
       was, "On hold: 0:12–0:22" under the player, and **"On hold"** beside the
       time while playback is inside it. The same as the Agent App's player.

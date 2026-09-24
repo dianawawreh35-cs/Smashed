@@ -38,4 +38,10 @@ public static class LoginErrorCodes
 
     /// <summary>Set by the client: the server answered with something unusable.</summary>
     public const string ServerError = "server_error";
+
+    /// <summary>
+    /// Set by the Agent App: a real account, but a supervisor's. Supervisors use
+    /// the web app, which refuses agents the same way.
+    /// </summary>
+    public const string NotAnAgent = "not_an_agent";
 }

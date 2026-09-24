@@ -154,7 +154,8 @@
       "invalid_credentials": "The username or password is not correct.",
       "account_disabled": "This account has been disabled. Ask your supervisor to re-enable it.",
       "server_unreachable": "The server could not be reached. Check the network.",
-      "server_error": "The server reported an error. Please try again."
+      "server_error": "The server reported an error. Please try again.",
+      "not_an_agent": "This is a supervisor account. Supervisors use the web app in the browser."
     }
   },
   "menu": {

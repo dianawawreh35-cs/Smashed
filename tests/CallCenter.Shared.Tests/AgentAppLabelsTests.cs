@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using CallCenter.Shared.Contracts.Auth;
 using FluentAssertions;
 using Xunit;
 
@@ -97,6 +98,28 @@ public class AgentAppLabelsTests
         CommunicationStatuses.All
             .Where(status => !english.ContainsKey($"callLog.status.{status}"))
             .Should().BeEmpty("a call with this status would show the raw key in the call log");
+    }
+
+    /// <summary>
+    /// The sign-in screen shows <c>login.errors.{code}</c>, another key built at
+    /// runtime. A code with no label would put the raw key under the password
+    /// box at the moment an agent most needs to know what went wrong.
+    /// </summary>
+    [Fact]
+    public void Every_login_error_code_has_a_sign_in_label()
+    {
+        var english = Load("en");
+
+        var codes = typeof(LoginErrorCodes)
+            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(f => f.IsLiteral)
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        codes.Should().Contain(LoginErrorCodes.NotAnAgent, "the reflection found the codes");
+
+        codes.Where(code => !english.ContainsKey($"login.errors.{code}"))
+            .Should().BeEmpty("the sign-in screen would show the raw key for this refusal");
     }
 
     private static Dictionary<string, string> Load(string language)

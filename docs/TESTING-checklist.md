@@ -130,6 +130,12 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 
 Sign in as `dia20`. None of this needs a call.
 
+- [ ] **Sign in as `supervisor` first.** It must refuse with "This is a
+      supervisor account. Supervisors use the web app in the browser", and the
+      Arabic equivalent with the interface in Arabic. If a raw key such as
+      `login.errors.not_an_agent` shows instead, the label is missing. If the
+      app signs in, it is running an old build: check the `bin` date. Then sign
+      in as `dia20` and carry on.
 - [ ] **Menu tab (A-66).** Search `سماشد`, then `ماشروم`, then a misspelling of
       one. The folding is meant to find them all.
 - [ ] **Search by what is in an item** — "mushroom" in the contents, not the

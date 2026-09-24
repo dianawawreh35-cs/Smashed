@@ -105,7 +105,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 
 | ID | Requirement | Priority |
 |---|---|---|
-| A-01 | Agent logs in with username and password issued by the supervisor. The app receives the agent's extension and SIP credentials from the server; the agent never types SIP details. | Must |
+| A-01 | Agent logs in with username and password issued by the supervisor. The app receives the agent's extension and SIP credentials from the server; the agent never types SIP details. A supervisor account is refused and pointed to the web app, just as the web app refuses agents. | Must |
 | A-02 | The app registers the agent's extension on the Issabel PBX across the VPN and shows its status (Registered / Failed) at all times; re-registers automatically after network or VPN drops. A refusal by the PBX and a PBX that cannot be reached are shown differently, because the first needs the supervisor and the second will clear itself. | Must |
 | A-03 | Audio device selection (microphone, speaker, ring device) remembered per laptop. | Must |
 | A-05 | Shared laptops: the app is installed once per laptop and supports any agent logging in. On login it registers the logged-in agent's two extensions; on logout it unregisters them. Audio device choices are per laptop; everything else (calls, classifications, queued uploads) belongs to the logged-in agent. Agents must log out at the end of their shift (automatic logout after a configurable idle time). | Must |

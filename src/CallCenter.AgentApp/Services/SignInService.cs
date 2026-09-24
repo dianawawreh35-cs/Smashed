@@ -1,5 +1,6 @@
 using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Sip;
+using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.Logging;
 
@@ -45,6 +46,17 @@ public class SignInService(
         if (!result.IsOk || result.Value is null)
         {
             return SignInResult.Failed(result.ErrorCode ?? LoginErrorCodes.ServerError);
+        }
+
+        // The API authenticates anyone; this app is for agents. A supervisor
+        // gets no extension and no session, and every call they took would be
+        // refused by the server, so they are told where to go instead. Nothing
+        // to close on the server: only agents are given a session row.
+        if (result.Value.User.Role != UserRoles.Agent)
+        {
+            logger.LogInformation("Refused {Role} {Login}: the Agent App is for agents.",
+                result.Value.User.Role, login.Trim());
+            return SignInResult.Failed(LoginErrorCodes.NotAnAgent);
         }
 
         session.SignIn(result.Value);

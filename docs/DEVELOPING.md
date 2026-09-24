@@ -100,11 +100,10 @@ console worth reading.
 | Who | Username | Notes |
 | --- | --- | --- |
 | Supervisor | `supervisor` | The web app. It refuses agent accounts. |
-| Agent | `dia20` | The Agent App. Extension 2001, PBX 192.168.0.27. |
+| Agent | `dia20` | The Agent App. Extension 2001, PBX 192.168.0.27. It refuses supervisor accounts. |
 
-The Agent App currently also accepts supervisor logins. That is deliberate and
-temporary — it is how sign-in was tested before user management existed — and it
-is on the list to close before handover.
+Each app turns away the other's accounts, so testing the Agent App needs an agent
+account. Create more in the web app's Users screen.
 
 If no account exists yet, seed one:
 

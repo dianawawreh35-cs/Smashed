@@ -292,6 +292,9 @@ cannot be faked, and the part most likely to find something.
       name at the top and **Mute / Hold / Hang up** at the bottom stay on
       screen while it does. *Reported 24 Sep:* the window was cut off, with no
       way to reach what was below.
+- [ ] **The scroll bar is thin and dark**, a rounded grey bar with no arrows
+      that lightens under the pointer, in the pop-up and in every list (call
+      log, contacts, menu). In Arabic the pop-up's bar is on the left.
 - [ ] **Open the form, hang up, keep typing.** The pop-up stays until Save or
       Cancel. **Stop the server and Save:** it says the server could not be
       reached and keeps what was typed; start the server and Save again.

@@ -187,7 +187,8 @@ describe('calls page', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'Open' }))
 
     const details = await screen.findByRole('region', { name: 'Call details' })
-    expect(within(details).getByText('smashed-002')).toBeInTheDocument()
+    // Drawn at once from the row; the queue arrives a moment later, in its place.
+    expect(await within(details).findByText('smashed-002')).toBeInTheDocument()
 
     // The hold the recorder wrote, as times and as a mark under the bar.
     expect(await within(details).findByText('0:01–0:02')).toBeInTheDocument()

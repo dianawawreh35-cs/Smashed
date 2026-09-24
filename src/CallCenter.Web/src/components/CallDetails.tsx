@@ -1,7 +1,8 @@
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { callClassification, callDetails, classificationHistory } from '../api/calls'
-import type { CallClassification, ClassificationChange } from '../api/calls'
+import type { CallClassification, CallRow, ClassificationChange } from '../api/calls'
 import { getClassificationForm } from '../api/classifications'
 import type { FormField } from '../api/classifications'
 import { formatClock } from '../lib/recordingWav'
@@ -13,13 +14,29 @@ import RecordingPlayer from './RecordingPlayer'
  *
  * Reading only. Editing a classification from here (S-04's second half) needs
  * the classification form in the browser, which does not exist yet.
+ *
+ * **It opens whole, at once, and then fills in without moving.** It first
+ * showed "Loading…", then the facts, then the classification, then the
+ * player, each one pushing the panel taller, and the classification waited for
+ * the facts before it was even asked for. Reported as glitchy on 24 Sep. Now
+ * the list row it was opened from supplies everything it already knows, so
+ * the panel draws at once; the rest is fetched in parallel; and what is still
+ * coming holds its space.
  */
-export default function CallDetails({ id, onClose }: { id: string; onClose: () => void }) {
+export default function CallDetails({ row, onClose }: { row: CallRow; onClose: () => void }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
+  const id = row.id
+  const panel = useRef<HTMLElement>(null)
+
+  // Opened near the bottom of the window, it slides into view rather than
+  // opening off-screen. Nearest, so a panel already visible does not move.
+  useEffect(() => {
+    panel.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }, [])
 
   const details = useQuery({ queryKey: ['calls', 'details', id], queryFn: () => callDetails(id) })
-  const classified = details.data?.summary.isClassified ?? false
+  const classified = row.isClassified
 
   const classification = useQuery({
     queryKey: ['calls', 'classification', id],
@@ -35,14 +52,16 @@ export default function CallDetails({ id, onClose }: { id: string; onClose: () =
   // since removed shows under its key rather than not at all.
   const form = useQuery({ queryKey: ['classification', 'form'], queryFn: getClassificationForm, enabled: classified })
 
-  if (details.isLoading) return <div className="card card-body text-slate-400">{t('app.loading')}</div>
-  if (!details.data) return <div className="card card-body notice-error">{t('calls.details.failed')}</div>
-
-  const { summary, callNotes } = details.data
-  const when = (at: string | null) => (at ? new Date(at).toLocaleString(i18n.language) : '')
+  const summary = row
+  // What the row does not carry, as a placeholder of the same size until it arrives.
+  const pending = details.isLoading ? '…' : null
+  const extra = details.data
+  // The row's notes are the call's own note whenever the call is not classified.
+  const callNotes = extra ? extra.callNotes : classified ? null : row.notes
+  const when = (at: string | null | undefined) => (at ? new Date(at).toLocaleString(i18n.language) : '')
 
   return (
-    <section className="card" aria-label={t('calls.details.heading')}>
+    <section ref={panel} className="card animate-fade-in" aria-label={t('calls.details.heading')}>
       <div className="card-header">
         <div>
           <h2 className="font-semibold text-slate-100">
@@ -58,17 +77,18 @@ export default function CallDetails({ id, onClose }: { id: string; onClose: () =
       </div>
 
       <div className="card-body space-y-6">
+        {details.isError && <p className="notice-error">{t('calls.details.failed')}</p>}
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
           <Fact label={t('calls.columns.agent')} value={summary.agentDisplayName} />
-          <Fact label={t('calls.details.extension')} value={details.data.extension} ltr />
+          <Fact label={t('calls.details.extension')} value={pending ?? extra?.extension} ltr />
           <Fact label={t('calls.columns.direction')} value={t(`calls.directions.${summary.direction}`)} />
           <Fact
             label={t('calls.columns.status')}
             value={t(`history.statuses.${summary.status}`, { defaultValue: summary.status })}
           />
-          <Fact label={t('calls.details.queue')} value={details.data.queueName} />
-          <Fact label={t('calls.details.answeredAt')} value={when(details.data.answeredAt)} />
-          <Fact label={t('calls.details.endedAt')} value={when(details.data.endedAt)} />
+          <Fact label={t('calls.details.queue')} value={pending ?? extra?.queueName} />
+          <Fact label={t('calls.details.answeredAt')} value={pending ?? when(extra?.answeredAt)} />
+          <Fact label={t('calls.details.endedAt')} value={pending ?? when(extra?.endedAt)} />
           <Fact
             label={t('calls.columns.duration')}
             value={summary.durationSec === null ? null : formatClock(summary.durationSec)}
@@ -93,12 +113,15 @@ export default function CallDetails({ id, onClose }: { id: string; onClose: () =
         )}
 
         {classified ? (
-          classification.data && (
+          classification.data ? (
             <Classification
               value={classification.data}
               fields={form.data?.definition.fields ?? []}
               arabic={arabic}
             />
+          ) : (
+            // Its space, held while it comes, so the panel does not jump.
+            <div className="h-28 animate-pulse rounded-md bg-ink-800/60" aria-hidden="true" />
           )
         ) : (
           summary.status === 'Answered' && <p className="badge-muted">{t('history.unclassified')}</p>

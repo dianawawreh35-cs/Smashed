@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -33,12 +33,19 @@ const looksLikeNumber = (query: string) => /^[\d\s+()-]{3,}$/.test(query.trim())
  * S-45 asks for is this same list with the VIP or Blocked filter applied —
  * filtering and searching compose, and there is one contact list in the app
  * rather than two that can disagree.
+ *
+ * **A contact opens under its own row**, to edit or to flag, as the menu,
+ * delivery, users and calls lists do (21 Sep). Both used to open above the
+ * table, and editing waited for the full contact before anything appeared, so
+ * double-clicking a row near the bottom made the page jump to the top a moment
+ * later. Reported as glitchy on 24 Sep. Only a new contact, and flagging a
+ * number nobody has, open above the list: there is no row for them to sit under.
  */
 export default function ContactsPage() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<ContactFilter>('all')
-  const [editing, setEditing] = useState<Contact | 'new' | null>(null)
+  const [adding, setAdding] = useState(false)
   const [flagging, setFlagging] = useState<FlagTarget | null>(null)
 
   const { data: results, isLoading } = useQuery({
@@ -55,7 +62,7 @@ export default function ContactsPage() {
           <h2 className="page-title">{t('contacts.heading')}</h2>
           <p className="page-subtitle">{t('contacts.intro')}</p>
         </div>
-        <button type="button" onClick={() => setEditing('new')} className="btn-primary">
+        <button type="button" onClick={() => setAdding(true)} className="btn-primary">
           {t('contacts.add')}
         </button>
       </div>
@@ -87,19 +94,15 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {editing && (
-        <ContactForm
-          contact={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      {adding && <ContactForm contact={null} onClose={() => setAdding(false)} />}
 
+      {/* Only a bare number, offered from the empty result below: it has no row. */}
       {flagging && <FlagDialog target={flagging} onClose={() => setFlagging(null)} />}
 
       {isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : results && results.length > 0 ? (
-        <ContactTable contacts={results} onEdit={setEditing} onFlag={setFlagging} />
+        <ContactTable contacts={results} />
       ) : (
         /* An empty list and a failed search must not look the same. */
         <div className="card card-body flex flex-col items-center gap-3 text-center">
@@ -125,23 +128,16 @@ export default function ContactsPage() {
   )
 }
 
-function ContactTable({
-  contacts,
-  onEdit,
-  onFlag,
-}: {
-  contacts: ContactSummary[]
-  onEdit: (contact: Contact) => void
-  onFlag: (target: FlagTarget) => void
-}) {
-  const { t } = useTranslation()
+/** What is open under a row: its editor, or its flag dialog. */
+type Opened = { id: string; mode: 'edit' | 'flag' } | null
 
-  // The row is a summary; editing needs the full contact, including every
-  // number and the notes the list does not show.
-  const open = useMutation({
-    mutationFn: getContact,
-    onSuccess: onEdit,
-  })
+function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
+  const { t } = useTranslation()
+  const [opened, setOpened] = useState<Opened>(null)
+
+  const toggle = (id: string, mode: 'edit' | 'flag') =>
+    setOpened((current) => (current?.id === id && current.mode === mode ? null : { id, mode }))
+  const close = () => setOpened(null)
 
   return (
     <div className="card overflow-x-auto">
@@ -155,14 +151,16 @@ function ContactTable({
           </tr>
         </thead>
         <tbody>
-          {contacts.map((contact) => (
-            /* Double-click the row to open it, as well as the Edit button. The
-               button stays: it is what makes the action discoverable, and a
-               double-click is unreachable from the keyboard. */
+          {contacts.map((contact) => {
+            const open = opened?.id === contact.id ? opened.mode : null
+            return (
+            <Fragment key={contact.id}>
+            {/* Double-click the row to open it, as well as the Edit button. The
+                button stays: it is what makes the action discoverable, and a
+                double-click is unreachable from the keyboard. */}
             <tr
-              key={contact.id}
-              onDoubleClick={() => open.mutate(contact.id)}
-              className="cursor-pointer"
+              onDoubleClick={() => toggle(contact.id, 'edit')}
+              className={`cursor-pointer ${open ? 'bg-ink-800/40' : ''}`}
             >
               <td className="font-medium text-slate-100">
                 {contact.name ?? <span className="text-slate-500">{t('contacts.noName')}</span>}
@@ -180,28 +178,87 @@ function ContactTable({
               </td>
               <td className="tabular text-slate-400">{contact.phones.join(' · ')}</td>
               <td className="text-slate-400">{contact.address}</td>
-              <td className="text-end whitespace-nowrap">
+              {/* The double-click stops here: a quick double press of Edit
+                  would otherwise open the contact and shut it again. */}
+              <td className="text-end whitespace-nowrap" onDoubleClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
-                  onClick={() => open.mutate(contact.id)}
+                  onClick={() => toggle(contact.id, 'edit')}
+                  aria-expanded={open === 'edit'}
                   className="btn-ghost btn-sm"
                 >
                   {t('contacts.edit')}
                 </button>
                 <button
                   type="button"
-                  onClick={() => onFlag({ kind: 'contact', ...contact })}
+                  onClick={() => toggle(contact.id, 'flag')}
+                  aria-expanded={open === 'flag'}
                   className="btn-ghost btn-sm"
                 >
                   {t('contacts.flag')}
                 </button>
               </td>
             </tr>
-          ))}
+
+            {/* Where the supervisor is already looking, not at the top of a list
+                they have scrolled past. */}
+            {open && (
+              <tr>
+                <td colSpan={4} className="bg-ink-950/60 p-3">
+                  {/* w-0 min-w-full: as wide as the table and never wider, so
+                      opening a row cannot make every column jump. */}
+                  <div className="w-0 min-w-full">
+                    <InPlace>
+                      {open === 'edit' ? (
+                        <OpenContact id={contact.id} onClose={close} />
+                      ) : (
+                        <FlagDialog target={{ kind: 'contact', ...contact }} onClose={close} />
+                      )}
+                    </InPlace>
+                  </div>
+                </td>
+              </tr>
+            )}
+            </Fragment>
+            )
+          })}
         </tbody>
       </table>
     </div>
   )
+}
+
+/**
+ * Fades in and, opened near the bottom of the window, slides itself into view.
+ * "Nearest", so a panel already on screen does not move at all.
+ */
+function InPlace({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    box.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }, [])
+  return (
+    <div ref={box} className="animate-fade-in">
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The editor for one contact. The row is a summary, and editing needs the full
+ * contact, every number and the notes. So the panel opens at once, holding the
+ * form's space, and the form takes its place when the contact arrives. It used
+ * to wait unseen and then appear all at once.
+ */
+function OpenContact({ id, onClose }: { id: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const contact = useQuery({ queryKey: ['contacts', 'one', id], queryFn: () => getContact(id) })
+
+  if (contact.isError) return <p className="notice-error">{t('contacts.errors.server_error')}</p>
+  if (!contact.data) {
+    return <div className="card h-72 animate-pulse bg-ink-800/60" aria-label={t('app.loading')} />
+  }
+  return <ContactForm contact={contact.data} onClose={onClose} />
 }
 
 function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: () => void }) {

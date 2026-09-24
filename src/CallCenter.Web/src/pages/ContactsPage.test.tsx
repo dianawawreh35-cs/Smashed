@@ -205,6 +205,41 @@ describe('contacts page', () => {
     )
   })
 
+  it('opens a contact under its own row on double-click, not above the table', async () => {
+    // Reported 24 Sep: the editor opened above the list, a moment after the
+    // double-click, so the page jumped to the top.
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/contacts/c1'
+        ? jsonResponse({
+            ...AHMAD, notes: 'Rings at lunch', deliveryNotes: null,
+            phones: [{ id: 'p1', raw: '0599123456', normalised: '970599123456', isPrimary: true }],
+            createdByDisplayName: null, createdAt: '', updatedAt: '',
+          })
+        : jsonResponse(url.startsWith('/api/contacts?') || url === '/api/contacts' ? [AHMAD] : []),
+    ))
+
+    renderPage()
+    const row = (await screen.findByText('Ahmad')).closest('tr')!
+    fireEvent.doubleClick(row)
+
+    // The row straight after it holds the editor, filled in once the full
+    // contact arrives.
+    const editor = await screen.findByRole('heading', { name: 'Edit contact' })
+    expect(row.nextElementSibling).toContainElement(editor)
+    expect(await screen.findByDisplayValue('Rings at lunch')).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('opens the flag dialog under its row too', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([AHMAD])))
+
+    renderPage()
+    const row = (await screen.findByText('Ahmad')).closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: 'Flag…' }))
+
+    expect(row.nextElementSibling).toContainElement(await screen.findByText('Flag Ahmad'))
+  })
+
   it('opens the flag dialog from the row and asks for a reason', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([AHMAD])))
 

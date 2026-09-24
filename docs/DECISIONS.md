@@ -4477,6 +4477,40 @@ refused both, the owning agent and a supervisor read both, and a call that does
 not exist is unchanged. With the two checks removed, exactly the refusal test
 fails. All 338 server tests pass against the database.
 
+---
+
+## 2026-09-24 — Opening a row is smooth: calls and contacts
+
+Reported on the call search: opening a call "feels glitchy". It had three
+causes, and the contacts list had the same ones.
+
+1. **The table's columns jumped.** The opened panel sits in a cell spanning the
+   table. Its content was wider than the columns, so the browser widened the
+   table, and every column moved the moment it opened. The panel is now wrapped
+   in `w-0 min-w-full`: as wide as the table and never wider.
+2. **It filled in by steps, each one taller.** "Loading…", then the facts, then
+   the classification, then "Loading the recording…", then the player. And the
+   classification wasn't even requested until the facts had arrived. Now the
+   list row it was opened from supplies what it already knows (who, when, the
+   result, whether it is classified or recorded), so the panel draws whole at
+   once. The rest is fetched in parallel, and what is still coming holds its
+   space: a grey block the classification replaces, and a loading line the
+   height of the player.
+3. **It just appeared.** It now fades in (`animate-fade-in`, the same 120 ms
+   the notices use). Opened near the bottom of the window, it scrolls itself
+   into view, to the nearest edge, so a panel already on screen does not move.
+
+**Contacts** also opened its editor, and the flag dialog, **above** the table,
+and the editor waited unseen for the full contact before appearing. Now both
+open under the row, as the menu, delivery, users and calls lists do, with the
+same three fixes. A new contact, and flagging a number nobody has, still open
+above the list, as there is no row for them.
+
+Tests: the calls tests now wait for what fills in after the panel draws; two new
+contacts tests check the editor and the flag dialog sit in the next row. 65 web
+tests, the build and lint pass. **How it feels can only be judged by eye:
+checklist 1.3 and 1.7.**
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

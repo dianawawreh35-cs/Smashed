@@ -235,7 +235,12 @@ export default function CallsPage() {
                   {row.id === openId && (
                     <tr>
                       <td colSpan={COLUMNS} className="bg-ink-950/60 p-3">
-                        <CallDetails id={row.id} onClose={() => setOpenId(null)} />
+                        {/* w-0 min-w-full: as wide as the table, and never
+                            wider. Without it the panel's content widened the
+                            table as it opened, and every column jumped. */}
+                        <div className="w-0 min-w-full">
+                          <CallDetails row={row} onClose={() => setOpenId(null)} />
+                        </div>
                       </td>
                     </tr>
                   )}

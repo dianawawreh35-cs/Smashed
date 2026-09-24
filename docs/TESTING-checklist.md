@@ -91,7 +91,11 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 
 ### 1.3 Contacts, flags and blocking (S-45)
 
-- [ ] Double-click a contact row — its details open.
+- [ ] **Double-click a contact near the bottom of the list.** Its editor opens
+      **in a row right under it**, at once (a grey placeholder for a moment,
+      then the form), with no jump to the top and no column changing width.
+      **Edit** does the same; **Flag…** opens its dialog under the row too.
+      *Reported 24 Sep:* both opened above the table, a moment late.
 - [ ] Mark a contact VIP; the badge appears.
 - [ ] Block a contact, giving a reason. Unblock it again.
       *You have already confirmed unblocking works end to end.*
@@ -156,6 +160,11 @@ Needs a second supervisor account; add one in Users if there is only one.
       right under it**, with no jump to the top. Its **Open** button does the
       same, and turns into **Close**. *Reported 24 Sep:* it first opened above
       the table and scrolled up to it.
+- [ ] **Opening a call is smooth.** The panel fades in whole, the table's
+      columns do not change width, and nothing inside it jumps as it fills
+      in: the classification's grey block becomes the classification in
+      place, and "Loading the recording…" becomes the player at the same
+      height. *Reported 24 Sep as glitchy.*
 - [ ] **Open a recorded call.** The details show the agent, extension, queue,
       times, and (if classified) type, branch, order value, notes, answers and
       who changed it when. **Play** the recording: the customer and the agent

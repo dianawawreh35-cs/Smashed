@@ -93,7 +93,10 @@ function Player({ communicationId }: { communicationId: string }) {
     return () => cancelAnimationFrame(frame)
   }, [playing])
 
-  if (state.kind === 'loading') return <p className="field-hint">{t('calls.recording.loading')}</p>
+  // The player's own height, so it takes the place of this line without a jump.
+  if (state.kind === 'loading') {
+    return <p className="field-hint flex min-h-[2.5rem] items-center">{t('calls.recording.loading')}</p>
+  }
   if (state.kind === 'unreadable') return <p className="notice-error">{t('calls.recording.unreadable')}</p>
   if (state.kind === 'failed') return <p className="notice-error">{t('calls.recording.failed')}</p>
 

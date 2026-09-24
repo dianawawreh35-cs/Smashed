@@ -171,3 +171,13 @@ public record FinishedCall(
 /// being linked to each other.
 /// </remarks>
 public record CallRecording(string SipCallId, RecordedCall File);
+
+/// <summary>
+/// A recording waiting in the queue: which call it belongs to, and where the
+/// file is on this laptop (A-31).
+/// </summary>
+/// <remarks>
+/// The path rather than the audio. The file is already on disk; copying
+/// megabytes into the queue's database would achieve nothing except filling it.
+/// </remarks>
+public record PendingRecording(string SipCallId, string Extension, string LocalPath);

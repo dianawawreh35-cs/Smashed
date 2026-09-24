@@ -27,6 +27,7 @@ public class CommunicationsService(
     CallCenterDbContext db,
     Settings.SettingsService settings,
     CallEditWindow editWindow,
+    RecordingStore recordings,
     ILogger<CommunicationsService> logger)
 {
     /// <summary>
@@ -321,6 +322,90 @@ public class CommunicationsService(
             .ToListAsync(ct);
 
         return await ToDtosAsync(rows, ct);
+    }
+
+    /// <summary>
+    /// Stores a recording against the call it belongs to (A-31).
+    /// </summary>
+    /// <remarks>
+    /// The call is found by the phone system's own reference plus the
+    /// extension — the same pair a classification uses, and the same pair the
+    /// Agent App has in hand. Recording and classification therefore hang off
+    /// the call rather than off each other.
+    ///
+    /// <b>A call the server has not been told about yet is not an error.</b> The
+    /// Agent App reports the call and uploads the recording as two separate
+    /// items in one queue; if the upload somehow runs first, the answer is
+    /// "not yet" and the app tries again. Any other outcome would either lose
+    /// the recording or attach it to the wrong call.
+    ///
+    /// Re-uploading the same call replaces what is there. The offline queue
+    /// resends, and a second row for one call would break the unique
+    /// constraint and, worse, leave two files where one is silently orphaned.
+    /// </remarks>
+    public async Task<(Guid? Id, Failure? Failure)> SaveRecordingAsync(
+        string sipCallId,
+        string extension,
+        Guid actingUserId,
+        Stream audio,
+        CancellationToken ct = default)
+    {
+        var call = await db.Communications
+            .Where(c => c.SipCallId == sipCallId && c.Extension == extension)
+            .OrderByDescending(c => c.StartedAt)
+            .Select(c => new { c.Id, c.AgentId, c.StartedAt })
+            .FirstOrDefaultAsync(ct);
+
+        if (call is null)
+        {
+            logger.LogInformation(
+                "A recording arrived for call {SipCallId} on {Extension}, which is not logged yet",
+                sipCallId, extension);
+
+            // NotFound maps to "call_not_found", which is what the Agent
+            // App's queue defers on rather than discarding.
+            return (null, Failure.NotFound);
+        }
+
+        // An agent may only file a recording against their own call. The token
+        // decides, never the request.
+        if (call.AgentId != actingUserId)
+        {
+            logger.LogWarning(
+                "An agent tried to attach a recording to call {CallId}, which is not theirs", call.Id);
+
+            return (null, Failure.NotYours);
+        }
+
+        var (path, size) = await recordings.SaveAsync(call.Id, call.StartedAt, audio, ct);
+
+        var existing = await db.Recordings.FirstOrDefaultAsync(r => r.CommunicationId == call.Id, ct);
+
+        if (existing is null)
+        {
+            db.Recordings.Add(new Recording
+            {
+                CommunicationId = call.Id,
+                Path = path,
+                SizeBytes = size,
+                Format = "wav",
+                UploadedAt = DateTimeOffset.UtcNow,
+            });
+        }
+        else
+        {
+            existing.Path = path;
+            existing.SizeBytes = size;
+            existing.UploadedAt = DateTimeOffset.UtcNow;
+
+            // A recording that was deleted by retention and then re-uploaded is
+            // present again, so the marker has to go or it would read as gone.
+            existing.DeletedAt = null;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        return (call.Id, null);
     }
 
     /// <summary>

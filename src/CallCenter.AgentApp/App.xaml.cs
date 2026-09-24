@@ -82,9 +82,13 @@ public partial class App : Application
         // queue file (A-04).
         await _host.Services.GetRequiredService<CallLogQueue>().InitialiseAsync();
 
-        // Every finished call reaches the server, or the buffer (A-14).
-        _host.Services.GetRequiredService<CallLogReporter>()
-            .Listen(_host.Services.GetRequiredService<CallService>());
+        // Every finished call reaches the server, or the buffer (A-14), and
+        // every recording follows its call there (A-31).
+        var reporter = _host.Services.GetRequiredService<CallLogReporter>();
+        var calls = _host.Services.GetRequiredService<CallService>();
+
+        reporter.Listen(calls);
+        reporter.ListenForRecordings(calls);
 
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;

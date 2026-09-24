@@ -83,4 +83,22 @@ public static class PendingUploadKinds
     /// server has it.
     /// </remarks>
     public const string Notes = "Notes";
+
+    /// <summary>
+    /// The audio of a finished call (A-31).
+    /// </summary>
+    /// <remarks>
+    /// The payload is the file's path on this laptop, not the audio itself. A
+    /// recording is megabytes and the queue is a small SQLite file holding
+    /// JSON; putting the bytes in it would bloat the buffer, and the file is
+    /// already safely on disk where a crash cannot lose it.
+    ///
+    /// Queued behind its call for the same reason as a classification: a
+    /// recording can only be attached to a call the server already knows about.
+    ///
+    /// <b>The local file is deleted only when the server confirms</b> (A-31).
+    /// Until then it stays, so a failed upload can be retried and nothing is
+    /// lost by the laptop being closed.
+    /// </remarks>
+    public const string Recording = "Recording";
 }

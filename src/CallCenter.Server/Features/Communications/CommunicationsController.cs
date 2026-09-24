@@ -104,6 +104,48 @@ public class CommunicationsController(CommunicationsService communications) : Co
     }
 
     /// <summary>
+    /// Uploads the audio of a call the agent has just finished (A-31).
+    /// </summary>
+    /// <remarks>
+    /// Multipart rather than JSON: the audio is megabytes, and base64 inside a
+    /// JSON body would inflate it by a third and hold the whole thing in memory
+    /// at both ends. The file streams to disk instead.
+    ///
+    /// The call is named by the phone system's reference and the extension —
+    /// what the Agent App has in hand — rather than by an id it has never seen.
+    ///
+    /// <b>404 means "not yet", not "never".</b> The call and its recording
+    /// travel as two items in one queue, and if the recording somehow arrives
+    /// first the app is expected to hold it and try again.
+    /// </remarks>
+    [HttpPost("recordings")]
+    [Authorize(AuthPolicies.AgentOnly)]
+    [RequestSizeLimit(RecordingStore.MaxBytes)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadRecording(
+        [FromForm] string sipCallId,
+        [FromForm] string extension,
+        IFormFile? audio,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(sipCallId)
+            || string.IsNullOrWhiteSpace(extension)
+            || audio is null || audio.Length == 0)
+        {
+            return Problem(CommunicationsService.Failure.UnknownValue);
+        }
+
+        await using var stream = audio.OpenReadStream();
+
+        var (_, failure) = await communications.SaveRecordingAsync(
+            sipCallId, extension, User.GetRequiredUserId(), stream, ct);
+
+        return failure is not null ? Problem(failure.Value) : NoContent();
+    }
+
+    /// <summary>
     /// One contact's history of calls, newest first — the panel in A-62.
     /// </summary>
     /// <remarks>

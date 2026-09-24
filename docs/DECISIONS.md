@@ -3383,6 +3383,76 @@ call, named by the same SIP Call-ID the classification already uses. That pair
 has worked since classification shipped, so the recording rides a road that is
 already proven.
 
+## 2026-09-24 — Call recording, part 2: the file reaches the call (A-31)
+
+Capture worked; the audio then sat on the laptop. It now goes to the server and
+attaches itself to the call it belongs to.
+
+**The path, not the audio, goes in the queue.** A recording is megabytes and the
+offline buffer is a small SQLite file of JSON. The file is already safely on
+disk where a crash cannot lose it, so the queue carries only where it is.
+
+**Queued behind its call, for the same reason a classification is.** The call
+and the recording are finished at the same instant, so at that moment the server
+may not know the call exists. The shared queue is what orders them, and the
+server's answer to a recording for an unreported call is **404 `call_not_found`
+- the exact code the queue already defers on**, rather than a refusal it would
+discard. Reusing that pairing mattered more than any new code here: get it wrong
+and the audio is thrown away on the one path that is hardest to reproduce.
+
+**The laptop's copy is deleted only once the server confirms** (A-31). One
+subtlety: an upload that succeeded but whose confirmation was lost answers
+`recording_missing` on the retry, and that is treated as done rather than
+retried forever.
+
+**Multipart, streamed at both ends.** JSON with base64 would inflate the audio
+by a third and hold the whole thing in memory on a laptop that may already be
+taking the next call.
+
+### On the server
+
+`RecordingStore` writes the bytes to disk and the row to the database, laid out
+as `yyyy/MM/dd/<communication-id>.wav` exactly as SCHEMA.md said. The folder,
+the mount and the nightly backup have existed for days with nothing reading
+them; they do now.
+
+Three decisions inside it:
+
+* **Written to `.part` and moved into place.** A request that dies halfway
+  cannot leave a truncated file that looks like a recording. A supervisor
+  playing silence and concluding a call was not recorded is worse than an
+  honest absence.
+* **Re-uploading replaces.** The offline queue resends; a second row would
+  break the unique constraint and a second file would leave one orphaned.
+* **A path check that cannot currently fail.** Every path is built there, never
+  taken from a request. The check costs nothing and stops a later change that
+  does accept one from quietly becoming a way to read any file on the server.
+
+An agent may only attach a recording to **their own** call. The token decides,
+never the request.
+
+### Tested properly, because the interesting cases are the unhappy ones
+
+Five tests against a real PostgreSQL: the recording is stored and attached; a
+recording for an unknown call is deferred with the right code; another agent's
+call is refused; uploading twice replaces rather than duplicates; a request with
+no audio is refused before anything is written.
+
+They use the `DatabaseFact` attribute the parallel session added - **skipped,
+never silently passed**, when no database is present. Confirmed both ways: with
+a database 248 server tests pass, without one 241 pass and 7 skip.
+
+A manual test was attempted first and abandoned: it needed the agent's password,
+which nobody should be typing into a shell. The tests are better anyway - they
+run forever, and in CI they run against a real database on every push.
+
+### Still to come
+
+The retention job (A-33), the endpoint that serves a recording to a supervisor
+(S-04), and the call search (S-02, S-03) that gives it somewhere to be played
+from. **Nothing yet reads a recording back**, so the audio is arriving somewhere
+nobody can hear it - which is precisely why the call search is next.
+
 ---
 
 # How this project is tracked

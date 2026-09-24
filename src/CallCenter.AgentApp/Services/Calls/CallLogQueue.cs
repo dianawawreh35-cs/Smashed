@@ -202,6 +202,14 @@ public class CallLogQueue(IDbContextFactory<AgentBufferDbContext> buffer, ILogge
                             items.Add(new PendingItem(row.Id, null, null, notes));
                         }
                     }
+                    else if (row.Kind == PendingUploadKinds.Recording)
+                    {
+                        if (JsonSerializer.Deserialize<PendingRecording>(row.Payload)
+                            is { } recording)
+                        {
+                            items.Add(new PendingItem(row.Id, null, null, null, recording));
+                        }
+                    }
                 }
                 catch (JsonException)
                 {
@@ -223,7 +231,55 @@ public class CallLogQueue(IDbContextFactory<AgentBufferDbContext> buffer, ILogge
         long Id,
         LogCallRequest? Call,
         SaveClassificationByCallRequest? Classification,
-        SaveCallNotesByCallRequest? Notes = null);
+        SaveCallNotesByCallRequest? Notes = null,
+        PendingRecording? Recording = null);
+
+    /// <summary>
+    /// Adds a finished recording to the queue (A-31).
+    /// </summary>
+    /// <remarks>
+    /// The path, not the audio. Re-recording the same call replaces the entry
+    /// rather than adding a second, which matters when the offline queue has
+    /// been sitting for a while.
+    /// </remarks>
+    public async Task EnqueueAsync(PendingRecording recording, CancellationToken ct = default)
+    {
+        var reference = $"{recording.SipCallId}|{recording.Extension}";
+
+        try
+        {
+            await using var db = await buffer.CreateDbContextAsync(ct);
+
+            var existing = await db.PendingUploads
+                .Where(u => u.Kind == PendingUploadKinds.Recording && u.Reference == reference)
+                .FirstOrDefaultAsync(ct);
+
+            if (existing is not null)
+            {
+                existing.Payload = JsonSerializer.Serialize(recording);
+                existing.Attempts = 0;
+                existing.LastError = null;
+            }
+            else
+            {
+                db.PendingUploads.Add(new PendingUpload
+                {
+                    Kind = PendingUploadKinds.Recording,
+                    Payload = JsonSerializer.Serialize(recording),
+                    Reference = reference,
+                    CreatedAt = DateTimeOffset.Now,
+                });
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // A queue that cannot be written must not take the app down; the
+            // file is still on disk and the next call's flush will find it.
+            logger.LogError(ex, "A recording could not be queued for upload");
+        }
+    }
 
     /// <summary>Adds a call to the queue. Called before the send is attempted.</summary>
     public async Task EnqueueAsync(LogCallRequest call, CancellationToken ct = default)

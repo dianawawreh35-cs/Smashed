@@ -1,3 +1,4 @@
+using System.IO;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Classifications;
 using CallCenter.Shared.Contracts.Communications;
@@ -53,6 +54,39 @@ public class CallLogReporter(
             // before anything is awaited, so nothing is lost if the app closes.
             _ = ReportAsync(Describe(call, extension));
         };
+
+    /// <summary>
+    /// Subscribes to a call service's finished recordings, so each one is
+    /// uploaded and attached to its call (A-31).
+    /// </summary>
+    /// <remarks>
+    /// Queued rather than sent, always. The recording is finished at the same
+    /// moment the call is reported, so at that instant the server may not yet
+    /// know the call exists; the shared queue is what puts it behind its call.
+    /// </remarks>
+    public void ListenForRecordings(CallService calls) =>
+        calls.RecordingReady += (_, recording) =>
+        {
+            var extension = session.Extensions?.Extension;
+
+            if (extension is null)
+            {
+                logger.LogWarning("A recording finished with no extension configured; it cannot be uploaded");
+                return;
+            }
+
+            // Fire and forget, as with a finished call: this runs on a SIP
+            // thread as the call tears down.
+            _ = QueueRecordingAsync(
+                new PendingRecording(recording.SipCallId, extension, recording.File.Path));
+        };
+
+    /// <summary>Queues a recording and tries to send it. Never throws.</summary>
+    public async Task QueueRecordingAsync(PendingRecording recording, CancellationToken ct = default)
+    {
+        await queue.EnqueueAsync(recording, ct);
+        await FlushAsync(ct);
+    }
 
     /// <summary>
     /// Records a finished call. Never throws: a reporting problem must not reach
@@ -127,8 +161,8 @@ public class CallLogReporter(
 
         foreach (var item in pending)
         {
-            var (id, call, classification, notes) =
-                (item.Id, item.Call, item.Classification, item.Notes);
+            var (id, call, classification, notes, recording) =
+                (item.Id, item.Call, item.Classification, item.Notes, item.Recording);
 
             // One loop over every kind, in one sequence.
             bool ok;
@@ -144,10 +178,26 @@ public class CallLogReporter(
                 var sent = await api.ClassifyByCallAsync(classification, ct);
                 (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
             }
+            else if (notes is not null)
+            {
+                var sent = await api.SaveCallNotesByCallAsync(notes, ct);
+                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
+            }
             else
             {
-                var sent = await api.SaveCallNotesByCallAsync(notes!, ct);
+                var sent = await api.UploadRecordingAsync(
+                    recording!.SipCallId, recording.Extension, recording.LocalPath, ct);
+
                 (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
+
+                // A-31: the laptop's copy goes only once the server has it. A
+                // file whose upload succeeded but whose confirmation was lost
+                // reports "recording_missing" on the retry, which is also done.
+                if (ok || errorCode is "recording_missing")
+                {
+                    DeleteLocal(recording.LocalPath);
+                    ok = true;
+                }
             }
 
             if (ok)
@@ -171,8 +221,8 @@ public class CallLogReporter(
             if (call is null && errorCode is "call_not_found")
             {
                 logger.LogDebug(
-                    "A classification or note is waiting for its call to be reported ({Reference})",
-                    classification?.SipCallId ?? notes?.SipCallId);
+                    "A classification, note or recording is waiting for its call to be reported ({Reference})",
+                    classification?.SipCallId ?? notes?.SipCallId ?? recording?.SipCallId);
 
                 deferred = true;
                 continue;
@@ -237,6 +287,30 @@ public class CallLogReporter(
     /// is all that is ever needed: the second pass has its calls already sent.
     /// </summary>
     private bool _retrying;
+
+    /// <summary>
+    /// Removes the laptop's copy of a recording the server has taken (A-31).
+    /// </summary>
+    /// <remarks>
+    /// Failing to delete is worth a line and nothing more: the recording is
+    /// safely on the server, and the worst case is a file left on a laptop
+    /// that the next upload will overwrite anyway.
+    /// </remarks>
+    private void DeleteLocal(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+                logger.LogInformation("The uploaded recording has been removed from this laptop");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "An uploaded recording could not be removed from this laptop");
+        }
+    }
 
     /// <summary>
     /// Turns a finished call into the report the server stores. The status is

@@ -59,6 +59,10 @@ try
     builder.Services.AddScoped<UsersService>();
     builder.Services.AddScoped<ContactsService>();
     builder.Services.AddScoped<ContactFlagsService>();
+    builder.Services.Configure<CallCenter.Server.Features.Communications.RecordingOptions>(
+        builder.Configuration.GetSection(
+            CallCenter.Server.Features.Communications.RecordingOptions.SectionName));
+    builder.Services.AddSingleton<CallCenter.Server.Features.Communications.RecordingStore>();
     builder.Services.AddScoped<CommunicationsService>();
     builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();

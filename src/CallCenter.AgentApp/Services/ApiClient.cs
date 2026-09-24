@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -119,6 +120,53 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
                 HttpMethod.Get, $"api/contacts/by-phone?number={Uri.EscapeDataString(number)}"),
             authenticated: true,
             ct);
+
+    /// <summary>
+    /// Uploads the audio of a finished call (A-31).
+    /// </summary>
+    /// <remarks>
+    /// Multipart and streamed from disk: the audio is megabytes, and reading it
+    /// into memory to post it would be a waste on a laptop that may be handling
+    /// the next call already.
+    ///
+    /// A 404 here means the call has not reached the server yet, which the
+    /// queue treats as "try again" rather than a failure.
+    /// </remarks>
+    public async Task<Result<object>> UploadRecordingAsync(
+        string sipCallId, string extension, string localPath, CancellationToken ct = default)
+    {
+        if (!File.Exists(localPath))
+        {
+            // The file has gone - deleted by hand, or a previous upload
+            // succeeded and the confirmation was lost. Either way there is
+            // nothing to send and nothing to retry.
+            logger.LogWarning("The recording for call {SipCallId} is no longer on disk", sipCallId);
+            return Result<object>.Failed(ApiStatus.NotFound, "recording_missing");
+        }
+
+        return await SendAsync<object>(
+            () =>
+            {
+                var content = new MultipartFormDataContent
+                {
+                    { new StringContent(sipCallId), "sipCallId" },
+                    { new StringContent(extension), "extension" },
+                };
+
+                var audio = new StreamContent(
+                    new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.Read));
+
+                audio.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+                content.Add(audio, "audio", Path.GetFileName(localPath));
+
+                return new HttpRequestMessage(HttpMethod.Post, "api/communications/recordings")
+                {
+                    Content = content,
+                };
+            },
+            authenticated: true,
+            ct);
+    }
 
     /// <summary>
     /// A customer's totals and last few calls, for the pop-up (A-10). Asked for

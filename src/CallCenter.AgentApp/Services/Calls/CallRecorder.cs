@@ -126,38 +126,29 @@ public sealed class CallRecorder : IDisposable
     }
 
     /// <summary>
-    /// The agent's voice, as the microphone feeding this call produced it.
+    /// The agent's voice, as it goes out to the PBX.
     /// </summary>
     /// <remarks>
-    /// Taken as raw samples rather than after encoding, because the raw event
-    /// states its own sampling rate and the encoded one does not. While the
-    /// call is muted or on hold the source is paused and nothing arrives, which
-    /// is why a held call records silence — the honest answer.
+    /// Taken encoded, from the same feed the call transmits, so it is what the
+    /// customer actually heard. The first attempt used the raw-sample event
+    /// instead and produced a <b>completely silent agent channel on a real
+    /// call</b>: <c>WindowsAudioEndPoint</c> never raises it — the compiler
+    /// said so, marking it obsolete with "the audio source only generates
+    /// encoded samples", and the warning was filtered out of the build output.
+    ///
+    /// While the call is muted or on hold the source is paused and nothing
+    /// arrives, which is why those stretches record silence — the honest
+    /// answer.
     /// </remarks>
-    public void WriteLocal(AudioSamplingRatesEnum rate, short[] pcm)
+    public void WriteLocal(EncodedAudioFrame frame)
     {
-        if (pcm is not { Length: > 0 })
+        if (frame?.EncodedAudio is not { Length: > 0 } encoded)
         {
             return;
         }
 
-        Write(remote: false, ToG711(pcm, HertzOf(rate)));
+        Write(remote: false, Transcode(encoded, frame.AudioFormat));
     }
-
-    /// <summary>
-    /// The library reports the microphone's rate as a name rather than a
-    /// number. Anything unexpected is treated as 8 kHz, which is what the call
-    /// itself runs at.
-    /// </summary>
-    private static int HertzOf(AudioSamplingRatesEnum rate) => rate switch
-    {
-        AudioSamplingRatesEnum.Rate8KHz => 8000,
-        AudioSamplingRatesEnum.Rate16KHz => 16000,
-        AudioSamplingRatesEnum.Rate24kHz => 24000,
-        AudioSamplingRatesEnum.Rate44_1kHz => 44100,
-        AudioSamplingRatesEnum.Rate48kHz => 48000,
-        _ => SampleRate,
-    };
 
     /// <summary>
     /// Finishes the file and returns it, or null if there is nothing usable.
@@ -194,6 +185,18 @@ public sealed class CallRecorder : IDisposable
             // The working files are twice the size of what they produced, and
             // nothing reads them again.
             Discard();
+
+            if (_remoteBytes == 0 || _localBytes == 0)
+            {
+                // One side of the conversation is missing. Said out loud,
+                // because the file is otherwise the right size and the right
+                // shape, and the only other way to find out is to play it.
+                _logger.LogWarning(
+                    "The recording has silence on one side: {Missing} was never heard. "
+                    + "Customer {RemoteBytes} bytes, agent {LocalBytes} bytes.",
+                    _remoteBytes == 0 ? "the customer" : "the agent",
+                    _remoteBytes, _localBytes);
+            }
 
             _logger.LogInformation(
                 "Recorded {Seconds}s of call audio to {Path} ({Size} bytes)", seconds, FilePath, bytes);
@@ -332,7 +335,7 @@ public sealed class CallRecorder : IDisposable
     {
         try
         {
-            var atRate = rate == SampleRate ? pcm : _codec.Resample(pcm, rate, SampleRate);
+            var atRate = rate == SampleRate ? pcm : PcmResampler.Resample(pcm, rate, SampleRate);
             return _codec.EncodeAudio(atRate, MuLaw);
         }
         catch (Exception ex)

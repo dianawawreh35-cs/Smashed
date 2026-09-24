@@ -3329,7 +3329,37 @@ line per frame would bury the log. A half-written file is deleted rather than
 attached, because a recording that exists and plays as noise is worse than an
 honest absence.
 
-### Verified synthetically, because a bad audio file is silent about it
+### The first real call recorded eight seconds of the agent saying nothing
+
+The PBX came back, Dia made a test call, and the file was the right size, the
+right shape and **completely silent on the agent's channel** — 8.8 seconds,
+correct header, customer's speech at proper levels, agent exactly zero
+throughout.
+
+The tap was on the wrong event. `OnAudioSourceRawSample` delivers raw
+microphone samples and `WindowsAudioEndPoint` never raises it; it only produces
+encoded ones. **The compiler said so**, marking the event obsolete with the
+words "the audio source only generates encoded samples" — and the build output
+was being filtered to errors, so a warning naming the exact bug scrolled past
+unread. That is a mistake in how the work was done, not only in the code:
+*filtering warnings out of a build is filtering out the compiler's opinion.*
+
+Fixed by tapping `OnAudioSourceEncodedFrameReady`, which carries its own format
+and is the same shape as the incoming side, so both directions now run through
+identical code. A second obsolete call in the same file — `AudioEncoder.Resample`
+— was fixed at the same time rather than left.
+
+**And the recorder now says so out loud.** If either channel receives nothing,
+the log warns and names the side. This failure produced a file of exactly the
+right size with a correct header; the only ways to notice were to play it or to
+measure it. That should never again be true silently.
+
+**Confirmed on the second call**: 34.2 seconds, both channels carrying speech at
+matching levels, and — the part that proves it is a real stereo recording rather
+than one voice copied twice — the two channels are loud at *different* moments,
+alternating the way a conversation does.
+
+### Verified synthetically first, because a bad audio file is silent about it
 
 A malformed WAV is a nasty failure: the file exists, the size looks right, and
 it simply will not play. So the recorder was driven with a 400 Hz tone on one

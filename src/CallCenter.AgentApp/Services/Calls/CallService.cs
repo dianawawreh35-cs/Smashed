@@ -983,7 +983,7 @@ public class CallService(
             }
 
             media.OnAudioFrameReceived += recorder.WriteRemote;
-            audio.OnAudioSourceRawSample += OnLocalAudio;
+            audio.OnAudioSourceEncodedFrameReady += recorder.WriteLocal;
 
             logger.LogInformation("Recording this call to {Path}", recorder.FilePath);
         }
@@ -991,22 +991,6 @@ public class CallService(
         {
             logger.LogError(ex, "This call will not be recorded; the call itself is unaffected");
         }
-    }
-
-    /// <summary>
-    /// The microphone, on its way into the call. A method rather than a lambda
-    /// so it can be unsubscribed when the call ends.
-    /// </summary>
-    private void OnLocalAudio(AudioSamplingRatesEnum rate, uint duration, short[] samples)
-    {
-        CallRecorder? recorder;
-
-        lock (_gate)
-        {
-            recorder = _recorder;
-        }
-
-        recorder?.WriteLocal(rate, samples);
     }
 
     /// <summary>
@@ -1043,7 +1027,7 @@ public class CallService(
 
             if (audio is not null)
             {
-                audio.OnAudioSourceRawSample -= OnLocalAudio;
+                audio.OnAudioSourceEncodedFrameReady -= recorder.WriteLocal;
             }
 
             var recorded = recorder.Stop();

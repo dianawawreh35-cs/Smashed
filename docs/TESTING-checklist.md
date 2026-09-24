@@ -239,7 +239,11 @@ cannot be faked, and the part most likely to find something.
       again**. That is a dialplan question, and it is what "Reject does nothing"
       looked like on 22 September. See the DECISIONS entry of that date on 603
       versus 486.
-### Call recording (A-30, A-32) — written, never run against a phone
+### Call recording (A-30, A-32) — capture confirmed on a real call 24 Sep
+
+*Both channels carried speech and alternated correctly on a 34-second test call.
+The first attempt recorded the agent as silence; if that ever returns, the log
+now warns and names the side.*
 
 - [ ] **Answer a call, talk for 30 seconds with both people speaking, hang up.**
       A file appears in `%LOCALAPPDATA%\CallCenter\recordings`; the log line

@@ -536,6 +536,9 @@ public class CallRow(CommunicationDto call, Localizer localizer)
     /// </summary>
     public bool IsUnclassified => call.IsUnclassified;
 
+    /// <summary>Only an answered call is recorded (A-30), incoming or outgoing.</summary>
+    public bool CanHaveRecording => call.CanHaveRecording;
+
     /// <summary>The audio is on the server and can be played (A-50, A-51).</summary>
     public bool HasRecording => call.HasRecording;
 

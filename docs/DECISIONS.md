@@ -4069,6 +4069,15 @@ classified may want to carry on listening, and the card's own Close is right
 there. Only the call log's buttons changed; the pop-up's Skip during a live
 call is its own instance and behaves as before.
 
+### Only answered calls are ever recorded, so only they mention it
+
+Also from the second look: a missed call's card said "this call has no recording
+— it may still be uploading", which is wrong on both counts. The recorder runs
+from answer to hang-up (A-30), so only an answered call, in or out, can have
+audio. `CommunicationDto.CanHaveRecording` states that beside `CanBeClassified`,
+with a test over every status, and the card says nothing about audio for any
+other call.
+
 **Not seen running.** Nobody has yet heard a recording through the app, or seen
 the card in either language. The seek bar follows the layout direction, so in
 Arabic it fills from the right. That is a choice to confirm on the screenshot,

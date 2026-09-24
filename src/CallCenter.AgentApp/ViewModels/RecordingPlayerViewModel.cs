@@ -158,6 +158,13 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
     {
         Close();
 
+        // A call nobody answered was never recorded (A-30), so the card says
+        // nothing about audio at all rather than "no recording".
+        if (!call.CanHaveRecording)
+        {
+            return;
+        }
+
         if (!call.HasRecording)
         {
             Problem = call.RecordingExpired ? PlaybackProblem.Expired : PlaybackProblem.NeverRecorded;

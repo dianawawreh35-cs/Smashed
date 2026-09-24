@@ -29,6 +29,19 @@ public class CallOutcomeTests
             .Should().Equal(CommunicationStatuses.Answered);
     }
 
+    /// <summary>
+    /// A-30: the recorder runs from answer to hang-up, so nothing else has
+    /// audio — and the call log must not tell an agent a missed call's
+    /// recording "may still be uploading".
+    /// </summary>
+    [Fact]
+    public void Only_an_answered_call_can_have_a_recording()
+    {
+        CommunicationStatuses.All
+            .Where(s => Call(s).CanHaveRecording)
+            .Should().Equal(CommunicationStatuses.Answered);
+    }
+
     [Fact]
     public void Missed_rejected_and_unanswered_outbound_calls_take_a_note()
     {

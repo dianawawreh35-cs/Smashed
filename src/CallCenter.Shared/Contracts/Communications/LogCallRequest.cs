@@ -98,6 +98,14 @@ public record CommunicationDto(
     public bool CanBeClassified => Status == CommunicationStatuses.Answered;
 
     /// <summary>
+    /// Only an answered call is recorded (A-30), incoming or outgoing: the
+    /// recorder runs from answer to hang-up. A missed, rejected, blocked or
+    /// unanswered call never has audio, so there is nothing to wait for or to
+    /// call missing.
+    /// </summary>
+    public bool CanHaveRecording => Status == CommunicationStatuses.Answered;
+
+    /// <summary>
     /// A missed, rejected or unanswered outbound call takes a note instead —
     /// why it went that way. Blocked and failed calls take neither.
     /// </summary>

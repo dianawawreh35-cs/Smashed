@@ -377,10 +377,14 @@ audio plays, the Windows default output device.*
       is the one failure here that affects a customer.
 - [ ] **Switch to another tab while it plays.** It pauses. Come back and Play
       carries on.
-- [ ] **A call with no recording** (a missed call, or one from before
-      recording was switched on). Double-click it: the card says the call has no
-      recording and mentions that a call which has only just ended may still be
-      uploading. No Play button.
+- [ ] **An answered call with no recording** (one from before uploads existed,
+      such as the 11:14 test call on 24 Sep). Double-click it: the card says the
+      call has no recording and mentions that a call which has only just ended
+      may still be uploading. No Play button.
+- [ ] **A missed, rejected, blocked or unanswered call.** Double-click it: the
+      card shows the details and **says nothing about a recording** — no
+      message, no Play. Only answered calls are recorded (A-30), so there is
+      nothing to be missing.
 - [ ] **An expired recording.** Needs one call whose recording retention has
       removed — use the "Retention actually deletes" step in Round 3a, or set
       `deleted_at` on one `recordings` row by hand on a test database. The list

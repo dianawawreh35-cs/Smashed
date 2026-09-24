@@ -6,6 +6,7 @@
   },
   "call": {
     "answer": "Answer",
+    "answering": "Answering…",
     "cancel": "Cancel",
     "connected": "Connected",
     "dialling": "Calling",
@@ -14,6 +15,7 @@
     "hangUp": "Hang up",
     "hold": "Hold",
     "incoming": "Incoming call",
+    "outgoing": "Outgoing call",
     "mute": "Mute",
     "muted": "Muted",
     "numberWithheld": "Number withheld",
@@ -151,6 +153,7 @@
   "dial": {
     "call": "Call",
     "callInProgress": "Another call is in progress.",
+    "delete": "Delete the last digit",
     "heading": "Dial a number",
     "intro": "Ring a customer directly. The call is logged and classified like any other.",
     "number": "Number",

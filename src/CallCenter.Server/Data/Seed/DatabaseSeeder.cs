@@ -531,21 +531,42 @@ public class DatabaseSeeder(
         return added;
     }
 
+    /// <summary>
+    /// One form per direction. A database from before outbound calls had their
+    /// own form gets the outbound one added, numbered after whatever exists.
+    /// </summary>
     private async Task<bool> SeedFormDefinitionAsync(CancellationToken ct)
     {
-        if (await db.FormDefinitions.AnyAsync(ct))
+        var existing = await db.FormDefinitions
+            .Select(f => new { f.Direction, f.Version })
+            .ToListAsync(ct);
+
+        var nextVersion = existing.Count == 0 ? 1 : existing.Max(f => f.Version) + 1;
+        var added = false;
+
+        foreach (var (direction, definition) in new[]
+                 {
+                     (Directions.In, SeedData.FormDefinitionV1),
+                     (Directions.Out, SeedData.FormDefinitionOutV1),
+                 })
         {
-            return false;
+            if (existing.Any(f => f.Direction == direction))
+            {
+                continue;
+            }
+
+            db.FormDefinitions.Add(new FormDefinition
+            {
+                Version = nextVersion++,
+                Definition = JsonDocument.Parse(definition),
+                Direction = direction,
+                IsCurrent = true,
+            });
+
+            added = true;
         }
 
-        db.FormDefinitions.Add(new FormDefinition
-        {
-            Version = 1,
-            Definition = JsonDocument.Parse(SeedData.FormDefinitionV1),
-            IsCurrent = true,
-        });
-
-        return true;
+        return added;
     }
 
     private async Task<int> SeedSettingsAsync(CancellationToken ct)

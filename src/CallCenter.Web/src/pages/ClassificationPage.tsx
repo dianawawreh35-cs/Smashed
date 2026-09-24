@@ -11,6 +11,7 @@ import {
 import type {
   ClassificationType,
   FieldKind,
+  FormDirection,
   FormField,
 } from '../api/classifications'
 import { errorCodeOf } from '../api/users'
@@ -23,6 +24,11 @@ import { errorCodeOf } from '../api/users'
  * complaints has to name the complaint type, so editing them apart would mean
  * holding one in your head while changing the other.
  *
+ * There are two sets of questions, one for calls that come in and one for
+ * calls the agent places: a call-back or a confirmation is not an order, and
+ * asking for a branch and an order value on it was noise. The types are shared
+ * because the reports count by type whichever way the call went.
+ *
  * Publishing writes a **new version**. Existing classifications keep the
  * version they were captured under, so a complaint classified in January still
  * reads back with January's questions — and a form that turns out wrong can be
@@ -33,9 +39,16 @@ export default function ClassificationPage() {
   const queryClient = useQueryClient()
 
   const { data: form, isLoading } = useQuery({
-    queryKey: ['classification-form'],
-    queryFn: getClassificationForm,
+    queryKey: ['classification-form', 'In'],
+    queryFn: () => getClassificationForm('In'),
   })
+
+  const { data: outbound } = useQuery({
+    queryKey: ['classification-form', 'Out'],
+    queryFn: () => getClassificationForm('Out'),
+  })
+
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ['classification-form'] })
 
   return (
     <div className="space-y-6">
@@ -48,20 +61,23 @@ export default function ClassificationPage() {
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : form ? (
         <>
-          <TypesCard
-            types={form.types}
-            onChanged={() =>
-              void queryClient.invalidateQueries({ queryKey: ['classification-form'] })
-            }
-          />
+          <TypesCard types={form.types} onChanged={refresh} />
           <FieldsCard
+            direction="In"
             version={form.version}
             fields={form.definition.fields}
             types={form.types}
-            onPublished={() =>
-              void queryClient.invalidateQueries({ queryKey: ['classification-form'] })
-            }
+            onPublished={refresh}
           />
+          {outbound && (
+            <FieldsCard
+              direction="Out"
+              version={outbound.version}
+              fields={outbound.definition.fields}
+              types={outbound.types}
+              onPublished={refresh}
+            />
+          )}
         </>
       ) : (
         <div className="card card-body text-center">
@@ -240,11 +256,13 @@ const KINDS: FieldKind[] = ['text', 'textarea', 'number', 'select', 'checkbox']
 
 /** The questions asked about a call (S-40). */
 function FieldsCard({
+  direction,
   version,
   fields,
   types,
   onPublished,
 }: {
+  direction: FormDirection
   version: number
   fields: FormField[]
   types: ClassificationType[]
@@ -259,7 +277,7 @@ function FieldsCard({
   useEffect(() => setDraft(fields), [fields])
 
   const publish = useMutation({
-    mutationFn: () => publishClassificationForm({ fields: draft }),
+    mutationFn: () => publishClassificationForm({ fields: draft }, direction),
     onSuccess: onPublished,
     onError: (e) => setError(t(`classification.errors.${errorCodeOf(e)}`)),
   })
@@ -294,9 +312,11 @@ function FieldsCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-slate-100">
-            {t('classification.fields')}
+            {t(direction === 'Out' ? 'classification.fieldsOut' : 'classification.fieldsIn')}
           </h3>
-          <p className="field-hint">{t('classification.fieldsHint')}</p>
+          <p className="field-hint">
+            {t(direction === 'Out' ? 'classification.fieldsOutHint' : 'classification.fieldsHint')}
+          </p>
         </div>
         <span className="badge-muted">{t('classification.version', { version })}</span>
       </div>

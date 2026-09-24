@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using CallCenter.Shared;
 using System.Text.Json;
 
 namespace CallCenter.Shared.Contracts.Classifications;
@@ -57,17 +58,29 @@ public record UpsertClassificationTypeRequest(
 /// filled in just as the supervisor published a change is still stored against
 /// the questions the agent actually answered.
 /// </param>
+/// <param name="Direction">
+/// Which calls this form is for: <see cref="Directions.In"/> or
+/// <see cref="Directions.Out"/>. An outbound call asks different questions from
+/// an inbound one, so each direction has its own current form.
+/// </param>
 public record ClassificationFormDto(
     int Version,
     JsonDocument Definition,
     IReadOnlyList<ClassificationTypeDto> Types,
-    IReadOnlyList<FormBranchDto> Branches);
+    IReadOnlyList<FormBranchDto> Branches,
+    string Direction = Directions.In);
 
 /// <summary>A branch, as the form's branch field offers it.</summary>
 public record FormBranchDto(Guid Id, string Name);
 
-/// <summary>Replaces the form, creating a new version (S-40).</summary>
-public record PublishFormRequest([Required] JsonDocument Definition);
+/// <summary>Replaces the form for one direction, creating a new version (S-40).</summary>
+/// <param name="Direction">
+/// <see cref="Directions.In"/> or <see cref="Directions.Out"/>. Defaults to
+/// inbound, which is what the form meant before outbound calls had their own.
+/// </param>
+public record PublishFormRequest(
+    [Required] JsonDocument Definition,
+    [MaxLength(10)] string Direction = Directions.In);
 
 /// <summary>What a call was about, as it is read back.</summary>
 public record ClassificationDto(

@@ -52,7 +52,12 @@ public partial class ClassificationFormViewModel(
     /// </remarks>
     private Guid? _communicationId;
 
-    private ClassificationFormDto? _form => catalog.Form;
+    /// <summary>
+    /// The form being drawn: inbound or outbound, chosen when the form opens
+    /// for a particular call. Null until then, or when that direction's form
+    /// never loaded.
+    /// </summary>
+    private ClassificationFormDto? _form;
 
     public Localizer Localizer { get; } = localizer;
 
@@ -98,8 +103,14 @@ public partial class ClassificationFormViewModel(
     /// because the server has no record of the call yet — it is told when the
     /// call ends.
     /// </remarks>
-    public void Begin(string? sipCallId, string? extension)
+    /// <param name="isOutbound">
+    /// Whether this agent placed the call. It decides which of the two forms is
+    /// drawn: an outbound call has its own questions (A-21, S-40).
+    /// </param>
+    public void Begin(string? sipCallId, string? extension, bool isOutbound = false)
     {
+        _form = catalog.FormFor(isOutbound);
+
         if (_form is null || string.IsNullOrWhiteSpace(sipCallId) || string.IsNullOrWhiteSpace(extension))
         {
             // Without the form or the key there is nothing to draw and nowhere
@@ -136,8 +147,12 @@ public partial class ClassificationFormViewModel(
     /// calls within the window the supervisor set, and gets a plain refusal
     /// otherwise rather than a form that will not save.
     /// </remarks>
-    public async Task BeginForLoggedCallAsync(Guid communicationId, CancellationToken ct = default)
+    /// <param name="isOutbound">Whether the call was one this agent placed; it picks the form.</param>
+    public async Task BeginForLoggedCallAsync(
+        Guid communicationId, bool isOutbound = false, CancellationToken ct = default)
     {
+        _form = catalog.FormFor(isOutbound);
+
         if (_form is null)
         {
             logger.LogWarning("A logged call cannot be classified: the form was never loaded");

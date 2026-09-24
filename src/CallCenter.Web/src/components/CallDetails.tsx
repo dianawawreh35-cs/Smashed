@@ -45,9 +45,15 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
     queryFn: () => classificationHistory(id),
     enabled: classified,
   })
-  // For the questions' labels. The current form's: an answer to a question
-  // since removed shows under its key rather than not at all.
-  const form = useQuery({ queryKey: ['classification', 'form'], queryFn: getClassificationForm, enabled: classified })
+  // For the questions' labels. The current form's, for the call's own
+  // direction: an answer to a question since removed shows under its key
+  // rather than not at all.
+  const direction = row.direction === 'Out' ? 'Out' : 'In'
+  const form = useQuery({
+    queryKey: ['classification', 'form', direction],
+    queryFn: () => getClassificationForm(direction),
+    enabled: classified,
+  })
 
   const summary = row
   // What the row does not carry, as a placeholder of the same size until it arrives.

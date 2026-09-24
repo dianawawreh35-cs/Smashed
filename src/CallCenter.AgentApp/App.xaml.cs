@@ -150,6 +150,9 @@ public partial class App : Application
         // shown and hidden, rather than built while the phone is ringing (A-10).
         // One definition, shared. Fetched at sign-in.
         services.AddSingleton<ClassificationCatalog>();
+        services.AddSingleton<Audio.RingbackTone>();
+        services.AddSingleton<Audio.RingTone>();
+        services.AddSingleton<Audio.KeyTone>();
 
         // Several forms being filled in, never shared: the pop-up has one open
         // during a call and the call log has another for a call that was

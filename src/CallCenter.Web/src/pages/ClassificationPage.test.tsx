@@ -40,6 +40,7 @@ const SPARE = {
 
 const FORM = {
   version: 2,
+  direction: 'In',
   definition: {
     fields: [
       { key: 'type', kind: 'type', required: true },
@@ -49,6 +50,19 @@ const FORM = {
   },
   types: [ORDER, COMPLAINT, SPARE],
   branches: [{ id: 'b1', name: 'ايكون' }],
+}
+
+/** The outbound form: its own questions, the same types. */
+const OUTBOUND_FORM = {
+  ...FORM,
+  version: 3,
+  direction: 'Out',
+  definition: {
+    fields: [
+      { key: 'type', kind: 'type', required: true },
+      { key: 'notes', kind: 'textarea', label: { ar: 'ملاحظات', en: 'Notes' } },
+    ],
+  },
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -68,7 +82,9 @@ function stubApi() {
     if (url.includes('/classifications/form') && init?.method === 'PUT') {
       return jsonResponse(FORM)
     }
-    if (url.includes('/classifications/form')) return jsonResponse(FORM)
+    if (url.includes('/classifications/form')) {
+      return jsonResponse(url.includes('direction=Out') ? OUTBOUND_FORM : FORM)
+    }
     if (url.includes('/classifications/types')) return jsonResponse(FORM.types)
     return jsonResponse(null, 204)
   })
@@ -133,13 +149,15 @@ describe('classification form editor', () => {
     const fetchMock = stubApi()
     renderPage()
 
-    await screen.findByText('Form questions')
+    const inbound = (await screen.findByText('Questions for incoming calls')).closest(
+      '.card',
+    )! as HTMLElement
 
     // The notes row's "asked for" ticks, one per type.
-    const asked = screen.getAllByRole('checkbox', { name: 'Complaint' })
+    const asked = within(inbound).getAllByRole('checkbox', { name: 'Complaint' })
     fireEvent.click(asked[asked.length - 1])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish form' }))
+    fireEvent.click(within(inbound).getByRole('button', { name: 'Publish form' }))
 
     await waitFor(() =>
       expect(bodyOf(fetchMock, 'PUT', '/classifications/form')).not.toBeNull(),
@@ -148,17 +166,44 @@ describe('classification form editor', () => {
     const published = bodyOf(fetchMock, 'PUT', '/classifications/form')
     const notes = published.definition.fields.find((f: { key: string }) => f.key === 'notes')
     expect(notes.showWhenType).toEqual(['Complaint'])
+    expect(published.direction).toBe('In')
+  })
+
+  it('publishes the outgoing questions as their own form', async () => {
+    // A call the agent placed asks different questions. Publishing the
+    // outbound card must not touch the inbound form.
+    const fetchMock = stubApi()
+    renderPage()
+
+    const outbound = (await screen.findByText('Questions for outgoing calls')).closest(
+      '.card',
+    )! as HTMLElement
+
+    fireEvent.click(within(outbound).getByRole('button', { name: 'Add question' }))
+    fireEvent.click(within(outbound).getByRole('button', { name: 'Publish form' }))
+
+    await waitFor(() =>
+      expect(bodyOf(fetchMock, 'PUT', '/classifications/form')).not.toBeNull(),
+    )
+
+    const published = bodyOf(fetchMock, 'PUT', '/classifications/form')
+    expect(published.direction).toBe('Out')
+    expect(published.definition.fields.map((f: { key: string }) => f.key)).toContain('notes')
+    expect(published.definition.fields.some((f: { key: string }) => f.key === 'branch')).toBe(false)
   })
 
   it('cannot publish until something changes', async () => {
     stubApi()
     renderPage()
 
-    const publish = await screen.findByRole('button', { name: 'Publish form' })
+    const inbound = (await screen.findByText('Questions for incoming calls')).closest(
+      '.card',
+    )! as HTMLElement
+    const publish = within(inbound).getByRole('button', { name: 'Publish form' })
     expect(publish).toBeDisabled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add question' }))
-    expect(screen.getByRole('button', { name: 'Publish form' })).toBeEnabled()
+    fireEvent.click(within(inbound).getByRole('button', { name: 'Add question' }))
+    expect(within(inbound).getByRole('button', { name: 'Publish form' })).toBeEnabled()
   })
 
   it('does not offer to remove the built-in type and branch questions', async () => {
@@ -167,9 +212,11 @@ describe('classification form editor', () => {
     stubApi()
     renderPage()
 
-    await screen.findByText('Form questions')
+    const inbound = (await screen.findByText('Questions for incoming calls')).closest(
+      '.card',
+    )! as HTMLElement
 
-    const rows = screen.getAllByRole('listitem')
+    const rows = within(inbound).getAllByRole('listitem')
     expect(within(rows[0]).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
     expect(within(rows[1]).queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
     expect(within(rows[2]).getByRole('button', { name: 'Remove' })).toBeInTheDocument()

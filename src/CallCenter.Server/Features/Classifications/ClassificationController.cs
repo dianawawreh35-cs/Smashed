@@ -27,16 +27,19 @@ public class ClassificationController(
     /// The form to draw, with its types and branches (A-40).
     /// </summary>
     /// <remarks>
-    /// Fetched at sign-in and kept. The version in the response is sent back
+    /// Fetched at sign-in and kept, once per direction: inbound and outbound
+    /// calls have their own forms. The version in the response is sent back
     /// when classifying, so a form filled in as a change was published is stored
     /// against the questions the agent actually answered.
     /// </remarks>
+    /// <param name="direction"><c>In</c> (the default) or <c>Out</c>.</param>
     [HttpGet("form")]
     [ProducesResponseType<ClassificationFormDto>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<ClassificationFormDto>> Form(CancellationToken ct) =>
-        Ok(await classifications.FormAsync(ct));
+    public async Task<ActionResult<ClassificationFormDto>> Form(
+        [FromQuery] string direction = Directions.In, CancellationToken ct = default) =>
+        Ok(await classifications.FormAsync(direction, ct));
 
-    /// <summary>Publishes a new version of the form (S-40).</summary>
+    /// <summary>Publishes a new version of one direction's form (S-40).</summary>
     [HttpPut("form")]
     [Authorize(AuthPolicies.SupervisorOnly)]
     [ProducesResponseType<ClassificationFormDto>(StatusCodes.Status200OK)]
@@ -44,7 +47,7 @@ public class ClassificationController(
         PublishFormRequest request, CancellationToken ct)
     {
         var (form, failure) = await classifications.PublishFormAsync(
-            request.Definition, User.GetRequiredUserId(), ct);
+            request.Definition, User.GetRequiredUserId(), request.Direction, ct);
 
         return failure is not null ? Problem(failure.Value) : Ok(form);
     }

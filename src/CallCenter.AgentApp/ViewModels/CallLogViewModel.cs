@@ -197,7 +197,7 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
         if (row.CanBeClassified)
         {
             CloseNotes();
-            await Classification.BeginForLoggedCallAsync(row.Id);
+            await Classification.BeginForLoggedCallAsync(row.Id, row.IsOutbound);
         }
         else if (row.TakesNotes)
         {
@@ -556,6 +556,9 @@ public class CallRow(CommunicationDto call, Localizer localizer)
 
     /// <summary>Date and time in full, for the details of an opened call.</summary>
     public string StartedAt => call.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+
+    /// <summary>A call this agent placed (A-21). It has its own form.</summary>
+    public bool IsOutbound => call.Direction == Directions.Out;
 
     /// <summary>Incoming or outgoing, in the agent's language.</summary>
     public string DirectionLabel => call.Direction == Directions.Out

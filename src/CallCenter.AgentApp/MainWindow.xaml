@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding Localizer[app.title]}"
         Height="740" Width="1180"
-        MinHeight="560" MinWidth="960"
+        MinHeight="560" MinWidth="1120"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
         Background="{StaticResource Bg}"

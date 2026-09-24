@@ -129,6 +129,7 @@ public partial class CallViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsNotesOpen))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(Number))]
+    [NotifyPropertyChangedFor(nameof(IsOutbound))]
     private FinishedCall? _notesFor;
 
     [ObservableProperty]
@@ -194,8 +195,10 @@ public partial class CallViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRinging))]
+    [NotifyPropertyChangedFor(nameof(OffersAnswer))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
     [NotifyPropertyChangedFor(nameof(IsDialling))]
+    [NotifyPropertyChangedFor(nameof(IsOutbound))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(Duration))]
     [NotifyPropertyChangedFor(nameof(Number))]
@@ -210,6 +213,14 @@ public partial class CallViewModel : ObservableObject
     private CallState _state = CallState.Idle;
 
     public bool IsRinging => State.Status is CallStatus.Ringing;
+
+    /// <summary>
+    /// A call this agent placed, from dialling through to the form after it
+    /// (A-20, A-21). The pop-up marks it, because an agent glancing at the
+    /// screen must know whether they rang the customer or the customer rang
+    /// them before they say a word.
+    /// </summary>
+    public bool IsOutbound => State.IsOutbound || NotesFor is { IsOutbound: true };
 
     public bool IsConnected => State.Status is CallStatus.Connected;
 
@@ -262,6 +273,7 @@ public partial class CallViewModel : ObservableObject
         : IsOnHold ? "call.onHold"
         : IsMuted ? "call.muted"
         : IsConnected ? "call.connected"
+        : IsAnswering ? "call.answering"
         : IsDialling ? "call.dialling"
         : "call.incoming"];
 
@@ -297,8 +309,33 @@ public partial class CallViewModel : ObservableObject
         ? $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}"
         : string.Empty;
 
+    /// <summary>
+    /// True from the click on Answer until the line is open. The pop-up says
+    /// "Answering" and drops the buttons at once, rather than sitting on
+    /// "Incoming call" with a greyed button while the audio starts.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(OffersAnswer))]
+    private bool _isAnswering;
+
+    /// <summary>Whether Answer and Reject are on screen: ringing, and not yet pressed.</summary>
+    public bool OffersAnswer => IsRinging && !IsAnswering;
+
     [RelayCommand]
-    private Task AnswerAsync() => _calls.AnswerAsync();
+    private async Task AnswerAsync()
+    {
+        IsAnswering = true;
+
+        try
+        {
+            await _calls.AnswerAsync();
+        }
+        finally
+        {
+            IsAnswering = false;
+        }
+    }
 
     [RelayCommand]
     private void Reject() => _calls.Reject();
@@ -333,7 +370,7 @@ public partial class CallViewModel : ObservableObject
                 // appearing once they have gone.
                 if (!wasConnected)
                 {
-                    Classification.Begin(state.SipCallId, Classification.Extension);
+                    Classification.Begin(state.SipCallId, Classification.Extension, state.IsOutbound);
                 }
             }
             else

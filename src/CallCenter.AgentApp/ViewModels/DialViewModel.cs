@@ -1,4 +1,5 @@
 using System.Windows.Threading;
+using CallCenter.AgentApp.Audio;
 using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.AgentApp.Services.Sip;
@@ -23,16 +24,19 @@ public partial class DialViewModel : ObservableObject
 {
     private readonly CallService _calls;
     private readonly SipRegistrationService _sip;
+    private readonly KeyTone _keyTone;
     private readonly Dispatcher _dispatcher;
 
     public DialViewModel(
         CallService calls,
         SipRegistrationService sip,
+        KeyTone keyTone,
         Localizer localizer,
         Dispatcher dispatcher)
     {
         _calls = calls;
         _sip = sip;
+        _keyTone = keyTone;
         _dispatcher = dispatcher;
         Localizer = localizer;
 
@@ -87,6 +91,29 @@ public partial class DialViewModel : ObservableObject
 
     [RelayCommand(CanExecute = nameof(CanDialTyped))]
     private Task Dial() => DialAsync(Number);
+
+    /// <summary>A key on the pad (A-20). Appends to whatever is typed, with the key's beep.</summary>
+    [RelayCommand]
+    private void PressKey(string? key)
+    {
+        if (string.IsNullOrEmpty(key))
+        {
+            return;
+        }
+
+        Number += key;
+        _keyTone.Play(key[0]);
+    }
+
+    /// <summary>The delete key: the last character goes.</summary>
+    [RelayCommand]
+    private void Backspace()
+    {
+        if (Number.Length > 0)
+        {
+            Number = Number[..^1];
+        }
+    }
 
     private bool CanDialTyped() => CanDial(Number);
 

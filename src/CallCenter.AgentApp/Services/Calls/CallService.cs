@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.IO;
+using CallCenter.AgentApp.Audio;
 using CallCenter.AgentApp.Services.Sip;
 using CallCenter.Shared.Contracts.Auth;
 using CallCenter.Shared.Phone;
@@ -51,6 +53,8 @@ public class CallService(
     PhonePreferences preferences,
     IOptions<DialingOptions> dialing,
     IOptions<RecordingOptions> recording,
+    RingbackTone ringback,
+    RingTone ring,
     ILoggerFactory loggerFactory,
     ILogger<CallService> logger) : IDisposable
 {
@@ -160,11 +164,25 @@ public class CallService(
             // Outgoing calls (A-20). Ringing is worth a line because it is the
             // proof the PBX accepted the number at all; the failure is kept so
             // the outcome can say which kind of failure it was.
+            //
+            // It is also when the agent should hear ringing. The PBX sends no
+            // early media, so without a local tone the line is silent until
+            // the customer answers. A 183 that does carry audio (a body with
+            // it) is left alone: the network is already playing something.
             _agent.ClientCallRinging += (_, response) =>
+            {
                 logger.LogInformation("The far end is ringing: {Status}", response?.Status);
+
+                if (string.IsNullOrEmpty(response?.Body))
+                {
+                    ringback.Start();
+                }
+            };
 
             _agent.ClientCallFailed += (_, error, response) =>
             {
+                ringback.Stop();
+
                 lock (_gate)
                 {
                     _lastDialFailure = response?.Status;
@@ -209,6 +227,8 @@ public class CallService(
             logger.LogWarning(ex, "A call did not end cleanly while stopping");
         }
 
+        ringback.Stop();
+        ring.Stop();
         StopRecording();
         CloseMedia();
         Set(CallState.Idle);
@@ -311,6 +331,10 @@ public class CallService(
                 return;
             }
 
+            // Before anything else: the customer is on the line, and the
+            // ringing must not talk over their first word.
+            ringback.Stop();
+
             lock (_gate)
             {
                 // The dialogue exists now, and with it the call's own reference.
@@ -389,17 +413,45 @@ public class CallService(
             return;
         }
 
+        var clock = Stopwatch.StartNew();
+
+        // On the click, not when the line opens: the agent has answered, and
+        // a ring that carried on while the audio started sounded like a
+        // second call.
+        ring.Stop();
+
         try
         {
-            var (media, audio) = CreateMedia();
+            // The media was prepared while the call rang (see PrepareMedia),
+            // so the click has nothing to build. Built here only if the
+            // preparation has not finished yet.
+            VoIPMediaSession? media;
+            WindowsAudioEndPoint? audio;
 
             lock (_gate)
             {
-                _media = media;
-                _audio = audio;
+                media = _media;
+                audio = _audio;
             }
 
-            var answered = await agent.Answer(pending, media);
+            var prepared = media is not null && audio is not null;
+
+            if (!prepared)
+            {
+                (media, audio) = CreateMedia();
+
+                lock (_gate)
+                {
+                    _media = media;
+                    _audio = audio;
+                }
+            }
+
+            var mediaReadyAt = clock.ElapsedMilliseconds;
+
+            var answered = await agent.Answer(pending, media!);
+
+            var answeredAt = clock.ElapsedMilliseconds;
 
             if (!answered)
             {
@@ -413,10 +465,16 @@ public class CallService(
                 _pending = null;
             }
 
-            StartRecording(media, audio);
+            StartRecording(media!, audio!);
 
             Set(State with { Status = CallStatus.Connected, ConnectedAt = DateTimeOffset.Now });
-            logger.LogInformation("Call answered");
+
+            // The timings are the point of this line: "Answer takes a moment"
+            // can only be fixed once it says which moment.
+            logger.LogInformation(
+                "Call answered in {Total} ms (media {Media} ms, prepared while ringing: {Prepared}; SIP answer {Sip} ms; recording {Rec} ms)",
+                clock.ElapsedMilliseconds, mediaReadyAt, prepared, answeredAt - mediaReadyAt,
+                clock.ElapsedMilliseconds - answeredAt);
         }
         catch (Exception ex)
         {
@@ -879,6 +937,19 @@ public class CallService(
             CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null,
             _callId));
 
+        // The ring (A-10). The pop-up alone is silent, and an agent looking at
+        // another screen or another window never saw it. Not for auto answer,
+        // which opens the line in the same instant.
+        if (!preferences.AutoAnswer)
+        {
+            ring.Start();
+        }
+
+        // The microphone, speaker and RTP session are built now, while the
+        // agent is reading the pop-up, rather than when they press Answer.
+        // Off this thread for the same reason as auto answer below.
+        _ = Task.Run(PrepareMedia);
+
         // A-18: auto answer. The state goes out first, so the pop-up is already
         // on screen showing who this is by the time the line opens — an agent
         // whose headset simply starts talking still has to see the number.
@@ -1053,6 +1124,57 @@ public class CallService(
     /// than held open, so the app does not sit on the microphone between calls —
     /// on a shared laptop that is both rude and a privacy question.
     /// </summary>
+    /// <summary>
+    /// Builds the media for a ringing call ahead of the answer, so pressing
+    /// Answer has nothing left to construct.
+    /// </summary>
+    /// <remarks>
+    /// Thrown away untouched if the call has already been answered, rejected
+    /// or missed by the time it is ready: <see cref="AnswerAsync"/> builds
+    /// its own when it gets there first, and a rejected call's media is closed
+    /// by <see cref="Finish"/> like any other.
+    /// </remarks>
+    private void PrepareMedia()
+    {
+        VoIPMediaSession media;
+        WindowsAudioEndPoint audio;
+
+        try
+        {
+            (media, audio) = CreateMedia();
+        }
+        catch (Exception ex)
+        {
+            // Not fatal: Answer will try again and report its own failure.
+            logger.LogWarning(ex, "The media could not be prepared while ringing");
+            return;
+        }
+
+        var keep = false;
+
+        lock (_gate)
+        {
+            if (_state.Status is CallStatus.Ringing && _media is null)
+            {
+                _media = media;
+                _audio = audio;
+                keep = true;
+            }
+        }
+
+        if (!keep)
+        {
+            try
+            {
+                media.Close("not needed");
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Prepared media did not close cleanly");
+            }
+        }
+    }
+
     private (VoIPMediaSession Media, WindowsAudioEndPoint Audio) CreateMedia()
     {
         var audio = new WindowsAudioEndPoint(new AudioEncoder());
@@ -1106,6 +1228,11 @@ public class CallService(
     {
         CallState state;
         string? callId;
+
+        // Whatever ended the call — cancel, failure, a refusal — the ringing
+        // ends with it.
+        ringback.Stop();
+        ring.Stop();
 
         lock (_gate)
         {

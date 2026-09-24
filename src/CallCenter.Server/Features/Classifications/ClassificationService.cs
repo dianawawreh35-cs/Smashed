@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
+using CallCenter.Server.Data.Seed;
 using CallCenter.Server.Features.Communications;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Classifications;
@@ -64,18 +65,28 @@ public class ClassificationService(
     // ---- the form ----------------------------------------------------------
 
     /// <summary>
-    /// The current form, its types and the branches, in one response (A-40).
+    /// The current form for one direction, its types and the branches, in one
+    /// response (A-40).
     /// </summary>
     /// <remarks>
     /// One call rather than three. The Agent App fetches this at sign-in and
     /// keeps it; it must not be making three requests while an agent waits to
     /// classify the call they have just finished.
+    ///
+    /// Inbound and outbound calls have separate forms: a call the agent placed
+    /// is a different conversation (a call-back, a confirmation, a follow-up)
+    /// from an order coming in, and asking for a branch and an order value on
+    /// it was noise. The types are shared, because the reports count by type
+    /// whichever way the call went.
     /// </remarks>
-    public async Task<ClassificationFormDto> FormAsync(CancellationToken ct = default)
+    public async Task<ClassificationFormDto> FormAsync(
+        string direction = Directions.In, CancellationToken ct = default)
     {
+        direction = NormaliseDirection(direction);
+
         var form = await db.FormDefinitions
             .AsNoTracking()
-            .Where(f => f.IsCurrent)
+            .Where(f => f.IsCurrent && f.Direction == direction)
             .OrderByDescending(f => f.Version)
             .FirstOrDefaultAsync(ct);
 
@@ -84,7 +95,8 @@ public class ClassificationService(
             // A database seeded before the form existed, or one where the
             // current flag was lost. The agent still gets a usable form rather
             // than a broken screen.
-            logger.LogError("No current form definition; falling back to the built-in fields");
+            logger.LogError(
+                "No current {Direction} form definition; falling back to the built-in fields", direction);
         }
 
         var typesInUse = await db.Classifications
@@ -109,10 +121,20 @@ public class ClassificationService(
 
         return new ClassificationFormDto(
             form?.Version ?? 1,
-            form?.Definition ?? DefaultForm(),
+            form?.Definition ?? DefaultForm(direction),
             types,
-            branches);
+            branches,
+            direction);
     }
+
+    /// <summary>
+    /// <see cref="Directions.Out"/> when that is what was asked for, otherwise
+    /// <see cref="Directions.In"/>. There is no form for app entries.
+    /// </summary>
+    public static string NormaliseDirection(string? direction) =>
+        string.Equals(direction, Directions.Out, StringComparison.OrdinalIgnoreCase)
+            ? Directions.Out
+            : Directions.In;
 
     /// <summary>
     /// Publishes a new version of the form (S-40).
@@ -127,27 +149,34 @@ public class ClassificationService(
     /// asks for the form and notices the version has moved.
     /// </remarks>
     public async Task<(ClassificationFormDto? Form, Failure? Failure)> PublishFormAsync(
-        JsonDocument definition, Guid actingUserId, CancellationToken ct = default)
+        JsonDocument definition, Guid actingUserId, string direction = Directions.In,
+        CancellationToken ct = default)
     {
+        direction = NormaliseDirection(direction);
+
         if (!IsDrawableForm(definition, out var reason))
         {
-            logger.LogWarning("Refused a form definition: {Reason}", reason);
+            logger.LogWarning("Refused a {Direction} form definition: {Reason}", direction, reason);
             return (null, Failure.BadForm);
         }
 
+        // Versions are numbered across both directions: a classification
+        // points at a version, and one sequence means the number alone says
+        // which questions were asked.
         var nextVersion = await db.FormDefinitions.MaxAsync(f => (int?)f.Version, ct) ?? 0;
 
         // The old current is cleared first and saved separately: the partial
-        // unique index allows only one current row, and setting the new one
-        // before clearing the old would collide.
+        // unique index allows only one current row per direction, and setting
+        // the new one before clearing the old would collide.
         await db.FormDefinitions
-            .Where(f => f.IsCurrent)
+            .Where(f => f.IsCurrent && f.Direction == direction)
             .ExecuteUpdateAsync(set => set.SetProperty(f => f.IsCurrent, false), ct);
 
         db.FormDefinitions.Add(new FormDefinition
         {
             Version = nextVersion + 1,
             Definition = definition,
+            Direction = direction,
             IsCurrent = true,
             CreatedBy = actingUserId,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -156,9 +185,10 @@ public class ClassificationService(
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
-            "Classification form version {Version} published by {UserId}", nextVersion + 1, actingUserId);
+            "Classification form version {Version} ({Direction}) published by {UserId}",
+            nextVersion + 1, direction, actingUserId);
 
-        return (await FormAsync(ct), null);
+        return (await FormAsync(direction, ct), null);
     }
 
     /// <summary>
@@ -228,16 +258,8 @@ public class ClassificationService(
     };
 
     /// <summary>The fields the system was built around, for a database with no form row.</summary>
-    private static JsonDocument DefaultForm() => JsonDocument.Parse(
-        """
-        { "fields": [
-            { "key": "type",        "kind": "type",     "required": true },
-            { "key": "branch",      "kind": "branch",   "required": true },
-            { "key": "order_value", "kind": "number",   "showWhenType": ["Order","Cancellation"] },
-            { "key": "notes",       "kind": "textarea" },
-            { "key": "follow_up",   "kind": "checkbox" }
-        ] }
-        """);
+    private static JsonDocument DefaultForm(string direction) => JsonDocument.Parse(
+        direction == Directions.Out ? SeedData.FormDefinitionOutV1 : SeedData.FormDefinitionV1);
 
     // ---- classifying -------------------------------------------------------
 
@@ -303,7 +325,7 @@ public class ClassificationService(
                 CommunicationId = communication.Id,
                 ClassifiedBy = actingUserId,
                 ClassifiedAt = now,
-                FormVersion = request.FormVersion ?? await CurrentVersionAsync(ct),
+                FormVersion = request.FormVersion ?? await CurrentVersionAsync(communication.Direction, ct),
             };
 
             db.Classifications.Add(classification);
@@ -509,9 +531,17 @@ public class ClassificationService(
             _ => Failure.EditWindowClosed,
         };
 
-    private async Task<int> CurrentVersionAsync(CancellationToken ct) =>
-        await db.FormDefinitions.Where(f => f.IsCurrent)
+    /// <summary>
+    /// The current version for the call's direction, when the client did not
+    /// say which form it drew.
+    /// </summary>
+    private async Task<int> CurrentVersionAsync(string? direction, CancellationToken ct)
+    {
+        var wanted = NormaliseDirection(direction);
+
+        return await db.FormDefinitions.Where(f => f.IsCurrent && f.Direction == wanted)
             .Select(f => f.Version).FirstOrDefaultAsync(ct) is var v && v > 0 ? v : 1;
+    }
 
     /// <summary>
     /// What a classification looked like, for the audit trail (A-43).

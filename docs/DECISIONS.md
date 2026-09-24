@@ -4657,6 +4657,201 @@ taskbar. A new call starts scrolled to the top.
 Agent App builds; 143 shared tests (labels) pass. Layout is for the eye:
 checklist Round 3.
 
+## 2026-09-24 — Outgoing calls have their own form, and say that they are outgoing (A-21, S-40)
+
+Asked for this evening, after the first outbound calls were made: the form
+that opens on an outgoing call should be its own, and an outgoing call should
+be told apart from an incoming one on the pop-up.
+
+Until now there was one form. The Agent App fetched it at sign-in and opened it
+on every answered call, whichever way the call went. A call the agent places is
+a different conversation — a call-back, a confirmation, a follow-up — and asking
+for a branch and an order value on it was noise the agent skipped past.
+
+**What changed.**
+
+- `form_definitions` has a `direction` (`In` or `Out`). The one-current-form
+  index is now one per direction. Versions stay in a single sequence, because a
+  classification points at a version and one number must say which questions
+  were asked.
+- `GET /api/classifications/form?direction=Out` returns the outbound form;
+  without the parameter it is the inbound one, as before. `PUT` takes a
+  `direction` in the body, defaulting to `In`. The types and branches come back
+  with both, because they are shared.
+- The migration adds a first outbound form (type, notes, follow-up) to a
+  database that predates it, numbered after whatever exists; the seeder does
+  the same for a fresh one.
+- The Agent App loads both at sign-in and draws whichever matches the call, in
+  the pop-up and in the call log. The pop-up shows an **"Outgoing call"** badge
+  under the state line, from dialling through to the form after hang-up.
+- The supervisor's Classification page has a second card, "Questions for
+  outgoing calls", published on its own. The call-details panel reads back a
+  classification against the form of the call's own direction.
+- The dial prefix is set to 48 in the Agent App's settings. It is added to what
+  is sent to the PBX only; the number on screen and in the log is the
+  customer's number as held. Typing the 48 by hand, as was done on the first
+  test call, now dials it twice.
+
+**What was checked and turned out fine.** The same call was reported as not
+recorded. It was: the log shows 8 seconds captured and uploaded, the database
+has the recording row, and the file has speech on both channels. The call that
+followed it was busy and never connected, so it has nothing to record.
+
+**Ringback, added in the same sitting.** There was none on an outgoing call:
+the PBX answers 180 Ringing with no early media, and the app only logged the
+event, so the agent heard silence until the customer answered — for up to 45
+seconds, with no way to tell ringing from dead. The developer asked whether a
+sound could be found online. It did not need to be: a ringback tone is a sine
+wave with a cadence, so `RingbackTone` generates it (425 Hz, one second on,
+four off, the ETSI tone used across the region) and plays it on the default
+output through NAudio, which the recording player already used. It starts on
+the PBX's 180 Ringing, unless that response carries a body — then the network
+is playing its own audio — and stops the moment the call is answered, fails,
+is cancelled or the app shuts down. A laptop with no output device logs a
+warning and places the call anyway.
+
+Server builds and 254 tests pass; the Agent App builds; 143 shared tests
+(labels) pass; the web page's 6 tests pass with the second card. The migration
+applied on this machine's database at 23:12. Screen checks: the outbound
+dialling round of the checklist.
+
+## 2026-09-24 — The call log says which way each call went, and its columns always fit (A-21, A-52)
+
+Asked for after the outbound work: the agent's call log did not show whether a
+call was incoming or outgoing until it was opened, and columns were being cut
+off at the right edge with nothing to say so.
+
+**Direction.** A first column with an arrow: in for calls that came in, out (in
+the accent colour) for calls the agent placed, and the word in the tooltip.
+Before this an answered outgoing call looked exactly like an answered incoming
+one in the list.
+
+**Widths.** The grid clips rather than wraps, and with horizontal scrolling off
+(the 22 September fix for the star column) whatever did not fit was simply
+gone. Two rules now:
+
+- Every column but Customer is bounded: the two icon columns are fixed at 38
+  pixels, and each text column is Auto with a MaxWidth, so one long value —
+  a queue name, a note — cannot push the columns after it off the card. Text
+  that does not fit trims with an ellipsis and carries its full value in the
+  tooltip, so nothing is silently lost. Customer takes what is left, and never
+  less than 110.
+- The sum of the minimums has to fit. With the 230-pixel navigation, the view's
+  margins and the cell padding, the nine columns need about 810 pixels, which
+  the old 960 window minimum could not give. The window's `MinWidth` is now
+  1120 (its default width is 1180, so most sessions never notice). Below that
+  the columns would have to clip again, and clipping is what this is removing.
+
+Agent App XAML compiles; labels unchanged. For the eye: the call log round of
+the checklist, at the window's minimum size and in both languages.
+
+## 2026-09-24 — Answer reacts at once, and the audio is built while the call rings (A-12)
+
+"When I click Accept it takes a moment to really accept." Two things made
+the moment: the audio was built on the click, and the screen said nothing
+until the whole answer had finished.
+
+- **Built while ringing.** The microphone, speaker and RTP session are now
+  created the moment the INVITE arrives, off the transport thread, and the
+  Answer click uses them. If the click beats the preparation, Answer builds
+  its own as before; a rejected or missed call's prepared media is closed by
+  the same path as any other.
+- **"Answering…" on the click.** The status line changes and the Answer /
+  Reject buttons go the instant Answer is pressed, instead of "Incoming call"
+  with a greyed button until the line is open.
+- **Timed.** The "Call answered" log line now says how long the whole answer
+  took and how it split: media (and whether it was ready in advance), the SIP
+  answer, and starting the recorder. For the 22:40 call tonight the half
+  second after the ACK was visible in the log but nothing said what the click
+  itself had cost; from the next call on, it will.
+
+Agent App builds; 143 shared tests pass. To hear: an incoming call, Answer,
+and the "Call answered in … ms" line in the agent log.
+
+## 2026-09-24 — The dial screen is a phone: a keypad, in the middle of the screen (A-20)
+
+Asked for after the first outbound calls: a dial pad, and the box in the
+centre rather than the top-left corner.
+
+The dial screen was a text box and a button, parked where a form goes. It is
+now laid out as a keypad: the number across the top with a delete key, the
+twelve keys below it in the order of every phone (1 to 9, then * 0 #), and a
+green Call button the width of the pad. The whole thing sits in the middle of
+the screen. Typing into the number still works; the pad is for the agent with
+a mouse in one hand and a headset on.
+
+The keys and the number are left-to-right in Arabic too, as the number box
+already was: a phone number is not text, and read the other way it is a
+different number. The keypad's labels are digits and need no translation; the
+delete key's tooltip is the one new label.
+
+**Two more, the same evening.** The number box and the Call button are given
+the keys' exact width (236: three keys of 72 and the two gaps), with the
+delete key inside the box's right end, so the three read as one instrument.
+And each key beeps: `KeyTone` generates the standard two-frequency tone for
+the key pressed, 120 ms at low volume with a short fade, on the default
+output. Twelve tones as arithmetic rather than twelve files; typing into the
+box stays silent, only the pad speaks.
+
+**The beep lagged the digit.** Each press opened a new Windows output on the
+UI thread, and the digit was only drawn once the device had opened. The tones
+now share one output, opened on the first press (off the UI thread) and kept
+open playing silence; a press hands it a burst to mix in, and the digit is
+drawn at once.
+
+**The keyboard is the pad.** A digit, `*` or `#` typed on the dial screen is
+handled as a click on that key: the key lights up in the accent colour for
+the length of a press, the tone sounds, the digit is added. Intercepted before
+the number box, so nothing is added twice; Enter dials, Backspace is the
+box's own. The box takes the focus whenever the screen is shown, so the first
+key pressed goes to the number.
+
+Agent App builds; 143 shared tests pass. For the eye and ear: the outbound
+dialling round of the checklist.
+
+## 2026-09-25 — An incoming call rings (A-10)
+
+"Incoming call doesn't ring." It never had: the pop-up came to the front
+silently, and an agent looking at another window, or another screen, had
+nothing to hear.
+
+`RingTone` plays from the moment the INVITE arrives until the agent presses
+Answer or Reject, the caller gives up, or the app stops: two short bursts of
+a two-tone bell (440 and 480 Hz, 0.4 s on, 0.2 off, 0.4 on, 2 s off), louder
+than the ringback because it has to cross a room rather than a line. It stops
+on the click, before the audio opens, so it never sounds like a second call
+over the customer's first word. Auto answer (A-18) does not ring: the line
+opens in the same instant.
+
+The first version held two pitches steady and sounded like a network tone;
+the developer asked for "more of a ring". A bell is a warble: the ring now
+swaps between 800 and 1040 Hz twenty times a second within each burst, which
+is what says "ringing" to the ear.
+
+The ringback and the ring now share `CadencedTonePlayer`, which takes the
+frequencies (mixed, or warbled at a given rate) and the on/off pattern; `RingbackTone` is the one-line
+subclass it was before. Both play on the default output; `RingDeviceId` in
+the settings is still unused.
+
+Agent App builds; 143 shared tests pass. To hear: an incoming call.
+
+## 2026-09-25 — The rail's two settings are switches, and check boxes are the theme's own (A-18)
+
+Asked for after the ring: "style the do-not-disturb and auto-answer check
+boxes." They were WPF's default, which draws a white Windows box whatever the
+background; on the dark rail each looked like a hole.
+
+The theme now templates `CheckBox`: a dark rounded box that takes the accent
+and a tick when checked, dims when disabled. It applies everywhere a check box
+is drawn, including the form's Follow-up question. The two in the rail use a
+keyed `Switch` style on top of it: a track with a knob that slides right and
+turns the track accent-blue when on. On or off is the whole question for those
+two, and a switch answers it from across the room where a tick does not. The
+disabled state (auto answer while do not disturb is on) stays visible, dimmed.
+
+Agent App builds; 143 shared tests pass. For the eye: the rail, both states,
+both languages.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

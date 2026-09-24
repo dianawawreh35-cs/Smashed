@@ -35,6 +35,23 @@
                    Style="{StaticResource Subtle}"
                    HorizontalAlignment="Center" />
 
+        <!-- A-20, A-21: a call the agent placed is marked as such. Without it an
+             outgoing call looks exactly like an incoming one once connected, and
+             the agent's opening line depends on which it was. -->
+        <Border Background="#1F2A37"
+                BorderBrush="{StaticResource Accent}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CornerSmall}"
+                Padding="10,3"
+                Margin="0,8,0,0"
+                HorizontalAlignment="Center"
+                Visibility="{Binding IsOutbound, Converter={StaticResource BoolToVisibility}}">
+          <TextBlock Text="{Binding Localizer[call.outgoing]}"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource Accent}" />
+        </Border>
+
         <!-- A-16: the VIP badge, above everything else, because its whole job is
              to change how the agent speaks before they have spoken. -->
         <Border Background="{StaticResource Warning}"
@@ -351,7 +368,7 @@
         <StackPanel Orientation="Horizontal"
                     HorizontalAlignment="Center"
                     Margin="0,22,0,0"
-                    Visibility="{Binding IsRinging, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding OffersAnswer, Converter={StaticResource BoolToVisibility}}">
           <Button Content="{Binding Localizer[call.answer]}"
                   Style="{StaticResource PrimaryButton}"
                   MinWidth="120"

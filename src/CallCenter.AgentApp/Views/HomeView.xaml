@@ -58,13 +58,15 @@
              again without hunting for it. -->
         <StackPanel DockPanel.Dock="Bottom" Margin="16,0,16,12">
           <CheckBox Content="{Binding Localizer[home.doNotDisturb]}"
+                    Style="{StaticResource Switch}"
                     IsChecked="{Binding DoNotDisturb, Mode=TwoWay}"
                     ToolTip="{Binding Localizer[home.doNotDisturbHint]}" />
           <CheckBox Content="{Binding Localizer[home.autoAnswer]}"
+                    Style="{StaticResource Switch}"
                     IsChecked="{Binding AutoAnswer, Mode=TwoWay}"
                     IsEnabled="{Binding DoNotDisturb, Converter={StaticResource InverseBool}}"
                     ToolTip="{Binding Localizer[home.autoAnswerHint]}"
-                    Margin="0,8,0,0" />
+                    Margin="0,10,0,0" />
         </StackPanel>
 
         <!-- The phone, always visible. An agent should never have to go looking

@@ -13,14 +13,16 @@ public class FormDefinitionConfiguration : IEntityTypeConfiguration<FormDefiniti
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Definition).HasColumnType("jsonb").IsRequired();
+        builder.Property(x => x.Direction).HasMaxLength(10).HasDefaultValue(Directions.In);
         builder.Property(x => x.IsCurrent).HasDefaultValue(false);
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
 
         builder.HasIndex(x => x.Version).IsUnique();
 
-        // Exactly one current version. A partial unique index on a boolean means
-        // a second row with is_current = true is rejected by the database.
-        builder.HasIndex(x => x.IsCurrent)
+        // Exactly one current version per direction. A partial unique index
+        // means a second current row for the same direction is rejected by the
+        // database.
+        builder.HasIndex(x => x.Direction)
             .IsUnique()
             .HasFilter("is_current")
             .HasDatabaseName("ux_form_current");

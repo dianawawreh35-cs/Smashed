@@ -222,23 +222,74 @@
                           CommandParameter="{Binding SelectedItem,
                                              RelativeSource={RelativeSource AncestorType=DataGrid}}" />
           </DataGrid.InputBindings>
+          <DataGrid.Resources>
+            <!-- Every text cell trims with an ellipsis and carries its full
+                 value in the tooltip. Without this a long name or queue simply
+                 ran under the next column: the DataGrid clips, it does not
+                 wrap, and nothing said the text had been cut. -->
+            <Style x:Key="TrimmedCell" TargetType="TextBlock">
+              <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+              <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
+              <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+          </DataGrid.Resources>
+
+          <!-- Column widths (A-52). Every column but Customer is bounded: a
+               fixed width for the icons, Auto with a MaxWidth for the text, so
+               no single long value can push the ones after it off the card.
+               Customer takes what is left, and never less than its MinWidth.
+               The window's MinWidth (MainWindow) is set so that the sum of
+               these minimums always fits beside the navigation; the sums are
+               worked out in DECISIONS.md, 24 September. -->
           <DataGrid.Columns>
-            <DataGridTextColumn x:Name="WhenColumn" Width="Auto" Binding="{Binding When}"
-                                FontFamily="{StaticResource MonoFont}" />
-            <DataGridTextColumn x:Name="WhoColumn" Width="*" MinWidth="90" Binding="{Binding Who}" />
-            <DataGridTextColumn x:Name="NumberColumn" Width="Auto" Binding="{Binding Number}"
-                                FontFamily="{StaticResource MonoFont}" />
-            <DataGridTextColumn x:Name="QueueColumn" Width="Auto" Binding="{Binding Queue}" />
-            <DataGridTextColumn x:Name="DurationColumn" Width="Auto" Binding="{Binding Duration}"
-                                FontFamily="{StaticResource MonoFont}" />
-            <DataGridTextColumn x:Name="StatusColumn" Width="Auto" Binding="{Binding Status}" />
+            <!-- A-21: which way the call went. An arrow in, an arrow out; the
+                 word is in the tooltip. Before this an answered outgoing call
+                 was indistinguishable from an answered incoming one. -->
+            <DataGridTemplateColumn Width="38" MinWidth="38" MaxWidth="38">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Grid ToolTip="{Binding DirectionLabel}" Background="Transparent">
+                    <TextBlock Text="&#xE8D5;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="{StaticResource TextMuted}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding IsOutbound, Converter={StaticResource InverseBoolToVisibility}}" />
+                    <TextBlock Text="&#xE8D4;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="{StaticResource Accent}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding IsOutbound, Converter={StaticResource BoolToVisibility}}" />
+                  </Grid>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+
+            <DataGridTextColumn x:Name="WhenColumn" Width="Auto" MaxWidth="120" Binding="{Binding When}"
+                                FontFamily="{StaticResource MonoFont}"
+                                ElementStyle="{StaticResource TrimmedCell}" />
+            <DataGridTextColumn x:Name="WhoColumn" Width="*" MinWidth="110" Binding="{Binding Who}"
+                                ElementStyle="{StaticResource TrimmedCell}" />
+            <DataGridTextColumn x:Name="NumberColumn" Width="Auto" MaxWidth="140" Binding="{Binding Number}"
+                                FontFamily="{StaticResource MonoFont}"
+                                ElementStyle="{StaticResource TrimmedCell}" />
+            <DataGridTextColumn x:Name="QueueColumn" Width="Auto" MaxWidth="120" Binding="{Binding Queue}"
+                                ElementStyle="{StaticResource TrimmedCell}" />
+            <DataGridTextColumn x:Name="DurationColumn" Width="Auto" MaxWidth="90" Binding="{Binding Duration}"
+                                FontFamily="{StaticResource MonoFont}"
+                                ElementStyle="{StaticResource TrimmedCell}" />
+            <DataGridTextColumn x:Name="StatusColumn" Width="Auto" MaxWidth="120" Binding="{Binding Status}"
+                                ElementStyle="{StaticResource TrimmedCell}" />
 
             <!-- A-50: which calls have audio. A speaker for a recording that can
                  be played, a muted one for a recording retention has removed
                  (A-33), and nothing for a call never recorded - so an old call
                  does not read as a recording that failed. MinWidth for the
                  same reason as the chip column below. -->
-            <DataGridTemplateColumn Width="Auto" MinWidth="34">
+            <DataGridTemplateColumn Width="38" MinWidth="38" MaxWidth="38">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Grid ToolTip="{Binding RecordingHint}" Background="Transparent">
@@ -264,7 +315,7 @@
             <!-- A-41: highlighted until classified. A chip rather than a column
                  of ticks and blanks, so a glance down the list shows the work
                  left rather than the work done. -->
-            <DataGridTemplateColumn Width="Auto" MinWidth="110">
+            <DataGridTemplateColumn Width="Auto" MinWidth="110" MaxWidth="200">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Grid>
@@ -282,7 +333,7 @@
                          whole of it is in the tooltip. -->
                     <TextBlock Text="{Binding Notes}"
                                ToolTip="{Binding Notes}"
-                               MaxWidth="220"
+                               MaxWidth="176"
                                FontSize="11"
                                Foreground="{StaticResource TextMuted}"
                                TextTrimming="CharacterEllipsis"

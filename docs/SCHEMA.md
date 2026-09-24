@@ -199,13 +199,14 @@ CREATE TABLE classification_types (
 
 CREATE TABLE form_definitions (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  version     int NOT NULL UNIQUE,
+  version     int NOT NULL UNIQUE,            -- one sequence across both directions
   definition  jsonb NOT NULL,                -- see JSON shape below
+  direction   varchar(10) NOT NULL DEFAULT 'In',  -- 'In' or 'Out': each has its own form (A-21, S-40)
   is_current  boolean NOT NULL DEFAULT false,
   created_by  uuid REFERENCES users(id),
   created_at  timestamptz NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX ux_form_current ON form_definitions(is_current) WHERE is_current;
+CREATE UNIQUE INDEX ux_form_current ON form_definitions(direction) WHERE is_current;  -- one current form per direction
 
 CREATE TABLE classifications (
   communication_id  uuid PRIMARY KEY REFERENCES communications(id) ON DELETE CASCADE,
@@ -252,7 +253,7 @@ Form definition JSON shape (stored in `form_definitions.definition`):
   ]
 }
 ```
-Built-in kinds `type`, `branch`, `number`(order_value), `textarea`(notes), `checkbox`(follow_up) map to real columns; any other field goes to `custom_values`. Editing the form creates a new version and sets `is_current`; old classifications keep their `form_version` so history renders correctly.
+Built-in kinds `type`, `branch`, `number`(order_value), `textarea`(notes), `checkbox`(follow_up) map to real columns; any other field goes to `custom_values`. Editing a form creates a new version and sets `is_current` for its direction; old classifications keep their `form_version` so history renders correctly. Inbound and outbound calls have separate forms (added 2026-09-24): `GET /api/classifications/form?direction=Out` returns the outbound one, and the Agent App draws whichever matches the call's direction. The types are shared.
 
 ---
 
@@ -440,7 +441,8 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - contacts / contact_phones: 15,289 customers and 15,529 numbers, carried over from the old ordering system (A-61). The export is `docs/Contacts.xlsx`; `tools/contacts-import/convert.py` turns it into the gzipped CSV embedded in the server assembly. Numbers go through `PhoneNormalizer` at seed time, so caller matching (A-13) finds them. 69 of the 15,358 exported rows are dropped as duplicates - every number on them already belongs to a contact inserted earlier.
 - channels: Phone (system), WhatsApp, Facebook, Instagram, Wheels
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)
-- form_definitions v1: the JSON above without the `reason` field
+- form_definitions v1: the JSON above without the `reason` field (direction `In`)
+- form_definitions, outbound: `type`, `notes`, `follow_up` (direction `Out`), numbered after whatever exists. The migration `FormPerDirection` adds it to a database that predates it.
 - settings: `recording.retention_days=90`, `agent.idle_logout_minutes=240`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `cdr.interval_seconds=300`, `cdr.last_offset=0`, `agent.call_log_days=7`
   - `cdr.last_offset` is the byte position in `Master.csv` the importer has read to (SRS S-55). It is state, not configuration, and is kept here so a restart resumes rather than re-reads. A file shorter than this value means the log rotated: reset to 0 and log it.
   - `callback.extension` and `pbx.ami.enabled` were **removed on 2026-09-21**. Both belonged to approaches ruled out in SRS 4.5, and a setting the supervisor can edit that changes nothing is worse than a missing one.

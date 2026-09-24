@@ -439,6 +439,24 @@ public static class SeedData
         """;
 
     /// <summary>
+    /// The first outbound form: what an agent notes about a call they placed.
+    /// A call-back or a confirmation has a type and a note, not a branch and an
+    /// order value; the supervisor adds whatever else the site asks (S-40).
+    /// </summary>
+    public const string FormDefinitionOutV1 = """
+        {
+          "fields": [
+            { "key": "type", "kind": "type", "required": true },
+            { "key": "notes", "kind": "textarea",
+              "label": { "ar": "ملاحظات", "en": "Notes" },
+              "required": false },
+            { "key": "follow_up", "kind": "checkbox",
+              "label": { "ar": "متابعة", "en": "Follow-up required" } }
+          ]
+        }
+        """;
+
+    /// <summary>
     /// Defaults the supervisor can change without a deployment. Blank values are
     /// site-specific and filled in during installation.
     /// </summary>

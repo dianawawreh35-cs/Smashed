@@ -2,56 +2,119 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              FlowDirection="{Binding Localizer.FlowDirection}"
-             Background="{StaticResource Bg}">
+             Background="{StaticResource Bg}"
+             Focusable="True">
 
-  <Grid Margin="28">
-    <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="*" />
-    </Grid.RowDefinitions>
+  <UserControl.Resources>
+    <!-- One key of the pad. Big enough to hit without looking, the same
+         monospace as the number so a key and the digit it produces match. -->
+    <Style x:Key="DialKey" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+      <Setter Property="Width" Value="72" />
+      <Setter Property="Height" Value="56" />
+      <Setter Property="Margin" Value="5" />
+      <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <!-- A click must not take the focus from the number box: Backspace and
+           the next typed digit still go to the number. -->
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Command" Value="{Binding PressKeyCommand}" />
+      <Setter Property="CommandParameter" Value="{Binding Content, RelativeSource={RelativeSource Self}}" />
+    </Style>
+  </UserControl.Resources>
 
-    <StackPanel Grid.Row="0" Margin="0,0,0,18">
-      <TextBlock Text="{Binding Localizer[dial.heading]}" Style="{StaticResource Heading}" />
+  <!-- Centred in the screen, not tucked top-left: this is a phone, and the
+       agent stands in front of it. The keys are laid out like every keypad
+       they have ever used, left to right even in Arabic, because a number is
+       not text (A-20). -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Margin="28"
+                MaxWidth="420">
+
+      <TextBlock Text="{Binding Localizer[dial.heading]}"
+                 Style="{StaticResource Heading}"
+                 HorizontalAlignment="Center" />
       <TextBlock Text="{Binding Localizer[dial.intro]}"
                  Style="{StaticResource Subtle}"
-                 Margin="0,6,0,0"
+                 Margin="0,6,0,18"
+                 TextAlignment="Center"
                  TextWrapping="Wrap" />
+
+      <Border Style="{StaticResource Card}" Padding="24" HorizontalAlignment="Center">
+        <StackPanel>
+
+          <!-- The number, exactly as wide as the keys below it (236: three keys
+               of 72 and the two gaps between them), with the delete
+               key sitting inside its right end. Typing still works: the pad is
+               for the agent with a mouse in one hand and a headset on. -->
+          <Grid FlowDirection="LeftToRight" Width="236" HorizontalAlignment="Center">
+            <TextBox x:Name="NumberBox"
+                     Text="{Binding Number, UpdateSourceTrigger=PropertyChanged}"
+                     FontFamily="{StaticResource MonoFont}"
+                     FontSize="24"
+                     Padding="12,10,44,10"
+                     TextAlignment="Center"
+                     VerticalContentAlignment="Center" />
+
+            <Button Style="{StaticResource GhostButton}"
+                    ToolTip="{Binding Localizer[dial.delete]}"
+                    Focusable="False"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Margin="0,0,4,0"
+                    Padding="8,4"
+                    Command="{Binding BackspaceCommand}">
+              <TextBlock Text="&#xE750;"
+                         FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                         FontSize="16" />
+            </Button>
+          </Grid>
+
+          <!-- 246 including the outer margins, so the visible keys span 236,
+               the width the number box and the Call button are given. -->
+          <UniformGrid x:Name="Pad"
+                       Columns="3"
+                       Rows="4"
+                       Width="246"
+                       HorizontalAlignment="Center"
+                       Margin="0,14,0,0"
+                       FlowDirection="LeftToRight">
+            <Button Style="{StaticResource DialKey}" Content="1" />
+            <Button Style="{StaticResource DialKey}" Content="2" />
+            <Button Style="{StaticResource DialKey}" Content="3" />
+            <Button Style="{StaticResource DialKey}" Content="4" />
+            <Button Style="{StaticResource DialKey}" Content="5" />
+            <Button Style="{StaticResource DialKey}" Content="6" />
+            <Button Style="{StaticResource DialKey}" Content="7" />
+            <Button Style="{StaticResource DialKey}" Content="8" />
+            <Button Style="{StaticResource DialKey}" Content="9" />
+            <Button Style="{StaticResource DialKey}" Content="*" />
+            <Button Style="{StaticResource DialKey}" Content="0" />
+            <Button Style="{StaticResource DialKey}" Content="#" />
+          </UniformGrid>
+
+          <Button Content="{Binding Localizer[dial.call]}"
+                  Style="{StaticResource SuccessButton}"
+                  Width="236"
+                  HorizontalAlignment="Center"
+                  Height="48"
+                  FontSize="16"
+                  Margin="0,14,0,0"
+                  Command="{Binding DialCommand}" />
+
+          <!-- Why the button is dead. The agent has a reason to be dialling. -->
+          <TextBlock Text="{Binding Hint}"
+                     Foreground="{StaticResource Warning}"
+                     FontSize="11"
+                     Margin="0,10,0,0"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap" />
+
+        </StackPanel>
+      </Border>
     </StackPanel>
-
-    <Border Grid.Row="1"
-            Style="{StaticResource Card}"
-            VerticalAlignment="Top"
-            HorizontalAlignment="Left"
-            MinWidth="380">
-      <StackPanel>
-
-        <TextBlock Text="{Binding Localizer[dial.number]}" Style="{StaticResource FieldLabel}" />
-
-        <!-- Left to right even in Arabic. A phone number is not text: read
-             right to left it is a different number, and the agent is about to
-             ring it. -->
-        <TextBox Text="{Binding Number, UpdateSourceTrigger=PropertyChanged}"
-                 FontFamily="{StaticResource MonoFont}"
-                 FontSize="20"
-                 Padding="10,8"
-                 FlowDirection="LeftToRight" />
-
-        <Button Content="{Binding Localizer[dial.call]}"
-                Style="{StaticResource PrimaryButton}"
-                HorizontalAlignment="Left"
-                MinWidth="140"
-                Margin="0,16,0,0"
-                Command="{Binding DialCommand}" />
-
-        <!-- Why the button is dead. The agent has a reason to be dialling. -->
-        <TextBlock Text="{Binding Hint}"
-                   Foreground="{StaticResource Warning}"
-                   FontSize="11"
-                   Margin="0,10,0,0"
-                   TextWrapping="Wrap" />
-
-      </StackPanel>
-    </Border>
-
-  </Grid>
+  </ScrollViewer>
 </UserControl>

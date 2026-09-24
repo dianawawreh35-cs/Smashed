@@ -58,25 +58,35 @@ export interface FormDefinition {
   fields: FormField[]
 }
 
+/**
+ * Which calls a form is for. Inbound and outbound calls have their own forms:
+ * a call the agent placed is a different conversation from an order coming in.
+ * The types are shared between them.
+ */
+export type FormDirection = 'In' | 'Out'
+
 export interface ClassificationForm {
   version: number
   definition: FormDefinition
   types: ClassificationType[]
   branches: FormBranch[]
+  direction: FormDirection
 }
 
-export const getClassificationForm = () =>
-  api.get<ClassificationForm>('/classifications/form')
+export const getClassificationForm = (direction: FormDirection = 'In') =>
+  api.get<ClassificationForm>('/classifications/form', { query: { direction } })
 
 /**
- * Publishes a new version of the form (S-40).
+ * Publishes a new version of one direction's form (S-40).
  *
  * Never an edit in place: existing classifications keep the version they were
  * captured under, so a complaint classified in January still reads back with
  * January's questions.
  */
-export const publishClassificationForm = (definition: FormDefinition) =>
-  api.put<ClassificationForm>('/classifications/form', { definition })
+export const publishClassificationForm = (
+  definition: FormDefinition,
+  direction: FormDirection = 'In',
+) => api.put<ClassificationForm>('/classifications/form', { definition, direction })
 
 export const listClassificationTypes = () =>
   api.get<ClassificationType[]>('/classifications/types', {

@@ -253,17 +253,20 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             ct);
 
     /// <summary>
-    /// The classification form, its types and the branches (A-40).
+    /// The classification form for one direction, its types and the branches
+    /// (A-40).
     /// </summary>
     /// <remarks>
-    /// Fetched once at sign-in and kept. The supervisor's changes reach agents
-    /// without reinstalling anything (S-40), so the version is checked again
-    /// whenever the app has reason to.
+    /// Fetched once per direction at sign-in and kept. The supervisor's changes
+    /// reach agents without reinstalling anything (S-40), so the version is
+    /// checked again whenever the app has reason to.
     /// </remarks>
+    /// <param name="direction"><see cref="Directions.In"/> or <see cref="Directions.Out"/>.</param>
     public Task<Result<ClassificationFormDto>> GetClassificationFormAsync(
-        CancellationToken ct = default) =>
+        string direction, CancellationToken ct = default) =>
         SendAsync<ClassificationFormDto>(
-            () => new HttpRequestMessage(HttpMethod.Get, "api/classifications/form"),
+            () => new HttpRequestMessage(
+                HttpMethod.Get, $"api/classifications/form?direction={Uri.EscapeDataString(direction)}"),
             authenticated: true,
             ct);
 

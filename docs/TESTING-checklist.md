@@ -220,7 +220,16 @@ Sign in as `dia20`. None of this needs a call.
       is a fault — report it.
 - [ ] **An item from the category you hid in 1.1 is still findable.**
 - [ ] **Delivery tab (A-65).** Search an area; it names the branch and price.
+- [ ] **An incoming call rings (A-10).** Ring the extension: the laptop plays
+      a two-burst bell until you answer or reject, or the caller gives up. It
+      stops the instant you press Answer. With Auto answer ticked it does not
+      ring at all.
 - [ ] **Call log tab (A-14).** It lists past calls.
+- [ ] **Every column fits.** Shrink the window to its smallest: the last
+      column ("Not classified" chips and notes) is still fully on the card,
+      nothing is cut at the right edge, and a long customer name shows "…"
+      with the full name in its tooltip. The first column is an arrow: in for
+      incoming calls, out (blue) for calls you placed; hover for the word.
 - [ ] **Open a date filter's calendar.** The day numbers, the Su/Mo/Tu row and
       the month name must all be readable, the chosen day is blue and today is
       tinted. *It was near-white text on a near-white panel until 21 September:
@@ -513,10 +522,24 @@ audio plays, the Windows default output device.*
 
 ### Outbound dialling (A-20, A-21) — never run
 
-- [ ] **Dial your own mobile from the Dial screen.** The pop-up appears saying
-      "Calling", with the number and a Cancel. Your phone rings. Answer it and
-      the pop-up says "Connected", the timer starts, and the classification form
-      opens exactly as it does on an incoming call (A-21).
+- [ ] **The Dial screen is a keypad in the middle of the window.** The number
+      across the top with a delete key, 1 to 9 then * 0 #, and a green Call
+      button under them, all three the same width. Clicking a key fills the
+      number and beeps like a phone key. Typing a digit on the keyboard does
+      the same: the key on the pad lights up and beeps. Enter dials.
+- [ ] **Dial your own mobile from the Dial screen.** Enter the number as it is
+      held (no 48): the app adds the prefix itself, and the pop-up and the log
+      show the number without it. The pop-up appears saying "Calling", with an
+      **"Outgoing call"** badge, the number and a Cancel. Your phone rings,
+      and **you hear ringing in the headset** while it does: one second on,
+      four off. It stops the instant you answer, and also if you press Cancel
+      or the number is busy.
+      Answer it and the pop-up says "Connected", the badge stays, the timer
+      starts, and the **outbound** classification form opens: Type, Notes and
+      Follow-up by default, no Branch or Order value. On the Classification tab
+      it is the second card, "Questions for outgoing calls"; add a question
+      there and it appears on the next outgoing call only. The rest of the
+      pop-up works exactly as it does on an incoming call (A-21).
       *Tried once on 22 September and it got as far as the PBX:* the number
       format is right, and the call was refused with **503 Service
       Unavailable** after about eight seconds of ringing tone. That is the

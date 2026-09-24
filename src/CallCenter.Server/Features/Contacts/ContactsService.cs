@@ -18,7 +18,7 @@ namespace CallCenter.Server.Features.Contacts;
 /// +9705… and 9705… the same number (A-13). The normalising rules live in
 /// <see cref="PhoneNormalizer"/> and are never re-implemented here.
 /// </remarks>
-public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> logger)
+public class ContactsService(CallCenterDbContext db, ContactCallLinker calls, ILogger<ContactsService> logger)
 {
     /// <summary>How many results a search returns before the caller must narrow it.</summary>
     public const int SearchLimit = 50;
@@ -211,6 +211,9 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
         await db.SaveChangesAsync(ct);
         await AuditAsync(actingUserId, "add-phone", contact, before, ct);
 
+        // The calls this number made while nobody knew whose it was (A-11).
+        await calls.LinkUnmatchedCallsAsync(contact.Id, [normalised], ct);
+
         logger.LogInformation("Number added to contact {ContactId}", contact.Id);
 
         return (ToDto(contact, await CreatorNameAsync(contact, ct)), null, null);
@@ -304,6 +307,10 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
         await db.SaveChangesAsync(ct);
         await AuditAsync(actingUserId, "create", contact, before: null, ct);
 
+        // A new customer's earlier calls, including the one they are on if it
+        // was reported first: "saving links the current call" (A-11).
+        await calls.LinkUnmatchedCallsAsync(contact.Id, numbers.Select(n => n.Normalised), ct);
+
         logger.LogInformation("Contact {ContactId} created with {Count} number(s)", contact.Id, numbers.Count);
 
         return (ToDto(contact, null), null, null);
@@ -375,6 +382,9 @@ public class ContactsService(CallCenterDbContext db, ILogger<ContactsService> lo
 
         await db.SaveChangesAsync(ct);
         await AuditAsync(actingUserId, "update", contact, before, ct);
+
+        // A number added by the edit brings its unmatched calls with it.
+        await calls.LinkUnmatchedCallsAsync(contact.Id, numbers.Select(n => n.Normalised), ct);
 
         return (ToDto(contact, await CreatorNameAsync(contact, ct)), null, null);
     }

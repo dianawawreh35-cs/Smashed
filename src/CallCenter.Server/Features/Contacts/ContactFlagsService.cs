@@ -21,7 +21,7 @@ namespace CallCenter.Server.Features.Contacts;
 /// A flag is a property of a customer, and a customer is a contact; a bare
 /// number with no name is still a contact, just one whose name is null.
 /// </remarks>
-public class ContactFlagsService(CallCenterDbContext db, ILogger<ContactFlagsService> logger)
+public class ContactFlagsService(CallCenterDbContext db, ContactCallLinker calls, ILogger<ContactFlagsService> logger)
 {
     /// <summary>How many flag changes the history returns. A screen, not an export.</summary>
     public const int HistoryLimit = 50;
@@ -133,6 +133,10 @@ public class ContactFlagsService(CallCenterDbContext db, ILogger<ContactFlagsSer
             await db.SaveChangesAsync(ct);
 
             logger.LogInformation("Contact {ContactId} created to carry a flag on a bare number", contact.Id);
+
+            // The nuisance calls that made somebody flag it, now on the contact
+            // that carries the flag, so its history says why.
+            await calls.LinkUnmatchedCallsAsync(contact.Id, [normalised], ct);
         }
 
         await ApplyAsync(contact, request.IsVip, request.IsBlocked, request.Reason, actingUserId, ct);

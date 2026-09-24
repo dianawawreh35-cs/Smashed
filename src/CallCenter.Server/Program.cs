@@ -64,6 +64,7 @@ try
     builder.Services.AddSingleton<ISipSecretProtector, SipSecretProtector>();
     builder.Services.AddScoped<AuthService>();
     builder.Services.AddScoped<UsersService>();
+    builder.Services.AddScoped<ContactCallLinker>();
     builder.Services.AddScoped<ContactsService>();
     builder.Services.AddScoped<ContactFlagsService>();
     builder.Services.Configure<CallCenter.Server.Features.Communications.RecordingOptions>(

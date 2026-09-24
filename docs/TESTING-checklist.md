@@ -295,7 +295,7 @@ cannot be faked, and the part most likely to find something.
 - [ ] **A VIP caller shows the badge (A-16).** Flag a contact VIP in the
       supervisor app with a reason, then call from that number. The badge and
       the reason sit above everything else.
-- [ ] **An unknown number says "New customer — not on file"**, with a small
+- [ ] **An unknown number says "New customer — not in contacts"**, with a small
       **Save as new customer** button under it (A-11). The classification form
       is not pushed down until the button is pressed.
 - [ ] **Press it, type a name and address, Save.** The pop-up switches to the

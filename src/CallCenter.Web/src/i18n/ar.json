@@ -397,7 +397,7 @@
     "count_other": "{{count}} مكالمة",
     "previous": "السابق",
     "next": "التالي",
-    "unknownCaller": "غير مسجّل",
+    "unknownCaller": "غير موجود في جهات الاتصال",
     "filter": {
       "q": "الرقم أو الاسم",
       "from": "من",

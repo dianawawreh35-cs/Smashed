@@ -28,6 +28,7 @@ export default function AppLayout() {
 
   const sections = [
     { to: '/dashboard', label: t('nav.dashboard') },
+    { to: '/calls', label: t('nav.calls') },
     { to: '/contacts', label: t('nav.contacts') },
     { to: '/delivery', label: t('nav.delivery') },
     { to: '/menu', label: t('nav.menu') },

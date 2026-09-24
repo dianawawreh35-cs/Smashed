@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
+import CallsPage from './pages/CallsPage'
 import DashboardPage from './pages/DashboardPage'
 import UsersPage from './pages/UsersPage'
 import SettingsPage from './pages/SettingsPage'
@@ -22,6 +23,7 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/calls" element={<CallsPage />} />
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
           <Route path="/menu" element={<MenuPage />} />

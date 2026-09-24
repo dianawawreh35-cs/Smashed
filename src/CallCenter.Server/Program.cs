@@ -71,6 +71,7 @@ try
             CallCenter.Server.Features.Communications.RecordingOptions.SectionName));
     builder.Services.AddSingleton<CallCenter.Server.Features.Communications.RecordingStore>();
     builder.Services.AddScoped<CommunicationsService>();
+    builder.Services.AddScoped<CallSearchService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Communications.RecordingRetention>();
 
     // A-33: the nightly pass that deletes recordings older than

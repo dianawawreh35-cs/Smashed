@@ -140,6 +140,36 @@ Needs a second supervisor account; add one in Users if there is only one.
 - [ ] **Reload the browser with no one signed in.** No "signed out" message.
       That line is only for someone who was thrown out while working.
 
+### 1.7 Calls: search, open, listen (S-02, S-03, S-04)
+
+- [ ] **Calls is in the sidebar, under Dashboard,** and lists recent calls from
+      every agent, newest first, with a count and pages of 50.
+- [ ] **Search by a number** three ways: `0599…`, `+970 599…`, and a piece from
+      the middle. All three find the same calls. Then **by a name**, in Arabic,
+      spelled with ة and then with ه. Both find the contact's calls.
+- [ ] **Each filter narrows the list:** agent, branch, type, result,
+      direction, a date range, notes text, order value from/to, recorded,
+      classified. *If a filter seems to do nothing:* check the count changes.
+      The server does the filtering, so the count is over every call.
+- [ ] **Typing does not search.** Nothing changes until Search is pressed.
+- [ ] **Open a recorded call.** The details show the agent, extension, queue,
+      times, and (if classified) type, branch, order value, notes, answers and
+      who changed it when. **Play** the recording: the customer and the agent
+      are both heard, the bar moves, and it seeks when dragged.
+      *If there is no sound but the bar moves:* the mu-law decoding is wrong.
+      Stop and tell me.
+- [ ] **Open a call that was put on hold** (put a test call on hold for ten
+      seconds first). Under the bar there is an **amber mark** where the hold
+      was, "On hold: 0:12–0:22" under the player, and **"On hold"** beside the
+      time while playback is inside it. The same as the Agent App's player.
+- [ ] **Download** saves a `.wav` that plays in Windows' own player.
+- [ ] **A call whose recording has expired** says so, rather than "no
+      recording".
+- [ ] **Everything above in Arabic.** The seek bar fills from the right, and
+      the hold marks must sit under the same stretch of it. *If the marks are
+      mirrored against the bar:* tell me. That is the one thing RTL can get wrong
+      here.
+
 ---
 
 ## Round 2 — the Agent App, without a phone

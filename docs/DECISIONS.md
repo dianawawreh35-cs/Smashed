@@ -4359,6 +4359,85 @@ did reach the server, so it uploads on the first pass of the new app, at sign-in
 or within a minute. The server fix needs a server restart to take effect; the
 app fixes alone are enough to stop this happening again.
 
+---
+
+## 2026-09-24 — The supervisor can search every call, open one, and hear it with its holds (S-02, S-03, S-04)
+
+The supervisor app had nowhere to find a call. The agent's own log (A-50) and a
+contact's history (A-62) were the only lists, and a recording had no screen to
+be played from. Now **Calls** in the sidebar searches every call from every
+agent, and opens any one of them.
+
+### The search is the server's
+
+`GET /api/communications/search`, supervisors only. Agents are refused: their
+own calls are in their own log, and a second door is what A-52 guards
+against. Every filter is part of the query and the total counts all matches, so
+page 1 of 7 means 7 (see 20 Sep, "filtering a page lies"). The filters are
+number or name, agent, branch, type, result, direction, a date range, notes
+text (the classification's and the call's own), order value from/to, recorded,
+and classified. One LINQ projection builds the row, so a page is one round trip
+whatever it joins. The page applies filters on **Search**, not per keystroke.
+
+- **Numbers.** Anything made only of digits, spaces, `+`, `-` and brackets is a
+  number. A whole number matches on its last nine digits, the caller-lookup rule
+  (A-13), so `0599…`, `+970 599…` and `00970599…` find the same calls. A test
+  caught that `+970…` first went to the name search, because of the `+`.
+- **Names** match the contact's normalised name, so ة and ه are the same (A-80).
+- **Days** are the supervisor's: the browser sends the start of the first day and
+  the start of the day after the last, as instants in its own time zone, and the
+  server converts them to UTC. Local offsets in `timestamptz` were the 20 Sep 500.
+- Under `api/communications`, not `api/calls`, so app communications (A-70) can
+  join. The **channel** filter waits for them, because every call is Phone.
+
+`GET /api/communications/{id}` adds the times, queue and extension. The
+classification, its answers and its change history come from the existing
+classification endpoints, and the audio from `GET /api/recordings/{id}`. Nothing
+was duplicated.
+
+### Hearing it, with the holds, as in the Agent App
+
+Chrome and Edge **do not play mu-law WAV**, which is all the recorder writes. So
+the browser decodes it (`src/lib/recordingWav.ts`): it walks the chunks, reads
+the `hold` chunk, turns the audio into 16-bit PCM, and gives that to a plain
+`<audio>` element, which keeps native seeking. The server is unchanged and
+serves the file as stored. The decode is tested against the G.711 values
+(±32124 at the extremes, both silences zero).
+
+The holds show as the Agent App shows them (A-51): amber marks under the seek
+bar, "On hold: 1:10–1:52" under the player, and "On hold" beside the time
+while playback is inside one. The marks are placed with `inset-inline-start`, so
+in Arabic they run from the right with the bar. The reader is a second copy of
+the Agent App's `RecordingWav`. The two apps share no code, so the tests cover
+the same cases, and `SCHEMA.md` says to change both together. **Download** gives
+the original file.
+
+### Split off, as the prompt allowed: editing a classification from here
+
+S-04 also says a supervisor may edit any classification at any time.
+`CallEditWindow` already allows it, but the web app has no classification form,
+only the designer. Building one is its own task, so the details are read-only
+for now, recorded under "Where to pick up".
+
+### Found, not fixed
+
+`GET /api/classifications/{id}/history` answers **any signed-in account for any
+call**. An agent can read who classified another agent's call, and how
+(A-52). It's recorded under "Known gaps".
+
+### Tested
+
+Server: `CallSearchTests`, 14 cases against a real database. Each test builds
+its own agent and three calls, and every search is narrowed to that agent, so
+the rest of the table can't leak in. Covered: every filter; paging and the
+total; four forms of a number; Arabic spellings of a name; the details; 404; and
+agents refused. Web: 8 reader tests (holds in order, a hold cut at the
+hang-up, an unknown chunk before the audio, the G.711 values, a non-mu-law file
+refused) and 5 page tests (rows, filters sent only on Search, a day range as
+instants, a call opened with its hold marked, an expired recording not fetched).
+All suites pass, and `npm run build` and lint are clean. **Not yet seen
+running**: checklist 1.7.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -4382,6 +4461,7 @@ and what comes after:
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |
+| Edit a classification from the supervisor's call details | S-04 | a classification form in the web app (only the designer exists) |
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |
@@ -4511,6 +4591,11 @@ there at all. See the 19 September CDR entry.
 - **Nothing displays the calls being recorded.** The rows accumulate and no
   screen reads them, so a mistake in what is stored would not be visible to
   anybody until the reports are built.
+- **Any signed-in account can read any call's classification history.**
+  `GET /api/classifications/{id}/history` has no check on whose call it is, so an
+  agent can see who classified another agent's call and how (A-52). It should
+  answer as `GET /api/classifications/{id}` does: supervisors any call, an agent
+  their own.
 - **Step 10 of the server runbook still describes the old agent setup**: two
   extensions per agent and a default branch. One extension per agent came in on
   17 September, and `users.default_branch_id` has been dropped. Rewrite it

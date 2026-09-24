@@ -15,7 +15,8 @@
     "users": "المستخدمون",
     "delivery": "التوصيل",
     "menu": "المنيو",
-    "classification": "التصنيف"
+    "classification": "التصنيف",
+    "calls": "المكالمات"
   },
   "login": {
     "heading": "تسجيل الدخول",
@@ -39,7 +40,9 @@
   },
   "common": {
     "notConnected": "غير متصل",
-    "connected": "متصل"
+    "connected": "متصل",
+    "yes": "نعم",
+    "no": "لا"
   },
   "users": {
     "heading": "المستخدمون والتحويلات",
@@ -215,7 +218,8 @@
       "Overflowed": "محوّلة",
       "Failed": "فاشلة",
       "Ringing": "ترنّ",
-      "Logged": "مسجّلة"
+      "Logged": "مسجّلة",
+      "NoAnswer": "لم يُرَد"
     }
   },
   "delivery": {
@@ -374,6 +378,84 @@
       "invalid_request": "تعذّر الحفظ.",
       "server_error": "حدث خطأ في الخادم.",
       "server_unreachable": "تعذّر الوصول إلى الخادم."
+    }
+  },
+  "calls": {
+    "heading": "المكالمات",
+    "intro": "كل المكالمات من كل الموظفين. صفِّ النتائج، ثم افتح مكالمة لتراها وتسمعها.",
+    "filters": "البحث في المكالمات",
+    "search": "بحث",
+    "clear": "مسح",
+    "failed": "تعذّر تحميل المكالمات. تحقّق من أن الخادم يعمل.",
+    "empty": "لا توجد مكالمات مطابقة.",
+    "emptyHint": "وسّع نطاق التاريخ أو امسح أحد المرشّحات.",
+    "count": "{{count}} مكالمة",
+    "count_one": "مكالمة واحدة",
+    "count_other": "{{count}} مكالمة",
+    "previous": "السابق",
+    "next": "التالي",
+    "unknownCaller": "غير مسجّل",
+    "filter": {
+      "q": "الرقم أو الاسم",
+      "from": "من",
+      "to": "إلى",
+      "notes": "الملاحظات تحتوي",
+      "minOrder": "قيمة الطلب من",
+      "maxOrder": "قيمة الطلب إلى",
+      "recording": "مسجّلة",
+      "classified": "مصنّفة",
+      "any": "الكل"
+    },
+    "columns": {
+      "when": "الوقت",
+      "direction": "الاتجاه",
+      "customer": "الزبون",
+      "agent": "الموظف",
+      "status": "النتيجة",
+      "type": "النوع",
+      "branch": "الفرع",
+      "orderValue": "قيمة الطلب",
+      "duration": "المدة",
+      "recording": "التسجيل",
+      "notes": "ملاحظات"
+    },
+    "directions": {
+      "In": "واردة",
+      "Out": "صادرة",
+      "None": "—"
+    },
+    "recording": {
+      "yes": "مسجّلة",
+      "expiredShort": "انتهت صلاحيته",
+      "loading": "جارٍ تحميل التسجيل…",
+      "none": "لا يوجد تسجيل لهذه المكالمة.",
+      "expired": "سُجّلت هذه المكالمة، وحُذف التسجيل عند انتهاء مدة الاحتفاظ به.",
+      "unreadable": "وصل التسجيل لكن تعذّرت قراءته.",
+      "failed": "تعذّر جلب التسجيل. تحقّق من أن الخادم يعمل.",
+      "play": "تشغيل",
+      "pause": "إيقاف مؤقت",
+      "position": "الموضع في التسجيل",
+      "download": "تنزيل",
+      "onHold": "في الانتظار:",
+      "holdNow": "في الانتظار"
+    },
+    "details": {
+      "heading": "تفاصيل المكالمة",
+      "close": "إغلاق",
+      "failed": "تعذّر فتح المكالمة.",
+      "extension": "التحويلة",
+      "queue": "قائمة الانتظار",
+      "answeredAt": "وقت الرد",
+      "endedAt": "وقت الانتهاء",
+      "recording": "التسجيل",
+      "callNotes": "ملاحظة على المكالمة",
+      "classification": "التصنيف",
+      "followUp": "متابعة",
+      "resolved": "تم الحل",
+      "classifiedBy": "صنّفها {{name}}، {{at}}",
+      "history": "التغييرات",
+      "firstClassified": "{{at}}: صنّفها {{name}}",
+      "changed": "{{at}}: عدّلها {{name}}"
     }
   }
 }

@@ -172,7 +172,10 @@ little-endian `uint32` per hold, the frame it began at and how many frames it
 lasted, where a frame is 1/8000 s. A call never held has no such chunk, so
 recordings before that date read as never held. Every WAV reader skips a chunk it
 does not know, so the file plays anywhere. The reader is `RecordingWav` in the
-Agent App; the supervisor's player (S-02) should read the same chunk.
+Agent App. The supervisor's player reads the same chunk in the browser
+(`src/CallCenter.Web/src/lib/recordingWav.ts`, since 24 Sep 2026), and also
+decodes the mu-law, which Chrome and Edge do not play. Change one reader, change
+both.
 
 Notes
 - One table for phone and app makes every report one query (`kind`/`channel_id` splits them).

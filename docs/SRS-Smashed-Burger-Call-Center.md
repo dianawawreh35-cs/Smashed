@@ -203,7 +203,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | ID | Requirement | Priority |
 |---|---|---|
 | S-01 | Login with supervisor account (browser on the LAN). Session expires after inactivity. | Must |
-| S-02 | Global search across calls, app communications and contacts: by phone number, customer name, agent, branch, channel, type, date range, notes text, order value range, status, has recording. | Must |
+| S-02 | Global search across calls, app communications and contacts: by phone number, customer name, agent, branch, channel, type, date range, notes text, order value range, status, has recording. **Built 24 Sep 2026 for calls; app communications and the channel filter join when A-70 exists.** Filtered and paged by the server. | Must |
 | S-03 | Every communication opens with full details: agent, customer, branch, channel, date/time, duration (calls), type, notes, order value, recording player, and the audit trail of changes. | Must |
 | S-04 | Play and download recordings for any agent; edit any classification at any time (logged). | Must |
 | S-05 | Export any list or report to Excel/CSV. | Must |

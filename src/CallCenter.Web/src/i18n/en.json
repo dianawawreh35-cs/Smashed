@@ -15,7 +15,8 @@
     "users": "Users",
     "delivery": "Delivery",
     "menu": "Menu",
-    "classification": "Classification"
+    "classification": "Classification",
+    "calls": "Calls"
   },
   "login": {
     "heading": "Sign in",
@@ -39,7 +40,9 @@
   },
   "common": {
     "notConnected": "Not connected",
-    "connected": "Connected"
+    "connected": "Connected",
+    "yes": "Yes",
+    "no": "No"
   },
   "users": {
     "heading": "Users and extensions",
@@ -215,7 +218,8 @@
       "Overflowed": "Overflowed",
       "Failed": "Failed",
       "Ringing": "Ringing",
-      "Logged": "Logged"
+      "Logged": "Logged",
+      "NoAnswer": "Not answered"
     }
   },
   "delivery": {
@@ -374,6 +378,84 @@
       "invalid_request": "It could not be saved.",
       "server_error": "The server had a problem.",
       "server_unreachable": "The server could not be reached."
+    }
+  },
+  "calls": {
+    "heading": "Calls",
+    "intro": "Every call, from every agent. Filter, then open one to see and hear it.",
+    "filters": "Search calls",
+    "search": "Search",
+    "clear": "Clear",
+    "failed": "The calls could not be loaded. Check the server is running.",
+    "empty": "No calls match.",
+    "emptyHint": "Widen the dates, or clear a filter.",
+    "count": "{{count}} calls",
+    "count_one": "1 call",
+    "count_other": "{{count}} calls",
+    "previous": "Previous",
+    "next": "Next",
+    "unknownCaller": "Not on file",
+    "filter": {
+      "q": "Number or name",
+      "from": "From",
+      "to": "To",
+      "notes": "Notes contain",
+      "minOrder": "Order from",
+      "maxOrder": "Order to",
+      "recording": "Recorded",
+      "classified": "Classified",
+      "any": "Any"
+    },
+    "columns": {
+      "when": "When",
+      "direction": "Direction",
+      "customer": "Customer",
+      "agent": "Agent",
+      "status": "Result",
+      "type": "Type",
+      "branch": "Branch",
+      "orderValue": "Order value",
+      "duration": "Duration",
+      "recording": "Recording",
+      "notes": "Notes"
+    },
+    "directions": {
+      "In": "Incoming",
+      "Out": "Outgoing",
+      "None": "—"
+    },
+    "recording": {
+      "yes": "Recorded",
+      "expiredShort": "Expired",
+      "loading": "Loading the recording…",
+      "none": "This call has no recording.",
+      "expired": "This call was recorded, and the recording was deleted when its retention period ended.",
+      "unreadable": "The recording arrived but could not be read.",
+      "failed": "The recording could not be fetched. Check the server is running.",
+      "play": "Play",
+      "pause": "Pause",
+      "position": "Position in the recording",
+      "download": "Download",
+      "onHold": "On hold:",
+      "holdNow": "On hold"
+    },
+    "details": {
+      "heading": "Call details",
+      "close": "Close",
+      "failed": "The call could not be opened.",
+      "extension": "Extension",
+      "queue": "Queue",
+      "answeredAt": "Answered",
+      "endedAt": "Ended",
+      "recording": "Recording",
+      "callNotes": "Note on the call",
+      "classification": "Classification",
+      "followUp": "Follow-up",
+      "resolved": "Resolved",
+      "classifiedBy": "Classified by {{name}}, {{at}}",
+      "history": "Changes",
+      "firstClassified": "{{at}}: classified by {{name}}",
+      "changed": "{{at}}: changed by {{name}}"
     }
   }
 }

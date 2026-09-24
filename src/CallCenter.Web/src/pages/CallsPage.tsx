@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -68,6 +68,11 @@ function toFilters(d: Draft): CallFilters {
  * would say "no calls" whenever the match was older than the page (20 Sep).
  * The filters apply on Search, not on every keystroke, so typing a number does
  * not send a query per digit across a year of calls.
+ *
+ * **A call opens under its own row**, by double-click or its Open button, the
+ * same as the menu, delivery and users lists (21 Sep, "The editors open where
+ * you are"). It first opened above the table and scrolled up to it, which on
+ * page 3 of a busy day is exactly the jump that decision was made to end.
  */
 export default function CallsPage() {
   const { t, i18n } = useTranslation()
@@ -185,8 +190,6 @@ export default function CallsPage() {
         </div>
       </form>
 
-      {openId && <CallDetails id={openId} onClose={() => setOpenId(null)} />}
-
       {results.isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : results.isError ? (
@@ -216,14 +219,27 @@ export default function CallsPage() {
                 <th>{t('calls.columns.duration')}</th>
                 <th>{t('calls.columns.recording')}</th>
                 <th>{t('calls.columns.notes')}</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {results.data!.rows.map((row) => (
-                <Row key={row.id} row={row} open={row.id === openId} onOpen={() => {
-                  setOpenId(row.id)
-                  window.scrollTo?.({ top: 0, behavior: 'smooth' })
-                }} />
+                <Fragment key={row.id}>
+                  <Row
+                    row={row}
+                    open={row.id === openId}
+                    onToggle={() => setOpenId(row.id === openId ? null : row.id)}
+                  />
+                  {/* Where the supervisor is already looking, not at the top of
+                      a list they have scrolled past. */}
+                  {row.id === openId && (
+                    <tr>
+                      <td colSpan={COLUMNS} className="bg-ink-950/60 p-3">
+                        <CallDetails id={row.id} onClose={() => setOpenId(null)} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -233,18 +249,17 @@ export default function CallsPage() {
   )
 }
 
-function Row({ row, open, onOpen }: { row: CallRow; open: boolean; onOpen: () => void }) {
+/** The table's columns, counting the one for the Open button. */
+const COLUMNS = 12
+
+function Row({ row, open, onToggle }: { row: CallRow; open: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
 
   return (
-    <tr
-      onClick={onOpen}
-      onKeyDown={(e) => e.key === 'Enter' && onOpen()}
-      tabIndex={0}
-      aria-selected={open}
-      className={`cursor-pointer hover:bg-ink-800 ${open ? 'bg-ink-800' : ''}`}
-    >
+    // Double-click is a shortcut, never the only way in: the Open button does
+    // the same, and is what a keyboard reaches.
+    <tr onDoubleClick={onToggle} className={`hover:bg-ink-800/60 ${open ? 'bg-ink-800' : ''}`}>
       <td className="whitespace-nowrap">{new Date(row.startedAt).toLocaleString(i18n.language)}</td>
       <td>{t(`calls.directions.${row.direction}`)}</td>
       <td>
@@ -267,6 +282,13 @@ function Row({ row, open, onOpen }: { row: CallRow; open: boolean; onOpen: () =>
         ) : null}
       </td>
       <td className="max-w-[16rem] truncate text-slate-400" title={row.notes ?? undefined}>{row.notes}</td>
+      {/* The double-click stops here, so a quick double press of the button
+          does not open the call and close it again. */}
+      <td className="text-end" onDoubleClick={(e) => e.stopPropagation()}>
+        <button type="button" className="btn-ghost btn-sm" aria-expanded={open} onClick={onToggle}>
+          {open ? t('calls.details.close') : t('calls.open')}
+        </button>
+      </td>
     </tr>
   )
 }

@@ -456,6 +456,7 @@
       "history": "التغييرات",
       "firstClassified": "{{at}}: صنّفها {{name}}",
       "changed": "{{at}}: عدّلها {{name}}"
-    }
+    },
+    "open": "فتح"
   }
 }

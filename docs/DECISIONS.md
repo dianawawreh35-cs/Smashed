@@ -4412,6 +4412,15 @@ the Agent App's `RecordingWav`. The two apps share no code, so the tests cover
 the same cases, and `SCHEMA.md` says to change both together. **Download** gives
 the original file.
 
+### A call opens under its own row
+
+Reported the same evening: double-clicking a call jumped to the top of the page.
+It had been built to open the details above the table and scroll up to them,
+which is exactly what 21 September ruled out for the menu, delivery and users
+lists. Now a call opens in a row straight under the one double-clicked, and its
+**Open** button (which the keyboard reaches) does the same and becomes
+**Close**. A test checks that the details sit in the next row.
+
 ### Split off, as the prompt allowed: editing a classification from here
 
 S-04 also says a supervisor may edit any classification at any time.

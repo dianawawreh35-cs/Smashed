@@ -106,7 +106,6 @@ beforeEach(async () => {
   await i18n.changeLanguage('en')
   URL.createObjectURL = vi.fn(() => 'blob:recording')
   URL.revokeObjectURL = vi.fn()
-  window.scrollTo = vi.fn() as unknown as typeof window.scrollTo
 })
 
 afterEach(() => {
@@ -166,11 +165,26 @@ describe('calls page', () => {
     expect(new Date(sent.searchParams.get('to')!)).toEqual(new Date(2026, 8, 25))
   })
 
+  it('opens a call under its own row on double-click, not at the top of the page', async () => {
+    vi.stubGlobal('fetch', server())
+
+    renderPage()
+    const row = (await screen.findByText('Old caller')).closest('tr')!
+    fireEvent.doubleClick(row)
+
+    const details = await screen.findByRole('region', { name: 'Call details' })
+    // The row straight after the one double-clicked holds the details.
+    expect(row.nextElementSibling).toContainElement(details)
+    expect(within(row).getByRole('button', { name: 'Close' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('opens a call with its recording, and marks where it was on hold', async () => {
     vi.stubGlobal('fetch', server())
 
     renderPage()
-    fireEvent.click(await screen.findByText('Mahmoud'))
+    const row = (await screen.findByText('Mahmoud')).closest('tr')!
+    // The button, as a keyboard reaches it: double-click is only a shortcut.
+    fireEvent.click(within(row).getByRole('button', { name: 'Open' }))
 
     const details = await screen.findByRole('region', { name: 'Call details' })
     expect(within(details).getByText('smashed-002')).toBeInTheDocument()
@@ -187,7 +201,7 @@ describe('calls page', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     renderPage()
-    fireEvent.click(await screen.findByText('Old caller'))
+    fireEvent.doubleClick((await screen.findByText('Old caller')).closest('tr')!)
 
     expect(await screen.findByText(/deleted when its retention period ended/)).toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/recordings/c2'))).toBe(false)

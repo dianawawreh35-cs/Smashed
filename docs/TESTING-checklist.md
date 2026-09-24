@@ -152,6 +152,10 @@ Needs a second supervisor account; add one in Users if there is only one.
       classified. *If a filter seems to do nothing:* check the count changes.
       The server does the filtering, so the count is over every call.
 - [ ] **Typing does not search.** Nothing changes until Search is pressed.
+- [ ] **Double-click a call near the bottom of the page.** It opens **in a row
+      right under it**, with no jump to the top. Its **Open** button does the
+      same, and turns into **Close**. *Reported 24 Sep:* it first opened above
+      the table and scrolled up to it.
 - [ ] **Open a recorded call.** The details show the agent, extension, queue,
       times, and (if classified) type, branch, order value, notes, answers and
       who changed it when. **Play** the recording: the customer and the agent

@@ -456,6 +456,7 @@
       "history": "Changes",
       "firstClassified": "{{at}}: classified by {{name}}",
       "changed": "{{at}}: changed by {{name}}"
-    }
+    },
+    "open": "Open"
   }
 }

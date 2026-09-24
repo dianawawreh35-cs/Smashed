@@ -229,6 +229,87 @@ public class LoginTests(CallCenterApiFactory factory)
         exitCode.Should().Be(1);
     }
 
+    [DatabaseFact]
+    public async Task Reset_password_on_the_command_line_signs_the_account_out_everywhere_at_once()
+    {
+        // If a password is reset because it leaked, a token already handed out
+        // must stop working now, not when it expires twelve hours later.
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (client, _) = await data.SignInAsync(agent);
+        (await client.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await ResetPasswordCommand.RunAsync(
+            factory.Services, ["reset-password", "--user", agent.Login, "--password", "NewPass!2026"]);
+
+        (await client.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await client.GetAsync("/api/communications/mine")).StatusCode
+            .Should().Be(HttpStatusCode.Unauthorized, "every endpoint refuses it, not only /me");
+    }
+
+    [DatabaseFact]
+    public async Task A_supervisor_resetting_a_password_in_the_Users_screen_signs_that_agent_out()
+    {
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (agentClient, _) = await data.SignInAsync(agent);
+        var (supervisorClient, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+
+        var reset = await supervisorClient.PostAsJsonAsync(
+            $"/api/users/{agent.Id}/password", new { newPassword = "NewPass!2026" });
+        reset.IsSuccessStatusCode.Should().BeTrue();
+
+        (await agentClient.GetAsync("/api/communications/mine")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await supervisorClient.GetAsync("/api/auth/me")).StatusCode
+            .Should().Be(HttpStatusCode.OK, "only the account whose password changed is signed out");
+    }
+
+    [DatabaseFact]
+    public async Task Disabling_an_account_signs_it_out_at_once()
+    {
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (agentClient, _) = await data.SignInAsync(agent);
+        var (supervisorClient, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+
+        var disable = await supervisorClient.PutAsJsonAsync(
+            $"/api/users/{agent.Id}", new { displayName = agent.DisplayName, isActive = false });
+        disable.IsSuccessStatusCode.Should().BeTrue();
+
+        (await agentClient.GetAsync("/api/communications/mine")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [DatabaseFact]
+    public async Task A_change_of_role_retires_the_tokens_issued_under_the_old_one()
+    {
+        // The role is in the token. An agent promoted with --make-supervisor
+        // would otherwise go on acting as an agent for twelve hours, and a
+        // demotion would leave supervisor powers in a token.
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (client, _) = await data.SignInAsync(agent);
+
+        await ResetPasswordCommand.RunAsync(
+            factory.Services,
+            ["reset-password", "--user", agent.Login, "--password", TestData.Password, "--make-supervisor"]);
+
+        (await client.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "even with the same password, the role it was issued under is gone");
+
+        var again = await data.Client().PostAsJsonAsync(
+            "/api/auth/login", new LoginRequest(agent.Login, TestData.Password));
+        var body = (await again.Content.ReadFromJsonAsync<LoginResponse>())!;
+        body.User.Role.Should().Be(UserRoles.Supervisor, "a fresh sign-in carries the new role");
+    }
+
+    [DatabaseFact]
+    public async Task Signing_in_again_does_not_retire_the_token_from_an_earlier_sign_in()
+    {
+        // Two laptops, or the Agent App and a reload: the stamp only changes when
+        // the account does, so a second sign-in leaves the first one working.
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (first, _) = await data.SignInAsync(agent);
+        await data.SignInAsync(agent);
+
+        (await first.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     private static async Task ShouldBeRefusedAsync(HttpResponseMessage response, string code)
     {
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);

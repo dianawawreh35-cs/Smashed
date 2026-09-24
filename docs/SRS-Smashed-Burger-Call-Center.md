@@ -321,7 +321,7 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 | N-03 | Capacity: 5 agents initially, designed for up to 20 without changes; one server. | Must |
 | N-04 | Availability: the phone function of the Agent App never depends on the server being up (see A-04). It does depend on the VPN and the provider (N-01), which are outside the developer's control — the agreed uptime and support hours for them are the client's arrangement with the provider (see 12.3). | Must |
 | N-04a | The Agent App shows at all times whether the phone is usable, and says which part is missing — not connected to the VPN, not registered, or server unreachable — so an agent can tell a network problem from a broken application (see A-02). | Must |
-| N-05 | Security: role-based access; passwords hashed; recordings served only to authorised users through the API (never as shared folders); SIP credentials stored encrypted on the server and never shown to agents. | Must |
+| N-05 | Security: role-based access; passwords hashed; recordings served only to authorised users through the API (never as shared folders); SIP credentials stored encrypted on the server and never shown to agents. A password reset, a disabled account or a change of role takes effect on existing sign-ins at once, not when they expire. | Must |
 | N-06 | Audit: all edits to classifications and contacts record user and time. | Must |
 | N-07 | Backup: nightly automatic backup of database and recordings to a second disk or client-provided location; restore procedure documented and tested at handover. | Must |
 | N-08 | Data retention: communications and contacts kept indefinitely; recordings 90 days by default (S-43). | Must |

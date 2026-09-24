@@ -36,6 +36,10 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Login),
             new(ClaimTypes.Role, user.Role),
+
+            // What lets a password reset, a disable or a role change revoke
+            // this token before it expires (N-05).
+            new(AppClaims.Stamp, AccountTokenCheck.Stamp(user.PasswordHash, user.Role)),
         };
 
         if (sessionId is not null)

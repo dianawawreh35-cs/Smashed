@@ -18,4 +18,10 @@ public static class AppClaims
 {
     /// <summary>The <c>agent_sessions</c> row this token was issued for (A-05).</summary>
     public const string SessionId = "sid";
+
+    /// <summary>
+    /// Fingerprint of the account's password and role when the token was issued.
+    /// A token whose stamp no longer matches is refused (see <see cref="AccountTokenCheck"/>).
+    /// </summary>
+    public const string Stamp = "stamp";
 }

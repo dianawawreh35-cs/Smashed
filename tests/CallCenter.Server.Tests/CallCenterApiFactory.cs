@@ -1,5 +1,12 @@
+using System.Security.Claims;
+using CallCenter.Server.Data;
+using CallCenter.Server.Features.Auth;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace CallCenter.Server.Tests;
 
@@ -47,6 +54,37 @@ public class CallCenterApiFactory : WebApplicationFactory<Program>
             .UseEnvironment("Testing")
             .UseSetting("Database:MigrateOnStartup", HasDatabase ? "true" : "false")
             .UseSetting("Jwt:SigningKey", SigningKey)
-            .UseSetting("Security:SipSecretKey", "test-only-sip-secret-key");
+            .UseSetting("Security:SipSecretKey", "test-only-sip-secret-key")
+            .ConfigureTestServices(services =>
+            {
+                services.RemoveAll<AccountTokenCheck>();
+                services.AddScoped<AccountTokenCheck, TokensForMadeUpAccounts>();
+            });
+    }
+
+    /// <summary>
+    /// Puts the real <see cref="AccountTokenCheck"/> back, for a host that signs
+    /// real accounts in. <see cref="TestData.Client"/> uses it, so every
+    /// database test goes through the check that production runs.
+    /// </summary>
+    public static void UseRealTokenCheck(IServiceCollection services)
+    {
+        services.RemoveAll<AccountTokenCheck>();
+        services.AddScoped<AccountTokenCheck>();
+    }
+
+    /// <summary>
+    /// Accepts any correctly signed token. <b>Only for the door tests</b>, which
+    /// mint tokens for accounts that exist nowhere, to check a policy (a
+    /// supervisor is 403, a blank name is 400) without a database. The real
+    /// check would turn every one of them into a 401 before the policy ran.
+    /// Whether a token outlives a password reset is tested with real accounts,
+    /// in <see cref="LoginTests"/>.
+    /// </summary>
+    private sealed class TokensForMadeUpAccounts(CallCenterDbContext db, ILogger<AccountTokenCheck> logger)
+        : AccountTokenCheck(db, logger)
+    {
+        public override Task<bool> IsCurrentAsync(ClaimsPrincipal principal, CancellationToken ct) =>
+            Task.FromResult(true);
     }
 }

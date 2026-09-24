@@ -81,6 +81,8 @@ try
     builder.Services.AddScoped<ClassificationTypeService>();
     builder.Services.AddScoped<SettingsService>();
 
+    builder.Services.AddScoped<AccountTokenCheck>();
+
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
               ?? throw new InvalidOperationException(
                   "The 'Jwt' configuration section is missing. See docs/DEPLOY-server-runbook.md step 5.");
@@ -117,6 +119,10 @@ try
 
                     return Task.CompletedTask;
                 },
+
+                // A token outlives nothing that happens to its account: a reset
+                // password, a disable or a new role refuses it at once (N-05).
+                OnTokenValidated = AccountTokenCheck.OnTokenValidatedAsync,
             };
         });
 

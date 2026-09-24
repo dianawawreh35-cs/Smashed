@@ -3785,10 +3785,10 @@ A VIP isn't on it.
 
 Run locally against a scratch database: `docs/DEVELOPING.md` section 5.
 
-### Found on the way, not fixed
+### Found on the way (fixed the same day; see the password-reset entry below)
 
-**A token outlives `reset-password`.** The command closes the account's sessions
-"so the old tokens stop working", and they don't. Nothing checks a session
+**A token outlived `reset-password`.** The command closed the account's sessions
+"so the old tokens stop working", and they didn't. Nothing checks a session
 when a request arrives, so a token lasts its full 12 hours. It's recorded under
 "Known gaps". Fixing it means a session lookup on every request, which should be
 decided together with the concurrency item rather than slipped in here.
@@ -4044,6 +4044,65 @@ the card in either language. The seek bar follows the layout direction, so in
 Arabic it fills from the right. That is a choice to confirm on the screenshot,
 not a settled one. Checklist steps are in `TESTING-checklist.md`.
 
+---
+
+## 2026-09-24 — A password reset now signs the account out everywhere, at once (N-05)
+
+Found while writing the login tests this morning. `reset-password` closed the
+account's sessions "so the old tokens stop working", but they didn't. Nothing
+looked at the account when a request arrived. A token checked its own signature
+and expiry and nothing else, so it lasted its full 12 hours. The same went for
+the Users screen's password reset, for disabling an account, and for a change of
+role. If a password was reset because it leaked, whoever held a token kept it.
+
+**Each token now carries a stamp**, a short fingerprint of the account's
+password hash and role when it was issued. On every signed-in request,
+`AccountTokenCheck` reads that account's hash, role and enabled flag (one
+primary-key read of two columns and a flag) and refuses the token with a 401 if
+the fingerprint no longer matches or the account is disabled. Because the stamp
+is derived from the row rather than stored beside it, **every way of changing
+those things revokes the tokens without extra code**: the command line, the
+Users screen, a disable, `--make-supervisor`. A plain second sign-in changes
+nothing, so the Agent App on one laptop and a reload in the browser don't sign
+each other out.
+
+**Why a stamp and not the sessions.** Checking `agent_sessions` would have been
+the obvious route, since reset-password already closes them. But supervisors
+have no session, and a supervisor is the likeliest account to be reset. The
+stamp covers both roles, and needs no migration.
+
+**One cost at the upgrade:** tokens issued before this have no stamp and are
+refused. **Everyone signs in once more after the server is updated.** Deploy
+between shifts. The Agent App's call queue keeps anything a 401 refused and
+sends it after the next sign-in, so no call report is lost.
+
+**The cost per request is one small query.** It lands on exactly the path the
+concurrency item is about ("authenticated requests collapse when they arrive
+together"). It is almost certainly not that bug, which predates it, but measure
+with it in place when that item is worked on.
+
+**Tested with real accounts** (`LoginTests`, 5 new): a token refused at once
+after reset-password on the command line and after a reset in the Users screen,
+on every endpoint and not just `/me`; refused after a disable and after a role
+change; and a second sign-in leaving the first working. With the check switched
+off, exactly the four refusal tests fail. `AccountTokenCheckTests` (6, no
+database) covers the stamp itself, and shows a token without a stamp is refused
+before any query.
+
+The door tests mint tokens for accounts that exist nowhere, to check policies
+without a database. The default test host gives them a stand-in that accepts any
+signed token (`TokensForMadeUpAccounts`, documented as for those tests only).
+Every database test runs the real check.
+
+### Not done here: the apps don't notice
+
+The server refuses a revoked token at once. **Neither app reacts to that yet.**
+The Agent App shows failed lookups and queues its call reports until the agent
+signs in again. The SIP registration is separate from the token, so **the phone
+keeps ringing**. The web app goes back to its sign-in page only on a reload.
+Signing the agent out on the first 401 is the missing half, and it is recorded
+under "Known gaps".
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -4180,13 +4239,12 @@ there at all. See the 19 September CDR entry.
 
 ## Known gaps in what is built
 
-- **A token outlives `reset-password`.** The command closes the account's
-  sessions, and its comment says that stops the old tokens working. It doesn't.
-  Nothing checks a session when a request arrives, so a token stays good until
-  it expires, up to 12 hours (`Jwt:Lifetime`). If a password was reset because
-  it leaked, whoever holds a token keeps it. The fix is to check the session on
-  each request (on `OnTokenValidated`), which puts a query on every call. Decide
-  that together with the concurrency item, which is about exactly that cost.
+- **Neither app reacts when its token is refused.** Since 24 September a
+  password reset, a disable or a role change makes the server refuse the
+  account's tokens at once. But the Agent App carries on with failed lookups and
+  a growing call queue, and its phone stays registered. The web app only notices
+  on a reload. Both should go back to the sign-in screen on the first 401 from a
+  signed-in call, and the Agent App should unregister the phone as it does so.
 - **The call path has met a PBX and works.** Confirmed on 2026-09-20: a call
   arrives through queue `smashed-002`, the pop-up appears, Answer connects
   two-way audio, and Hang up ends the leg cleanly. The automatic rejection of a

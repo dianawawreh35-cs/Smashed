@@ -10,7 +10,9 @@ namespace CallCenter.Shared.Contracts.Auth;
 /// <param name="Password">Plain password, checked against the BCrypt hash.</param>
 /// <param name="LaptopId">
 /// Machine name of the laptop. Laptops are shared between shifts (A-05), so the
-/// session row records which machine this login happened on.
+/// session row records which machine this login happened on. Only the Agent App
+/// sends it, and an agent's session and SIP details are only issued with it: the
+/// web app leaves it out, so an agent signing in there is given neither.
 /// </param>
 /// <param name="AppVersion">Agent App version, recorded for support.</param>
 public record LoginRequest(

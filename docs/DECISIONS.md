@@ -3578,6 +3578,90 @@ the door and validation checks on both notes endpoints. **Not yet seen
 running** — neither notes box has been opened against a real call, and the
 migration has not been applied to a real database.
 
+## 2026-09-24 — The Agent App refuses supervisors, and its `Sip` settings are gone
+
+Two items from "Known gaps", both there since the phone was first built.
+
+### Supervisors are turned away at sign-in (A-01)
+
+The Agent App let supervisors in so that sign-in could be tested before user
+management existed. That reason went with the Users screen. A supervisor in the
+Agent App gets no extension, no session row, and a 403 from every call it tries
+to report, so it half-works. Now `SignInService` refuses any account that is not
+an agent, with `login.errors.not_an_agent` ("Supervisors use the web app in the
+browser"), before anything is stored. There is nothing to close on the server,
+because only agents are given a session.
+
+**It is checked in the app, not the server, and that is deliberate.** The
+web app refuses agents the same way, in the browser after the login succeeds
+(`api/auth.ts`). A server check would need the request to say which app is
+signing in, and any client could claim either. So it would protect nothing: a
+supervisor's token already reaches everything the Agent App can, and the
+agent-only endpoints already refuse supervisors. The refusal is about sending
+people to the right app, not about access.
+
+`login.errors.{code}` is built at runtime, so the label test could not see it.
+`AgentAppLabelsTests` now checks that every `LoginErrorCodes` value has a sign-in
+label.
+
+### The whole `Sip` section went, not three keys of it
+
+`Server`, `Username` and `Password` were known to be dead: they arrive in the
+login response (A-01). **`RtpPortMin` and `RtpPortMax` were recorded here as
+real, and they are not.** Nothing in the Agent App reads the `Sip` section at
+all. Only `Server`, `Dialing` and `Recording` are bound, and `CreateMedia()`
+builds its `VoIPMediaSession` without a port, so SIPSorcery picks one. Every
+call so far has worked like that across the VPN. Leaving the two keys would have
+been the same trap as the other three: a setting that looks like it controls
+the audio port and doesn't.
+
+If a laptop firewall ever needs a fixed RTP range, it has to be built: passed
+to the media session and tested on a call. It is not a setting that only needs
+to be switched back on.
+
+### Found on the way, and fixed the same day
+
+**An agent who signed in to the web app left a session open, and got their SIP
+secret in the browser.** The server opened an `agent_sessions` row for any agent
+login and returned the decrypted secret. The browser then refused the agent and
+threw both away without logging out, so the row counted them as signed in until
+something closed it.
+
+Now **an agent session and the SIP details are only issued when the request
+carries a laptop id**. Only the Agent App sends one (`Environment.MachineName`);
+the web app never has. The login itself still succeeds, because the web app needs
+the role to tell the agent where to go. The old `"unknown"` laptop fallback went
+with it: nothing legitimate signed an agent in without a laptop.
+
+This isn't protection against a client that lies. A laptop id is a claim, like
+the app check above. What it stops is the web app, working as designed, leaving a
+session behind and a secret in a browser (N-05). An agent who fakes a laptop id
+from a browser gets only their own extension, with their own password.
+`AgentSignInTests` covers both sides against a real database, and the web case
+fails against the old code.
+
+These are the suite's first tests that need PostgreSQL and are **skipped**, not
+passed, without it. `[DatabaseFact]` does that, and the tests planned for login,
+call logging and flags will use it too.
+
+**The install guide set up a call-back extension that no longer exists.** Step 3
+opened `5060/udp` and `10000:10100/udp`, and `.env.example` carried
+`CALLBACK_EXT`, `AMI_USER`, `AMI_PASSWORD`, `SERVER_IP`, `PBX_HOST` and
+`RTP_PORT_MIN`/`MAX`. The runbook's own copy of the file had `PBX_IP`. **Nothing
+in the server reads any of them.** The call-back extension was removed and AMI
+ruled out on 19 September, and the PBX address has been the `pbx.host` setting
+since the 16th. All gone, and the compose comments no longer say the API does SIP
+or AMI. Step 7 now says to set `pbx.host` in Settings. No step said that before,
+and a blank one means every agent signs in without a phone.
+
+A fresh install is unaffected, apart from two firewall ports that are no longer
+opened. On a server already installed, `sudo ufw delete allow from
+192.168.1.0/24 to any port 5060 proto udp`, and the same for `10000:10100`,
+closes them. The stray `.env` lines do no harm.
+
+**Still stale, and not touched here:** step 10 of the runbook still describes two
+extensions per agent and a default branch. Both went on 17 September.
+
 ---
 
 # Open items (live)
@@ -3740,13 +3824,10 @@ there at all. See the 19 September CDR entry.
   flags then do — finding the contact a number belongs to, creating a nameless
   one when nothing matches, and the audit rows — is untested for the same reason
   as login: the suite runs without PostgreSQL.
-- **The Agent App accepts supervisor logins.** Deliberate while the phone was
-  being built — it is how sign-in was tested before user management existed. The
-  supervisor web app already refuses agents. Close this before handover.
-- **The Agent App's `appsettings.json` has a dead `Sip` section.** Nothing reads
-  `Server`, `Username` or `Password`; they arrive in the login response (A-01).
-  Misleading, because it looks like where the PBX is configured.
-  `RtpPortMin`/`RtpPortMax` are real and should stay.
+- **Step 10 of the server runbook still describes the old agent setup**: two
+  extensions per agent and a default branch. One extension per agent came in on
+  17 September, and `users.default_branch_id` has been dropped. Rewrite it
+  against the current Users screen before the next install.
 - **Two of the three UI checks are still throwaway scripts.** The label check
   became a real test on 22 September (`AgentAppLabelsTests`), after the fourth
   label to reach the screen as a raw key. The other two are not reproducible by

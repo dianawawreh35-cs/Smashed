@@ -3,8 +3,9 @@
 #   cp .env.example .env      # then fill in the secrets
 #   docker compose up -d
 #
-# The API runs with network_mode: host so the SIP/RTP media path and the
-# Asterisk Manager Interface connection reach the PBX without NAT.
+# The API runs with network_mode: host so it uses the host's VPN route to the
+# PBX, for the CDR import (runbook step 8). It makes no SIP or audio connection:
+# the softphone runs on each agent's laptop.
 
 services:
   db:
@@ -33,8 +34,8 @@ services:
     image: callcenter-api:latest
     container_name: callcenter-api
     restart: unless-stopped
-    # Host networking: required for SIP/RTP and AMI against the PBX, and so the
-    # container uses the host's VPN route to the provider.
+    # Host networking, so the container uses the host's VPN route to the
+    # provider.
     network_mode: host
     env_file:
       - .env

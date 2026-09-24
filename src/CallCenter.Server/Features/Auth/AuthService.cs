@@ -53,15 +53,23 @@ public class AuthService(
             return (null, LoginFailure.AccountDisabled);
         }
 
+        // An agent session belongs to a laptop running the Agent App (A-05): the
+        // row records which machine, and the SIP secret is for the softphone on
+        // it. The web app sends no laptop id, and it refuses agents once it sees
+        // the role. So an agent who signs in there must leave nothing behind: no
+        // session row counting them as signed in, and no secret in a browser
+        // (N-05).
+        var fromAgentApp = !string.IsNullOrWhiteSpace(request.LaptopId);
+
         // Only agents get a session row: it is what the idle-logout timer closes
         // and what presence is reported against (A-05, A-83).
         AgentSession? session = null;
-        if (user.Role == UserRoles.Agent)
+        if (user.Role == UserRoles.Agent && fromAgentApp)
         {
             session = new AgentSession
             {
                 UserId = user.Id,
-                LaptopId = string.IsNullOrWhiteSpace(request.LaptopId) ? "unknown" : request.LaptopId.Trim(),
+                LaptopId = request.LaptopId!.Trim(),
                 AppVersion = request.AppVersion,
                 LoggedInAt = DateTimeOffset.UtcNow,
             };
@@ -79,14 +87,17 @@ public class AuthService(
         var (token, expiresAt) = tokens.Issue(user, sessionId);
 
         logger.LogInformation(
-            "{Role} {Login} signed in from {LaptopId}", user.Role, user.Login, request.LaptopId ?? "unknown");
+            "{Role} {Login} signed in from {LaptopId}",
+            user.Role,
+            user.Login,
+            fromAgentApp ? request.LaptopId!.Trim() : "the web app");
 
         return (new LoginResponse(
             token,
             expiresAt,
             ToDto(user),
             sessionId,
-            await BuildExtensionsAsync(user, ct)), null);
+            fromAgentApp ? await BuildExtensionsAsync(user, ct) : null), null);
     }
 
     /// <summary>

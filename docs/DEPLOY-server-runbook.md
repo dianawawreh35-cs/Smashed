@@ -84,13 +84,14 @@ sudo apt install -y ufw curl unzip
 sudo ufw allow from 192.168.1.0/24 to any port 22 proto tcp
 sudo ufw allow from 192.168.1.0/24 to any port 80 proto tcp
 sudo ufw allow from 192.168.1.0/24 to any port 5000 proto tcp
-# Callback extension (SIP signalling + audio) — only if you use that feature
-sudo ufw allow from 192.168.1.0/24 to any port 5060 proto udp
-sudo ufw allow from 192.168.1.0/24 to any port 10000:10100 proto udp
 sudo ufw enable
 sudo ufw status
 ```
-The RTP range 10000–10100 must match what you configure in the API's SIP settings.
+Nothing else is opened. **The server takes no part in the phone calls.** The
+softphone runs on each agent's laptop, which registers with the PBX itself. Older
+copies of this runbook also opened `5060/udp` and `10000:10100/udp` for a
+call-back extension on the server. That feature was removed on 19 September 2026
+(S-56), so don't open those ports.
 
 Port 80 is what lets the supervisor open the dashboard by typing the server
 address on its own, with no port number after it. Nothing listens on 5001, so
@@ -116,7 +117,7 @@ docker compose version
 
 ## Step 5 — Application folder and settings
 
-**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, PBX address, the CDR pull account) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database, the recordings or the menu photographs.
+**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, signing keys, the CDR pull account) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database, the recordings or the menu photographs.
 
 **Work**
 ```bash
@@ -138,20 +139,20 @@ Fill in:
 POSTGRES_PASSWORD=<long random>
 JWT_SECRET=<long random, 64+ chars>
 SIP_SECRET_KEY=<long random, 32+ chars>
-SERVER_IP=192.168.1.100
-PBX_IP=192.168.1.10
 CDR__HOST=192.168.1.10
 CDR__PORT=22
 CDR__USERNAME=cdrpull
 CDR__KEYPATH=/opt/callcenter/secrets/cdrpull
 CDR__REMOTEPATH=/var/log/asterisk/cdr-csv/Master.csv
 CDR__INTERVALSECONDS=300
-RTP_PORT_MIN=10000
-RTP_PORT_MAX=10100
 RECORDING_RETENTION_DAYS=90
 TZ=Asia/Hebron
 ```
 Generate random values with `openssl rand -base64 48`.
+
+**The PBX address isn't in this file.** It's the `pbx.host` setting in the
+supervisor app, and it's set in step 7. Older copies had `PBX_IP` or `PBX_HOST`
+here, and nothing ever read either of them.
 
 `JWT_SECRET` signs the tokens agents and supervisors hold; changing it signs
 everyone out. `SIP_SECRET_KEY` encrypts the agents' SIP secrets in the database,
@@ -179,7 +180,7 @@ services:
   api:
     image: callcenter-api:latest
     restart: unless-stopped
-    network_mode: host          # needed for SIP/RTP without port mapping
+    network_mode: host          # uses the host's VPN route to the PBX (step 8)
     env_file: .env
     environment:
       ConnectionStrings__Default: Host=127.0.0.1;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}
@@ -276,6 +277,8 @@ optional (it defaults to Branch 1-4) and is ignored if branches already exist.
 command line and is in this machine's shell history.
 
 From a laptop browser: `http://192.168.1.100` → log in → **change the password** → check Settings shows the branches, types and channels, and that the contacts list is not empty.
+
+Then, in **Settings**, set **`pbx.host`** to the PBX's address on the VPN (`10.8.0.1` in the example). It's what every Agent App registers to. While it's blank, agents sign in but the phone stays offline.
 
 ### If the supervisor password is ever lost
 

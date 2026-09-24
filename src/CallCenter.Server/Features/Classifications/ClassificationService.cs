@@ -359,7 +359,10 @@ public class ClassificationService(
 
         await db.SaveChangesAsync(ct);
 
-        return (await GetAsync(communication.Id, actingUserId, actorIsSupervisor, ct), null);
+        // Read back through the same door. Whoever got this far passed the edit
+        // check, which is stricter than the read one, so it always answers.
+        var (saved, _) = await GetAsync(communication.Id, actingUserId, actorIsSupervisor, ct);
+        return (saved, null);
     }
 
     /// <summary>
@@ -401,7 +404,16 @@ public class ClassificationService(
             communicationId.Value, request.Classification, actingUserId, actorIsSupervisor, ct);
     }
 
-    public async Task<ClassificationDto?> GetAsync(
+    /// <summary>
+    /// A call's classification, or null when it has none (A-42, S-03).
+    /// </summary>
+    /// <remarks>
+    /// <b>A supervisor reads any call's; an agent only their own (A-52).</b>
+    /// It used to answer any signed-in account for any call, so one agent could
+    /// read what another's customer ordered or complained about. The Agent App
+    /// only ever asks about the agent's own calls, from their own log.
+    /// </remarks>
+    public async Task<(ClassificationDto? Found, Failure? Failure)> GetAsync(
         Guid communicationId, Guid actingUserId, bool actorIsSupervisor,
         CancellationToken ct = default)
     {
@@ -414,7 +426,12 @@ public class ClassificationService(
 
         if (row is null)
         {
-            return null;
+            return (null, null);
+        }
+
+        if (!actorIsSupervisor && row.Communication.AgentId != actingUserId)
+        {
+            return (null, Failure.NotYours);
         }
 
         var updatedBy = row.UpdatedBy is null
@@ -424,7 +441,7 @@ public class ClassificationService(
 
         var canEdit = await MayEditAsync(row.Communication, actingUserId, actorIsSupervisor, ct) is null;
 
-        return new ClassificationDto(
+        return (new ClassificationDto(
             row.CommunicationId,
             row.TypeId,
             row.Type.Name,
@@ -442,19 +459,41 @@ public class ClassificationService(
             row.ClassifiedAt,
             updatedBy,
             row.UpdatedAt,
-            canEdit);
+            canEdit), null);
     }
 
-    /// <summary>The audit trail for one call (A-43).</summary>
-    public async Task<IReadOnlyList<ClassificationHistoryDto>> HistoryAsync(
-        Guid communicationId, CancellationToken ct = default) =>
-        await db.ClassificationHistory
+    /// <summary>
+    /// The audit trail for one call (A-43). The same door as
+    /// <see cref="GetAsync"/>: a supervisor any call, an agent their own, since
+    /// the trail carries everything the classification said at every step.
+    /// </summary>
+    public async Task<(IReadOnlyList<ClassificationHistoryDto> Changes, Failure? Failure)> HistoryAsync(
+        Guid communicationId, Guid actingUserId, bool actorIsSupervisor, CancellationToken ct = default)
+    {
+        if (!actorIsSupervisor)
+        {
+            var call = await db.Communications
+                .AsNoTracking()
+                .Where(c => c.Id == communicationId)
+                .Select(c => new { c.AgentId })
+                .FirstOrDefaultAsync(ct);
+
+            if (call is not null && call.AgentId != actingUserId)
+            {
+                return ([], Failure.NotYours);
+            }
+        }
+
+        var changes = await db.ClassificationHistory
             .AsNoTracking()
             .Where(h => h.CommunicationId == communicationId)
             .OrderByDescending(h => h.ChangedAt)
             .Select(h => new ClassificationHistoryDto(
                 h.ChangedAt, h.ChangedByUser.DisplayName, h.Before, h.After))
             .ToListAsync(ct);
+
+        return (changes, null);
+    }
 
     /// <summary>
     /// Whether this user may write this classification, and why not (A-42).

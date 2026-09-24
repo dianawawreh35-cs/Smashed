@@ -4419,11 +4419,11 @@ S-04 also says a supervisor may edit any classification at any time.
 only the designer. Building one is its own task, so the details are read-only
 for now, recorded under "Where to pick up".
 
-### Found, not fixed
+### Found (fixed the same day; see the next entry)
 
-`GET /api/classifications/{id}/history` answers **any signed-in account for any
-call**. An agent can read who classified another agent's call, and how
-(A-52). It's recorded under "Known gaps".
+`GET /api/classifications/{id}/history` answered **any signed-in account for any
+call**. An agent could read who classified another agent's call, and how
+(A-52).
 
 ### Tested
 
@@ -4437,6 +4437,36 @@ refused) and 5 page tests (rows, filters sent only on Search, a day range as
 instants, a call opened with its hold marked, an expired recording not fetched).
 All suites pass, and `npm run build` and lint are clean. **Not yet seen
 running**: checklist 1.7.
+
+---
+
+## 2026-09-24 — An agent reads only their own calls' classifications (A-52)
+
+Found while building the call search. **Both** classification reads answered any
+signed-in account for any call: `GET /api/classifications/{id}` and
+`GET /api/classifications/{id}/history`. The "Known gaps" line recorded only the
+history, and it wrongly said the first one already checked. It didn't: it used
+the caller's identity only to decide `CanEdit`. So one agent could read what
+another agent's customer ordered, what they complained about, the notes, and who
+changed each of them and when.
+
+Now both answer **a supervisor for any call, an agent for their own**, and
+**403 `not_your_call`** for another agent's call. That is the code the edit path
+already uses, and the Agent App already has a message for it. Nothing
+legitimate is refused. The Agent App reads a classification in one place only:
+opening the agent's own call from their own log. The supervisor web app is
+supervisors only. A call that does not exist still answers 404, and an empty
+history, telling nobody anything about it. The refusal comes before "is it
+classified", so it doesn't reveal that either.
+
+`SaveAsync` reads the saved classification back through `GetAsync`. Whoever got
+that far passed the edit check, which is stricter, so the read-back always
+answers.
+
+**Tested** (`ClassificationAccessTests`, 4, real accounts): another agent is
+refused both, the owning agent and a supervisor read both, and a call that does
+not exist is unchanged. With the two checks removed, exactly the refusal test
+fails. All 338 server tests pass against the database.
 
 # Open items (live)
 
@@ -4591,11 +4621,6 @@ there at all. See the 19 September CDR entry.
 - **Nothing displays the calls being recorded.** The rows accumulate and no
   screen reads them, so a mistake in what is stored would not be visible to
   anybody until the reports are built.
-- **Any signed-in account can read any call's classification history.**
-  `GET /api/classifications/{id}/history` has no check on whose call it is, so an
-  agent can see who classified another agent's call and how (A-52). It should
-  answer as `GET /api/classifications/{id}` does: supervisors any call, an agent
-  their own.
 - **Step 10 of the server runbook still describes the old agent setup**: two
   extensions per agent and a default branch. One extension per agent came in on
   17 September, and `users.default_branch_id` has been dropped. Rewrite it

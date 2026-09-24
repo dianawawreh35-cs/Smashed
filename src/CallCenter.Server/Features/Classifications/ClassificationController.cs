@@ -94,8 +94,15 @@ public class ClassificationController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ClassificationDto>> Get(Guid communicationId, CancellationToken ct)
     {
-        var found = await classifications.GetAsync(
+        var (found, failure) = await classifications.GetAsync(
             communicationId, User.GetRequiredUserId(), IsSupervisor, ct);
+
+        // 403 not_your_call for an agent asking about another agent's call
+        // (A-52), before "is it classified", so the answer says nothing about it.
+        if (failure is not null)
+        {
+            return Problem(failure.Value);
+        }
 
         return found is null ? NotFound() : Ok(found);
     }
@@ -135,9 +142,15 @@ public class ClassificationController(
     /// <summary>Who changed this classification, when, and what it said before (A-43).</summary>
     [HttpGet("{communicationId:guid}/history")]
     [ProducesResponseType<IReadOnlyList<ClassificationHistoryDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IReadOnlyList<ClassificationHistoryDto>>> History(
-        Guid communicationId, CancellationToken ct) =>
-        Ok(await classifications.HistoryAsync(communicationId, ct));
+        Guid communicationId, CancellationToken ct)
+    {
+        var (changes, failure) = await classifications.HistoryAsync(
+            communicationId, User.GetRequiredUserId(), IsSupervisor, ct);
+
+        return failure is not null ? Problem(failure.Value) : Ok(changes);
+    }
 
     private bool IsSupervisor => User.IsInRole(UserRoles.Supervisor);
 

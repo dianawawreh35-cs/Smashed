@@ -387,8 +387,15 @@ audio plays, the Windows default output device.*
       shows a **crossed-out speaker**; double-click it and the card says the call
       **was recorded** and the recording was deleted when its retention period
       ended. It must not read as "no recording".
-- [ ] **Close.** The Close button on the card shuts the card, stops the audio
-      and closes the form under it.
+- [ ] **Close, from any of the three buttons.** Close on the card, **Skip**
+      under the classification form, and **Close** under a missed call's note
+      each shut the whole call: the card, the recording (the audio stops) and
+      the form or note. Nothing is left on screen below the list.
+      *Before 24 Sep, Skip and the note's Close shut only their own panel and
+      left the recording card standing.*
+- [ ] **Save does not close it.** Saving a classification keeps the card and
+      form open with "Saved", so an agent can keep listening while checking
+      what they wrote.
 - [ ] **Both languages.** Switch to Arabic and open the same recorded call. The
       card's labels are Arabic, the date, number and `0:00 / m:ss` read left to
       right, and the seek bar fills **from the right**. **Take a screenshot in

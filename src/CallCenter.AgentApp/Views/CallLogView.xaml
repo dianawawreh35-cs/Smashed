@@ -427,7 +427,7 @@
                   Style="{StaticResource GhostButton}"
                   MinWidth="100"
                   Margin="10,0,0,0"
-                  Command="{Binding Classification.SkipCommand}" />
+                  Command="{Binding SkipCallCommand}" />
         </StackPanel>
 
         <TextBlock Text="{Binding Classification.Missing}"
@@ -470,7 +470,7 @@
                   Style="{StaticResource GhostButton}"
                   MinWidth="100"
                   Margin="10,0,0,0"
-                  Command="{Binding CloseNotesCommand}" />
+                  Command="{Binding CloseCallCommand}" />
         </StackPanel>
 
         <TextBlock Text="{Binding NotesMessage}"

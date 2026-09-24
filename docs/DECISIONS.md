@@ -4059,6 +4059,16 @@ landed at 15:18). Its file, and one from 11:04, are still in
 `%LOCALAPPDATA%\CallCenter\recordings` and were never queued. Calls from then on
 upload.
 
+### One opened call, one thing to close
+
+The second look found that Skip under the form, and Close under a note, shut
+only their own panel and left the details card and recording standing with
+nothing under them. All three buttons now close the whole call. **Save still
+leaves it open**, as it always has, with "Saved" showing: an agent who has just
+classified may want to carry on listening, and the card's own Close is right
+there. Only the call log's buttons changed; the pop-up's Skip during a live
+call is its own instance and behaves as before.
+
 **Not seen running.** Nobody has yet heard a recording through the app, or seen
 the card in either language. The seek bar follows the layout direction, so in
 Arabic it fills from the right. That is a choice to confirm on the screenshot,

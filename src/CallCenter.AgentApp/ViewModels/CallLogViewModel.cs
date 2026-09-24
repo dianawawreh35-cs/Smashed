@@ -214,7 +214,23 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Closes the open call: its details, its recording and its form.</summary>
+    /// <summary>
+    /// Skip under the form: leaves the call unclassified (A-41) and closes it
+    /// whole, as Close under a note does.
+    /// </summary>
+    /// <remarks>
+    /// Closing only the form left the details card and the recording on screen
+    /// with nothing under them, which read as the button having half worked.
+    /// One opened call, one thing to close.
+    /// </remarks>
+    [RelayCommand]
+    private void SkipCall()
+    {
+        Classification.SkipCommand.Execute(null);
+        CloseCall();
+    }
+
+    /// <summary>Closes the open call: its details, its recording and its form or note.</summary>
     [RelayCommand]
     private void CloseCall()
     {

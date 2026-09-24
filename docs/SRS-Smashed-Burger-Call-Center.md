@@ -156,7 +156,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | ID | Requirement | Priority |
 |---|---|---|
 | A-50 | List of the agent's own calls: date/time, direction, number, contact, duration, status, type, notes, recording indicator. Filter by date and search by number/name. **The list reaches back a limited number of days, set by the supervisor (S-47, `agent.call_log_days`, one week by default).** It is a working window, not a retention rule: nothing is deleted, the contact history (A-62) still shows every call, and the supervisor's reports are unaffected. The limit is applied by the server, not by the app, and it is also what keeps the screen quick on a busy extension. | Must |
-| A-51 | Open any own call: view details, play the recording (play/pause/seek), and — subject to A-42 — classify or edit the classification of an answered call, or write or edit the note on a missed, rejected or unanswered one (A-41). | Must |
+| A-51 | Open any own call: view details, play the recording (play/pause/seek), and — subject to A-42 — classify or edit the classification of an answered call, or write or edit the note on a missed, rejected or unanswered one (A-41). **Playing only:** an agent plays their own call's recording and no one else's (A-52); **downloading a copy is the supervisor's** (S-04). | Must |
 | A-52 | Agents cannot see other agents' calls. | Must |
 
 ### 3.7 Contacts (shared)

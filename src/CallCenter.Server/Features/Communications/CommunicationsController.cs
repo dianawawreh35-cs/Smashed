@@ -150,8 +150,10 @@ public class CommunicationsController(CommunicationsService communications) : Co
     /// </summary>
     /// <remarks>
     /// Open to any signed-in account: A-62 says every agent sees a contact's
-    /// full history from all agents. Recordings are the part that is restricted,
-    /// and they are not served from here.
+    /// full history from all agents. The audio is the part with a narrower rule
+    /// — an agent hears their own calls (A-51, A-52) and a supervisor hears any
+    /// (S-04) — so it is served from <see cref="RecordingsController"/> rather
+    /// than from here.
     /// </remarks>
     [HttpGet("by-contact/{contactId:guid}")]
     [ProducesResponseType<IReadOnlyList<CommunicationDto>>(StatusCodes.Status200OK)]

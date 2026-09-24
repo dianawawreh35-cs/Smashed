@@ -3795,6 +3795,164 @@ decided together with the concurrency item rather than slipped in here.
 
 ---
 
+## 2026-09-24 — Call recording, part 3: it expires, and somebody can hear it (A-33, S-04, S-43)
+
+The audio has been arriving on the server since part 2 and nothing deleted it,
+nothing measured it and nobody could play it. All three are now built. **No
+screen was touched**: these are endpoints, and the players belong to the call
+search (S-02) and the agent's call details (A-51), which are other tasks and
+were told to leave the space.
+
+### Who may hear a recording — the brief was wrong and the SRS was right
+
+The brief for this work said playback was **supervisors only**. The SRS does not
+say that, and the difference matters:
+
+* **A-51 (Must)** — an agent opens any *own* call and *plays the recording
+  (play/pause/seek)*.
+* **A-52 (Must)** — agents cannot see other agents' calls. That is the boundary:
+  own calls only, not no calls.
+* **S-04 (Must)** — a supervisor plays **and downloads** recordings for any agent.
+* **Acceptance criteria, section 9** — "the recording is playable from the
+  agent's call log and from the supervisor web app."
+
+So what was built is the SRS's rule, not the brief's: **a supervisor plays any
+recording; an agent plays their own and is refused (403) anybody else's.** The
+ownership test is the one `SaveRecordingAsync` already applies on upload — the
+same `NotYours` failure, decided by the token and never by the request — so
+there is one definition of "their call" in the code rather than two that could
+drift apart.
+
+**Downloading is supervisors only.** S-04 grants "play and download"; A-51 grants
+"play the recording" and stops there. Separating them cost one extra endpoint, so
+the narrower reading is the one built rather than the convenient one. It is a
+reading, not a certainty: if the client wants agents to keep copies, it is one
+attribute and one line of the SRS. A-51 now says so explicitly, so the next
+reader does not have to re-derive it.
+
+Recordings are served from a **`RecordingsController` of their own**, not from
+`CommunicationsController`, because every other communications endpoint is open
+to any signed-in account and this one is not. The old comment there saying
+recordings "are not served from here" was true and would now mislead; it has been
+rewritten to point at the new controller and name the rule.
+
+### The retention job (A-33)
+
+A `BackgroundService` that runs five minutes after startup and then once a day.
+Nightly is enough for a ninety-day rule, and a job that walked the table every
+few minutes would cost more than it is worth.
+
+Three things it gets right, because each is a way to be quietly wrong:
+
+* **The file goes, the row stays.** N-08 keeps communications and classifications
+  indefinitely; only the audio expires. Nothing here deletes a row — it sets
+  `deleted_at`, so a report over last year stays correct and an old call reads as
+  *recorded, expired* rather than as one that was never recorded. There is a test
+  for exactly that, with a classification attached.
+* **The setting is read on every run**, not captured at startup, so a supervisor
+  changing 90 days to 30 sees it take effect that night with nobody restarting
+  the server. Also tested: two runs in one process, the setting changed between
+  them.
+* **It cannot take the server down.** Every run is wrapped and every file is
+  wrapped. An unreadable file is a logged warning and the run carries on to the
+  next recording. A worker that throws out of `ExecuteAsync` stops for good and
+  nobody notices until the disk fills, so it never throws out of it.
+
+Two subtleties worth writing down:
+
+* **A missing folder skips the whole run.** The recordings folder is a mount, and
+  a mount can be absent. Deleting from a folder that is not there would find
+  every file "already gone" and mark a year of recordings expired while they sat
+  safely on a disk nobody had attached. The run logs a warning and does nothing
+  instead.
+* **A file that is genuinely missing still marks its row.** Once the folder is
+  there and one file is not, the row has to say the audio is gone, or that call
+  reads as never recorded. A delete that *fails* — a permission, a lock — leaves
+  the row alone, so tomorrow's run tries again rather than recording an expiry
+  that did not happen.
+
+### Empty date folders: deliberately left, not forgotten
+
+The brief asked for a decision on the 365 empty date folders a year leaves
+behind. **They are left in place**, with reasoning rather than a shrug.
+
+An empty directory costs about 4 KB. A year of them is under 1.5 MB beside the
+~50 GB of audio they exist to hold — about 0.003%. The risk on the other side is
+not symmetric: to delete one safely you must know no upload is about to write
+into it, and a laptop that has been offline for a week uploads into *last week's*
+folder the moment it reconnects. Losing one recording to that race is worse than
+any quantity of empty directories, and A-31 spent real effort making sure an
+upload is never lost.
+
+So: not built, on purpose. What *was* built is the measurement — the storage
+endpoint reports `emptyFolders`, so if the count ever becomes interesting the
+number is already on the screen that would justify acting on it. The safe version,
+if it is ever wanted, prunes only folders whose date is older than the retention
+window, which takes the race away with it.
+
+### The storage view (S-43)
+
+`GET /api/recordings/storage`, supervisors only: the retention period, how many
+recordings are kept and their total size, how many have expired, the oldest and
+newest kept, and what the folder actually holds on disk.
+
+**Two sizes on purpose.** One is what the database believes it is holding and one
+is what walking the folder finds. They should be close, and the gap is the
+interesting part: files orphaned by a failed retention run show as disk exceeding
+kept, and a half-restored backup shows the other way round. Averaging them into
+one number would hide both.
+
+**The real storage number is still not measured, because there is nothing to
+measure yet.** No production calls have accumulated; the only recordings on this
+machine are the ones the tests write. What can be stated exactly is the rate the
+recorder produces — stereo G.711 at 8 kHz is 16,000 bytes a second, 0.96 MB a
+minute, 57.6 MB an hour of talk time — which is where the ~50 GB estimate for
+four agents over ninety days comes from. This endpoint is what turns that
+estimate into a fact once the system is live, and it is the first thing to look
+at after a week of real calls.
+
+### Playing and downloading (S-04)
+
+`GET /api/recordings/{communicationId}` plays it, `.../download` offers it as a
+file. Both stream from disk and neither buffers: an hour of a call is about
+55 MB, and that has no business in memory.
+
+**Range requests are answered**, so a player can seek without fetching the whole
+call. That was cheap — the file on disk is seekable, so it is one flag on the
+result — and it is what makes the "play/pause/seek" in A-51 true rather than
+aspirational.
+
+**A recording whose file has gone answers 404 `recording_expired`; one that never
+existed answers 404 `recording_not_found`.** Same status, different code, on
+purpose: the screen must be able to say *expired* rather than leave a supervisor
+believing the call was never recorded. Telling those two apart is the whole
+reason the row outlives the file.
+
+### Tested against a real database, including the refusal
+
+Seventeen new tests — sixteen against a real database, one without. The three
+that matter most are the three arms of the access
+rule — a supervisor plays another agent's recording, an agent plays their own, an
+agent is refused another agent's with `not_your_call` and the file untouched —
+and the retention pair: the file goes, the row and its classification stay.
+Ranges, the expired-versus-missing codes, an agent refused the download, and the
+storage figures are covered too. One needs no database at all: an unauthenticated
+request is 401, which is N-05 at its bluntest.
+
+Numbers on 24 September: **with a database, 301 server tests pass and none skip;
+without one, 242 pass and 48 skip** — sixteen of the skipped ones are the new
+tests here. The two runs do not add to the same total because another session was
+committing its own tests into this working copy between them, which is the state
+of the repository today rather than a measurement error.
+
+### What is not done here
+
+The screens. The supervisor's call search (S-02, S-03) and the agent's own call
+details (A-51) are unbuilt and belong to other briefs; **the endpoints are ready
+for both.** Nobody has yet played a recording through a browser, so the audio is
+proven to arrive, to expire and to be served, and is not yet proven to be
+listenable at the far end of a range request in a real player.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -3865,6 +4023,14 @@ Merging and import are independent of all of this and can be done whenever.
 
 The history panel (A-62) genuinely cannot start yet — it shows a contact's past
 calls, and communications do not exist until the call work lands.
+
+**Recording retention, playback and storage are server-side done** (A-33, S-04,
+S-43, 24 September). The nightly job expires audio and keeps the rows, a
+supervisor may play or download any recording and an agent may play their own,
+and `GET /api/recordings/storage` reports what the folder holds. **Nothing calls
+them yet**: the player belongs to the supervisor's call search (S-02, S-03) and
+to the agent's own call details (A-51), both unbuilt. Nobody has heard a
+recording through a browser.
 
 ## Must fix before handover
 

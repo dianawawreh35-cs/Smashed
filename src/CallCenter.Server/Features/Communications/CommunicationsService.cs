@@ -58,7 +58,23 @@ public class CommunicationsService(
 
         /// <summary>The agent's window to edit their own call has closed (A-42).</summary>
         EditWindowClosed,
+
+        /// <summary>
+        /// The call was recorded and the audio has gone: retention removed it
+        /// (A-33), or the file is not on disk. Kept apart from
+        /// <see cref="NotFound"/> on purpose, so a screen can say <i>expired</i>
+        /// rather than <i>never recorded</i>.
+        /// </summary>
+        RecordingExpired,
     }
+
+    /// <summary>A recording opened for playback or download (A-51, S-04).</summary>
+    /// <param name="Content">
+    /// The audio itself, still on disk. It is streamed to the response and
+    /// never read into memory; an hour of a call is about 55 MB.
+    /// </param>
+    public sealed record RecordingFile(
+        Stream Content, string FileName, string ContentType, long? SizeBytes, DateTimeOffset UploadedAt);
 
     /// <summary>
     /// Records one call, or updates it if the app has reported it before (A-14).
@@ -406,6 +422,81 @@ public class CommunicationsService(
         await db.SaveChangesAsync(ct);
 
         return (call.Id, null);
+    }
+
+    /// <summary>
+    /// Opens the audio of one call, for a supervisor or for the agent whose
+    /// call it is (A-51, S-04).
+    /// </summary>
+    /// <remarks>
+    /// <b>Who may hear it.</b> A supervisor may play and download any agent's
+    /// recording (S-04). An agent may play their own and no one else's: A-51
+    /// puts the player on their own call details and A-52 draws the line at
+    /// other agents' calls. The ownership test is the same one
+    /// <see cref="SaveRecordingAsync"/> applies on the way in — the token
+    /// decides, never the request — so there is one definition of "their call"
+    /// rather than two that could drift apart.
+    ///
+    /// <b>A missing file is normal.</b> Retention (A-33) deletes files and keeps
+    /// rows, so every recording older than the retention period is a row whose
+    /// audio has gone. That answers <see cref="Failure.RecordingExpired"/> and
+    /// not <see cref="Failure.NotFound"/>, which is what lets the screen say
+    /// the recording has expired rather than imply the call was never recorded.
+    ///
+    /// The caller owns the stream and must dispose it.
+    /// </remarks>
+    public async Task<(RecordingFile? File, Failure? Failure)> OpenRecordingAsync(
+        Guid communicationId, Guid actingUserId, bool isSupervisor, CancellationToken ct = default)
+    {
+        var found = await db.Recordings
+            .AsNoTracking()
+            .Where(r => r.CommunicationId == communicationId)
+            .Select(r => new
+            {
+                r.Path,
+                r.SizeBytes,
+                r.UploadedAt,
+                r.DeletedAt,
+                r.Communication.AgentId,
+                r.Communication.Extension,
+                r.Communication.StartedAt,
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (found is null)
+        {
+            return (null, Failure.NotFound);
+        }
+
+        // A-52: an agent reaches their own calls and nothing else. Checked
+        // before the file is touched, so a refusal cannot be told apart from a
+        // recording that does not exist by how long it takes.
+        if (!isSupervisor && found.AgentId != actingUserId)
+        {
+            logger.LogWarning(
+                "An agent asked for the recording of call {CallId}, which is not theirs", communicationId);
+
+            return (null, Failure.NotYours);
+        }
+
+        if (found.DeletedAt is not null)
+        {
+            return (null, Failure.RecordingExpired);
+        }
+
+        var stream = recordings.Open(found.Path);
+
+        if (stream is null)
+        {
+            // The row says recorded and the disk disagrees. RecordingStore has
+            // already logged it; the caller still hears "expired", because from
+            // the screen's side there is nothing to play either way.
+            return (null, Failure.RecordingExpired);
+        }
+
+        var name = $"call-{found.StartedAt.UtcDateTime:yyyyMMdd-HHmmss}-{found.Extension ?? "unknown"}.wav";
+
+        return (new RecordingFile(stream, name, "audio/wav", found.SizeBytes, found.UploadedAt), null);
     }
 
     /// <summary>

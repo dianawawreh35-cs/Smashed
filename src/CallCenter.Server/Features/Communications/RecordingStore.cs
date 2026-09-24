@@ -44,6 +44,22 @@ public class RecordingOptions
 /// </remarks>
 public class RecordingStore(IOptions<RecordingOptions> options, ILogger<RecordingStore> logger)
 {
+    /// <summary>What <see cref="DeleteFile"/> found when it went to delete (A-33).</summary>
+    public enum DeleteOutcome
+    {
+        /// <summary>The file was there and is now gone.</summary>
+        Deleted,
+
+        /// <summary>The file was not there. The row is still marked expired.</summary>
+        AlreadyGone,
+
+        /// <summary>The file is there and could not be removed. Try again tomorrow.</summary>
+        Failed,
+    }
+
+    /// <summary>What the recordings folder holds right now (S-43).</summary>
+    public readonly record struct StorageUsage(long Bytes, int Files, int EmptyFolders, bool Readable);
+
     /// <summary>
     /// The largest recording accepted. An hour of the Agent App's format is
     /// about 55 MB; 120 MB leaves room for a very long call without letting a
@@ -127,24 +143,118 @@ public class RecordingStore(IOptions<RecordingOptions> options, ILogger<Recordin
         }
     }
 
-    /// <summary>Deletes a recording's file, for the retention job (A-33).</summary>
-    public bool Delete(string relativePath)
+    /// <summary>
+    /// Deletes a recording's file, for the retention job (A-33), and says what
+    /// actually happened.
+    /// </summary>
+    /// <remarks>
+    /// The three answers are not the same thing and the job treats them
+    /// differently. <see cref="DeleteOutcome.AlreadyGone"/> is a file somebody
+    /// or something removed behind our back — the row still has to be marked,
+    /// or it would read as "never recorded"; <see cref="DeleteOutcome.Failed"/>
+    /// leaves the row alone so tonight's failure is retried tomorrow rather
+    /// than recorded as an expiry that never happened.
+    /// </remarks>
+    public DeleteOutcome DeleteFile(string relativePath)
     {
         try
         {
             var full = Resolve(relativePath);
 
-            if (File.Exists(full))
+            if (!File.Exists(full))
             {
-                File.Delete(full);
+                logger.LogWarning(
+                    "Recording {Path} was already gone from disk when retention reached it", relativePath);
+                return DeleteOutcome.AlreadyGone;
             }
 
-            return true;
+            File.Delete(full);
+            return DeleteOutcome.Deleted;
         }
         catch (Exception ex)
         {
+            // A-33: one unreadable file is a warning and a job that carries on.
             logger.LogError(ex, "Recording {Path} could not be deleted", relativePath);
-            return false;
+            return DeleteOutcome.Failed;
+        }
+    }
+
+    /// <summary>
+    /// Whether the recordings folder is actually there (A-33).
+    /// </summary>
+    /// <remarks>
+    /// The folder is a mount in the deployment, and a mount can be missing. The
+    /// retention job asks this before it starts, because a run against an
+    /// unmounted folder would find every file "already gone" and mark a year of
+    /// recordings expired while they sat safely on a disk nobody had attached.
+    /// </remarks>
+    public bool RootExists() => Directory.Exists(_root);
+
+    /// <summary>
+    /// What the recordings actually occupy on disk, for the storage usage view
+    /// (S-43).
+    /// </summary>
+    /// <remarks>
+    /// Measured by walking the folder rather than summing <c>size_bytes</c>,
+    /// because the point of the number is to size a disk: the two disagreeing
+    /// is itself worth seeing. Never throws — a folder that cannot be read
+    /// answers <c>Readable = false</c> and the screen says so, rather than the
+    /// endpoint failing.
+    ///
+    /// <c>EmptyFolders</c> is reported because nothing deletes them (see the
+    /// 24 September decision entry); if the count ever becomes interesting, the
+    /// number is already on the screen that would justify acting on it.
+    /// </remarks>
+    public StorageUsage Measure()
+    {
+        try
+        {
+            if (!Directory.Exists(_root))
+            {
+                return new StorageUsage(0, 0, 0, Readable: false);
+            }
+
+            long bytes = 0;
+            var files = 0;
+
+            foreach (var file in Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    bytes += new FileInfo(file).Length;
+                    files++;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // One file that vanished mid-walk, or that we may not read,
+                    // is not a reason to answer nothing.
+                    logger.LogDebug(ex, "Recording {Path} could not be measured", file);
+                }
+            }
+
+            var empty = 0;
+
+            foreach (var folder in Directory.EnumerateDirectories(_root, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    if (!Directory.EnumerateFileSystemEntries(folder).Any())
+                    {
+                        empty++;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    logger.LogDebug(ex, "Recording folder {Path} could not be read", folder);
+                }
+            }
+
+            return new StorageUsage(bytes, files, empty, Readable: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "The recordings folder could not be measured");
+            return new StorageUsage(0, 0, 0, Readable: false);
         }
     }
 

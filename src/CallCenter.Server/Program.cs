@@ -64,6 +64,12 @@ try
             CallCenter.Server.Features.Communications.RecordingOptions.SectionName));
     builder.Services.AddSingleton<CallCenter.Server.Features.Communications.RecordingStore>();
     builder.Services.AddScoped<CommunicationsService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Communications.RecordingRetention>();
+
+    // A-33: the nightly pass that deletes recordings older than
+    // recording.retention_days and keeps their rows. It reads the setting on
+    // every run, so a change on the settings screen needs no restart.
+    builder.Services.AddHostedService<CallCenter.Server.Workers.RecordingRetentionWorker>();
     builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();
     builder.Services.AddOptions<MenuImageOptions>()

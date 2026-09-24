@@ -341,6 +341,49 @@ now warns and names the side.*
 
 ---
 
+## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)
+
+There is no screen for these yet: the player belongs to the supervisor's call
+search (S-02) and to the agent's own call details (A-51), and neither is built.
+So they are checked from `http://localhost:5000/swagger`, using the **Authorize**
+button with the `accessToken` from `POST /api/auth/login`. You need one call that
+has a recording — make a test call from the Agent App, or take a call id from the
+`recordings` table.
+
+- [ ] **A supervisor plays a recording.** `GET /api/recordings/{communicationId}`
+      signed in as `supervisor` answers 200 with `audio/wav`. Save the response
+      and open it in any player: it should be a normal conversation, customer on
+      the left and agent on the right.
+      *If it is silence:* the audio was captured wrong, not served wrong — see
+      the 24 September recording entries, where exactly that happened.
+      *If it is 404 `recording_expired`:* the row is there and the file is not.
+      Retention may have taken it, or the `Recordings:Path` folder is not the one
+      it was written to.
+- [ ] **The agent plays their own and nobody else's.** Signed in as `dia20`, the
+      same request for one of that agent's calls answers 200; for a call
+      belonging to another agent it answers **403 `not_your_call`** (A-52). That
+      refusal is the one worth checking by hand, because getting it wrong leaks
+      one agent's calls to another.
+- [ ] **Download is the supervisor's.** `GET /api/recordings/{id}/download` as
+      `supervisor` offers a `.wav` named after the call; as an agent it is 403.
+- [ ] **Storage usage.** `GET /api/recordings/storage` as `supervisor` reports
+      the retention days, how many recordings are kept, their size, and what the
+      folder holds on disk. **Write the number down** — it is the first real
+      measurement of whether 90 days is affordable, and the estimate it is being
+      checked against is about 50 GB for four agents.
+      *If `diskReadable` is false:* the recordings folder is not where the server
+      is looking. Nothing has been lost; the database figures are still right.
+- [ ] **Retention actually deletes.** Set the recording retention period to
+      **1 day** on the settings screen, wait for the nightly pass or restart the
+      server and wait five minutes, then check that a recording older than a day
+      has lost its file and **kept its row** with `deleted_at` set — and that its
+      call and classification are still there (N-08). **Set the period back to
+      90 afterwards.**
+      *If the row disappeared:* that is a bug, not a cleanup. The rule is that
+      the file goes and the row stays.
+
+---
+
 ## Round 3b — before any deployment
 
 - [ ] **`npm run build` succeeds** in `src/CallCenter.Web`. This is not the same

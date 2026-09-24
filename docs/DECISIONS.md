@@ -4039,6 +4039,26 @@ Numbers on 24 September: **Shared tests 138 pass; server tests with a database
 301 pass, none skipped.** The server suite includes part 3's tests, from the
 other session in this working copy.
 
+### The first screenshot: the list disappeared
+
+The first look at it (24 September) showed the card and form working, and the
+call list shrunk to a thin line under the filters. The card plus the form were
+taller than the window, and the list, the only row with flexible height, gave
+up everything it had. The form alone had nearly done the same before; the card
+tipped it over.
+
+Fixed by giving the list a minimum height (200 px: the header and about four
+rows) and putting the card and form in a scrolling area capped, in the
+code-behind, at whatever height remains. It has to be in code: a grid measures
+an auto-height row as if height were unlimited, so a scroll area inside one
+never scrolls until it is given a maximum. That maximum depends on the window.
+
+The call in that screenshot said "no recording", and correctly so. It was the
+34-second capture test from 11:14, recorded before uploading existed (A-31
+landed at 15:18). Its file, and one from 11:04, are still in
+`%LOCALAPPDATA%\CallCenter\recordings` and were never queued. Calls from then on
+upload.
+
 **Not seen running.** Nobody has yet heard a recording through the app, or seen
 the card in either language. The seek bar follows the layout direction, so in
 Arabic it fills from the right. That is a choice to confirm on the screenshot,

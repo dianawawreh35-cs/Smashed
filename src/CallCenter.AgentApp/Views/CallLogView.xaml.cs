@@ -6,6 +6,15 @@ namespace CallCenter.AgentApp.Views;
 /// <summary>The agent's own calls (A-50, A-52).</summary>
 public partial class CallLogView : UserControl
 {
+    /// <summary>
+    /// The least the list keeps when a call is opened: the header and about four
+    /// rows, enough to see the call that was opened and its neighbours.
+    /// </summary>
+    public const double MinListHeight = 200;
+
+    /// <summary>The least the opened call gets, however small the window.</summary>
+    private const double MinOpenCallHeight = 120;
+
     private readonly CallLogViewModel _viewModel;
 
     public CallLogView(CallLogViewModel viewModel)
@@ -39,6 +48,26 @@ public partial class CallLogView : UserControl
                 _viewModel.Hide();
             }
         };
+
+        Root.SizeChanged += (_, _) => FitOpenCall();
+    }
+
+    /// <summary>
+    /// Caps the opened call's area at what is left once the list has its
+    /// minimum, so the card and the form scroll instead of squeezing the list.
+    /// </summary>
+    /// <remarks>
+    /// Done here rather than in XAML because a grid measures an Auto row as if
+    /// it had unlimited height, so a ScrollViewer in one never scrolls. It
+    /// only scrolls once it has a MaxHeight, and that depends on the window.
+    /// Without it, the details card and the form were taller than the window
+    /// and the list shrank to a thin line.
+    /// </remarks>
+    private void FitOpenCall()
+    {
+        var header = Root.RowDefinitions[0].ActualHeight + Root.RowDefinitions[1].ActualHeight;
+
+        OpenCall.MaxHeight = Math.Max(MinOpenCallHeight, Root.ActualHeight - header - MinListHeight);
     }
 
     /// <summary>

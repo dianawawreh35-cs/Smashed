@@ -1,6 +1,7 @@
 <UserControl x:Class="CallCenter.AgentApp.Views.CallLogView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
              Background="{StaticResource Bg}">
@@ -72,7 +73,7 @@
     </Style>
   </UserControl.Resources>
 
-  <Grid Margin="28,24">
+  <Grid x:Name="Root" Margin="28,24">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*" />
       <ColumnDefinition Width="Auto" />
@@ -80,11 +81,14 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
-      <RowDefinition Height="*" />
-      <!-- The call chosen from the list: its details and recording (A-51). -->
-      <RowDefinition Height="Auto" />
-      <!-- The classification form or the note, when a call has been chosen
-           from the list. Never both: opening one closes the other. -->
+      <!-- The list. MinHeight, and the cap on the row below set in the
+           code-behind, are what keep it on screen once a call is opened: the
+           details card and the form together are taller than the window, and
+           without both the list gave up all its height and vanished. -->
+      <RowDefinition Height="*" MinHeight="{x:Static local:CallLogView.MinListHeight}" />
+      <!-- The call chosen from the list: its details and recording (A-51),
+           then its classification form or its note - never both. Scrolls
+           rather than pushing the list off the screen. -->
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
@@ -294,11 +298,15 @@
       </Grid>
     </Border>
 
+    <ScrollViewer x:Name="OpenCall"
+                  Grid.Row="3" Grid.ColumnSpan="2"
+                  VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+
     <!-- A-51: the call chosen from the list - what it was, and its recording.
          Above the form rather than instead of it: the form is what a call is
          opened for most of the time. -->
-    <Border Grid.Row="3" Grid.ColumnSpan="2"
-            Margin="0,14,0,0"
+    <Border Margin="0,14,0,0"
             Style="{StaticResource Card}"
             Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}">
       <Grid>
@@ -392,8 +400,7 @@
 
     <!-- The form for a call chosen from the list above. Its own instance, so an
          incoming call cannot wipe out what is being typed here. -->
-    <Border Grid.Row="4" Grid.ColumnSpan="2"
-            Margin="0,14,0,0"
+    <Border Margin="0,14,0,0"
             Style="{StaticResource Card}"
             Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
       <StackPanel>
@@ -438,8 +445,7 @@
 
     <!-- The note on a missed, rejected or unanswered call chosen from the list. These are
          never classified - nobody spoke - so the only question is why. -->
-    <Border Grid.Row="4" Grid.ColumnSpan="2"
-            Margin="0,14,0,0"
+    <Border Margin="0,14,0,0"
             Style="{StaticResource Card}"
             Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">
       <StackPanel>
@@ -473,6 +479,9 @@
                    TextWrapping="Wrap" />
       </StackPanel>
     </Border>
+
+      </StackPanel>
+    </ScrollViewer>
 
   </Grid>
 </UserControl>

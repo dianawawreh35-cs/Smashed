@@ -322,6 +322,11 @@ audio plays, the Windows default output device.*
       `0:00 / m:ss`. The classification form below it opens exactly as before.
       *If the form no longer opens, or opens only after the recording loads:*
       that is a regression — the form must never wait on the audio.
+- [ ] **The list stays on screen with a call open**, at the default window
+      size. At least four rows stay visible, and the card and form below
+      scroll instead of pushing the list away.
+      *On the first try (24 Sep) the list shrank to a thin line.* If it does
+      again, send a screenshot with the window size.
 - [ ] **Play it.** You hear the call in the headset: customer on the left, you on
       the right. The button says **Pause** and the time counts up.
       *If it is static or a harsh buzz:* the file was not read as mu-law. Tell

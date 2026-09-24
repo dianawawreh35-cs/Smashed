@@ -1,8 +1,10 @@
+using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.Shared.Contracts.Contacts;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 
 namespace CallCenter.AgentApp.ViewModels;
@@ -20,6 +22,18 @@ namespace CallCenter.AgentApp.ViewModels;
 /// on screen from the first moment whatever the server is doing, because A-04
 /// requires the phone to work with the server down and because a ringing phone
 /// does not wait for HTTP.
+///
+/// <b>A new customer can be saved from here (A-11).</b> For a number the server
+/// is sure nobody has, a button opens a short form (name, address, notes) under
+/// the "New customer" line. It is closed until asked for, so it never pushes the
+/// classification form down (22 Sep). The number is the caller's, never typed.
+/// Saving links the call: the server attaches every earlier call from the number
+/// that had no contact, the current one included if it was reported first, and
+/// matches any later one as it arrives. A matching name offers "add this number
+/// to them", as the Contacts tab does (A-63). With the server unreachable, the
+/// form keeps what was typed and says so. A save can need the agent's decision
+/// (a number already on someone, a name already taken), so it is never queued
+/// to happen later with nobody there to make it.
 /// </remarks>
 public partial class CallerViewModel : ObservableObject
 {
@@ -68,7 +82,12 @@ public partial class CallerViewModel : ObservableObject
         _logger = logger;
         Localizer = localizer;
 
-        localizer.LanguageChanged += (_, _) => OnPropertyChanged(nameof(StatusText));
+        localizer.LanguageChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(FormMessage));
+            OnPropertyChanged(nameof(SameNameMessage));
+        };
     }
 
     public Localizer Localizer { get; }
@@ -78,7 +97,54 @@ public partial class CallerViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsKnown))]
     [NotifyPropertyChangedFor(nameof(HasStatus))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(CanOfferNewCustomer))]
     private Lookup _state = Lookup.None;
+
+    // ---- saving a new customer (A-11) ------------------------------------
+
+    /// <summary>The caller's number, as the PBX gave it: what a new contact is saved with.</summary>
+    private string? _number;
+
+    /// <summary>
+    /// Raised when the new-customer form is saved or cancelled, so the pop-up,
+    /// which it may be keeping open after the call ended, can go.
+    /// </summary>
+    public event EventHandler? FormFinished;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOfferNewCustomer))]
+    private bool _isFormOpen;
+
+    [ObservableProperty]
+    private string _formName = string.Empty;
+
+    [ObservableProperty]
+    private string _formAddress = string.Empty;
+
+    [ObservableProperty]
+    private string _formNotes = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveNewCustomerCommand))]
+    [NotifyCanExecuteChangedFor(nameof(AddToExistingCommand))]
+    private bool _isSaving;
+
+    /// <summary>Why the save did not happen, as a label key, so it follows the language.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FormMessage))]
+    private string? _formMessageKey;
+
+    public string? FormMessage => FormMessageKey is null ? null : Localizer[FormMessageKey];
+
+    /// <summary>Contacts that already carry the typed name (A-63). A prompt to look, never a refusal.</summary>
+    public ObservableCollection<ContactSummaryDto> SameName { get; } = [];
+
+    public string? SameNameMessage => SameName.Count == 0
+        ? null
+        : $"{Localizer["contacts.sameName"]} ({SameName.Count})";
+
+    /// <summary>The "Save as new customer" button: only for a number nobody has, and not once it is open.</summary>
+    public bool CanOfferNewCustomer => State is Lookup.NewCustomer && !IsFormOpen;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasName))]
@@ -155,6 +221,7 @@ public partial class CallerViewModel : ObservableObject
     public void Begin(string? number)
     {
         Clear();
+        _number = string.IsNullOrWhiteSpace(number) ? null : number.Trim();
 
         if (string.IsNullOrWhiteSpace(number))
         {
@@ -187,8 +254,14 @@ public partial class CallerViewModel : ObservableObject
             // Already gone; nothing to cancel.
         }
 
+        _number = null;
+
         Set(() =>
         {
+            // A form left open from the last call is dropped, as an untouched
+            // classification is: the next caller is somebody else.
+            ResetForm();
+
             State = Lookup.None;
             Name = null;
             Address = null;
@@ -294,6 +367,151 @@ public partial class CallerViewModel : ObservableObject
         FlagReason = contact.FlagReason;
         State = Lookup.Found;
     });
+
+    [RelayCommand]
+    private void OpenNewCustomer()
+    {
+        FormMessageKey = null;
+        IsFormOpen = true;
+    }
+
+    [RelayCommand]
+    private void CancelNewCustomer()
+    {
+        ResetForm();
+        FormFinished?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Asks whether the typed name is already somebody's (A-63). Called as the
+    /// agent leaves the name box, so they are told before saving.
+    /// </summary>
+    [RelayCommand]
+    private async Task CheckNameAsync()
+    {
+        SameName.Clear();
+        OnPropertyChanged(nameof(SameNameMessage));
+
+        if (string.IsNullOrWhiteSpace(FormName))
+        {
+            return;
+        }
+
+        var result = await _api.FindContactsByNameAsync(FormName.Trim(), null);
+        if (!result.IsOk || result.Value is null)
+        {
+            return;
+        }
+
+        foreach (var match in result.Value)
+        {
+            SameName.Add(match);
+        }
+
+        OnPropertyChanged(nameof(SameNameMessage));
+    }
+
+    private bool CanSave() => !IsSaving && _number is not null;
+
+    /// <summary>Saves the caller as a new contact, with their number (A-11).</summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private async Task SaveNewCustomerAsync()
+    {
+        if (_number is not { } number)
+        {
+            return;
+        }
+
+        var forCall = _lookup;
+        IsSaving = true;
+        FormMessageKey = null;
+
+        try
+        {
+            var result = await _api.CreateContactAsync(new UpsertContactRequest(
+                Blank(FormName), Blank(FormAddress), Blank(FormNotes), DeliveryNotes: null, [number]));
+
+            await AfterSaveAsync(result, forCall);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    /// <summary>
+    /// The same person after all: this number goes on the contact that has the
+    /// name, rather than a second record for them (A-63).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private async Task AddToExistingAsync(ContactSummaryDto? existing)
+    {
+        if (existing is null || _number is not { } number)
+        {
+            return;
+        }
+
+        var forCall = _lookup;
+        IsSaving = true;
+        FormMessageKey = null;
+
+        try
+        {
+            await AfterSaveAsync(await _api.AddContactPhoneAsync(existing.Id, number), forCall);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    /// <summary>
+    /// A saved contact becomes the caller on screen, as if the number had been
+    /// known all along. A refusal stays in the form, with what was typed.
+    /// </summary>
+    private async Task AfterSaveAsync(ApiClient.Result<ContactDto> result, CancellationTokenSource? forCall)
+    {
+        // Another call has arrived since Save was pressed. What was saved stands
+        // on the server; it is not this caller, so nothing here changes.
+        if (!ReferenceEquals(forCall, _lookup))
+        {
+            return;
+        }
+
+        if (!result.IsOk || result.Value is not { } contact)
+        {
+            FormMessageKey = result.ErrorCode switch
+            {
+                "duplicate_number" => "contacts.errors.duplicate_number",
+                "no_usable_number" => "contacts.errors.no_usable_number",
+                "server_unreachable" => "caller.saveOffline",
+                _ => "contacts.errors.server_error",
+            };
+            return;
+        }
+
+        ResetForm();
+        Show(contact);
+        FormFinished?.Invoke(this, EventArgs.Empty);
+
+        if (forCall is not null)
+        {
+            await LoadCardAsync(contact.Id, forCall.Token);
+        }
+    }
+
+    private void ResetForm()
+    {
+        IsFormOpen = false;
+        FormName = string.Empty;
+        FormAddress = string.Empty;
+        FormNotes = string.Empty;
+        FormMessageKey = null;
+        SameName.Clear();
+        OnPropertyChanged(nameof(SameNameMessage));
+    }
+
+    private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void Set(Action change) => _dispatcher.Invoke(change);
 }

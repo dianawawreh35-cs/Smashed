@@ -61,6 +61,18 @@ public partial class CallPopupWindow : Window
         Topmost = false;
     }
 
+    /// <summary>
+    /// A-63: whether the name typed for a new customer is already somebody's,
+    /// asked as the agent leaves the box, the same moment the Contacts tab asks.
+    /// </summary>
+    private void OnNewCustomerNameLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is CallViewModel { Caller: var caller } && caller.CheckNameCommand.CanExecute(null))
+        {
+            caller.CheckNameCommand.Execute(null);
+        }
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
         if (!_shuttingDown)

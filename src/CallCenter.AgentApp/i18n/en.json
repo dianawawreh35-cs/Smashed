@@ -88,7 +88,10 @@
     "newCustomer": "New customer — not on file",
     "notChecked": "Could not check who this is",
     "orders": "orders",
-    "vip": "VIP CUSTOMER"
+    "vip": "VIP CUSTOMER",
+    "saveAsNew": "Save as new customer",
+    "saveCustomer": "Save customer",
+    "saveOffline": "The server could not be reached, so the customer was not saved. What you typed is kept: press Save again once it is back."
   },
   "classification": {
     "heading": "Classify this call",

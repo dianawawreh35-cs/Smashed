@@ -4562,6 +4562,75 @@ Tests: hovering a contact fetches it and its history before any click; a
 double-click's second press is stopped and a single press is not. 18 contacts
 tests, 68 in all, build and lint pass.
 
+---
+
+## 2026-09-24 — A new customer is saved from the pop-up, and their calls come with them (A-11)
+
+The pop-up said "New customer — not on file" and could do nothing about it.
+Now a **Save as new customer** button opens a short form under that line: name,
+address, notes. The number is the caller's, never typed. Decided with Dia:
+
+- **A button, then the form**, not a form always open. The client removed the
+  last-calls list on 22 Sep for pushing the classification form down, and three
+  boxes on every unknown caller would do the same.
+- **Saving links all the number's earlier unmatched calls**, not only the one on
+  screen.
+- **Offline, the form keeps what was typed** and says the server could not be
+  reached. It is not queued. A save can need the agent's decision (the number is
+  on someone else, the name is already taken), and a queued save would meet that
+  with nobody there.
+
+### How the call is linked: by number, on the server, whenever
+
+A-11 says saving links the current call. The obvious way (send the call's SIP id
+with the save) breaks on the order of events. The call is reported through the
+offline queue, sometimes before the save, sometimes after, and while the server
+is down it has no id at all. So the link is made by number instead,
+`ContactCallLinker`: whenever numbers are put on a contact (created, a number
+added, an edit, a bare number flagged), every call from those numbers **with no
+contact** is attached to it. It uses the caller lookup's rule: exact normalised
+number, else the last nine digits, never the tail of a short number. A call
+reported before the save is attached then. One reported after is matched when it
+arrives, as before. A call already on a contact is **never moved**.
+
+A matching name (A-63) offers **Add this number to them**, as the Contacts tab
+does. That puts the number on the existing contact, which brings its calls too.
+An open form keeps the pop-up after the call ends, as an unfinished
+classification does, and a new call drops it unsaved.
+
+### Planned, not built: the POS customer lookup
+
+Dia, 24 Sep: the restaurant's POS system will soon offer an endpoint to look a
+customer up by phone number. The plan, **documented only, nothing built** until
+the endpoint and its details exist:
+
+1. **A regular check of recent unknown callers.** A server job, every so often,
+   takes the numbers of recent calls that still have no contact, asks the POS
+   about each, and creates the contact (or fills in a missing name or address)
+   from what it returns. `ContactCallLinker` then attaches those numbers' calls,
+   so the history and the reports see them. This is why the linker is a
+   separate piece rather than a line in the contacts service.
+2. **Possibly, the pop-up.** When our own lookup finds nobody, the POS may know
+   them. Its name and address could fill the new-customer form in advance, for
+   the agent to confirm, rather than being saved unseen.
+
+Questions for when it arrives: how the POS identifies a customer (by number
+alone, or its own id); how fresh its data is and how often it may be asked;
+whether it can answer in the second before a call is picked up, which decides
+whether (2) is possible; and which side wins when the POS and a contact
+disagree. The contact was typed by an agent who spoke to the customer, so
+probably the contact.
+
+### Tested
+
+`ContactCallLinkTests`, 5 against a real database: a new customer's earlier call
+and current call (in the PBX's `+970` form) are attached; a call reported after
+the save is matched; adding a number brings that number's calls; a call already
+on a contact is not moved; a short number matches exactly, never on its tail.
+343 server tests pass with the database, 143 shared (the new labels included),
+and the Agent App builds. **The pop-up form has no automated test**, because the
+Agent App has no test project. It is on the checklist, Round 3.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -4580,12 +4649,12 @@ and what comes after:
 | Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
-| The inline "new customer" form on the pop-up | A-11 | identity — **done** |
 | Click-to-call from the log and from a contact | A-20 | dialling — **done**, needs its test call |
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |
 | Edit a classification from the supervisor's call details | S-04 | a classification form in the web app (only the designer exists) |
+| POS customer lookup by phone: a regular check of recent unknown callers, maybe a pop-up prefill | — | the POS endpoint and its details (24 Sep entry) |
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |

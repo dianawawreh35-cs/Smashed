@@ -276,7 +276,20 @@ cannot be faked, and the part most likely to find something.
 - [ ] **A VIP caller shows the badge (A-16).** Flag a contact VIP in the
       supervisor app with a reason, then call from that number. The badge and
       the reason sit above everything else.
-- [ ] **An unknown number says "New customer — not on file".**
+- [ ] **An unknown number says "New customer — not on file"**, with a small
+      **Save as new customer** button under it (A-11). The classification form
+      is not pushed down until the button is pressed.
+- [ ] **Press it, type a name and address, Save.** The pop-up switches to the
+      customer's name as if they had been known. Afterwards, in the web app,
+      the contact's history shows **this call**, and any earlier call from the
+      number. *If the history is missing the call:* tell me; that is the link
+      A-11 asks for.
+- [ ] **Type a name that already exists.** Leaving the box shows the matching
+      contacts with **Add this number to them**. Pressing it puts the number
+      on that contact, and the pop-up shows them.
+- [ ] **Open the form, hang up, keep typing.** The pop-up stays until Save or
+      Cancel. **Stop the server and Save:** it says the server could not be
+      reached and keeps what was typed; start the server and Save again.
 - [ ] **Stop the server, then call.** The pop-up must still appear with the
       number and Answer, and must say **"Could not check who this is"** — not
       "New customer". Telling an agent a regular is new is how a second record

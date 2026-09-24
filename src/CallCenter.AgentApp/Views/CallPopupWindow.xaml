@@ -142,6 +142,84 @@
                  Margin="0,8,0,0"
                  Visibility="{Binding Caller.HasStatus, Converter={StaticResource BoolToVisibility}}" />
 
+      <!-- A-11: a number nobody has can be saved as a customer from here. A
+           button until asked for, so the classification form below is never
+           pushed down for a caller the agent does not mean to save. -->
+      <Button Content="{Binding Localizer[caller.saveAsNew]}"
+              Style="{StaticResource SmallButton}"
+              HorizontalAlignment="Center"
+              Margin="0,8,0,0"
+              Command="{Binding Caller.OpenNewCustomerCommand}"
+              Visibility="{Binding Caller.CanOfferNewCustomer, Converter={StaticResource BoolToVisibility}}" />
+
+      <!-- The form. The number is the caller's, never typed. -->
+      <StackPanel Margin="0,12,0,0"
+                  Visibility="{Binding Caller.IsFormOpen, Converter={StaticResource BoolToVisibility}}">
+        <TextBlock Text="{Binding Localizer[contacts.name]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+        <TextBox Text="{Binding Caller.FormName, UpdateSourceTrigger=PropertyChanged}"
+                 LostFocus="OnNewCustomerNameLostFocus" />
+
+        <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
+        <Border Margin="0,8,0,0"
+                Padding="10,8"
+                Background="#2A2412"
+                BorderBrush="{StaticResource Warning}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CornerSmall}"
+                Visibility="{Binding Caller.SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
+          <StackPanel>
+            <TextBlock Text="{Binding Caller.SameNameMessage}" FontSize="11" Foreground="#E8C56B" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Caller.SameName}" Margin="0,6,0,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,0,6">
+                    <TextBlock FontSize="11" Text="{Binding Name}" Foreground="{StaticResource Text}" />
+                    <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
+                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            Style="{StaticResource SmallButton}"
+                            HorizontalAlignment="Left"
+                            Margin="0,3,0,0"
+                            Command="{Binding DataContext.Caller.AddToExistingCommand,
+                                      RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="{Binding Localizer[contacts.address]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
+        <TextBox Text="{Binding Caller.FormAddress, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="{Binding Localizer[contacts.notes]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
+        <TextBox Text="{Binding Caller.FormNotes, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 MinHeight="44" />
+
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+          <Button Content="{Binding Localizer[caller.saveCustomer]}"
+                  Style="{StaticResource PrimaryButton}"
+                  MinWidth="120"
+                  Command="{Binding Caller.SaveNewCustomerCommand}" />
+          <Button Content="{Binding Localizer[contacts.cancel]}"
+                  Style="{StaticResource GhostButton}"
+                  MinWidth="90"
+                  Margin="10,0,0,0"
+                  Command="{Binding Caller.CancelNewCustomerCommand}" />
+        </StackPanel>
+
+        <!-- Why it was not saved: offline, a number already on someone. What
+             was typed stays, so the agent only presses Save again. -->
+        <TextBlock Text="{Binding Caller.FormMessage}"
+                   Foreground="{StaticResource Warning}"
+                   FontSize="11"
+                   Margin="0,6,0,0"
+                   TextWrapping="Wrap"
+                   Visibility="{Binding Caller.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
+      </StackPanel>
+
       <!-- Whatever name the PBX sent, small, and only while the real contact is
            unknown (A-11). -->
       <TextBlock Text="{Binding CallerName}"

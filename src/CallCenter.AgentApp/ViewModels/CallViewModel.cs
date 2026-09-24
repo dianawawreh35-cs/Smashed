@@ -70,7 +70,21 @@ public partial class CallViewModel : ObservableObject
         {
             if (e.PropertyName is nameof(ClassificationFormViewModel.IsUnfinished)
                 && !Classification.IsUnfinished
-                && !State.IsActive)
+                && !State.IsActive
+                && !Caller.IsFormOpen)
+            {
+                Classification.Close();
+                Caller.Clear();
+                CallEnded?.Invoke(this, EventArgs.Empty);
+            }
+        };
+
+        // A new-customer form being filled in keeps the pop-up too (A-11): an
+        // unknown caller who rang off mid-sentence still has to be saved. Once
+        // it is saved or cancelled, the pop-up goes if nothing else holds it.
+        Caller.FormFinished += (_, _) =>
+        {
+            if (!State.IsActive && !Classification.IsUnfinished && !IsNotesOpen)
             {
                 Classification.Close();
                 Caller.Clear();
@@ -147,7 +161,7 @@ public partial class CallViewModel : ObservableObject
     {
         CloseNotes();
 
-        if (!State.IsActive)
+        if (!State.IsActive && !Caller.IsFormOpen)
         {
             Caller.Clear();
             CallEnded?.Invoke(this, EventArgs.Empty);
@@ -341,7 +355,8 @@ public partial class CallViewModel : ObservableObject
 
                 CallArrived?.Invoke(this, EventArgs.Empty);
             }
-            else if (!state.IsActive && wasActive && !Classification.IsUnfinished && !IsNotesOpen)
+            else if (!state.IsActive && wasActive && !Classification.IsUnfinished && !IsNotesOpen
+                     && !Caller.IsFormOpen)
             {
                 Caller.Clear();
                 CallEnded?.Invoke(this, EventArgs.Empty);

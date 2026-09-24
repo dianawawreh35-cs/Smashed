@@ -19,7 +19,7 @@ public class CallOutcomeTests
     private static CommunicationDto Call(string status, bool classified = false) => new(
         Guid.NewGuid(), CommunicationKinds.Call, Directions.In, status,
         null, null, "0599123456", null, DateTimeOffset.UtcNow, null, null, null,
-        null, "2001", null, classified, null);
+        null, "2001", null, classified, null, HasRecording: false, RecordingExpired: false);
 
     [Fact]
     public void Only_an_answered_call_is_classified()

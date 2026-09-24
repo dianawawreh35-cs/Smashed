@@ -3953,6 +3953,97 @@ for both.** Nobody has yet played a recording through a browser, so the audio is
 proven to arrive, to expire and to be served, and is not yet proven to be
 listenable at the far end of a range request in a real player.
 
+## 2026-09-24 — Call recording, part 4: the agent hears their own call (A-50, A-51)
+
+Reported as "the agent has no recording they can hear when double-clicking a
+call in the log". True, and not a regression: nothing had ever played one back.
+Part 3 built the server's side; this is the Agent App's.
+
+**In plain terms:** double-clicking a call in the call log now shows a card
+above the form with the call's details and, when it was recorded, a Play /
+Pause button and a seek bar. The list itself marks which calls have audio.
+
+### Double-click sits around the form, not in front of it
+
+The form is what an agent opens a call for nearly every time, so it still opens
+at once. The details and the player sit **above** it, in their own card. A
+details screen with the form one click behind it would have slowed the common
+case to make room for the rare one. Blocked and failed calls, which used to open
+nothing, now open their details alone. Close shuts the card, the player and the
+form together.
+
+### The list says expired, not just "no audio"
+
+`CommunicationDto` gains two booleans, **`HasRecording`** and
+**`RecordingExpired`**, read from the `recordings` row and its `deleted_at`. One
+boolean would have made a call from four months ago read the same as a call
+whose recorder failed, which is exactly the confusion the row outliving the file
+exists to prevent. Both false means no recording ever reached the server. In the
+grid: a speaker for audio that can be played, a muted speaker for audio that has
+expired, nothing for neither. The new column keeps `CanUserSortColumns` off and
+has a `MinWidth`, per the two 22 September grid faults.
+
+A call that has only just ended may show no recording for a minute: the upload
+follows the call through the queue. The message for a call with no recording
+says so, rather than stating flatly that there is none.
+
+### Played with NAudio, from memory, not with `MediaElement`
+
+The prompt expected `MediaElement` with a temp file. Neither was used:
+
+* **No temp file.** `MediaElement` takes a URL or a path, never bytes, and it
+  would not send the bearer token. A temp file would work, and would leave a
+  customer's call on a shared laptop after the agent closed it. The bytes are
+  fetched into memory and played from there; a few minutes of call is a few
+  megabytes.
+* **NAudio was already here.** SIPSorceryMedia.Windows plays the call audio with
+  it, so this adds no new library, only names NAudio 3.0.0 explicitly in
+  `Directory.Packages.props` so a SIPSorcery upgrade cannot change it underneath
+  the player. `MuLawPlaybackStream` decodes the mu-law to PCM as it plays, so the
+  call is not doubled in memory and a seek is exact: one byte of file is one
+  sample, whatever the position.
+* **The download is not held to the ten-second API timeout.** Only the response
+  headers are. An hour-long call can take longer than ten seconds over the VPN,
+  and cutting it off would read as a broken recording. Closing the card cancels
+  it instead.
+
+It plays on the **Windows default output device**, which is where call audio
+goes too (`CreateMedia` does not pick a device either). If calls ever start
+honouring the speaker saved in A-03, the player should follow them.
+
+### A live call always wins
+
+The recording plays in the same headset the customer is heard in. A call
+ringing in **pauses** it, and Play stays disabled until the phone is idle again,
+with a line saying why. Leaving the call log pauses it too. An agent who cannot
+hear a caller because last week's call is playing over them is worse than one who
+has to press Play twice. `CallService` is untouched: the player only listens to
+its `StateChanged`.
+
+### Tested, and what could not be
+
+* `RecordingWavTests` (six, no database) cover the reader of the WAV header: the
+  file the recorder writes, a file with an extra chunk before the audio, a file
+  cut short, a PCM file refused, something that is not a WAV, and a file with no
+  audio. The reader is kept free of WPF and NAudio so the test project can
+  compile that one file; the app itself is a WPF project it cannot reference.
+* `CallLogRecordingTests` (database) checks that `/api/communications/mine`
+  tells kept, expired and never-recorded apart.
+* The decoder was checked by a throwaway program: a 400 Hz tone on the left and
+  800 Hz on the right, encoded to mu-law and played back through the stream. The
+  worst error was 98 in 8,000 (mu-law's own rounding), a seek to 1.5 s landed on
+  frame 12,000, and an odd seek position snapped to a whole frame with the
+  channels unswapped.
+
+Numbers on 24 September: **Shared tests 138 pass; server tests with a database
+301 pass, none skipped.** The server suite includes part 3's tests, from the
+other session in this working copy.
+
+**Not seen running.** Nobody has yet heard a recording through the app, or seen
+the card in either language. The seek bar follows the layout direction, so in
+Arabic it fills from the right. That is a choice to confirm on the screenshot,
+not a settled one. Checklist steps are in `TESTING-checklist.md`.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -3968,7 +4059,7 @@ and what comes after:
 | Next | Requirement | Depends on |
 |---|---|---|
 | **Classification: the form and the supervisor's designer** | A-40, S-40 | nothing — A-14 landed |
-| Opening a call from the log: details, classify | A-51 | classification (A-40) |
+| Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
 | The inline "new customer" form on the pop-up | A-11 | identity — **done** |
@@ -4027,10 +4118,11 @@ calls, and communications do not exist until the call work lands.
 **Recording retention, playback and storage are server-side done** (A-33, S-04,
 S-43, 24 September). The nightly job expires audio and keeps the rows, a
 supervisor may play or download any recording and an agent may play their own,
-and `GET /api/recordings/storage` reports what the folder holds. **Nothing calls
-them yet**: the player belongs to the supervisor's call search (S-02, S-03) and
-to the agent's own call details (A-51), both unbuilt. Nobody has heard a
-recording through a browser.
+and `GET /api/recordings/storage` reports what the folder holds. **The agent's
+player is built** (A-50, A-51, 24 September): the call log marks recorded and
+expired calls and plays the agent's own, but nobody has heard one through it yet.
+The supervisor's player belongs to the call search (S-02, S-03), still unbuilt.
+Nobody has heard a recording through a browser.
 
 ## Must fix before handover
 

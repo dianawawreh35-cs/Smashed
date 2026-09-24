@@ -302,6 +302,65 @@ now warns and names the side.*
 - [ ] **Mute, then Hold, then Resume.** You must still be muted after the
       resume: status "Muted", button "Unmute".
 
+### Hearing a recording in the call log (A-50, A-51) — never run
+
+*Needs the server from today (part 3's `/api/recordings`) and one answered call
+that was recorded and uploaded. Wear the headset: the recording plays where call
+audio plays, the Windows default output device.*
+
+- [ ] **The list marks recorded calls.** Open the Call log tab. An answered,
+      recorded call shows a small **speaker** between Result and the chip
+      column; hover it and the tooltip says it was recorded. A missed call shows
+      nothing there.
+      *If no call shows a speaker:* press Refresh first — a call that has just
+      ended uploads its recording a moment later. If it still shows none, check
+      the `recordings` table has a row for that call.
+- [ ] **Double-click a recorded call.** A card opens **above** the
+      classification form, with the customer, the number, the date and time,
+      Incoming or Outgoing, the duration, the result and the queue. It says
+      "Loading the recording…" briefly, then shows **Play**, a seek bar and
+      `0:00 / m:ss`. The classification form below it opens exactly as before.
+      *If the form no longer opens, or opens only after the recording loads:*
+      that is a regression — the form must never wait on the audio.
+- [ ] **Play it.** You hear the call in the headset: customer on the left, you on
+      the right. The button says **Pause** and the time counts up.
+      *If it is static or a harsh buzz:* the file was not read as mu-law. Tell
+      me, with the log line containing "not a mu-law WAV".
+      *If it says no speaker or headset was found:* Windows has no default output
+      device. Check the sound settings, not the app.
+- [ ] **Pause, then Play.** It carries on from where it stopped, not from the
+      start.
+- [ ] **Seek.** Click halfway along the bar: playback jumps there and the time
+      matches. Drag the dot: it follows, and plays from where you let go.
+- [ ] **Let it play to the end.** The button returns to **Play**; pressing it
+      starts again from the beginning.
+- [ ] **A call rings while a recording is playing.** The recording **pauses at
+      once**, the card says it is paused while you are on a call, and Play is
+      greyed out until the call ends. Afterwards Play works again.
+      *If the recording keeps playing over the caller:* stop and tell me — that
+      is the one failure here that affects a customer.
+- [ ] **Switch to another tab while it plays.** It pauses. Come back and Play
+      carries on.
+- [ ] **A call with no recording** (a missed call, or one from before
+      recording was switched on). Double-click it: the card says the call has no
+      recording and mentions that a call which has only just ended may still be
+      uploading. No Play button.
+- [ ] **An expired recording.** Needs one call whose recording retention has
+      removed — use the "Retention actually deletes" step in Round 3a, or set
+      `deleted_at` on one `recordings` row by hand on a test database. The list
+      shows a **crossed-out speaker**; double-click it and the card says the call
+      **was recorded** and the recording was deleted when its retention period
+      ended. It must not read as "no recording".
+- [ ] **Close.** The Close button on the card shuts the card, stops the audio
+      and closes the form under it.
+- [ ] **Both languages.** Switch to Arabic and open the same recorded call. The
+      card's labels are Arabic, the date, number and `0:00 / m:ss` read left to
+      right, and the seek bar fills **from the right**. **Take a screenshot in
+      each language with the player visible** — whether the bar should fill from
+      the right in Arabic is a choice to settle on the screenshot.
+- [ ] **A blocked call opens its details.** Double-click a Blocked row: the card
+      opens alone, with no form and no note. It used to open nothing.
+
 ### Outbound dialling (A-20, A-21) — never run
 
 - [ ] **Dial your own mobile from the Dial screen.** The pop-up appears saying
@@ -343,9 +402,9 @@ now warns and names the side.*
 
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)
 
-There is no screen for these yet: the player belongs to the supervisor's call
-search (S-02) and to the agent's own call details (A-51), and neither is built.
-So they are checked from `http://localhost:5000/swagger`, using the **Authorize**
+The agent's player is in the call log now (see "Hearing a recording in the call
+log" in Round 3), but the supervisor's belongs to the call search (S-02), which
+is not built, and the refusals are easier to see here. So they are checked from `http://localhost:5000/swagger`, using the **Authorize**
 button with the `accessToken` from `POST /api/auth/login`. You need one call that
 has a recording — make a test call from the Agent App, or take a call id from the
 `recordings` table.
@@ -418,7 +477,6 @@ These cannot be checked on this laptop, and each has burned a project somewhere.
 ## What is not on this list because it is not built
 
 Not testable yet, and listed so the gaps are not mistaken for failures:
-classification (A-40, S-40), branch management (S-41), opening a call from the
-log (A-51), caller identity in the pop-up (A-16, A-11), blacklist export
+classification (A-40, S-40), branch management (S-41), caller identity in the pop-up (A-16, A-11), blacklist export
 (S-46), click-to-call, merging contacts, and contact import
 from Excel. `DECISIONS.md` holds the live list.

@@ -36,6 +36,9 @@
     <PackageReference Include="SIPSorcery" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="SIPSorceryMedia.Windows" />
+    <!-- The recording player (A-51); see Directory.Packages.props. -->
+    <PackageReference Include="NAudio.Core" />
+    <PackageReference Include="NAudio.WinMM" />
   </ItemGroup>
 
   <ItemGroup>

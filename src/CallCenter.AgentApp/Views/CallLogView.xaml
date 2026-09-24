@@ -5,6 +5,73 @@
              FontFamily="{StaticResource UiFont}"
              Background="{StaticResource Bg}">
 
+  <UserControl.Resources>
+    <!-- The seek bar for a recording (A-51). Styled here because the theme has
+         no Slider, and an unstyled WPF control does not take the dark theme:
+         it arrives as a pale Windows track on a dark card. -->
+    <Style x:Key="SeekFill" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Border Height="4" CornerRadius="2" Background="{StaticResource Accent}" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="SeekRest" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Border Background="Transparent" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="SeekBar" TargetType="Slider">
+      <Setter Property="IsMoveToPointEnabled" Value="True" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+            <Grid Background="Transparent" MinHeight="20">
+              <Border Height="4"
+                      CornerRadius="2"
+                      Background="{StaticResource SurfaceAlt}"
+                      VerticalAlignment="Center" />
+              <Track x:Name="PART_Track" VerticalAlignment="Center">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton Style="{StaticResource SeekFill}" Command="Slider.DecreaseLarge" />
+                </Track.DecreaseRepeatButton>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton Style="{StaticResource SeekRest}" Command="Slider.IncreaseLarge" />
+                </Track.IncreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb Width="12" Height="12">
+                    <Thumb.Template>
+                      <ControlTemplate TargetType="Thumb">
+                        <Ellipse Fill="{StaticResource Text}" />
+                      </ControlTemplate>
+                    </Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+              </Track>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.4" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
+
   <Grid Margin="28,24">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*" />
@@ -14,6 +81,8 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
+      <!-- The call chosen from the list: its details and recording (A-51). -->
+      <RowDefinition Height="Auto" />
       <!-- The classification form or the note, when a call has been chosen
            from the list. Never both: opening one closes the other. -->
       <RowDefinition Height="Auto" />
@@ -139,10 +208,11 @@
                   Margin="6"
                   Visibility="{Binding HasCalls, Converter={StaticResource BoolToVisibility}}">
           <DataGrid.InputBindings>
-            <!-- A-41: the way back to a call that was skipped. Double-click, as
-                 the contacts, menu and delivery lists open their editors. An
-                 answered call opens the classification; a missed, rejected or unanswered
-                 one opens its note; anything else opens nothing. -->
+            <!-- A-41, A-51: the way back to a call. Double-click, as the
+                 contacts, menu and delivery lists open their editors. Every
+                 call opens its details and recording; an answered call opens
+                 the classification with them, and a missed, rejected or
+                 unanswered one its note. -->
             <MouseBinding MouseAction="LeftDoubleClick"
                           Command="{Binding OpenCommand}"
                           CommandParameter="{Binding SelectedItem,
@@ -158,6 +228,34 @@
             <DataGridTextColumn x:Name="DurationColumn" Width="Auto" Binding="{Binding Duration}"
                                 FontFamily="{StaticResource MonoFont}" />
             <DataGridTextColumn x:Name="StatusColumn" Width="Auto" Binding="{Binding Status}" />
+
+            <!-- A-50: which calls have audio. A speaker for a recording that can
+                 be played, a muted one for a recording retention has removed
+                 (A-33), and nothing for a call never recorded - so an old call
+                 does not read as a recording that failed. MinWidth for the
+                 same reason as the chip column below. -->
+            <DataGridTemplateColumn Width="Auto" MinWidth="34">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <Grid ToolTip="{Binding RecordingHint}" Background="Transparent">
+                    <TextBlock Text="&#xE767;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="{StaticResource TextMuted}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding HasRecording, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="&#xE74F;"
+                               FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="{StaticResource TextFaint}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding RecordingExpired, Converter={StaticResource BoolToVisibility}}" />
+                  </Grid>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
 
             <!-- A-41: highlighted until classified. A chip rather than a column
                  of ticks and blanks, so a glance down the list shows the work
@@ -196,9 +294,105 @@
       </Grid>
     </Border>
 
+    <!-- A-51: the call chosen from the list - what it was, and its recording.
+         Above the form rather than instead of it: the form is what a call is
+         opened for most of the time. -->
+    <Border Grid.Row="3" Grid.ColumnSpan="2"
+            Margin="0,14,0,0"
+            Style="{StaticResource Card}"
+            Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="{Binding Opened.Who}"
+                     Foreground="{StaticResource Text}"
+                     FontWeight="SemiBold" />
+          <TextBlock Text="{Binding Opened.Number}"
+                     FontFamily="{StaticResource MonoFont}"
+                     Foreground="{StaticResource TextMuted}"
+                     FlowDirection="LeftToRight"
+                     Margin="10,0,0,0" />
+        </StackPanel>
+
+        <Button Grid.Column="1" Grid.RowSpan="2"
+                Content="{Binding Localizer[callLog.closeCall]}"
+                Style="{StaticResource GhostButton}"
+                VerticalAlignment="Top"
+                Command="{Binding CloseCallCommand}" />
+
+        <!-- When, which way, how long, how it ended, through which queue. -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,4,0,0">
+          <TextBlock Text="{Binding Opened.StartedAt}"
+                     Style="{StaticResource Subtle}"
+                     FontFamily="{StaticResource MonoFont}"
+                     FlowDirection="LeftToRight" />
+          <TextBlock Text="{Binding Opened.DirectionLabel}" Style="{StaticResource Subtle}" Margin="14,0,0,0" />
+          <TextBlock Text="{Binding Opened.Duration}"
+                     Style="{StaticResource Subtle}"
+                     FontFamily="{StaticResource MonoFont}"
+                     FlowDirection="LeftToRight"
+                     Margin="14,0,0,0" />
+          <TextBlock Text="{Binding Opened.Status}" Style="{StaticResource Subtle}" Margin="14,0,0,0" />
+          <TextBlock Text="{Binding Opened.Queue}" Style="{StaticResource Subtle}" Margin="14,0,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Grid.ColumnSpan="2">
+        <!-- The player, once the audio has arrived. -->
+        <Grid Margin="0,12,0,0"
+              Visibility="{Binding Player.IsPlayable, Converter={StaticResource BoolToVisibility}}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <Button Content="{Binding Player.PlayPauseLabel}"
+                  Style="{StaticResource PrimaryButton}"
+                  MinWidth="90"
+                  Command="{Binding Player.PlayPauseCommand}" />
+
+          <Slider Grid.Column="1"
+                  Style="{StaticResource SeekBar}"
+                  Margin="14,0"
+                  VerticalAlignment="Center"
+                  Minimum="0"
+                  Maximum="{Binding Player.DurationSeconds}"
+                  Value="{Binding Player.PositionSeconds, Mode=TwoWay}"
+                  LargeChange="5"
+                  SmallChange="1" />
+
+          <!-- Digits read left to right in both languages. -->
+          <TextBlock Grid.Column="2"
+                     Text="{Binding Player.PositionText}"
+                     FontFamily="{StaticResource MonoFont}"
+                     Foreground="{StaticResource TextMuted}"
+                     FlowDirection="LeftToRight"
+                     VerticalAlignment="Center" />
+        </Grid>
+
+        <!-- Loading, or why there is nothing to play - or, under the player,
+             that it is waiting for a live call to end. -->
+        <TextBlock Text="{Binding Player.Message}"
+                   Style="{StaticResource Subtle}"
+                   TextWrapping="Wrap"
+                   Margin="0,10,0,0"
+                   Visibility="{Binding Player.HasMessage, Converter={StaticResource BoolToVisibility}}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
     <!-- The form for a call chosen from the list above. Its own instance, so an
          incoming call cannot wipe out what is being typed here. -->
-    <Border Grid.Row="3" Grid.ColumnSpan="2"
+    <Border Grid.Row="4" Grid.ColumnSpan="2"
             Margin="0,14,0,0"
             Style="{StaticResource Card}"
             Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
@@ -244,7 +438,7 @@
 
     <!-- The note on a missed, rejected or unanswered call chosen from the list. These are
          never classified - nobody spoke - so the only question is why. -->
-    <Border Grid.Row="3" Grid.ColumnSpan="2"
+    <Border Grid.Row="4" Grid.ColumnSpan="2"
             Margin="0,14,0,0"
             Style="{StaticResource Card}"
             Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">

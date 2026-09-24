@@ -17,4 +17,11 @@
     <ProjectReference Include="..\..\src\CallCenter.Shared\CallCenter.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- One file from the Agent App, compiled in rather than referenced: the app
+         is a WPF project this one cannot load, and the WAV reader (A-51) is
+         written to need nothing from it. -->
+    <Compile Include="..\..\src\CallCenter.AgentApp\Audio\RecordingWav.cs" Link="AgentApp\RecordingWav.cs" />
+  </ItemGroup>
+
 </Project>

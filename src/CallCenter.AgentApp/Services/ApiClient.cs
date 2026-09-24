@@ -460,6 +460,68 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
         }
     }
 
+    /// <summary>
+    /// The audio of one of the agent's own calls, to play in the call log (A-51).
+    /// </summary>
+    /// <remarks>
+    /// Fetched whole, into memory, rather than handed to a player as a URL: no
+    /// Windows player sends the bearer token, and writing the audio to a temp
+    /// file would leave a customer's call on the laptop after the agent closed
+    /// it. A call of a few minutes is a few megabytes.
+    ///
+    /// <b>Only the headers are held to the usual timeout.</b> The body of an
+    /// hour-long call can take longer than ten seconds over the VPN, and cutting
+    /// it off there would read as "this recording is broken". The caller's
+    /// token ends it instead — closing the call cancels the download.
+    ///
+    /// The server decides whose recording this is (A-52): another agent's call
+    /// answers <c>not_your_call</c>, and nothing here checks it again.
+    /// </remarks>
+    /// <returns>
+    /// The WAV bytes, or the server's reason: <c>recording_not_found</c> (never
+    /// recorded), <c>recording_expired</c> (deleted by retention, A-33) or
+    /// <c>not_your_call</c>.
+    /// </returns>
+    public async Task<Result<byte[]>> GetRecordingAsync(
+        Guid communicationId, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/recordings/{communicationId}");
+
+        if (session.AccessToken is { } token)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        try
+        {
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var status = response.StatusCode switch
+                {
+                    HttpStatusCode.NotFound => ApiStatus.NotFound,
+                    HttpStatusCode.Unauthorized => ApiStatus.Unauthorized,
+                    _ => ApiStatus.ServerError,
+                };
+
+                return Result<byte[]>.Failed(
+                    status, await ReadErrorCodeAsync(response, LoginErrorCodes.ServerError, ct));
+            }
+
+            return Result<byte[]>.Ok(await response.Content.ReadAsByteArrayAsync(ct));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException
+                                   && !ct.IsCancellationRequested)
+        {
+            logger.LogWarning(
+                "The recording of call {CommunicationId} could not be fetched ({Reason})",
+                communicationId, ex.Message);
+
+            return Result<byte[]>.Failed(ApiStatus.Unreachable, LoginErrorCodes.ServerUnreachable);
+        }
+    }
+
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>
         SendAsync<CurrentUserDto>(

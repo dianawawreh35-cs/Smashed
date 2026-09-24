@@ -43,12 +43,14 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     public CallLogViewModel(
         ApiClient api,
         ClassificationFormViewModel classification,
+        RecordingPlayerViewModel player,
         Localizer localizer,
         Dispatcher dispatcher)
     {
         _api = api;
         _dispatcher = dispatcher;
         Classification = classification;
+        Player = player;
         Localizer = localizer;
 
         // A saved classification clears the chip on the row it belongs to, so
@@ -80,6 +82,11 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(StatusMessage));
             OnPropertyChanged(nameof(NotesHeading));
             Rebuild();
+
+            // The open call's details are worded from the row, which reads the
+            // language as it is asked, so telling the screen to ask again is
+            // enough.
+            OnPropertyChanged(nameof(Opened));
         };
     }
 
@@ -142,16 +149,36 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     /// </remarks>
     public ClassificationFormViewModel Classification { get; }
 
+    /// <summary>Plays the open call's recording (A-51). One per call log.</summary>
+    public RecordingPlayerViewModel Player { get; }
+
     /// <summary>
-    /// Opens a call from the list (A-41, A-42): the classification form for an
-    /// answered call, the note for a missed, rejected or unanswered one, and nothing for
-    /// the rest.
+    /// The call opened from the list, whose details and recording are shown
+    /// (A-51). Null when none is.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOpen))]
+    private CallRow? _opened;
+
+    public bool IsOpen => Opened is not null;
+
+    /// <summary>
+    /// Opens a call from the list (A-51): its details and recording, and with
+    /// them the classification form for an answered call (A-41, A-42) or the note
+    /// for a missed, rejected or unanswered one.
     /// </summary>
     /// <remarks>
+    /// <b>This sits around what double-click already did rather than replacing
+    /// it.</b> The form is what an agent opens a call for nearly every time, so
+    /// it still opens at once, with the details and the player above it. Putting
+    /// it one click behind a details screen would slow the common case to make
+    /// room for the rare one.
+    ///
     /// Only an answered call is classified — nobody spoke on the others, so
     /// there is no order or complaint to record. What is worth knowing about a
     /// missed, rejected or unanswered call is why, and that is a sentence. A blocked or
-    /// failed call takes neither: nobody chose anything.
+    /// failed call takes neither: nobody chose anything, so it opens its details
+    /// alone.
     /// </remarks>
     [RelayCommand]
     private async Task OpenAsync(CallRow? row)
@@ -160,6 +187,12 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
         {
             return;
         }
+
+        Opened = row;
+
+        // Not awaited: the form should not wait on a recording of several
+        // megabytes, and the player says it is loading while it does.
+        _ = Player.LoadAsync(row);
 
         if (row.CanBeClassified)
         {
@@ -174,7 +207,28 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
             NotesText = row.Notes;
             NotesMessage = string.Empty;
         }
+        else
+        {
+            Classification.Close();
+            CloseNotes();
+        }
     }
+
+    /// <summary>Closes the open call: its details, its recording and its form.</summary>
+    [RelayCommand]
+    private void CloseCall()
+    {
+        Player.Close();
+        Classification.Close();
+        CloseNotes();
+        Opened = null;
+    }
+
+    /// <summary>
+    /// The call log has gone off screen. A recording playing to nobody is
+    /// paused, not stopped, so coming back carries on from the same place.
+    /// </summary>
+    public void Hide() => Player.Pause();
 
     // ---- the note on a missed, rejected or unanswered call ---------------------------
 
@@ -276,6 +330,7 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _typingTimer.Stop();
+        Player.Dispose();
 
         try
         {
@@ -464,4 +519,27 @@ public class CallRow(CommunicationDto call, Localizer localizer)
     /// the agent can see at a glance what they still owe.
     /// </summary>
     public bool IsUnclassified => call.IsUnclassified;
+
+    /// <summary>The audio is on the server and can be played (A-50, A-51).</summary>
+    public bool HasRecording => call.HasRecording;
+
+    /// <summary>
+    /// Recorded, and removed since by retention (A-33). Marked differently from
+    /// a call that was never recorded, so an old call does not look like a
+    /// recording that failed.
+    /// </summary>
+    public bool RecordingExpired => call.RecordingExpired;
+
+    /// <summary>What the mark in the list means, for its tooltip.</summary>
+    public string RecordingHint => HasRecording
+        ? localizer["callLog.recording.available"]
+        : RecordingExpired ? localizer["callLog.recording.expiredShort"] : string.Empty;
+
+    /// <summary>Date and time in full, for the details of an opened call.</summary>
+    public string StartedAt => call.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+
+    /// <summary>Incoming or outgoing, in the agent's language.</summary>
+    public string DirectionLabel => call.Direction == Directions.Out
+        ? localizer["callLog.outgoing"]
+        : localizer["callLog.incoming"];
 }

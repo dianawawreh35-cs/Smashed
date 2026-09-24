@@ -28,6 +28,17 @@ public partial class CallLogView : UserControl
                 _viewModel.RefreshCommand.Execute(null);
             }
         };
+
+        // A-51: a recording is not left playing to a screen nobody is looking
+        // at. IsVisibleChanged rather than Unloaded, because it covers the shell
+        // hiding this view as well as swapping it out.
+        IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is false)
+            {
+                _viewModel.Hide();
+            }
+        };
     }
 
     /// <summary>

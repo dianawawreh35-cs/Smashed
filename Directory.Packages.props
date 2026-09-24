@@ -49,6 +49,11 @@
          only from 10.0.5, which is what moved the Agent App to .NET 10. -->
     <PackageVersion Include="SIPSorcery" Version="10.0.16" />
     <PackageVersion Include="SIPSorceryMedia.Windows" Version="10.0.16" />
+    <!-- Plays a call's recording back in the call log (A-51). The same version
+         SIPSorceryMedia.Windows already brings for call audio, named here so a
+         SIPSorcery upgrade cannot change or remove it underneath the player. -->
+    <PackageVersion Include="NAudio.Core" Version="3.0.0" />
+    <PackageVersion Include="NAudio.WinMM" Version="3.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

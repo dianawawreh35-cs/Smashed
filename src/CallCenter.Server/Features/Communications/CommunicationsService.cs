@@ -581,6 +581,15 @@ public class CommunicationsService(
 
         var classifiedSet = classified.ToHashSet();
 
+        // Which have audio, and which had it until retention removed it (A-50,
+        // A-33). The row survives the file, so an expired recording is told
+        // apart from a call that was never recorded.
+        var recorded = await db.Recordings
+            .AsNoTracking()
+            .Where(r => ids.Contains(r.CommunicationId))
+            .Select(r => new { r.CommunicationId, Expired = r.DeletedAt != null })
+            .ToDictionaryAsync(r => r.CommunicationId, r => r.Expired, ct);
+
         var contactNames = await db.Contacts
             .AsNoTracking()
             .Where(c => contactIds.Contains(c.Id))
@@ -608,7 +617,9 @@ public class CommunicationsService(
             c.Extension,
             c.AgentId is { } agentId && agentNames.TryGetValue(agentId, out var agent) ? agent : null,
             classifiedSet.Contains(c.Id),
-            c.Notes))
+            c.Notes,
+            HasRecording: recorded.TryGetValue(c.Id, out var gone) && !gone,
+            RecordingExpired: recorded.TryGetValue(c.Id, out var expired) && expired))
             .ToList();
     }
 }

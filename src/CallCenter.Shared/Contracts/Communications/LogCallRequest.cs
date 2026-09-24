@@ -61,6 +61,15 @@ public record LogCallRequest(
 /// went that way. Null for every other call; an answered call's notes are on
 /// its classification.
 /// </param>
+/// <param name="HasRecording">
+/// The call's audio is on the server and can be played (A-50, A-51).
+/// </param>
+/// <param name="RecordingExpired">
+/// The call was recorded and retention has since deleted the audio (A-33). Kept
+/// apart from <paramref name="HasRecording"/> so the call log can say
+/// "expired" rather than leave the agent thinking the call was never recorded.
+/// Both false means no recording ever reached the server.
+/// </param>
 public record CommunicationDto(
     Guid Id,
     string Kind,
@@ -78,7 +87,9 @@ public record CommunicationDto(
     string? Extension,
     string? AgentDisplayName,
     bool IsClassified,
-    string? Notes)
+    string? Notes,
+    bool HasRecording,
+    bool RecordingExpired)
 {
     /// <summary>
     /// Only an answered call is classified (A-40). Anything else had no

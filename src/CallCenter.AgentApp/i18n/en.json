@@ -60,7 +60,24 @@
     "notesHeadingNoAnswer": "Why didn't this call go through?",
     "notesSave": "Save note",
     "notesCancel": "Close",
-    "notesSaved": "Note saved"
+    "notesSaved": "Note saved",
+    "incoming": "Incoming",
+    "outgoing": "Outgoing",
+    "closeCall": "Close",
+    "recording": {
+      "play": "Play",
+      "pause": "Pause",
+      "loading": "Loading the recording…",
+      "available": "Recorded - open the call to listen",
+      "expiredShort": "Recording expired",
+      "none": "This call has no recording. If it has only just ended, the recording may still be uploading - refresh in a minute.",
+      "expired": "This call was recorded, and the recording was deleted when its retention period ended.",
+      "notYours": "This recording belongs to another agent's call.",
+      "offline": "The recording could not be fetched - the server could not be reached.",
+      "unreadable": "The recording arrived but could not be played. Tell your supervisor.",
+      "noDevice": "The recording could not be played - no speaker or headset was found.",
+      "onCall": "Paused while you are on a call. Play it again once the call ends."
+    }
   },
   "caller": {
     "cancellations": "cancelled",

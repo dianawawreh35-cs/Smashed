@@ -158,6 +158,8 @@ public partial class App : Application
         services.AddTransient<HomeViewModel>();
         services.AddTransient<ContactsViewModel>();
         services.AddTransient<CallLogViewModel>();
+        // One per call log, with it: the recording of the call opened there (A-51).
+        services.AddTransient<RecordingPlayerViewModel>();
         services.AddTransient<DeliveryViewModel>();
         // Singleton: the point of it is that a picture fetched on one visit to
         // the menu is still there on the next.

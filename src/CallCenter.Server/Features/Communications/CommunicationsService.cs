@@ -26,6 +26,7 @@ namespace CallCenter.Server.Features.Communications;
 public class CommunicationsService(
     CallCenterDbContext db,
     Settings.SettingsService settings,
+    CallEditWindow editWindow,
     ILogger<CommunicationsService> logger)
 {
     /// <summary>
@@ -41,6 +42,21 @@ public class CommunicationsService(
 
         /// <summary>The Phone channel is missing, which means the database was never seeded.</summary>
         NoPhoneChannel,
+
+        /// <summary>No such call.</summary>
+        NotFound,
+
+        /// <summary>
+        /// The call is not missed, rejected or unanswered. An answered call is
+        /// classified instead, and a blocked or failed one takes nothing.
+        /// </summary>
+        NotesNotTaken,
+
+        /// <summary>The call belongs to another agent.</summary>
+        NotYours,
+
+        /// <summary>The agent's window to edit their own call has closed (A-42).</summary>
+        EditWindowClosed,
     }
 
     /// <summary>
@@ -127,6 +143,79 @@ public class CommunicationsService(
             call.Status, call.Extension, existing is null ? "new" : "updated");
 
         return (await ToDtoAsync(call, ct), null);
+    }
+
+    /// <summary>
+    /// Writes the note on a missed, rejected or unanswered outbound call — why
+    /// it went that way (A-41). Blank clears it.
+    /// </summary>
+    /// <remarks>
+    /// These calls are never classified: there was no conversation, so there is
+    /// no order or complaint to record, and a classification would put one into
+    /// the reports. What is worth keeping is the reason, and that is a sentence.
+    ///
+    /// Held to the same edit window as a classification (<see cref="CallEditWindow"/>).
+    /// </remarks>
+    public async Task<(CommunicationDto? Communication, Failure? Failure)> SaveNotesAsync(
+        Guid communicationId,
+        string? notes,
+        Guid actingUserId,
+        bool actorIsSupervisor,
+        CancellationToken ct = default)
+    {
+        var call = await db.Communications.FirstOrDefaultAsync(c => c.Id == communicationId, ct);
+
+        if (call is null)
+        {
+            return (null, Failure.NotFound);
+        }
+
+        if (!CommunicationStatuses.TakesNotes(call.Status))
+        {
+            return (null, Failure.NotesNotTaken);
+        }
+
+        switch (await editWindow.CheckAsync(call, actingUserId, actorIsSupervisor, ct))
+        {
+            case CallEditWindow.Refusal.NotYours:
+                return (null, Failure.NotYours);
+            case CallEditWindow.Refusal.Closed:
+                return (null, Failure.EditWindowClosed);
+        }
+
+        call.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        call.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return (await ToDtoAsync(call, ct), null);
+    }
+
+    /// <summary>
+    /// Writes a note on a call the server may not have been told about yet
+    /// (A-04, A-41).
+    /// </summary>
+    /// <remarks>
+    /// From the pop-up, keyed on the SIP Call-ID and extension. The Agent App
+    /// queues the note behind its call, so normally the call is here; if it is
+    /// not, the caller is told and the app keeps the note queued and tries
+    /// again.
+    /// </remarks>
+    public async Task<(CommunicationDto? Communication, Failure? Failure)> SaveNotesByCallAsync(
+        SaveCallNotesByCallRequest request,
+        Guid actingUserId,
+        bool actorIsSupervisor,
+        CancellationToken ct = default)
+    {
+        var id = await db.Communications
+            .Where(c => c.SipCallId == request.SipCallId && c.Extension == request.Extension)
+            .OrderByDescending(c => c.StartedAt)
+            .Select(c => (Guid?)c.Id)
+            .FirstOrDefaultAsync(ct);
+
+        return id is null
+            ? (null, Failure.NotFound)
+            : await SaveNotesAsync(id.Value, request.Notes, actingUserId, actorIsSupervisor, ct);
     }
 
     /// <summary>
@@ -342,7 +431,8 @@ public class CommunicationsService(
             c.QueueName,
             c.Extension,
             c.AgentId is { } agentId && agentNames.TryGetValue(agentId, out var agent) ? agent : null,
-            classifiedSet.Contains(c.Id)))
+            classifiedSet.Contains(c.Id),
+            c.Notes))
             .ToList();
     }
 }

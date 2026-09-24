@@ -147,7 +147,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | ID | Requirement | Priority |
 |---|---|---|
 | A-40 | **The classification form opens as soon as the call is answered**, for inbound and outbound calls, and stays open while the agent is talking. It is filled in **during** the call, not after it: the agent is taking the order as the customer speaks, and the order value, the branch and the notes are what is being said. The form stays on screen after hang-up until it is saved or skipped, so a call that ends mid-sentence does not take the agent's typing with it. Saving is possible during the call and at any point after it. The form's fields are defined by the supervisor (see S-40). Default fields: Type (Order, Cancellation, Complaint, Inquiry, Wrong number, Other), Branch (one of 4), Order value, Notes, Follow-up required. | Must |
-| A-41 | The agent may skip; the call remains "Unclassified" and is highlighted in the call log until classified. A form left untouched when the call ends is a skip, not a loss — nothing is saved until the agent saves it, and the call is simply unclassified. | Must |
+| A-41 | The agent may skip; the call remains "Unclassified" and is highlighted in the call log until classified. A form left untouched when the call ends is a skip, not a loss — nothing is saved until the agent saves it, and the call is simply unclassified. **Only answered calls are classified.** A missed, rejected or unanswered outbound call has no conversation to classify, is never marked "Unclassified", and instead takes a free-text note saying why, opened from the call log and editable under the same rule as A-42. When an outbound call ends unanswered, the call pop-up stays open and offers the note straight away (save or skip). Blocked and failed calls take neither. | Must |
 | A-42 | Agents can classify or edit the classification of their own calls for the current day only. Older entries are read-only for agents; supervisors can edit at any time. | Must |
 | A-43 | Every classification change is stored with who changed it and when (audit trail). | Must |
 
@@ -156,7 +156,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | ID | Requirement | Priority |
 |---|---|---|
 | A-50 | List of the agent's own calls: date/time, direction, number, contact, duration, status, type, notes, recording indicator. Filter by date and search by number/name. **The list reaches back a limited number of days, set by the supervisor (S-47, `agent.call_log_days`, one week by default).** It is a working window, not a retention rule: nothing is deleted, the contact history (A-62) still shows every call, and the supervisor's reports are unaffected. The limit is applied by the server, not by the app, and it is also what keeps the screen quick on a busy extension. | Must |
-| A-51 | Open any own call: view details, play the recording (play/pause/seek), and classify or edit classification subject to A-42. | Must |
+| A-51 | Open any own call: view details, play the recording (play/pause/seek), and — subject to A-42 — classify or edit the classification of an answered call, or write or edit the note on a missed, rejected or unanswered one (A-41). | Must |
 | A-52 | Agents cannot see other agents' calls. | Must |
 
 ### 3.7 Contacts (shared)

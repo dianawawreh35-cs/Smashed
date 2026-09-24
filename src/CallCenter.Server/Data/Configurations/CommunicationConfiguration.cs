@@ -23,6 +23,7 @@ public class CommunicationConfiguration : IEntityTypeConfiguration<Communication
         builder.Property(x => x.Direction).IsRequired();
         builder.Property(x => x.Status).IsRequired();
         builder.Property(x => x.Source).IsRequired();
+        builder.Property(x => x.Notes).HasMaxLength(4000);
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
 

@@ -1,4 +1,5 @@
 using CallCenter.Server.Features.Auth;
+using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -61,6 +62,48 @@ public class CommunicationsController(CommunicationsService communications) : Co
             User.GetRequiredUserId(), from, to, q, unclassified, Clamp(limit), ct));
 
     /// <summary>
+    /// The note on a missed, rejected or unanswered outbound call — why it went
+    /// that way (A-41).
+    /// </summary>
+    /// <remarks>
+    /// Those calls are never classified; this is what they take instead. The
+    /// same edit window as a classification applies (A-42).
+    /// </remarks>
+    [HttpPut("{id:guid}/notes")]
+    [ProducesResponseType<CommunicationDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CommunicationDto>> SaveNotes(
+        Guid id, SaveCallNotesRequest request, CancellationToken ct)
+    {
+        var (call, failure) = await communications.SaveNotesAsync(
+            id, request.Notes, User.GetRequiredUserId(),
+            User.IsInRole(UserRoles.Supervisor), ct);
+
+        return failure is not null ? Problem(failure.Value) : Ok(call);
+    }
+
+    /// <summary>
+    /// The same note, keyed on the call rather than its server id (A-04).
+    /// </summary>
+    /// <remarks>
+    /// For the Agent App's offline queue, as with a classification: a 404 means
+    /// the call has not arrived yet, and the app keeps the note queued.
+    /// </remarks>
+    [HttpPut("by-call/notes")]
+    [ProducesResponseType<CommunicationDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CommunicationDto>> SaveNotesByCall(
+        SaveCallNotesByCallRequest request, CancellationToken ct)
+    {
+        var (call, failure) = await communications.SaveNotesByCallAsync(
+            request, User.GetRequiredUserId(), User.IsInRole(UserRoles.Supervisor), ct);
+
+        return failure is not null ? Problem(failure.Value) : Ok(call);
+    }
+
+    /// <summary>
     /// One contact's history of calls, newest first — the panel in A-62.
     /// </summary>
     /// <remarks>
@@ -91,12 +134,23 @@ public class CommunicationsController(CommunicationsService communications) : Co
             CommunicationsService.Failure.NoPhoneChannel =>
                 (StatusCodes.Status500InternalServerError, "not_seeded",
                     "The Phone channel is missing. The database has not been seeded."),
+            CommunicationsService.Failure.NotFound =>
+                (StatusCodes.Status404NotFound, "call_not_found", "No such call."),
+            CommunicationsService.Failure.NotesNotTaken =>
+                (StatusCodes.Status409Conflict, "notes_not_taken",
+                    "Only a missed, rejected or unanswered outbound call takes a note. An answered call is classified instead."),
+            CommunicationsService.Failure.NotYours =>
+                (StatusCodes.Status403Forbidden, "not_your_call",
+                    "That call belongs to another agent."),
+            CommunicationsService.Failure.EditWindowClosed =>
+                (StatusCodes.Status403Forbidden, "edit_window_closed",
+                    "This call can no longer be changed. Ask a supervisor."),
             _ => (StatusCodes.Status400BadRequest, "invalid_request", "The call could not be logged."),
         };
 
         var problem = new ProblemDetails
         {
-            Title = "Call not logged",
+            Title = "Call not saved",
             Detail = detail,
             Status = status,
         };

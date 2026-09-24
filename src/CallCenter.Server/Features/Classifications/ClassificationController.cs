@@ -148,6 +148,9 @@ public class ClassificationController(
             ClassificationService.Failure.CommunicationNotFound =>
                 (StatusCodes.Status404NotFound, "call_not_found",
                     "That call is not on the server yet."),
+            ClassificationService.Failure.NotAnswered =>
+                (StatusCodes.Status409Conflict, "not_answered",
+                    "Only an answered call is classified. A missed, rejected or unanswered call takes a note instead."),
             ClassificationService.Failure.UnknownType =>
                 (StatusCodes.Status400BadRequest, "unknown_type",
                     "No such classification type, or it is no longer offered."),

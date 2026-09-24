@@ -69,6 +69,9 @@ function HistoryRow({ call }: { call: Communication }) {
         {call.status === 'Answered' && !call.isClassified && (
           <span className="badge-muted ms-2">{t('history.unclassified')}</span>
         )}
+        {/* A missed or rejected call is never classified; the agent's note
+            on why is what it carries instead. */}
+        {call.notes && <div className="mt-1 text-xs text-slate-400">{call.notes}</div>}
       </td>
       {/* Blank rather than 0:00 for a call that was never answered: a zero
           duration reads as a call that connected and was silent. */}

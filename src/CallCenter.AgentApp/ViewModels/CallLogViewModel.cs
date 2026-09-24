@@ -78,6 +78,7 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
         localizer.LanguageChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(StatusMessage));
+            OnPropertyChanged(nameof(NotesHeading));
             Rebuild();
         };
     }
@@ -142,19 +143,117 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     public ClassificationFormViewModel Classification { get; }
 
     /// <summary>
-    /// Opens the form for a call in the list (A-41, A-42).
+    /// Opens a call from the list (A-41, A-42): the classification form for an
+    /// answered call, the note for a missed, rejected or unanswered one, and nothing for
+    /// the rest.
     /// </summary>
     /// <remarks>
-    /// The way back to a skipped call. Without it the chip in this list points
-    /// at work nobody can do.
+    /// Only an answered call is classified — nobody spoke on the others, so
+    /// there is no order or complaint to record. What is worth knowing about a
+    /// missed, rejected or unanswered call is why, and that is a sentence. A blocked or
+    /// failed call takes neither: nobody chose anything.
     /// </remarks>
     [RelayCommand]
-    private async Task ClassifyAsync(CallRow? row)
+    private async Task OpenAsync(CallRow? row)
     {
-        if (row is not null)
+        if (row is null)
         {
+            return;
+        }
+
+        if (row.CanBeClassified)
+        {
+            CloseNotes();
             await Classification.BeginForLoggedCallAsync(row.Id);
         }
+        else if (row.TakesNotes)
+        {
+            Classification.Close();
+
+            NotesFor = row;
+            NotesText = row.Notes;
+            NotesMessage = string.Empty;
+        }
+    }
+
+    // ---- the note on a missed, rejected or unanswered call ---------------------------
+
+    /// <summary>The call whose note is open, or null when none is.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNotesOpen), nameof(NotesHeading))]
+    [NotifyCanExecuteChangedFor(nameof(SaveNotesCommand))]
+    private CallRow? _notesFor;
+
+    [ObservableProperty]
+    private string _notesText = string.Empty;
+
+    /// <summary>A confirmation, or why it could not be saved.</summary>
+    [ObservableProperty]
+    private string _notesMessage = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveNotesCommand))]
+    private bool _isSavingNotes;
+
+    public bool IsNotesOpen => NotesFor is not null;
+
+    /// <summary>Asks the question the note answers, for the kind of call it is.</summary>
+    public string NotesHeading => Localizer[NotesFor?.StatusKey switch
+    {
+        CommunicationStatuses.Rejected => "callLog.notesHeadingRejected",
+        CommunicationStatuses.NoAnswer => "callLog.notesHeadingNoAnswer",
+        _ => "callLog.notesHeadingMissed",
+    }];
+
+    private bool CanSaveNotes => NotesFor is not null && !IsSavingNotes;
+
+    [RelayCommand(CanExecute = nameof(CanSaveNotes))]
+    private async Task SaveNotesAsync()
+    {
+        if (NotesFor is not { } row)
+        {
+            return;
+        }
+
+        IsSavingNotes = true;
+        NotesMessage = string.Empty;
+
+        try
+        {
+            var result = await _api.SaveCallNotesAsync(row.Id, NotesText);
+
+            if (!result.IsOk)
+            {
+                // The same refusals as a classification (A-42): past the
+                // window, or somebody else's call.
+                NotesMessage = Localizer[result.ErrorCode switch
+                {
+                    "edit_window_closed" => "classification.tooOld",
+                    "not_your_call" => "classification.notYours",
+                    _ => "classification.saveFailed",
+                }];
+
+                return;
+            }
+
+            NotesMessage = Localizer["callLog.notesSaved"];
+
+            // Refetched rather than patched, as a saved classification is: the
+            // row shows the note, and the server's copy is the one that counts.
+            _ = RefreshAsync(CancellationToken.None);
+        }
+        finally
+        {
+            IsSavingNotes = false;
+        }
+    }
+
+    [RelayCommand]
+    private void CloseNotes()
+    {
+        NotesFor = null;
+        NotesText = string.Empty;
+        NotesMessage = string.Empty;
     }
 
     /// <summary>Clears every filter and shows the most recent calls again.</summary>
@@ -345,6 +444,20 @@ public class CallRow(CommunicationDto call, Localizer localizer)
 
     /// <summary>Answered, Missed, Rejected or Blocked, in the agent's language.</summary>
     public string Status => localizer[$"callLog.status.{call.Status}"];
+
+    /// <summary>The untranslated status, for decisions rather than display.</summary>
+    public string StatusKey => call.Status;
+
+    /// <summary>Only an answered call is classified (A-40).</summary>
+    public bool CanBeClassified => call.CanBeClassified;
+
+    /// <summary>A missed, rejected or unanswered call takes a note instead (A-41).</summary>
+    public bool TakesNotes => call.TakesNotes;
+
+    /// <summary>Why a missed, rejected or unanswered call went that way. Blank for the rest.</summary>
+    public string Notes => call.Notes ?? string.Empty;
+
+    public bool HasNotes => !string.IsNullOrWhiteSpace(call.Notes);
 
     /// <summary>
     /// True while the call has no classification (A-41). The row is marked so

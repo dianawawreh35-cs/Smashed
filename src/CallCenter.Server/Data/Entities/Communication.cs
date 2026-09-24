@@ -78,6 +78,13 @@ public class Communication
     /// <summary>Machine name of the laptop that logged it.</summary>
     public string? LaptopId { get; set; }
 
+    /// <summary>
+    /// Why a missed, rejected or unanswered outbound call went the way it did,
+    /// in the agent's words (A-41). Only those: an answered call is classified
+    /// instead, and its notes live on the <see cref="Classification"/>.
+    /// </summary>
+    public string? Notes { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 

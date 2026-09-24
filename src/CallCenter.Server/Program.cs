@@ -60,6 +60,7 @@ try
     builder.Services.AddScoped<ContactsService>();
     builder.Services.AddScoped<ContactFlagsService>();
     builder.Services.AddScoped<CommunicationsService>();
+    builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();
     builder.Services.AddOptions<MenuImageOptions>()
         .Bind(builder.Configuration.GetSection(MenuImageOptions.SectionName))

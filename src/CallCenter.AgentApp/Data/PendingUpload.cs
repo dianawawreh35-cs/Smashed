@@ -72,4 +72,15 @@ public static class PendingUploadKinds
     /// the call arrives first.
     /// </remarks>
     public const string Classification = "Classification";
+
+    /// <summary>
+    /// The note on an outbound call the customer did not pick up (A-41),
+    /// written in the pop-up as the call ends.
+    /// </summary>
+    /// <remarks>
+    /// Queued behind its call for the same reason as a classification: the
+    /// call is reported as it ends, and the note may be saved before the
+    /// server has it.
+    /// </remarks>
+    public const string Notes = "Notes";
 }

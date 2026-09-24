@@ -115,7 +115,51 @@ public class CallLogQueue(IDbContextFactory<AgentBufferDbContext> buffer, ILogge
     }
 
     /// <summary>
-    /// Everything waiting, of either kind, oldest first.
+    /// Adds a call's note to the queue (A-41).
+    /// </summary>
+    /// <remarks>
+    /// Replaces a note already queued for the same call, as a classification
+    /// does: a corrected note is one note, not two.
+    /// </remarks>
+    public async Task EnqueueAsync(SaveCallNotesByCallRequest notes, CancellationToken ct = default)
+    {
+        var reference = $"{notes.SipCallId}|{notes.Extension}";
+
+        try
+        {
+            await using var db = await buffer.CreateDbContextAsync(ct);
+
+            var existing = await db.PendingUploads
+                .Where(u => u.Kind == PendingUploadKinds.Notes && u.Reference == reference)
+                .FirstOrDefaultAsync(ct);
+
+            if (existing is not null)
+            {
+                existing.Payload = JsonSerializer.Serialize(notes);
+                existing.Attempts = 0;
+                existing.LastError = null;
+            }
+            else
+            {
+                db.PendingUploads.Add(new PendingUpload
+                {
+                    Kind = PendingUploadKinds.Notes,
+                    Payload = JsonSerializer.Serialize(notes),
+                    Reference = reference,
+                    CreatedAt = DateTimeOffset.Now,
+                });
+            }
+
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "A call note could not be queued to the offline buffer");
+        }
+    }
+
+    /// <summary>
+    /// Everything waiting, of every kind, oldest first.
     /// </summary>
     /// <remarks>
     /// One list rather than one per kind, because the order across kinds is the
@@ -150,6 +194,14 @@ public class CallLogQueue(IDbContextFactory<AgentBufferDbContext> buffer, ILogge
                             items.Add(new PendingItem(row.Id, null, classification));
                         }
                     }
+                    else if (row.Kind == PendingUploadKinds.Notes)
+                    {
+                        if (JsonSerializer.Deserialize<SaveCallNotesByCallRequest>(row.Payload)
+                            is { } notes)
+                        {
+                            items.Add(new PendingItem(row.Id, null, null, notes));
+                        }
+                    }
                 }
                 catch (JsonException)
                 {
@@ -166,9 +218,12 @@ public class CallLogQueue(IDbContextFactory<AgentBufferDbContext> buffer, ILogge
         }
     }
 
-    /// <summary>One queued thing: exactly one of the two is set.</summary>
+    /// <summary>One queued thing: exactly one of the three is set.</summary>
     public record PendingItem(
-        long Id, LogCallRequest? Call, SaveClassificationByCallRequest? Classification);
+        long Id,
+        LogCallRequest? Call,
+        SaveClassificationByCallRequest? Classification,
+        SaveCallNotesByCallRequest? Notes = null);
 
     /// <summary>Adds a call to the queue. Called before the send is attempted.</summary>
     public async Task EnqueueAsync(LogCallRequest call, CancellationToken ct = default)

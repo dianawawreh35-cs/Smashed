@@ -1,7 +1,7 @@
 using System.Text.Json;
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
-using CallCenter.Server.Features.Settings;
+using CallCenter.Server.Features.Communications;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Classifications;
 using Microsoft.EntityFrameworkCore;
@@ -28,13 +28,16 @@ namespace CallCenter.Server.Features.Classifications;
 /// </remarks>
 public class ClassificationService(
     CallCenterDbContext db,
-    SettingsService settings,
+    CallEditWindow editWindow,
     ILogger<ClassificationService> logger)
 {
     public enum Failure
     {
         /// <summary>No such call.</summary>
         CommunicationNotFound,
+
+        /// <summary>The call was not answered, so there is nothing to classify.</summary>
+        NotAnswered,
 
         /// <summary>No such classification type, or it has been hidden.</summary>
         UnknownType,
@@ -257,6 +260,15 @@ public class ClassificationService(
             return (null, Failure.CommunicationNotFound);
         }
 
+        // Only an answered call is classified. A missed, rejected or unanswered call takes a
+        // note instead (CommunicationsService.SaveNotesAsync); classifying it
+        // would put an "order" or a "complaint" into the reports for a call on
+        // which nobody spoke.
+        if (communication.Status != CommunicationStatuses.Answered)
+        {
+            return (null, Failure.NotAnswered);
+        }
+
         var allowed = await MayEditAsync(communication, actingUserId, actorIsSupervisor, ct);
         if (allowed is not null)
         {
@@ -446,46 +458,17 @@ public class ClassificationService(
 
     /// <summary>
     /// Whether this user may write this classification, and why not (A-42).
+    /// The rule itself is <see cref="CallEditWindow"/>, shared with call notes.
     /// </summary>
-    /// <remarks>
-    /// Supervisors may always. An agent may only their own calls, and only
-    /// within the window the supervisor set — the default is the day of the
-    /// call, so what an agent recorded during a shift stops being editable once
-    /// the shift is over and the reports have been read.
-    ///
-    /// The window is measured against the call's start, not against when it was
-    /// classified: a call taken at 23:55 and classified at 00:05 belongs to the
-    /// day it happened.
-    /// </remarks>
     private async Task<Failure?> MayEditAsync(
         Communication communication, Guid actingUserId, bool actorIsSupervisor,
-        CancellationToken ct)
-    {
-        if (actorIsSupervisor)
+        CancellationToken ct) =>
+        await editWindow.CheckAsync(communication, actingUserId, actorIsSupervisor, ct) switch
         {
-            return null;
-        }
-
-        if (communication.AgentId != actingUserId)
-        {
-            return Failure.NotYours;
-        }
-
-        var window = await settings.GetStringAsync("agent.edit_window", "SameDay", ct);
-
-        if (window.Equals("Always", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        // Local time, not UTC: "the same day" means the agent's day. A shift
-        // ending after midnight UTC is still the same evening in Hebron.
-        var startedLocal = communication.StartedAt.ToLocalTime().Date;
-
-        return startedLocal == DateTimeOffset.Now.Date
-            ? null
-            : Failure.EditWindowClosed;
-    }
+            null => null,
+            CallEditWindow.Refusal.NotYours => Failure.NotYours,
+            _ => Failure.EditWindowClosed,
+        };
 
     private async Task<int> CurrentVersionAsync(CancellationToken ct) =>
         await db.FormDefinitions.Where(f => f.IsCurrent)

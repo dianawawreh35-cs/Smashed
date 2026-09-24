@@ -134,6 +134,7 @@ CREATE TABLE communications (
   pbx_unique_id      text,                                        -- Asterisk uniqueid; the CDR import's dedupe key (needs loguniqueid=yes)
   source             text NOT NULL CHECK (source IN ('AgentApp','AMI','CDR','Manual')),
   laptop_id          text,                                        -- machine name that logged it
+  notes              varchar(4000),                               -- why a Missed/Rejected/NoAnswer call went that way (A-41); answered calls are classified instead
   created_at         timestamptz NOT NULL DEFAULT now(),
   updated_at         timestamptz NOT NULL DEFAULT now()
 );

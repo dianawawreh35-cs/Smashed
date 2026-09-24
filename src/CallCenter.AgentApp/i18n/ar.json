@@ -9,6 +9,8 @@
     "cancel": "إلغاء",
     "connected": "متّصل",
     "dialling": "جارٍ الاتصال",
+    "notAnswered": "لم يتم الرد",
+    "notesHeading": "لم يرد العميل. هل تريد إضافة ملاحظة؟",
     "hangUp": "إنهاء",
     "hold": "تعليق",
     "incoming": "مكالمة واردة",
@@ -52,7 +54,13 @@
     "from": "من",
     "to": "إلى",
     "clearFilters": "مسح التصفية",
-    "unclassified": "غير مصنّفة"
+    "unclassified": "غير مصنّفة",
+    "notesHeadingMissed": "لماذا فاتتك هذه المكالمة؟",
+    "notesHeadingRejected": "لماذا رُفضت هذه المكالمة؟",
+    "notesHeadingNoAnswer": "لماذا لم تتم هذه المكالمة؟",
+    "notesSave": "حفظ الملاحظة",
+    "notesCancel": "إغلاق",
+    "notesSaved": "تم حفظ الملاحظة"
   },
   "caller": {
     "cancellations": "إلغاءات",

@@ -276,6 +276,35 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             ct);
 
     /// <summary>
+    /// Writes the note on a missed, rejected or unanswered call — why it went that way
+    /// (A-41). Those calls are never classified; this is what they take instead.
+    /// </summary>
+    public Task<Result<CommunicationDto>> SaveCallNotesAsync(
+        Guid communicationId, string? notes, CancellationToken ct = default) =>
+        SendAsync<CommunicationDto>(
+            () => new HttpRequestMessage(
+                HttpMethod.Put, $"api/communications/{communicationId}/notes")
+            {
+                Content = JsonContent.Create(new SaveCallNotesRequest(notes)),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// The same note, keyed on the call rather than its server id (A-04). For
+    /// the offline queue, behind the call it belongs to.
+    /// </summary>
+    public Task<Result<CommunicationDto>> SaveCallNotesByCallAsync(
+        SaveCallNotesByCallRequest request, CancellationToken ct = default) =>
+        SendAsync<CommunicationDto>(
+            () => new HttpRequestMessage(HttpMethod.Put, "api/communications/by-call/notes")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>
     /// The signed-in agent's own calls (A-50). No agent id is sent and none is
     /// accepted: the token decides whose calls these are, so there is no request
     /// this app could make that would return another agent's (A-52).

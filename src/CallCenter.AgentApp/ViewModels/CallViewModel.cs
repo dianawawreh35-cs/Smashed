@@ -1,6 +1,7 @@
 using System.Windows.Threading;
 using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Localization;
+using CallCenter.Shared.Contracts.Communications;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -22,17 +23,20 @@ namespace CallCenter.AgentApp.ViewModels;
 public partial class CallViewModel : ObservableObject
 {
     private readonly CallService _calls;
+    private readonly CallLogReporter _reporter;
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _timer;
 
     public CallViewModel(
         CallService calls,
+        CallLogReporter reporter,
         ClassificationFormViewModel classification,
         CallerViewModel caller,
         Localizer localizer,
         Dispatcher dispatcher)
     {
         _calls = calls;
+        _reporter = reporter;
         _dispatcher = dispatcher;
         Classification = classification;
         Caller = caller;
@@ -48,6 +52,7 @@ public partial class CallViewModel : ObservableObject
 
         localizer.LanguageChanged += (_, _) => RefreshLabels();
         _calls.StateChanged += OnStateChanged;
+        _calls.CallFinished += OnCallFinished;
 
         // The PBX's name hides itself once the real contact arrives, and that
         // arrives on another object, so this view model has to be told.
@@ -94,6 +99,85 @@ public partial class CallViewModel : ObservableObject
     /// <summary>Raised when the call is over and the pop-up should go away.</summary>
     public event EventHandler? CallEnded;
 
+    // ---- the note on an outbound call nobody picked up (A-41) -------------
+
+    /// <summary>
+    /// The call the note belongs to, while the note is on screen. Null
+    /// otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Only an outbound call the customer did not pick up. It is never
+    /// classified — nobody spoke — but "rang twice, try after 6" is exactly
+    /// what the next agent to call them needs to know, and the moment the call
+    /// ends is when the agent knows it.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNotesOpen))]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(Number))]
+    private FinishedCall? _notesFor;
+
+    [ObservableProperty]
+    private string _notesText = string.Empty;
+
+    public bool IsNotesOpen => NotesFor is not null;
+
+    /// <summary>
+    /// Keeps the note and lets the pop-up go. Queued behind the call, which has
+    /// only just been reported, so it cannot arrive first.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveNotesAsync()
+    {
+        if (NotesFor is { } call && Classification.Extension is { } extension
+            && !string.IsNullOrWhiteSpace(NotesText))
+        {
+            await _reporter.SaveNotesAsync(
+                new SaveCallNotesByCallRequest(call.SipCallId, extension, NotesText.Trim()));
+        }
+
+        FinishNotes();
+    }
+
+    /// <summary>No note. The call is logged all the same.</summary>
+    [RelayCommand]
+    private void SkipNotes() => FinishNotes();
+
+    private void FinishNotes()
+    {
+        CloseNotes();
+
+        if (!State.IsActive)
+        {
+            Caller.Clear();
+            CallEnded?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void CloseNotes()
+    {
+        NotesFor = null;
+        NotesText = string.Empty;
+    }
+
+    /// <summary>
+    /// Opens the note when an outbound call ends unanswered. Raised just before
+    /// the state goes idle, so the pop-up knows to stay.
+    /// </summary>
+    private void OnCallFinished(object? sender, FinishedCall call)
+    {
+        if (!call.IsOutbound || call.Outcome is not CallOutcome.NoAnswer)
+        {
+            return;
+        }
+
+        _dispatcher.Invoke(() =>
+        {
+            NotesFor = call;
+            NotesText = string.Empty;
+        });
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRinging))]
     [NotifyPropertyChangedFor(nameof(IsConnected))]
@@ -126,9 +210,10 @@ public partial class CallViewModel : ObservableObject
     /// The caller's number, or a label when it was withheld. A blank line would
     /// read as a broken screen at the moment the agent most needs to trust it.
     /// </summary>
-    public string Number => string.IsNullOrWhiteSpace(State.Number)
-        ? Localizer["call.numberWithheld"]
-        : State.Number!;
+    public string Number => (State.IsActive ? State.Number : NotesFor?.Number ?? State.Number) is { } number
+                            && !string.IsNullOrWhiteSpace(number)
+        ? number
+        : Localizer["call.numberWithheld"];
 
     /// <summary>The microphone is paused (A-12).</summary>
     public bool IsMuted => State.IsMuted;
@@ -159,7 +244,8 @@ public partial class CallViewModel : ObservableObject
     /// </para>
     /// </summary>
     public string StatusText => Localizer[
-        IsOnHold ? "call.onHold"
+        !State.IsActive && IsNotesOpen ? "call.notAnswered"
+        : IsOnHold ? "call.onHold"
         : IsMuted ? "call.muted"
         : IsConnected ? "call.connected"
         : IsDialling ? "call.dialling"
@@ -243,10 +329,11 @@ public partial class CallViewModel : ObservableObject
 
             if (state.IsActive && !wasActive)
             {
-                // A new call replaces whatever was still on screen. A form left
-                // untouched from the last call is a skip (A-41), not something
-                // to hold the next caller up over.
+                // A new call replaces whatever was still on screen. A form or
+                // note left untouched from the last call is a skip (A-41), not
+                // something to hold the next caller up over.
                 Classification.Close();
+                CloseNotes();
 
                 // Who it is (A-10). Started here, not awaited: the pop-up is on
                 // screen and the phone is ringing whatever the server does.
@@ -254,7 +341,7 @@ public partial class CallViewModel : ObservableObject
 
                 CallArrived?.Invoke(this, EventArgs.Empty);
             }
-            else if (!state.IsActive && wasActive && !Classification.IsUnfinished)
+            else if (!state.IsActive && wasActive && !Classification.IsUnfinished && !IsNotesOpen)
             {
                 Caller.Clear();
                 CallEnded?.Invoke(this, EventArgs.Empty);

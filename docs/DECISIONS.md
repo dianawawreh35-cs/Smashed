@@ -3403,6 +3403,68 @@ machine: 15,289 contacts in about eight seconds, the right counts in
 `contacts` and `contact_phones`, `last9` generated, and a second run creating
 nothing.
 
+
+## 2026-09-24 — Only answered calls are classified; missed, rejected and unanswered ones take a note
+
+Double-clicking a missed or rejected call in the agent's call log opened the
+full classification form, the same as an answered one. Nobody spoke on those
+calls, so there is no order, complaint or branch to record, and a
+classification on one would put an "order" into the reports that never
+happened. What is worth knowing is **why** it was missed or rejected, and that
+is a sentence, not a form.
+
+**What the log does now.** Answered → the classification form, as before.
+Missed, Rejected or NoAnswer (an outbound call the customer did not pick up) →
+a small notes box ("Why was this call missed?"). Blocked and Failed → nothing
+opens: nobody chose anything, or the number could not be dialled. The saved note shows in the last column of the
+log, trimmed, with the full text in the tooltip, and in the supervisor app's
+contact history under the status.
+
+**The note lives on the call, not on a classification.** A new nullable
+`communications.notes` column (migration `AddCallNotes`, max 4000 like the
+classification's notes). Putting it in `classifications` would have meant a
+classification row with no type — every report counts those rows, so every
+report would have had to learn to skip them.
+
+**The server enforces it, not just the screen.** `PUT /api/classifications/{id}`
+(and `by-call`) now answers **409 `not_answered`** for any call that is not
+Answered. `PUT /api/communications/{id}/notes` answers **409 `notes_not_taken`**
+for any call that is not Missed or Rejected. Which statuses take a note is one
+function, `CommunicationStatuses.TakesNotes`, used by both the server and the
+app.
+
+**The pop-up asks too, for an outbound call nobody picked up.** When a call the
+agent placed ends as NoAnswer, the pop-up stays on screen with a notes box
+("The customer didn't answer. Add a note?") and Save note / Skip, instead of
+closing. That is the moment the agent knows "tried twice, call after 6". The
+pop-up learns the outcome from `CallService.CallFinished`, which is raised just
+before the state goes idle, so it knows to stay. A new call arriving closes the
+note unsaved, as it does an untouched classification.
+
+The pop-up has no server id for the call, so the note goes through the offline
+queue as a new kind, `Notes`, keyed on SIP Call-ID and extension, and is sent to
+`PUT /api/communications/by-call/notes` behind its call — the same route a
+classification takes. No change to the laptop's buffer schema: the queue was
+built generic for exactly this. A 404 `call_not_found` waits for the call; the
+server's definite refusals (`notes_not_taken`, `not_your_call`,
+`edit_window_closed`, and `not_answered` for classifications) are now dropped
+rather than retried forever.
+
+**One edit window for both.** The A-42 rule (own calls, same day unless the
+supervisor sets `agent.edit_window` to Always; supervisors always) moved out of
+`ClassificationService` into `CallEditWindow`, which both the classification
+and the note use. Two copies would drift, and an agent would find one editable
+the morning after and the other not.
+
+**Failed outbound calls do not get the pop-up note.** Failed means the number
+could not be dialled at all, and nothing about the customer was learned.
+
+**Verified:** server, agent app and web build; 131 shared and 241 server tests
+pass, including new ones for which statuses classify and which take a note, and
+the door and validation checks on both notes endpoints. **Not yet seen
+running** — neither notes box has been opened against a real call, and the
+migration has not been applied to a real database.
+
 ---
 
 # Open items (live)

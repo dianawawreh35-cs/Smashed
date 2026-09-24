@@ -9,6 +9,8 @@
     "cancel": "Cancel",
     "connected": "Connected",
     "dialling": "Calling",
+    "notAnswered": "No answer",
+    "notesHeading": "The customer didn't answer. Add a note?",
     "hangUp": "Hang up",
     "hold": "Hold",
     "incoming": "Incoming call",
@@ -52,7 +54,13 @@
     "from": "From",
     "to": "To",
     "clearFilters": "Clear filters",
-    "unclassified": "Not classified"
+    "unclassified": "Not classified",
+    "notesHeadingMissed": "Why was this call missed?",
+    "notesHeadingRejected": "Why was this call rejected?",
+    "notesHeadingNoAnswer": "Why didn't this call go through?",
+    "notesSave": "Save note",
+    "notesCancel": "Close",
+    "notesSaved": "Note saved"
   },
   "caller": {
     "cancellations": "cancelled",

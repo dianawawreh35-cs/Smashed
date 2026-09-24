@@ -56,6 +56,11 @@ public record LogCallRequest(
 /// Decided by the server (A-13), never sent by the app.
 /// </param>
 /// <param name="DurationSec">Talk time: answered to ended. Null when never answered.</param>
+/// <param name="Notes">
+/// The agent's note on a missed, rejected or unanswered outbound call — why it
+/// went that way. Null for every other call; an answered call's notes are on
+/// its classification.
+/// </param>
 public record CommunicationDto(
     Guid Id,
     string Kind,
@@ -72,8 +77,21 @@ public record CommunicationDto(
     string? QueueName,
     string? Extension,
     string? AgentDisplayName,
-    bool IsClassified)
+    bool IsClassified,
+    string? Notes)
 {
+    /// <summary>
+    /// Only an answered call is classified (A-40). Anything else had no
+    /// conversation, so there is nothing for the form to describe.
+    /// </summary>
+    public bool CanBeClassified => Status == CommunicationStatuses.Answered;
+
+    /// <summary>
+    /// A missed, rejected or unanswered outbound call takes a note instead —
+    /// why it went that way. Blocked and failed calls take neither.
+    /// </summary>
+    public bool TakesNotes => CommunicationStatuses.TakesNotes(Status);
+
     /// <summary>
     /// A call the agent still owes a classification for (A-41), highlighted in
     /// their call log until they deal with it.
@@ -83,6 +101,26 @@ public record CommunicationDto(
     /// classify — there was no conversation — and marking them as owing one
     /// would leave every agent with a list of work they can never clear.
     /// </remarks>
-    public bool IsUnclassified =>
-        !IsClassified && Status == CommunicationStatuses.Answered;
+    public bool IsUnclassified => !IsClassified && CanBeClassified;
 }
+
+/// <summary>
+/// The note on a missed, rejected or unanswered outbound call (A-41). Blank
+/// clears it.
+/// </summary>
+public record SaveCallNotesRequest([MaxLength(4000)] string? Notes);
+
+/// <summary>
+/// The same note, keyed on the call rather than its server id (A-04, A-41).
+/// </summary>
+/// <remarks>
+/// For the pop-up: an outbound call the customer did not pick up is noted the
+/// moment it ends, before the server has necessarily heard of it. The SIP
+/// Call-ID and extension are the pair the server keys a call on, so the note is
+/// queued behind its call and lands on it — the same route a classification
+/// takes.
+/// </remarks>
+public record SaveCallNotesByCallRequest(
+    [Required, MaxLength(200)] string SipCallId,
+    [Required, MaxLength(40)] string Extension,
+    [MaxLength(4000)] string? Notes);

@@ -125,6 +125,63 @@ public class CommunicationsEndpointTests(CallCenterApiFactory factory)
         response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Without_a_token_a_note_cannot_be_written()
+    {
+        var response = await factory.CreateClient().PutAsJsonAsync(
+            "/api/communications/11111111-1111-1111-1111-111111111111/notes",
+            new { notes = "Was on another call" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task An_agent_gets_past_the_door_to_write_a_note()
+    {
+        // A-41: a missed or rejected call takes a note instead of a
+        // classification. Whose call it is and whether it is still editable are
+        // decided past this point, against the database.
+        var response = await ClientFor(UserRoles.Agent).PutAsJsonAsync(
+            "/api/communications/11111111-1111-1111-1111-111111111111/notes",
+            new { notes = "Was on another call" });
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_note_longer_than_the_column_is_refused_before_the_database()
+    {
+        var response = await ClientFor(UserRoles.Agent).PutAsJsonAsync(
+            "/api/communications/11111111-1111-1111-1111-111111111111/notes",
+            new { notes = new string('x', 4001) });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task An_agent_gets_past_the_door_to_note_a_call_by_its_SIP_id()
+    {
+        // The pop-up's route: an outbound call nobody picked up is noted as it
+        // ends, keyed on the call because its server id is not known yet.
+        var response = await ClientFor(UserRoles.Agent).PutAsJsonAsync(
+            "/api/communications/by-call/notes",
+            new { sipCallId = "abc123@pbx", extension = "2001", notes = "No answer, try after 6" });
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_note_by_call_with_no_SIP_call_id_is_refused_before_the_database()
+    {
+        var response = await ClientFor(UserRoles.Agent).PutAsJsonAsync(
+            "/api/communications/by-call/notes",
+            new { extension = "2001", notes = "No answer" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private HttpClient ClientFor(string role)
     {
         var tokens = new TokenService(

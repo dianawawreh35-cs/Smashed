@@ -28,6 +28,8 @@ export interface Communication {
   extension: string | null
   agentDisplayName: string | null
   isClassified: boolean
+  /** Why a missed or rejected call went that way, in the agent's words. */
+  notes: string | null
 }
 
 /**

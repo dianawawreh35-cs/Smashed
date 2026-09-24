@@ -14,7 +14,8 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
-      <!-- The classification form, when a call has been chosen from the list. -->
+      <!-- The classification form or the note, when a call has been chosen
+           from the list. Never both: opening one closes the other. -->
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
@@ -139,9 +140,11 @@
                   Visibility="{Binding HasCalls, Converter={StaticResource BoolToVisibility}}">
           <DataGrid.InputBindings>
             <!-- A-41: the way back to a call that was skipped. Double-click, as
-                 the contacts, menu and delivery lists open their editors. -->
+                 the contacts, menu and delivery lists open their editors. An
+                 answered call opens the classification; a missed, rejected or unanswered
+                 one opens its note; anything else opens nothing. -->
             <MouseBinding MouseAction="LeftDoubleClick"
-                          Command="{Binding ClassifyCommand}"
+                          Command="{Binding OpenCommand}"
                           CommandParameter="{Binding SelectedItem,
                                              RelativeSource={RelativeSource AncestorType=DataGrid}}" />
           </DataGrid.InputBindings>
@@ -162,15 +165,28 @@
             <DataGridTemplateColumn Width="Auto" MinWidth="110">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
-                  <Border Padding="7,2"
-                          CornerRadius="{StaticResource CornerSmall}"
-                          Background="#2A2412"
-                          Visibility="{Binding IsUnclassified, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock Text="{Binding DataContext.Localizer[callLog.unclassified],
-                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                  <Grid>
+                    <Border Padding="7,2"
+                            CornerRadius="{StaticResource CornerSmall}"
+                            Background="#2A2412"
+                            Visibility="{Binding IsUnclassified, Converter={StaticResource BoolToVisibility}}">
+                      <TextBlock Text="{Binding DataContext.Localizer[callLog.unclassified],
+                                        RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                 FontSize="11"
+                                 Foreground="{StaticResource Warning}" />
+                    </Border>
+
+                    <!-- A missed, rejected or unanswered call's note, trimmed to fit; the
+                         whole of it is in the tooltip. -->
+                    <TextBlock Text="{Binding Notes}"
+                               ToolTip="{Binding Notes}"
+                               MaxWidth="220"
                                FontSize="11"
-                               Foreground="{StaticResource Warning}" />
-                  </Border>
+                               Foreground="{StaticResource TextMuted}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
+                  </Grid>
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
@@ -220,6 +236,44 @@
                    TextWrapping="Wrap" />
 
         <TextBlock Text="{Binding Classification.Message}"
+                   Style="{StaticResource Subtle}"
+                   Margin="0,4,0,0"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <!-- The note on a missed, rejected or unanswered call chosen from the list. These are
+         never classified - nobody spoke - so the only question is why. -->
+    <Border Grid.Row="3" Grid.ColumnSpan="2"
+            Margin="0,14,0,0"
+            Style="{StaticResource Card}"
+            Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">
+      <StackPanel>
+        <TextBlock Text="{Binding NotesHeading}"
+                   Foreground="{StaticResource Text}"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,12" />
+
+        <TextBox Text="{Binding NotesText, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 MinHeight="70"
+                 MaxLength="4000"
+                 VerticalScrollBarVisibility="Auto" />
+
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <Button Content="{Binding Localizer[callLog.notesSave]}"
+                  Style="{StaticResource PrimaryButton}"
+                  MinWidth="120"
+                  Command="{Binding SaveNotesCommand}" />
+          <Button Content="{Binding Localizer[callLog.notesCancel]}"
+                  Style="{StaticResource GhostButton}"
+                  MinWidth="100"
+                  Margin="10,0,0,0"
+                  Command="{Binding CloseNotesCommand}" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding NotesMessage}"
                    Style="{StaticResource Subtle}"
                    Margin="0,4,0,0"
                    TextWrapping="Wrap" />

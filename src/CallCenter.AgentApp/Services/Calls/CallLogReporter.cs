@@ -85,6 +85,20 @@ public class CallLogReporter(
     }
 
     /// <summary>
+    /// Records the note on a call that has just ended (A-41) — an outbound call
+    /// the customer did not pick up.
+    /// </summary>
+    /// <remarks>
+    /// Queued behind its call, like a classification, so it cannot arrive for a
+    /// call the server has not heard of yet.
+    /// </remarks>
+    public async Task SaveNotesAsync(SaveCallNotesByCallRequest notes, CancellationToken ct = default)
+    {
+        await queue.EnqueueAsync(notes, ct);
+        await FlushAsync(ct);
+    }
+
+    /// <summary>
     /// Sends everything waiting. Called after each call and at sign-in, so a
     /// laptop that was offline for a shift catches up as soon as somebody logs
     /// in on it.
@@ -113,9 +127,10 @@ public class CallLogReporter(
 
         foreach (var item in pending)
         {
-            var (id, call, classification) = (item.Id, item.Call, item.Classification);
+            var (id, call, classification, notes) =
+                (item.Id, item.Call, item.Classification, item.Notes);
 
-            // One loop over both kinds, in one sequence.
+            // One loop over every kind, in one sequence.
             bool ok;
             string? errorCode;
 
@@ -124,9 +139,14 @@ public class CallLogReporter(
                 var sent = await api.LogCallAsync(call, ct);
                 (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
             }
+            else if (classification is not null)
+            {
+                var sent = await api.ClassifyByCallAsync(classification, ct);
+                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
+            }
             else
             {
-                var sent = await api.ClassifyByCallAsync(classification!, ct);
+                var sent = await api.SaveCallNotesByCallAsync(notes!, ct);
                 (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
             }
 
@@ -148,11 +168,11 @@ public class CallLogReporter(
             // the classification blocking the very call it is waiting for, and
             // the queue would deadlock - which is exactly what it did: two calls
             // and two classifications sat unsent behind each other.
-            if (classification is not null && errorCode is "call_not_found")
+            if (call is null && errorCode is "call_not_found")
             {
                 logger.LogDebug(
-                    "A classification is waiting for its call to be reported ({Reference})",
-                    classification.SipCallId);
+                    "A classification or note is waiting for its call to be reported ({Reference})",
+                    classification?.SipCallId ?? notes?.SipCallId);
 
                 deferred = true;
                 continue;
@@ -162,7 +182,8 @@ public class CallLogReporter(
             // often it is retried, and a queue that retries it forever blocks
             // every call behind it. Drop it, loudly.
             if (errorCode is "unknown_value" or "invalid_request"
-                or "unknown_type" or "unknown_branch" or "not_your_call")
+                or "unknown_type" or "unknown_branch" or "not_your_call"
+                or "not_answered" or "notes_not_taken" or "edit_window_closed")
             {
                 logger.LogError(
                     "The server refused queued item {Id} ({Code}); it is discarded rather than retried forever",

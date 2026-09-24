@@ -232,6 +232,40 @@
                    TextWrapping="Wrap" />
       </StackPanel>
 
+      <!-- An outbound call the customer did not pick up (A-41). Never
+           classified - nobody spoke - but the agent knows right now what the
+           next person to ring them should know: "tried twice, call after 6".
+           The pop-up stays until this is saved or skipped. -->
+      <StackPanel Margin="0,18,0,0"
+                  Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">
+
+        <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
+
+        <TextBlock Text="{Binding Localizer[call.notesHeading]}"
+                   Foreground="{StaticResource Text}"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,12" />
+
+        <TextBox Text="{Binding NotesText, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 MinHeight="70"
+                 MaxLength="4000"
+                 VerticalScrollBarVisibility="Auto" />
+
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <Button Content="{Binding Localizer[callLog.notesSave]}"
+                  Style="{StaticResource PrimaryButton}"
+                  MinWidth="120"
+                  Command="{Binding SaveNotesCommand}" />
+          <Button Content="{Binding Localizer[classification.skip]}"
+                  Style="{StaticResource GhostButton}"
+                  MinWidth="100"
+                  Margin="10,0,0,0"
+                  Command="{Binding SkipNotesCommand}" />
+        </StackPanel>
+      </StackPanel>
+
       <!-- Dialling out (A-20). No Answer and no Reject: there is nothing to
            accept on a call the agent placed, only to give up on. -->
       <StackPanel HorizontalAlignment="Center"

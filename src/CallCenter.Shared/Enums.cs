@@ -78,6 +78,13 @@ public static class CommunicationStatuses
 
     public static readonly IReadOnlyList<string> All =
         new[] { Ringing, Answered, Missed, Rejected, Blocked, Abandoned, Overflowed, NoAnswer, Failed, Logged };
+
+    /// <summary>
+    /// The calls that take a note rather than a classification (A-41): a
+    /// customer rang and the agent did not take it, or the agent rang and the
+    /// customer did not pick up. The note says why, or what to do next.
+    /// </summary>
+    public static bool TakesNotes(string? status) => status is Missed or Rejected or NoAnswer;
 }
 
 /// <summary><c>communications.source</c>.</summary>

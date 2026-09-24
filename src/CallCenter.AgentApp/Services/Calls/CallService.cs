@@ -1,3 +1,4 @@
+using System.IO;
 using CallCenter.AgentApp.Services.Sip;
 using CallCenter.Shared.Contracts.Auth;
 using CallCenter.Shared.Phone;
@@ -49,6 +50,8 @@ public class CallService(
     BlockListCache blockList,
     PhonePreferences preferences,
     IOptions<DialingOptions> dialing,
+    IOptions<RecordingOptions> recording,
+    ILoggerFactory loggerFactory,
     ILogger<CallService> logger) : IDisposable
 {
     private readonly Lock _gate = new();
@@ -81,6 +84,13 @@ public class CallService(
     private SIPResponseStatusCodesEnum? _lastDialFailure;
 
     /// <summary>
+    /// The recorder for the call in progress (A-30), or null when the call is
+    /// not being recorded — which includes every case where recording failed,
+    /// because A-32 says a recording problem must never reach the call.
+    /// </summary>
+    private CallRecorder? _recorder;
+
+    /// <summary>
     /// The Call-ID of the call in progress, so a re-INVITE for it can be told
     /// apart from a genuine second call.
     /// </summary>
@@ -107,6 +117,18 @@ public class CallService(
     /// which never appear on screen.
     /// </summary>
     public event EventHandler<FinishedCall>? CallFinished;
+
+    /// <summary>
+    /// Raised when a call that was recorded has a finished file waiting to go
+    /// to the server (A-31).
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="CallFinished"/> and raised after it, because a
+    /// recording can only be attached to a call the server already knows about.
+    /// A call with no recording raises nothing, which is what "flagged: no
+    /// recording" (A-32) amounts to in practice.
+    /// </remarks>
+    public event EventHandler<CallRecording>? RecordingReady;
 
     public CallState State
     {
@@ -187,6 +209,7 @@ public class CallService(
             logger.LogWarning(ex, "A call did not end cleanly while stopping");
         }
 
+        StopRecording();
         CloseMedia();
         Set(CallState.Idle);
     }
@@ -296,6 +319,8 @@ public class CallService(
                 _callId = agent.Dialogue?.CallId;
             }
 
+            StartRecording(media, audio);
+
             Set(State with
             {
                 Status = CallStatus.Connected,
@@ -387,6 +412,8 @@ public class CallService(
             {
                 _pending = null;
             }
+
+            StartRecording(media, audio);
 
             Set(State with { Status = CallStatus.Connected, ConnectedAt = DateTimeOffset.Now });
             logger.LogInformation("Call answered");
@@ -901,6 +928,136 @@ public class CallService(
     }
 
     /// <summary>
+    /// Starts recording a call that has just been answered (A-30), and taps the
+    /// audio in both directions.
+    /// </summary>
+    /// <remarks>
+    /// <b>Answered calls only.</b> A missed, rejected or blocked call has no
+    /// conversation to record.
+    /// </remarks>
+    /// <param name="media">
+    /// The customer's voice, as encoded frames off the network. Taken from the
+    /// session rather than the speaker so it is what arrived, not what the
+    /// laptop managed to play.
+    /// </param>
+    /// <param name="audio">
+    /// The agent's voice. Taken as raw microphone samples, which state their
+    /// own rate; the encoded event does not.
+    /// </param>
+    /// <remarks>
+    /// Wrapped end to end. A-32 is the strictest rule in this file: if
+    /// recording cannot start, the call still happens and simply has no
+    /// recording. The events are only subscribed once a recorder exists, so a
+    /// failure here costs nothing per frame afterwards.
+    /// </remarks>
+    private void StartRecording(VoIPMediaSession media, WindowsAudioEndPoint audio)
+    {
+        if (!recording.Value.Enabled)
+        {
+            return;
+        }
+
+        try
+        {
+            // Named for the call, not the clock: this is the name the server
+            // will attach to the call record, and two calls in the same second
+            // would otherwise collide.
+            var name = (_callId ?? Guid.NewGuid().ToString()).Replace(':', '_');
+
+            foreach (var invalid in Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(invalid, '_');
+            }
+
+            var recorder = CallRecorder.Start(
+                recording.Value.Folder, name, loggerFactory.CreateLogger<CallRecorder>());
+
+            if (recorder is null)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                _recorder = recorder;
+            }
+
+            media.OnAudioFrameReceived += recorder.WriteRemote;
+            audio.OnAudioSourceRawSample += OnLocalAudio;
+
+            logger.LogInformation("Recording this call to {Path}", recorder.FilePath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "This call will not be recorded; the call itself is unaffected");
+        }
+    }
+
+    /// <summary>
+    /// The microphone, on its way into the call. A method rather than a lambda
+    /// so it can be unsubscribed when the call ends.
+    /// </summary>
+    private void OnLocalAudio(AudioSamplingRatesEnum rate, uint duration, short[] samples)
+    {
+        CallRecorder? recorder;
+
+        lock (_gate)
+        {
+            recorder = _recorder;
+        }
+
+        recorder?.WriteLocal(rate, samples);
+    }
+
+    /// <summary>
+    /// Finishes the recording and hands the file on (A-31). Returns whatever is
+    /// worth uploading, or null.
+    /// </summary>
+    private RecordedCall? StopRecording()
+    {
+        CallRecorder? recorder;
+        WindowsAudioEndPoint? audio;
+        VoIPMediaSession? media;
+
+        lock (_gate)
+        {
+            recorder = _recorder;
+            audio = _audio;
+            media = _media;
+            _recorder = null;
+        }
+
+        if (recorder is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            // Unsubscribed before the file is closed, so a frame arriving
+            // during the tear-down cannot be written to a stream that has gone.
+            if (media is not null)
+            {
+                media.OnAudioFrameReceived -= recorder.WriteRemote;
+            }
+
+            if (audio is not null)
+            {
+                audio.OnAudioSourceRawSample -= OnLocalAudio;
+            }
+
+            var recorded = recorder.Stop();
+            recorder.Dispose();
+            return recorded;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "The recording could not be closed cleanly");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// The microphone and speaker, as a media session. Created per call rather
     /// than held open, so the app does not sit on the microphone between calls —
     /// on a shared laptop that is both rude and a privacy question.
@@ -981,6 +1138,10 @@ public class CallService(
             _state = CallState.Idle;
         }
 
+        // Before the media is closed: the tap hangs off the session, and
+        // closing that first would take the last frames with it.
+        var recorded = StopRecording();
+
         CloseMedia();
 
         if (state.Status is CallStatus.Idle)
@@ -1006,6 +1167,13 @@ public class CallService(
             DateTimeOffset.Now,
             state.IsOutbound));
 
+        // After the call has been reported, never before: a recording can only
+        // be attached to a call the server has already been told about (A-31).
+        if (recorded is not null && callId is not null)
+        {
+            Announce(new CallRecording(callId, recorded));
+        }
+
         // The state was set inside the lock above; this is only the event.
         StateChanged?.Invoke(this, CallState.Idle);
     }
@@ -1014,6 +1182,22 @@ public class CallService(
     /// Hands a finished call to whoever is recording them. Never throws: a
     /// reporting problem must not take the phone down mid-shift.
     /// </summary>
+    /// <summary>
+    /// Hands a finished recording to whoever uploads it. Never throws, for the
+    /// same reason as <see cref="Report"/>.
+    /// </summary>
+    private void Announce(CallRecording recording)
+    {
+        try
+        {
+            RecordingReady?.Invoke(this, recording);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "A recording could not be handed on for upload");
+        }
+    }
+
     private void Report(FinishedCall call)
     {
         try

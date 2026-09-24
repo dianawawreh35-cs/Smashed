@@ -101,6 +101,7 @@ public partial class App : Application
     {
         services.Configure<ServerOptions>(context.Configuration.GetSection(ServerOptions.SectionName));
         services.Configure<DialingOptions>(context.Configuration.GetSection(DialingOptions.SectionName));
+        services.Configure<RecordingOptions>(context.Configuration.GetSection(RecordingOptions.SectionName));
 
         // One session object for the process: every view model asks it who is
         // signed in, rather than passing the answer around.

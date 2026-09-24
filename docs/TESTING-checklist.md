@@ -239,6 +239,28 @@ cannot be faked, and the part most likely to find something.
       again**. That is a dialplan question, and it is what "Reject does nothing"
       looked like on 22 September. See the DECISIONS entry of that date on 603
       versus 486.
+### Call recording (A-30, A-32) — written, never run against a phone
+
+- [ ] **Answer a call, talk for 30 seconds with both people speaking, hang up.**
+      A file appears in `%LOCALAPPDATA%\CallCenter\recordings`; the log line
+      says exactly where.
+      *The header and the channel layout were checked with generated tones, so
+      what is untested here is the real audio path, not the file format.*
+- [ ] **Play it.** It must open in Windows Media Player or VLC.
+- [ ] **Both voices are there**, and in step — neither lagging the other.
+      With headphones, the customer is on the left and you are on the right.
+- [ ] **Put the call on hold for a few seconds.** That stretch must be silence,
+      not the sound of the room. Same for mute.
+      *If you can hear the office while muted, stop and tell me: that is a
+      privacy failure, not a glitch.*
+- [ ] **A call nobody answers leaves no file.** Missed, rejected and blocked
+      calls have no conversation to record.
+- [ ] **Fill the disk, or make the folder read-only, then take a call.** The
+      call must connect and behave normally (A-32). The log says the recording
+      could not start; nothing else changes.
+- [ ] **Check the size.** Roughly 0.9 MB per minute. Far off that in either
+      direction means the format is not what it should be.
+
 - [ ] **Does taking a call reset the idle-logout timer?** Flagged and never
       checked. If it does not, an agent on a long call gets logged out
       mid-conversation.

@@ -160,3 +160,14 @@ public record FinishedCall(
     DateTimeOffset? AnsweredAt,
     DateTimeOffset EndedAt,
     bool IsOutbound = false);
+
+/// <summary>
+/// A finished recording and the call it belongs to (A-31).
+/// </summary>
+/// <remarks>
+/// The call is named by its SIP Call-ID, the same reference the classification
+/// uses, because that is what the server keys a call on. Recording and
+/// classification are therefore two things hanging off one call rather than
+/// being linked to each other.
+/// </remarks>
+public record CallRecording(string SipCallId, RecordedCall File);

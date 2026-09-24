@@ -3270,6 +3270,89 @@ flags and the classification write path all have "no database-backed test" next
 to them in the list below, and the reason given each time was that CI has no
 database. That reason has gone. The tests themselves still have to be written.
 
+## 2026-09-24 — Call recording, part 1: capturing the audio (A-30, A-32)
+
+The table, the entity, the folder in the deployment, the backup that copies it
+and the 90-day setting have all existed for days. Not one line of code read any
+of them, and nothing tapped the audio. It looked far more finished than it was.
+
+Capture is now written. Nothing is uploaded yet, and **no real call has been
+through it** — the PBX is down. Committed anyway rather than left loose, and
+flagged here so nobody mistakes it for proven.
+
+### Both voices, on separate channels, in one file
+
+Dia chose this over mixing them, which would have halved the disk. One stereo
+file per call: **customer on the left, agent on the right**. It plays as an
+ordinary conversation, and a supervisor reviewing a complaint can turn one side
+down when the two talked over each other — which is what the calls worth
+reviewing sound like. Mixing throws that away permanently, and a complaint is
+exactly where somebody later disputes who said what.
+
+**Stored as the phone system sends it.** The audio arrives as G.711, so it is
+written as G.711 inside a WAV container rather than expanded to plain PCM. Same
+bytes, same quality, half the size, and it still opens in anything. About 0.9 MB
+a minute, so 90 days of four agents lands near 50 GB — bounded, and the number
+to size the disk on. Compression would cut that fivefold and costs a dependency
+and a conversion per call; better measured than guessed.
+
+### What is recorded is what crossed the line
+
+The customer's side is taken from the network frames, not from the speaker, so
+it is what arrived rather than what the laptop managed to play. The agent's side
+is taken from the microphone feed the call itself is using — raw samples, which
+state their own rate, where the encoded event does not.
+
+That choice makes mute and hold honest for free. Both pause the source, so
+nothing arrives, so those stretches record **silence rather than the office**.
+A recording that captured the room while the agent believed they were muted
+would be a genuine privacy failure, not a bug.
+
+### The two channels are kept in step by padding, not by hope
+
+Audio only arrives while somebody is speaking. A hold, a mute, or ten seconds of
+listening all produce a gap in one direction, and without something to fill it
+the next thing that person says would be heard on top of what the other party
+said ten seconds earlier. Each channel is padded with silence when it falls more
+than 200 ms behind the clock.
+
+**G.711 silence is 0xFF, not zero.** Zero is a loud buzz. That is the sort of
+thing discovered by playing back a call that was on hold, and it is written down
+here so nobody has to discover it twice.
+
+### A-32 held hardest
+
+Every way in is wrapped. A full disk, a file that will not open, a codec nobody
+expected — each costs the recording and nothing else. A write that fails logs
+once and never again, because a full disk will not empty itself mid-call and a
+line per frame would bury the log. A half-written file is deleted rather than
+attached, because a recording that exists and plays as noise is worse than an
+honest absence.
+
+### Verified synthetically, because a bad audio file is silent about it
+
+A malformed WAV is a nasty failure: the file exists, the size looks right, and
+it simply will not play. So the recorder was driven with a 400 Hz tone on one
+side and 800 Hz on the other, and the result read back the way a player would.
+Every header field correct, and both tones returned at full strength on their
+correct channels — 399 Hz left, 799 Hz right. Silence, swapped channels or a
+wrong sample rate would each have shown up.
+
+That is not the same as a real call, and the checklist says so.
+
+### Still to come
+
+Upload and attach to the call record (A-31), the retention job (A-33), the
+endpoint that serves a recording (S-04) — and the supervisor's call search
+(S-02, S-03), without which there is nowhere to play one from. The upload half
+can be built and tested with a generated file while the PBX is down; only the
+capture needs a phone.
+
+**Recording and classification do not link to each other.** Both hang off the
+call, named by the same SIP Call-ID the classification already uses. That pair
+has worked since classification shipped, so the recording rides a road that is
+already proven.
+
 ---
 
 # How this project is tracked

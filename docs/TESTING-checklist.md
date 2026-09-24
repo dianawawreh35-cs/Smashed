@@ -292,6 +292,10 @@ cannot be faked, and the part most likely to find something.
       name at the top and **Mute / Hold / Hang up** at the bottom stay on
       screen while it does. *Reported 24 Sep:* the window was cut off, with no
       way to reach what was below.
+- [ ] **The pop-up stays centred as it grows.** Answer a call, so the
+      classification appears, then open the new-customer form: it grows up and
+      down equally and stays in the middle of the screen. Drag it aside and
+      open a field: it stays where you put it. The next call is centred again.
 - [ ] **The scroll bar is thin and dark**, a rounded grey bar with no arrows
       that lightens under the pointer, in the pop-up and in every list (call
       log, contacts, menu). In Arabic the pop-up's bar is on the left.

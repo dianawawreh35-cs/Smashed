@@ -12,7 +12,9 @@ import {
   updateContact,
 } from '../api/contacts'
 import type { Contact, ContactFilter, ContactSummary, DuplicateNumber } from '../api/contacts'
+import { communicationsForContact } from '../api/communications'
 import { errorCodeOf } from '../api/users'
+import { noSelectOnDoubleClick } from '../lib/rows'
 import ContactHistory from '../components/ContactHistory'
 import FlagDialog from '../components/FlagDialog'
 import type { FlagTarget } from '../components/FlagDialog'
@@ -133,7 +135,20 @@ type Opened = { id: string; mode: 'edit' | 'flag' } | null
 
 function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const [opened, setOpened] = useState<Opened>(null)
+
+  // Fetched while the pointer is over the row, so by the double-click the
+  // contact and its history are usually here and the form opens whole, rather
+  // than as a placeholder, then a form, then a history (24 Sep). The same keys
+  // the editor and the history ask with, so they find it waiting.
+  const prefetch = (id: string) => {
+    void queryClient.prefetchQuery({ queryKey: ['contacts', 'one', id], queryFn: () => getContact(id) })
+    void queryClient.prefetchQuery({
+      queryKey: ['communications', 'by-contact', id],
+      queryFn: () => communicationsForContact(id),
+    })
+  }
 
   const toggle = (id: string, mode: 'edit' | 'flag') =>
     setOpened((current) => (current?.id === id && current.mode === mode ? null : { id, mode }))
@@ -160,6 +175,8 @@ function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
                 double-click is unreachable from the keyboard. */}
             <tr
               onDoubleClick={() => toggle(contact.id, 'edit')}
+              onMouseDown={noSelectOnDoubleClick}
+              onMouseEnter={() => prefetch(contact.id)}
               className={`cursor-pointer ${open ? 'bg-ink-800/40' : ''}`}
             >
               <td className="font-medium text-slate-100">
@@ -249,7 +266,9 @@ function OpenContact({ id, onClose }: { id: string; onClose: () => void }) {
 
   if (contact.isError) return <p className="notice-error">{t('contacts.errors.server_error')}</p>
   if (!contact.data) {
-    return <div className="card h-72 animate-pulse bg-ink-800/60" aria-label={t('app.loading')} />
+    // Still, not pulsing: only seen when the contact was not already fetched
+    // on hover, and a flashing block is itself a flicker.
+    return <div className="card h-72 bg-ink-800/40" aria-label={t('app.loading')} />
   }
   return <ContactForm contact={contact.data} onClose={onClose} />
 }

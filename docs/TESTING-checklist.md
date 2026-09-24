@@ -96,6 +96,10 @@ Nothing here needs the PBX or a phone. Start the database, the server and
       then the form), with no jump to the top and no column changing width.
       **Edit** does the same; **Flag…** opens its dialog under the row too.
       *Reported 24 Sep:* both opened above the table, a moment late.
+- [ ] **Double-clicking a row never turns a word blue**, on contacts, a
+      contact's history, or calls. Dragging across text still selects it.
+- [ ] **Rest the pointer on a contact for a moment, then double-click.** The
+      form opens complete, history included, with no grey block first.
 - [ ] **In an open contact, double-click a call in its history.** The call's
       details and recording open **under that call**, the same panel as on the
       Calls page, and **nothing scrolls**. Its **Open** button does the same.

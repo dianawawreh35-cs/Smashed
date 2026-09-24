@@ -9,6 +9,7 @@ import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
 import CallDetails from '../components/CallDetails'
 import { formatClock } from '../lib/recordingWav'
+import { noSelectOnDoubleClick } from '../lib/rows'
 
 const PAGE_SIZE = 50
 
@@ -264,7 +265,11 @@ function Row({ row, open, onToggle }: { row: CallRow; open: boolean; onToggle: (
   return (
     // Double-click is a shortcut, never the only way in: the Open button does
     // the same, and is what a keyboard reaches.
-    <tr onDoubleClick={onToggle} className={`hover:bg-ink-800/60 ${open ? 'bg-ink-800' : ''}`}>
+    <tr
+      onDoubleClick={onToggle}
+      onMouseDown={noSelectOnDoubleClick}
+      className={`hover:bg-ink-800/60 ${open ? 'bg-ink-800' : ''}`}
+    >
       <td className="whitespace-nowrap">{new Date(row.startedAt).toLocaleString(i18n.language)}</td>
       <td>{t(`calls.directions.${row.direction}`)}</td>
       <td>

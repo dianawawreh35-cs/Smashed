@@ -4535,6 +4535,33 @@ which the panel fetches for a classified call. `hasRecording` and
 66 web tests, build and lint pass; a new test opens a contact, then a call in
 its history, and checks the panel sits in the next row.
 
+---
+
+## 2026-09-24 — Opening a contact, third pass: no selected word, no steps
+
+Still reported as not smooth after the two passes above. The two remaining
+causes were both in the moment of the double-click.
+
+**The double-click selected a word.** The browser selects the word under the
+pointer on a double-click. So every time a contact opened, part of the name
+turned blue at the same instant, which reads as a flicker whatever the panel
+itself does. Rows that open on double-click (contacts, a contact's history,
+calls) now stop the second press's selection (`noSelectOnDoubleClick` in
+`src/lib/rows.ts`). A single press is untouched, so text can still be dragged
+across and copied.
+
+**It opened in steps.** The contact is fetched when the row opens, so it drew a
+placeholder, then the form (a different height), then "Loading…" for the
+history, then the history. Now the contact and its history are fetched
+**while the pointer is over the row**, under the same query keys the editor and
+the history use. By the double-click they are usually waiting, and the form
+opens whole. When they are not, the placeholder is still rather than pulsing,
+and the history holds its space while it loads.
+
+Tests: hovering a contact fetches it and its history before any click; a
+double-click's second press is stopped and a single press is not. 18 contacts
+tests, 68 in all, build and lint pass.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

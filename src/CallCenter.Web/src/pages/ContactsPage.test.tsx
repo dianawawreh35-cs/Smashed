@@ -230,6 +230,34 @@ describe('contacts page', () => {
     expect(within(row).getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('starts fetching a contact while the pointer is over it, before the double-click', async () => {
+    // So the editor opens whole rather than in steps (24 Sep).
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([AHMAD]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    const row = (await screen.findByText('Ahmad')).closest('tr')!
+    fireEvent.mouseEnter(row)
+
+    await waitFor(() => {
+      const urls = fetchMock.mock.calls.map(([url]) => String(url))
+      expect(urls).toContain('/api/contacts/c1')
+      expect(urls.some((u) => u.startsWith('/api/communications/by-contact/c1'))).toBe(true)
+    })
+  })
+
+  it('does not select text when a row is double-clicked', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([AHMAD])))
+
+    renderPage()
+    const row = (await screen.findByText('Ahmad')).closest('tr')!
+
+    // The second press of a double-click is what selects a word; it is stopped.
+    expect(fireEvent.mouseDown(row, { detail: 2 })).toBe(false)
+    // A single press is left alone, so dragging still selects and copies.
+    expect(fireEvent.mouseDown(row, { detail: 1 })).toBe(true)
+  })
+
   it('opens a call from the contact history under its own row', async () => {
     const CALL = {
       id: 'h1', kind: 'Call', direction: 'In', status: 'Answered', contactId: 'c1', contactName: 'Ahmad',

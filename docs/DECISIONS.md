@@ -4112,6 +4112,16 @@ through 1 s of audio, a 1.5 s hold and 1 s more: the file's RIFF size matched it
 length, the audio started at byte 58, and the hold came back as 1.02–2.52 s.
 Shared tests: 143 pass. **Not yet heard on a real call.**
 
+**A recording now lasts until the hang-up, not the last sound.** At first a call
+hung up while on hold ended at the last thing anybody said. Silence was only ever
+padded in when the next sound arrived, and none came. So the final hold had no
+audio under it and no mark. The recorder now runs both sides on in silence to
+the moment the call ended, which is also what A-30 says ("from answer to
+hang-up"), and it covers a call hung up while muted too. A failure writing that
+tail costs the tail, not the recording. Checked with the same drive of the real
+recorder, now ending on a 0.3 s hold: the audio ran to 3.90 s instead of 3.43 s,
+and the last hold read back as 3.59–3.90 s.
+
 **Not seen running.** Nobody has yet heard a recording through the app, or seen
 the card in either language. The seek bar follows the layout direction, so in
 Arabic it fills from the right. That is a choice to confirm on the screenshot,

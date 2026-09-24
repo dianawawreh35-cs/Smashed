@@ -202,6 +202,8 @@ public sealed class CallRecorder : IDisposable
     /// </summary>
     public RecordedCall? Stop()
     {
+        long hangUpFrame;
+
         lock (_gate)
         {
             if (_stopped)
@@ -209,10 +211,12 @@ public sealed class CallRecorder : IDisposable
                 return null;
             }
 
+            hangUpFrame = FramesSoFar();
+
             // Hung up while on hold: the hold ends with the call.
             if (_holdStartFrame is { } start)
             {
-                _holds.Add((start, FramesSoFar() - start));
+                _holds.Add((start, hangUpFrame - start));
                 _holdStartFrame = null;
             }
 
@@ -221,16 +225,22 @@ public sealed class CallRecorder : IDisposable
 
         try
         {
-            CloseScratch();
-
             if (_failed || (_remoteBytes == 0 && _localBytes == 0))
             {
                 // Nobody said anything, or the writing had already given up. An
                 // empty file attached to a call is worse than no file: it looks
                 // like a recording until somebody plays it.
+                CloseScratch();
                 Discard();
                 return null;
             }
+
+            // Before the padding below makes both sides look heard.
+            var remoteHeard = _remoteBytes;
+            var localHeard = _localBytes;
+
+            PadToHangUp(hangUpFrame);
+            CloseScratch();
 
             var bytes = Interleave();
             var seconds = (int)(bytes / (double)(BytesPerSecondPerChannel * 2));
@@ -239,7 +249,7 @@ public sealed class CallRecorder : IDisposable
             // nothing reads them again.
             Discard();
 
-            if (_remoteBytes == 0 || _localBytes == 0)
+            if (remoteHeard == 0 || localHeard == 0)
             {
                 // One side of the conversation is missing. Said out loud,
                 // because the file is otherwise the right size and the right
@@ -247,8 +257,8 @@ public sealed class CallRecorder : IDisposable
                 _logger.LogWarning(
                     "The recording has silence on one side: {Missing} was never heard. "
                     + "Customer {RemoteBytes} bytes, agent {LocalBytes} bytes.",
-                    _remoteBytes == 0 ? "the customer" : "the agent",
-                    _remoteBytes, _localBytes);
+                    remoteHeard == 0 ? "the customer" : "the agent",
+                    remoteHeard, localHeard);
             }
 
             _logger.LogInformation(
@@ -265,6 +275,41 @@ public sealed class CallRecorder : IDisposable
             DeleteQuietly(FilePath);
             Discard();
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Runs both channels on to the moment the call ended, in silence.
+    /// </summary>
+    /// <remarks>
+    /// A recording lasts from answer to hang-up (A-30). Padding otherwise only
+    /// happens when the next sound arrives, so a call hung up while on hold or
+    /// muted ended at the last thing anybody said, and the hold it ended on had
+    /// no audio under it to be marked on (A-51).
+    ///
+    /// A failure here costs the silent tail and nothing more: the audio before
+    /// it is whole, so it is logged and the recording finished without it.
+    /// </remarks>
+    private void PadToHangUp(long hangUpFrame)
+    {
+        try
+        {
+            // One byte per frame per channel.
+            if (_remote is not null && _remoteBytes < hangUpFrame)
+            {
+                PadSilence(_remote, hangUpFrame - _remoteBytes);
+                _remoteBytes = hangUpFrame;
+            }
+
+            if (_local is not null && _localBytes < hangUpFrame)
+            {
+                PadSilence(_local, hangUpFrame - _localBytes);
+                _localBytes = hangUpFrame;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "The recording ends at the last sound rather than at the hang-up");
         }
     }
 

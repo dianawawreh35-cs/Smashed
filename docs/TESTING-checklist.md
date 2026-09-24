@@ -381,6 +381,12 @@ audio plays, the Windows default output device.*
       than by the Hold button. Only the agent's own holds are marked.
       *The mark is in the wrong place:* note how far off it is and tell me.
       It should be within a fraction of a second.
+- [ ] **Hang up while on hold.** Talk, press Hold, wait about 15 seconds, hang
+      up without resuming. The recording runs to the hang-up, so its length
+      matches the call's duration in the list, and the last hold is marked to
+      the very end of the bar.
+      *If the recording ends early and the last hold is missing:* the Agent
+      App is older than this fix.
 - [ ] **The same held call opens in any other player** (VLC, Windows Media
       Player) and plays normally. The marks are extra data those players skip.
 - [ ] **A call rings while a recording is playing.** The recording **pauses at

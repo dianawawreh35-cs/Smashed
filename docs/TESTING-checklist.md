@@ -130,7 +130,7 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 
 Sign in as `dia20`. None of this needs a call.
 
-- [ ] **Sign in as `supervisor` first.** It must refuse with "This is a
+- [x] **Sign in as `supervisor` first.** *Signed off by Dia 24 September.* It must refuse with "This is a
       supervisor account. Supervisors use the web app in the browser", and the
       Arabic equivalent with the interface in Arabic. If a raw key such as
       `login.errors.not_an_agent` shows instead, the label is missing. If the

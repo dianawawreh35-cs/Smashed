@@ -183,6 +183,16 @@ Needs a second supervisor account; add one in Users if there is only one.
       seconds first). Under the bar there is an **amber mark** where the hold
       was, "On hold: 0:12–0:22" under the player, and **"On hold"** beside the
       time while playback is inside it. The same as the Agent App's player.
+- [ ] **Edit a classification (S-04).** Open a classified call and press
+      **Edit** beside Classification. The form opens with the call's answers,
+      asks only the questions for the chosen type, and says what is missing
+      before Save works. Change the order value and save: the answers update,
+      and **Changes** below lists you, just now. Do it on a call from days
+      ago too: a supervisor may, an agent may not.
+- [ ] **Change an order to a complaint and save.** The order value is gone,
+      and a **Resolved** box appears for the complaint.
+- [ ] **Classify an answered call nobody classified:** its **Classify** button
+      does the same. An outgoing call is asked the outgoing form's questions.
 - [ ] **Download** saves a `.wav` that plays in Windows' own player.
 - [ ] **A call whose recording has expired** says so, rather than "no
       recording".

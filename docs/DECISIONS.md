@@ -4852,6 +4852,57 @@ disabled state (auto answer while do not disturb is on) stays visible, dimmed.
 Agent App builds; 143 shared tests pass. For the eye: the rail, both states,
 both languages.
 
+---
+
+## 2026-09-25 — The supervisor classifies or corrects any call from the call screen (S-04)
+
+S-04's second half: *edit any classification at any time (logged)*. The server
+has allowed it since classification shipped (`CallEditWindow` lets supervisors
+through always, and every change writes history, A-43). But the web app could
+only show a classification, because it had the form designer (S-40) and no form
+to fill in. The difference, which came up on 24 Sep: the designer changes the
+**questions** for every future call; this changes the **answers** of one call
+that already happened.
+
+**What the supervisor gets.** In an opened call (on the Calls page, or in a
+contact's history), **Edit** sits beside Classification on a classified call,
+and **Classify** on an answered one nobody classified. It opens the call's
+**direction's** current form, since inbound and outbound have their own (25
+Sep, 133e635), in place of the answers, filled with what the call has. Save
+goes through `PUT /api/classifications/{id}`, the endpoint the Agent App uses.
+The answers, the search row and a contact's history refresh, and **Changes**
+lists the supervisor at once.
+
+**It saves what the Agent App saves.** Same field kinds, same show-for-these-
+types rule, same split: type and branch by id; `order_value`, `notes` and
+`follow_up` in their own columns; every other answer in `customValues` by key.
+An answer counts **only while its question is asked**, as in the Agent App's
+`FieldValue`. Its test caught this editor carrying an order's value into a
+complaint on a change of type, where the reports would have counted it as
+revenue. Required questions, and a number that is not one, are named beside
+Save rather than leaving it dead. A type hidden since can still be read on the
+call, but not saved: the server refuses it, and the form says to pick another.
+
+**Two things the Agent App's form never faced:**
+
+- **Answers to questions the form no longer asks are kept.** The server
+  replaces a call's custom answers on every save, so correcting an old call
+  under today's questions would have silently deleted the answers to the
+  questions of its day. The editor sends them back untouched.
+- **Resolved**, for a complaint. The Agent App never sets it; a supervisor
+  following a complaint up does. The box appears when the type is Complaint.
+  On any other type the call's existing value goes back unchanged, and the
+  server clears it itself.
+
+**Tested.** 8 editor tests: opens with the call's answers; shows questions per
+type; offers no hidden type; names what is missing; refuses a non-number; saves
+the Agent App's shape and keeps answers to removed questions; drops the answers
+the new type does not ask; says why a save was refused. 1 page test: Classify on
+an unclassified call opens the inbound form. 1 server test with real accounts: a
+supervisor changes another agent's classification from three days ago, and it
+is recorded under their name. 78 web tests, 344 server tests with the database,
+the build and lint pass.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -4874,7 +4925,6 @@ and what comes after:
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |
-| Edit a classification from the supervisor's call details | S-04 | a classification form in the web app (only the designer exists) |
 | POS customer lookup by phone: a regular check of recent unknown callers, maybe a pop-up prefill | — | the POS endpoint and its details (24 Sep entry) |
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |

@@ -197,6 +197,33 @@ describe('calls page', () => {
     expect(within(details).getByRole('button', { name: 'Play' })).toBeInTheDocument()
   })
 
+  it('lets the supervisor classify an answered call nobody classified (S-04)', async () => {
+    const fetchMock = server()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) =>
+      url.startsWith('/api/classifications/form')
+        ? jsonResponse({
+            version: 2, direction: 'In', branches: [{ id: 'b1', name: 'Ramallah' }],
+            types: [{ id: 't1', name: 'Order', labelAr: 'طلب', labelEn: 'Order', colour: null,
+              isSystem: true, sortOrder: 1, isActive: true, inUse: true }],
+            definition: { fields: [{ key: 'type', kind: 'type', required: true, label: { en: 'Type' } }] },
+          })
+        : base(url, init))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    const row = (await screen.findByText('Mahmoud')).closest('tr')!
+    fireEvent.doubleClick(row)
+
+    const details = await screen.findByRole('region', { name: 'Call details' })
+    fireEvent.click(within(details).getByRole('button', { name: 'Classify' }))
+
+    // The call's direction's form, drawn in the panel.
+    expect(await within(details).findByLabelText('Type *')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/classifications/form?direction=In')).toBe(true)
+    expect(within(details).getByRole('button', { name: 'Save classification' })).toBeDisabled()
+  })
+
   it('says a recording has expired rather than fetching audio that is gone', async () => {
     const fetchMock = server()
     vi.stubGlobal('fetch', fetchMock)

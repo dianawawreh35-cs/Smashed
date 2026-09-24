@@ -71,6 +71,38 @@ public class ClassificationAccessTests(CallCenterApiFactory factory)
             .Should().BeEmpty();
     }
 
+    [DatabaseFact]
+    public async Task A_supervisor_changes_any_agent_s_classification_days_later_and_it_is_recorded()
+    {
+        // S-04, from the call screen: another agent's call, from days ago, when
+        // the agent's own edit window has long closed (A-42).
+        var (_, callId) = await ClassifiedCallAsync(DateTimeOffset.UtcNow.AddDays(-3));
+        var supervisorAccount = await data.CreateUserAsync(UserRoles.Supervisor);
+        var (supervisor, _) = await data.SignInAsync(supervisorAccount);
+        var before = await supervisor.GetFromJsonAsync<ClassificationDto>($"/api/classifications/{callId}");
+
+        var response = await supervisor.PutAsJsonAsync($"/api/classifications/{callId}", new
+        {
+            typeId = before!.TypeId,
+            branchId = (Guid?)null,
+            orderValue = 52m,
+            notes = "corrected by the supervisor",
+            followUp = true,
+            formVersion = before.FormVersion,
+            customValues = new { },
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var after = await supervisor.GetFromJsonAsync<ClassificationDto>($"/api/classifications/{callId}");
+        after!.Notes.Should().Be("corrected by the supervisor");
+        after.OrderValue.Should().Be(52m);
+        after.UpdatedByName.Should().Be(supervisorAccount.DisplayName);
+
+        var history = await supervisor.GetFromJsonAsync<List<ClassificationHistoryDto>>($"/api/classifications/{callId}/history");
+        history!.Should().HaveCount(2, "the first classification and the supervisor's change");
+        history[0].ChangedByName.Should().Be(supervisorAccount.DisplayName, "newest first");
+    }
+
     private static async Task ShouldBeNotYoursAsync(HttpResponseMessage response)
     {
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -79,7 +111,7 @@ public class ClassificationAccessTests(CallCenterApiFactory factory)
     }
 
     /// <summary>An agent's answered call, classified, with one history row.</summary>
-    private async Task<(User Owner, Guid CallId)> ClassifiedCallAsync()
+    private async Task<(User Owner, Guid CallId)> ClassifiedCallAsync(DateTimeOffset? startedAt = null)
     {
         await data.EnsurePhoneChannelAsync();
         var owner = await data.CreateUserAsync();
@@ -102,7 +134,7 @@ public class ClassificationAccessTests(CallCenterApiFactory factory)
                 Status = CommunicationStatuses.Answered,
                 AgentId = owner.Id,
                 RemoteNumberRaw = TestData.NewMobile(),
-                StartedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+                StartedAt = startedAt ?? DateTimeOffset.UtcNow.AddMinutes(-10),
                 SipCallId = TestData.NewSipCallId(),
                 Extension = owner.Extension,
                 Source = CommunicationSources.AgentApp,

@@ -460,6 +460,25 @@
       "firstClassified": "{{at}}: classified by {{name}}",
       "changed": "{{at}}: changed by {{name}}"
     },
-    "open": "Open"
+    "open": "Open",
+    "edit": {
+      "heading": "Classify this call",
+      "edit": "Edit",
+      "classify": "Classify",
+      "save": "Save classification",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "choose": "Choose…",
+      "missing": "Still needed: {{fields}}",
+      "notANumber": "Not a number: {{fields}}",
+      "inactiveType": "This call's type has been hidden since. Choose another type to save.",
+      "errors": {
+        "save_failed": "The classification could not be saved. Please try again.",
+        "not_answered": "Only an answered call is classified.",
+        "unknown_type": "That type is no longer offered. Choose another.",
+        "unknown_branch": "That branch no longer exists. Choose another.",
+        "call_not_found": "That call is no longer on the server."
+      }
+    }
   }
 }

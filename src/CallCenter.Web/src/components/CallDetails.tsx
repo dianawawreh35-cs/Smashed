@@ -1,18 +1,23 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { callClassification, callDetails, classificationHistory } from '../api/calls'
 import type { CallClassification, CallRow, ClassificationChange } from '../api/calls'
 import { getClassificationForm } from '../api/classifications'
 import type { FormField } from '../api/classifications'
 import { formatClock } from '../lib/recordingWav'
+import ClassificationEditor from './ClassificationEditor'
 import RecordingPlayer from './RecordingPlayer'
 
 /**
  * One call opened in full (S-03): who, when, how it went, what it was, what it
  * was worth, who changed that and when, and the recording with its holds.
  *
- * Reading only. Editing a classification from here (S-04's second half) needs
- * the classification form in the browser, which does not exist yet.
+ * **A supervisor classifies or changes it here** (S-04): Edit on a classified
+ * call, Classify on an answered call nobody classified, opening the call
+ * direction's form in place of the answers (`ClassificationEditor`). Saved
+ * through the endpoint the Agent App uses; the change appears in the history
+ * below at once.
  *
  * **It opens whole, at once, and then fills in without moving.** It first
  * showed "Loading…", then the facts, then the classification, then the
@@ -33,7 +38,11 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
   const id = row.id
 
   const details = useQuery({ queryKey: ['calls', 'details', id], queryFn: () => callDetails(id) })
-  const classified = row.isClassified
+  const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  // Classified here just now: the list row that says otherwise is refreshing.
+  const [classifiedHere, setClassifiedHere] = useState(false)
+  const classified = row.isClassified || classifiedHere
 
   const classification = useQuery({
     queryKey: ['calls', 'classification', id],
@@ -52,8 +61,17 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
   const form = useQuery({
     queryKey: ['classification', 'form', direction],
     queryFn: () => getClassificationForm(direction),
-    enabled: classified,
+    enabled: classified || editing,
   })
+
+  function onSaved() {
+    setEditing(false)
+    setClassifiedHere(true)
+    // Everything that shows this call's classification: the answers, their
+    // history, the search rows (type, order value) and a contact's history.
+    void queryClient.invalidateQueries({ queryKey: ['calls'] })
+    void queryClient.invalidateQueries({ queryKey: ['communications', 'by-contact'] })
+  }
 
   const summary = row
   // What the row does not carry, as a placeholder of the same size until it arrives.
@@ -115,19 +133,45 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
           </div>
         )}
 
-        {classified ? (
-          classification.data ? (
-            <Classification
-              value={classification.data}
-              fields={form.data?.definition.fields ?? []}
-              arabic={arabic}
-            />
-          ) : (
-            // Its space, held while it comes, so the panel does not jump.
-            <div className="h-28 animate-pulse rounded-md bg-ink-800/60" aria-hidden="true" />
-          )
-        ) : (
-          summary.status === 'Answered' && <p className="badge-muted">{t('history.unclassified')}</p>
+        {/* Only an answered call is classified (A-40): nobody spoke on the rest. */}
+        {summary.status === 'Answered' && (
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-200">{t('calls.details.classification')}</h3>
+              {!editing && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setEditing(true)}>
+                  {classified ? t('calls.edit.edit') : t('calls.edit.classify')}
+                </button>
+              )}
+            </div>
+
+            {editing ? (
+              form.data && (!classified || classification.data) ? (
+                <ClassificationEditor
+                  callId={id}
+                  form={form.data}
+                  existing={classified ? classification.data ?? null : null}
+                  onSaved={onSaved}
+                  onCancel={() => setEditing(false)}
+                />
+              ) : (
+                <div className="h-28 rounded-md bg-ink-800/40" aria-hidden="true" />
+              )
+            ) : classified ? (
+              classification.data ? (
+                <Classification
+                  value={classification.data}
+                  fields={form.data?.definition.fields ?? []}
+                  arabic={arabic}
+                />
+              ) : (
+                // Its space, held while it comes, so the panel does not jump.
+                <div className="h-28 animate-pulse rounded-md bg-ink-800/60" aria-hidden="true" />
+              )
+            ) : (
+              <p className="badge-muted">{t('history.unclassified')}</p>
+            )}
+          </div>
         )}
 
         {history.data && history.data.length > 0 && <History changes={history.data} />}
@@ -165,7 +209,6 @@ function Classification({
 
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-slate-200">{t('calls.details.classification')}</h3>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
         <Fact label={t('calls.columns.type')} value={arabic ? value.typeLabelAr : value.typeLabelEn} />
         <Fact label={t('calls.columns.branch')} value={value.branchName} />

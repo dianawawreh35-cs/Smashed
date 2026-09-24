@@ -52,9 +52,11 @@ export interface CallDetails {
 }
 
 export interface CallClassification {
+  typeId: string
   typeName: string
   typeLabelAr: string
   typeLabelEn: string
+  branchId: string | null
   branchName: string | null
   orderValue: number | null
   notes: string | null
@@ -104,6 +106,27 @@ export const searchCalls = (filters: CallFilters, page: number, pageSize = 50) =
 export const callDetails = (id: string) => api.get<CallDetails>(`/communications/${id}`)
 
 export const callClassification = (id: string) => api.get<CallClassification>(`/classifications/${id}`)
+
+/**
+ * What a classification is saved as (A-42, S-04). The built-in answers have
+ * columns of their own, because the reports group by them; every question the
+ * supervisor added travels in `customValues`, keyed by field.
+ */
+export interface SaveClassification {
+  typeId: string
+  branchId: string | null
+  orderValue: number | null
+  notes: string | null
+  followUp: boolean
+  /** Only kept for a complaint; the server clears it on anything else. */
+  resolved: boolean | null
+  formVersion: number
+  customValues: Record<string, unknown>
+}
+
+/** Classifies a call, or changes its classification. A supervisor may do either at any time (S-04). */
+export const saveClassification = (id: string, request: SaveClassification) =>
+  api.put<CallClassification>(`/classifications/${id}`, request)
 
 export const classificationHistory = (id: string) =>
   api.get<ClassificationChange[]>(`/classifications/${id}/history`)

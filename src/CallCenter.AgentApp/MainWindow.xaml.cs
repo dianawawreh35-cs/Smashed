@@ -1,7 +1,9 @@
 using System.Windows;
+using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.AgentApp.ViewModels;
 using CallCenter.AgentApp.Views;
+using CallCenter.Shared.Contracts.Auth;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CallCenter.AgentApp;
@@ -22,16 +24,27 @@ public partial class MainWindow : Window
 
         DataContext = this;
 
+        // The server can end the sign-in from its side (N-05). Back to the
+        // sign-in screen, saying why, rather than a main screen that fails at
+        // every turn.
+        services.GetRequiredService<SignedOutByServer>().SignedOut += (_, _) =>
+            Dispatcher.Invoke(() => ShowLogin(LoginErrorCodes.SignedOut));
+
         ShowLogin();
     }
 
     /// <summary>Bound by the window's XAML for its title and direction.</summary>
     public Localizer Localizer { get; }
 
-    private void ShowLogin()
+    /// <param name="reason">
+    /// One of <see cref="LoginErrorCodes"/>, shown under the password box, when
+    /// the agent did not sign out themselves.
+    /// </param>
+    private void ShowLogin(string? reason = null)
     {
         var viewModel = _services.GetRequiredService<LoginViewModel>();
         viewModel.SignedIn += (_, _) => ShowHome();
+        viewModel.ErrorCode = reason;
 
         ShellContent.Content = new LoginView(viewModel);
     }

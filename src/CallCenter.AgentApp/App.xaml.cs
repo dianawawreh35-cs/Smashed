@@ -127,6 +127,7 @@ public partial class App : Application
         services.AddSingleton<CallLogQueue>();
         services.AddSingleton<CallLogReporter>();
         services.AddSingleton<SignInService>();
+        services.AddSingleton<SignedOutByServer>();
 
         // The UI thread, so the call view model can marshal SIP events onto it.
         services.AddSingleton(_ => Current.Dispatcher);

@@ -4120,8 +4120,52 @@ The server refuses a revoked token at once. **Neither app reacts to that yet.**
 The Agent App shows failed lookups and queues its call reports until the agent
 signs in again. The SIP registration is separate from the token, so **the phone
 keeps ringing**. The web app goes back to its sign-in page only on a reload.
-Signing the agent out on the first 401 is the missing half, and it is recorded
-under "Known gaps".
+Signing the agent out on the first 401 was the missing half. It was done the
+same day; see the next entry.
+
+---
+
+## 2026-09-24 — Both apps sign out when the server ends the sign-in (N-05)
+
+The other half of the fix above. The server refused a stale token, and the apps
+didn't notice. The Agent App carried on with failed lookups and a growing queue,
+and **its phone stayed registered**, so an account a supervisor had just
+disabled went on taking calls. The web app only found out on a reload.
+
+**Agent App.** `ApiClient` reports any 401 to a request that carried the token
+(the login sends none, so a wrong password never counts), through
+`AgentSession.TokenRefused`. It goes through the session because there is one
+per process, while each consumer gets its own `ApiClient`. `SignedOutByServer`
+then does exactly what the Sign out button does: unregister the phone, stop the
+call service and the block-list refresh, clear the session. The window goes back
+to the sign-in screen with `login.errors.signed_out`.
+
+**Never in the middle of a call.** If the agent is talking to a customer, the
+sign-out waits for the call to end. The account change is not the customer's
+problem, and nothing is lost in those minutes: the call queue keeps what the
+server refused (a 401 has always been retried, never dropped) and sends it after
+the next sign-in. A burst of refused requests, including the logout call itself
+being refused, triggers one sign-out, not several.
+
+**Web app.** `client.ts` calls one registered handler on a 401 to a request that
+carried the token. `AuthProvider` drops the token and the user, and `RequireAuth`
+sends the supervisor to the login page, which opens with the same message. The
+message is only shown to someone who was signed in and working. A stale token
+found on page load goes to the login page quietly, as before.
+
+**One message for every cause.** "Your account was changed or your sign-in ran
+out" covers a reset, a disable, a role change and the 12-hour expiry alike. The
+app can't tell them apart from a 401, and guessing wrong ("your password was
+reset" to someone whose token merely expired) would be worse than being general.
+
+**Tested.** Web: 3 new tests. A supervisor thrown out at the first refused
+request sees the message. A wrong password at the login is not mistaken for it.
+The message clears on signing in again, returning to the page they were on. With
+the handler removed, the two sign-out tests fail. Also `npm run build` and lint.
+Agent App: it builds, and the label test confirms `signed_out` exists in both
+languages. **The Agent App's watcher has no automated test**, because the app
+has no test project and the watcher sits on the real call and sign-in services.
+It is on the checklist, in Round 2 and, for the mid-call case, Round 3.
 
 # Open items (live)
 
@@ -4259,12 +4303,6 @@ there at all. See the 19 September CDR entry.
 
 ## Known gaps in what is built
 
-- **Neither app reacts when its token is refused.** Since 24 September a
-  password reset, a disable or a role change makes the server refuse the
-  account's tokens at once. But the Agent App carries on with failed lookups and
-  a growing call queue, and its phone stays registered. The web app only notices
-  on a reload. Both should go back to the sign-in screen on the first 401 from a
-  signed-in call, and the Agent App should unregister the phone as it does so.
 - **The call path has met a PBX and works.** Confirmed on 2026-09-20: a call
   arrives through queue `smashed-002`, the pop-up appears, Answer connects
   two-way audio, and Hang up ends the leg cleanly. The automatic rejection of a

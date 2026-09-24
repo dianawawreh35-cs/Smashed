@@ -28,6 +28,7 @@
       "invalid_credentials": "The username or password is not correct.",
       "account_disabled": "This account has been disabled. Ask an administrator to re-enable it.",
       "not_a_supervisor": "This is an agent account. Please use the desktop Agent App.",
+      "signed_out": "You have been signed out. Your account was changed or your sign-in ran out. Please sign in again.",
       "server_unreachable": "The server could not be reached. Check the network.",
       "server_error": "The server reported an error. Please try again."
     }

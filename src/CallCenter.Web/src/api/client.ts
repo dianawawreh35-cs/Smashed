@@ -14,6 +14,32 @@ import { getToken } from '../auth/token'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
+let tokenRefused: (() => void) | null = null
+
+/**
+ * Called when the server answers a request that carried the token with 401:
+ * the sign-in is no longer accepted (N-05). The password was reset, the
+ * account disabled or its role changed, or the token ran out. `AuthProvider`
+ * registers the one handler, which signs the supervisor out on the spot rather
+ * than leaving them on screens that fail one by one.
+ */
+export function onTokenRefused(handler: (() => void) | null): void {
+  tokenRefused = handler
+}
+
+/** A 401 matters only if we sent a token. The login itself sends none. */
+function noteIfTokenRefused(response: Response, sentToken: boolean) {
+  if (response.status === 401 && sentToken) tokenRefused?.()
+}
+
+/** Whether the request will carry our token, after the caller's own headers. */
+function carriesToken(token: string | null, headers: HeadersInit | undefined): boolean {
+  if (!token) return false
+  if (!headers) return true
+  const own = new Headers(headers)
+  return !own.has('Authorization')
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -91,6 +117,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   const response = await fetch(buildUrl(path, query), init)
+  noteIfTokenRefused(response, carriesToken(token, headers))
 
   const contentType = response.headers.get('content-type') ?? ''
   const payload = response.status === 204
@@ -140,6 +167,8 @@ export async function requestBlob(
       ...headers,
     },
   })
+
+  noteIfTokenRefused(response, carriesToken(token, headers))
 
   if (!response.ok) {
     throw new ApiError(response.status, response.statusText, null)

@@ -11,6 +11,23 @@ public class AgentSession
     /// <summary>Raised whenever <see cref="IsSignedIn"/> changes.</summary>
     public event EventHandler? Changed;
 
+    /// <summary>
+    /// Raised when the server answers a signed-in request with 401: the token
+    /// no longer speaks for this account (N-05). <see cref="SignedOutByServer"/>
+    /// acts on it. Here, rather than on <see cref="ApiClient"/>, because there is
+    /// one session per process and a new API client per consumer.
+    /// </summary>
+    public event EventHandler? TokenRefused;
+
+    /// <summary>Called by <see cref="ApiClient"/> when a request carrying the token was refused.</summary>
+    public void ReportTokenRefused()
+    {
+        if (IsSignedIn)
+        {
+            TokenRefused?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     public CurrentUserDto? User { get; private set; }
 
     public string? AccessToken { get; private set; }

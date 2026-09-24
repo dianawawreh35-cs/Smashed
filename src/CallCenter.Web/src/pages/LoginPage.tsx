@@ -10,13 +10,17 @@ import LanguageSwitcher from '../components/LanguageSwitcher'
 /** Supervisor sign-in (S-01). Browser on the LAN; agents use the desktop app. */
 export default function LoginPage() {
   const { t } = useTranslation()
-  const { user, isLoading, signIn } = useAuth()
+  const { user, isLoading, signIn, signedOutByServer } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
-  const [errorCode, setErrorCode] = useState<LoginErrorCode | null>(null)
+  // Opens with the reason when the server, not the supervisor, ended the
+  // last sign-in: otherwise the login page would appear from nowhere.
+  const [errorCode, setErrorCode] = useState<LoginErrorCode | null>(
+    signedOutByServer ? LoginErrorCodes.SignedOut : null,
+  )
   const [isBusy, setIsBusy] = useState(false)
 
   // Already signed in - go where they were headed, or the dashboard.

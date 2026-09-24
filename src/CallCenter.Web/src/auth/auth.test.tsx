@@ -153,5 +153,58 @@ describe('route guard', () => {
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     await waitFor(() => expect(sessionStorage.getItem('callcenter.token')).toBeNull())
+    // Nobody was working, so there is nothing to explain.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('when the server ends the sign-in (N-05)', () => {
+  it('signs the supervisor out at the first refused request and says why', async () => {
+    // A password reset, a disable or a role change, done elsewhere while this
+    // supervisor was working: the token was good at /auth/me and is refused
+    // from then on.
+    setToken('token-before-the-reset')
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/auth/me' ? jsonResponse(SUPERVISOR) : jsonResponse({}, 401),
+    ))
+
+    renderApp('/contacts')
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(/signed out/i)
+    expect(sessionStorage.getItem('callcenter.token')).toBeNull()
+  })
+
+  it('does not treat a wrong password at the login as the server ending a sign-in', async () => {
+    // The login sends no token, so its 401 is only a wrong password.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ code: 'invalid_credentials' }, 401)))
+
+    renderApp()
+    signIn('supervisor', 'wrong')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The username or password is not correct.')
+  })
+
+  it('clears the message once the supervisor signs in again', async () => {
+    setToken('token-before-the-reset')
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/auth/me' ? jsonResponse(SUPERVISOR) : jsonResponse({}, 401),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp('/contacts')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/signed out/i)
+
+    fetchMock.mockImplementation(async (url: string) =>
+      url === '/api/auth/login'
+        ? jsonResponse({ accessToken: 'new-token', expiresAt: '', user: SUPERVISOR, sessionId: null, extensions: null })
+        : jsonResponse([]),
+    )
+    signIn('supervisor', 'NewPass!2026')
+
+    // Back to the page they were thrown out of, with the new token.
+    await waitFor(() => expect(sessionStorage.getItem('callcenter.token')).toBe('new-token'))
+    await waitFor(() => expect(screen.queryByText(/signed out/i)).not.toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).not.toBeInTheDocument()
   })
 })

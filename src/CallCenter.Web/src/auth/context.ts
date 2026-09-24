@@ -13,6 +13,12 @@ export interface AuthState {
   isLoading: boolean
   signIn: (login: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  /**
+   * True when the server ended the sign-in rather than the supervisor (N-05),
+   * so the login page can say why they are looking at it. Cleared by the next
+   * sign-in.
+   */
+  signedOutByServer: boolean
 }
 
 export const AuthContext = createContext<AuthState | null>(null)

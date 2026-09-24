@@ -447,6 +447,7 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
 
             if (!response.IsSuccessStatusCode)
             {
+                NoteIfTokenRefused(response, request);
                 return Result<byte[]>.Failed(ApiStatus.ServerError, "image_unavailable");
             }
 
@@ -498,6 +499,8 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
 
             if (!response.IsSuccessStatusCode)
             {
+                NoteIfTokenRefused(response, request);
+
                 var status = response.StatusCode switch
                 {
                     HttpStatusCode.NotFound => ApiStatus.NotFound,
@@ -529,6 +532,21 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             authenticated: true,
             ct);
 
+    /// <summary>
+    /// A 401 to a request that carried the token means the server no longer
+    /// accepts this sign-in (N-05), and the app should stop acting as if it
+    /// did. A 401 to the login itself is only a wrong password, and carries no
+    /// token, so it is not reported.
+    /// </summary>
+    private void NoteIfTokenRefused(HttpResponseMessage response, HttpRequestMessage request)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized && request.Headers.Authorization is not null)
+        {
+            logger.LogWarning("The server refused this sign-in ({Path})", request.RequestUri);
+            session.ReportTokenRefused();
+        }
+    }
+
     private async Task<Result<T>> SendAsync<T>(
         Func<HttpRequestMessage> build, bool authenticated, CancellationToken ct)
     {
@@ -545,6 +563,7 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
+                NoteIfTokenRefused(response, request);
                 return Result<T>.Failed(
                     ApiStatus.Unauthorized,
                     await ReadErrorCodeAsync(response, LoginErrorCodes.InvalidCredentials, ct));

@@ -41,6 +41,8 @@ export const LoginErrorCodes = {
   ServerError: 'server_error',
   /** A real account, but an agent's. Agents belong in the desktop app. */
   NotASupervisor: 'not_a_supervisor',
+  /** The server stopped accepting the sign-in part way through (N-05). */
+  SignedOut: 'signed_out',
 } as const
 
 export type LoginErrorCode = (typeof LoginErrorCodes)[keyof typeof LoginErrorCodes]

@@ -46,4 +46,12 @@ public static class LoginErrorCodes
     /// the web app, which refuses agents the same way.
     /// </summary>
     public const string NotAnAgent = "not_an_agent";
+
+    /// <summary>
+    /// Set by the client when the server stopped accepting the sign-in part way
+    /// through: the password was reset, the account disabled or its role changed
+    /// (N-05), or the token simply expired. Shown on the sign-in screen the app
+    /// has just gone back to.
+    /// </summary>
+    public const string SignedOut = "signed_out";
 }

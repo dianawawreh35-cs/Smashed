@@ -124,6 +124,22 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 - [ ] The two settings that did nothing (`callback.extension`,
       `pbx.ami.enabled`) are **gone**.
 
+### 1.6 Being signed out by the server (N-05)
+
+Needs a second supervisor account; add one in Users if there is only one.
+
+- [ ] **Sign in as supervisor A in one browser, and as supervisor B in
+      another** (or a private window). As B, reset A's password in Users. Then,
+      as A, open any page. It must go straight to the sign-in page with "You have
+      been signed out…" under the form, in the interface's language.
+      *If A's page just shows an error instead:* the server is an old build.
+      Restart it. *If A can carry on working:* the server is not checking the
+      token; stop and tell me.
+- [ ] **Sign A in again with the new password.** The message goes, and A is
+      back on the page they were on.
+- [ ] **Reload the browser with no one signed in.** No "signed out" message.
+      That line is only for someone who was thrown out while working.
+
 ---
 
 ## Round 2 — the Agent App, without a phone
@@ -175,6 +191,13 @@ Sign in as `dia20`. None of this needs a call.
 - [ ] **Contact history.** Open a contact; its past calls are listed.
 - [ ] **Leave the app sitting idle.** With 240 minutes that is a four-hour test,
       so do it on a day you are at the desk anyway rather than blocking on it.
+- [ ] **Signed out by the server (N-05).** With `dia20` signed in here, reset
+      `dia20`'s password in the web app's Users screen. Then do something in the
+      Agent App that asks the server, such as a contacts search. It must go back
+      to the sign-in screen with "You have been signed out…", in the app's
+      language, and the phone status must no longer show registered.
+      *If it stays on the main screen with failed lookups:* the Agent App is an
+      old build. Check the `bin` date. Sign in with the new password afterwards.
 
 ---
 
@@ -183,6 +206,14 @@ Sign in as `dia20`. None of this needs a call.
 This needs the PBX at 192.168.0.27 and extension 2001. It is the part that
 cannot be faked, and the part most likely to find something.
 
+- [ ] **Signed out by the server during a call (N-05).** Answer a call as
+      `dia20`, and while it is up, reset `dia20`'s password in the web app. The
+      call must **carry on**: nothing happens until you hang up. Then the app
+      goes to the sign-in screen with "You have been signed out…". Sign in again
+      and check the call is in the call log: it was queued and sent after the
+      new sign-in.
+      *If the call drops at the reset:* stop and tell me. That is exactly what
+      this is built not to do.
 - [ ] **Call extension 2001 from another phone.** The pop-up appears, with the
       caller's number.
 - [ ] **The caller's name, address and notes appear (A-10).** Call from a

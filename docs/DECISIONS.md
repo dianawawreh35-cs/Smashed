@@ -4230,6 +4230,90 @@ languages. **The Agent App's watcher has no automated test**, because the app
 has no test project and the watcher sits on the real call and sign-in services.
 It is on the checklist, in Round 2 and, for the mid-call case, Round 3.
 
+---
+
+## 2026-09-24 — The concurrency collapse: it no longer reproduces, and the pool that could cause it is capped
+
+The 21 September entry left this open. On this machine, 39 signed-in requests
+arriving together answered 7 of 39 in 25 seconds, while one at a time took
+10 ms each. Cause not found. The leading guess was that `EnableRetryOnFailure()`
+was hiding failures.
+
+### It does not reproduce
+
+Measured with `tools/load-probe/probe.py`, which is that measurement written
+down so it can be rerun. The server was a separate copy on port 5055, against
+the scratch database, with everything built today.
+
+| 39 at once, 3 rounds | first round | later rounds |
+|---|---|---|
+| `/health` (no sign-in, no database) | 39/39 in 0.19 s | 0.09 s |
+| `/api/menu` unsigned (401) | 0.12 s | 0.07 s |
+| `/api/menu` **signed in** | **39/39 in 0.59 s** | **0.22 s** |
+
+200 signed-in requests at once: 200/200 in 1.2 s. 100 contact searches at once:
+100/100 in 1.5 s. No retries, connection errors or warnings in the server's log.
+The retry guess doesn't hold: nothing was retried.
+
+### What most likely fixed it: `127.0.0.1`, the same day
+
+The commit that recorded the collapse also changed the development connection
+string from `localhost` to `127.0.0.1`. On Windows, `localhost` resolves to
+IPv6 `::1` first, and the dev database listens on IPv4 only. So every **new**
+connection tried IPv6, failed, and fell back. Putting `localhost` back
+reproduces a milder form of the same shape: **the first burst takes 2.9 s
+instead of 0.6 s**, then the pool is warm and it is fast again. The 21 September
+note lists "IPv6 versus IPv4 for localhost" as ruled out, but that was about the
+test client's address, not the database's. The full 25-second collapse didn't
+come back even with `localhost`, so this is the likeliest cause, not a proven
+one.
+
+### What the measuring found instead: the pool could take every connection
+
+Npgsql's pool grows to **100** connections by default, and PostgreSQL accepts
+**100** in total. After the 200-request burst, the server kept 100 idle
+connections for the five minutes a pooled connection lives. The database then
+refused everybody else with `53300 sorry, too many clients already`. That
+included `psql` as the admin, and the test suite starting beside it. In
+production that would be the nightly `pg_dump` (runbook step 9), a migration,
+or a second copy of the server during an update. And because
+`EnableRetryOnFailure` counts 53300 as transient, the server's own requests
+would not fail outright. They would retry with growing back-off, which
+resembles the 21 September symptoms. That wasn't what happened then (the note
+records one or two connections), but it is a real way to get there.
+
+**Now the pool is capped at 50** (`ConnectionPool`, `Database:MaxPoolSize` to
+change it). A connection string that sets its own `Maximum Pool Size` keeps
+it. The same 200-request burst: **200/200 in 1.1–1.5 s, holding 50 connections,
+not 100**. The other half stays free. Requests beyond the pool wait for a
+connection (Npgsql's 15-second `Timeout`) rather than failing at the database.
+Twenty agents are nowhere near 50 queries at once.
+
+**The test suite had the same leak on a smaller scale.** Every
+`TestData.Client()` built a new test server with its own pool, and nothing
+disposed it. They now share one (`CallCenterApiFactory.RealAccounts`).
+
+### The account check this morning added one query per request
+
+`AccountTokenCheck` (the password-reset fix above) reads the account on every
+signed-in request. All of the figures above were measured with it in place.
+
+### Tests
+
+`ConcurrencyTests`: 50 signed-in requests at once through the real token check
+and database, all 200, inside 15 s. The limit is generous so a slow CI machine
+passes; the collapse was tens of seconds and failures. `ConnectionPoolTests` (5,
+no database): the cap is 50, below PostgreSQL's 97 usable connections, and it
+can be configured; an explicit value in the connection string wins; nothing else
+in the string changes.
+
+### What is left
+
+Production runs on Linux with `127.0.0.1` and host networking, so the IPv6 path
+never applied there. Nothing here was measured on the production server. When
+it is installed, run the probe against it once (`--base http://<server>:5000`),
+signed in, and write the numbers here.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -4253,7 +4337,7 @@ and what comes after:
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |
-| **Concurrency: authenticated requests collapse when they arrive together** | — | **unresolved.** Reproduced locally, cause not found, production impact unknown. Test `EnableRetryOnFailure()` first. Settle before handover. |
+| Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |
 

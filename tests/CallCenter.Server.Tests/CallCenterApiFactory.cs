@@ -62,16 +62,28 @@ public class CallCenterApiFactory : WebApplicationFactory<Program>
             });
     }
 
+    private WebApplicationFactory<Program>? _realAccounts;
+
     /// <summary>
-    /// Puts the real <see cref="AccountTokenCheck"/> back, for a host that signs
-    /// real accounts in. <see cref="TestData.Client"/> uses it, so every
-    /// database test goes through the check that production runs.
+    /// The host the database tests sign real accounts in to. It runs the real
+    /// <see cref="AccountTokenCheck"/>, so every database test goes through the
+    /// check production runs, and it has a PBX address, so an agent's sign-in
+    /// returns an extension.
     /// </summary>
-    public static void UseRealTokenCheck(IServiceCollection services)
-    {
-        services.RemoveAll<AccountTokenCheck>();
-        services.AddScoped<AccountTokenCheck>();
-    }
+    /// <remarks>
+    /// <b>One, shared by every test.</b> It was created per call once, and every
+    /// host is a server with its own connection pool that nothing disposed. A
+    /// suite that starts sixty of them holds connections the database needs for
+    /// other things. That is the same shortage <c>ConnectionPool</c> guards
+    /// against in production.
+    /// </remarks>
+    public WebApplicationFactory<Program> RealAccounts => _realAccounts ??= WithWebHostBuilder(b => b
+        .UseSetting("Sip:Server", "192.0.2.10")
+        .ConfigureTestServices(services =>
+        {
+            services.RemoveAll<AccountTokenCheck>();
+            services.AddScoped<AccountTokenCheck>();
+        }));
 
     /// <summary>
     /// Accepts any correctly signed token. <b>Only for the door tests</b>, which

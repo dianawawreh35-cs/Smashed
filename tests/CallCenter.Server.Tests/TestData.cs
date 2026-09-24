@@ -7,8 +7,6 @@ using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Auth;
 using CallCenter.Shared.Phone;
 using FluentAssertions;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -46,11 +44,7 @@ public class TestData(CallCenterApiFactory factory)
     /// The host runs the real <see cref="AccountTokenCheck"/>, so a token is
     /// refused here exactly when production would refuse it.
     /// </remarks>
-    public HttpClient Client() =>
-        factory.WithWebHostBuilder(b => b
-                .UseSetting("Sip:Server", "192.0.2.10")
-                .ConfigureTestServices(CallCenterApiFactory.UseRealTokenCheck))
-            .CreateClient();
+    public HttpClient Client() => factory.RealAccounts.CreateClient();
 
     /// <summary>A mobile number nobody else in the database has, as a customer would type it.</summary>
     public static string NewMobile() => $"059{Random.Shared.Next(0, 10_000_000):D7}";

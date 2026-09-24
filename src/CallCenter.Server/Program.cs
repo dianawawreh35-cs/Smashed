@@ -31,8 +31,15 @@ try
         .Enrich.FromLogContext());
 
     // ---- Database -------------------------------------------------------
-    var connectionString = builder.Configuration.GetConnectionString("Default")
-                           ?? "Host=localhost;Port=5432;Database=callcenter;Username=callcenter;Password=callcenter";
+    // 127.0.0.1, not localhost: on Windows localhost tries IPv6 first, and every
+    // new connection paid for the failed attempt (appsettings.Development.json).
+    //
+    // The pool is capped below PostgreSQL's own limit, so a burst of requests
+    // cannot take every connection the database has (see ConnectionPool).
+    var connectionString = ConnectionPool.WithMaxSize(
+        builder.Configuration.GetConnectionString("Default")
+            ?? "Host=127.0.0.1;Port=5432;Database=callcenter;Username=callcenter;Password=callcenter",
+        builder.Configuration.GetValue("Database:MaxPoolSize", ConnectionPool.DefaultMaxSize));
 
     builder.Services.AddDbContext<CallCenterDbContext>(options =>
     {

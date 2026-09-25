@@ -119,6 +119,18 @@ Nothing here needs the PBX or a phone. Start the database, the server and
 - [ ] **Try to delete a type that is in use.** The row offers hiding instead.
 - [ ] **Publish a form, then publish the previous one again.** That is the way
       back from a bad change, and it is what the hint under the button promises.
+- [ ] **Choose which types each form offers (S-40).** On the outgoing-calls
+      card, the type question has a row "Types this form offers" with every
+      type ticked. Untick Order and publish. In the Agent App, after signing in
+      again, an outgoing call's form no longer offers Order; an incoming call's
+      still does. The last ticked box cannot be unticked. Tick every box again
+      and publish: the form offers every type, including one added later.
+- [ ] **An old call whose type a form stopped offering.** Open, on the Calls
+      page, an outgoing call classified as an Order before the change and
+      press Edit: it still reads Order, with a note to choose another type,
+      and Save waits until you do. *If Save goes through with Order:* tell me.
+- [ ] **The Applications card works the same way**, and the Agent App's
+      Applications section offers only the ticked types.
 
 ### 1.4 The interface itself
 

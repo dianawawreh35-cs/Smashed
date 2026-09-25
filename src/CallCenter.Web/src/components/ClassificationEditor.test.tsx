@@ -50,11 +50,11 @@ function jsonResponse(body: unknown, status = 200) {
   } as unknown as Response
 }
 
-function renderEditor(existing: CallClassification | null, onSaved = vi.fn()) {
+function renderEditor(existing: CallClassification | null, onSaved = vi.fn(), form: ClassificationForm = FORM) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
-      <ClassificationEditor callId="c1" form={FORM} existing={existing} onSaved={onSaved} onCancel={vi.fn()} />
+      <ClassificationEditor callId="c1" form={form} existing={existing} onSaved={onSaved} onCancel={vi.fn()} />
     </QueryClientProvider>,
   )
   return onSaved
@@ -97,6 +97,35 @@ describe('classification editor', () => {
     expect(screen.queryByLabelText('Payment')).not.toBeInTheDocument()
     // A complaint can be marked resolved: the supervisor following it up does that.
     expect(screen.getByLabelText('Resolved')).toBeInTheDocument()
+  })
+
+  /** The same form, offering only the types named (S-40). */
+  const offering = (...names: string[]): ClassificationForm => ({
+    ...FORM,
+    definition: {
+      fields: FORM.definition.fields.map((f) => (f.kind === 'type' ? { ...f, types: names } : f)),
+    },
+  })
+
+  it('offers only the types this form offers', () => {
+    // The supervisor ticked which types each form lists (S-40).
+    renderEditor(null, vi.fn(), offering('Complaint'))
+
+    const options = [...(screen.getByLabelText('Type *') as HTMLSelectElement).options].map((o) => o.value)
+    expect(options).toEqual(['', 't-complaint'])
+  })
+
+  it('shows a call\'s type the form no longer offers, and asks for another before saving', () => {
+    // Classified as an order before the form stopped offering orders: it still
+    // reads as an order, but cannot be saved as one (the server refuses it).
+    renderEditor(EXISTING, vi.fn(), offering('Complaint'))
+
+    expect(screen.getByLabelText('Type *')).toHaveValue('t-order')
+    expect(screen.getByText("This form no longer offers the call's type. Choose another type to save.")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save classification' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Type *'), { target: { value: 't-complaint' } })
+    expect(screen.getByRole('button', { name: 'Save classification' })).toBeEnabled()
   })
 
   it('does not offer a hidden type for a new classification', () => {

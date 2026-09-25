@@ -140,8 +140,21 @@ public partial class TypeFieldViewModel : ClassificationFieldViewModel
     {
         // Hidden types are left out: they are what a supervisor retires a type
         // with, and offering one would put it on a new call.
-        Types = new ObservableCollection<TypeOption>(
-            types.Where(t => t.IsActive).Select(t => new TypeOption(t, localizer)));
+        //
+        // S-40: and only the types this form offers, when the supervisor chose
+        // them. The list is of names, so a renamed label stays on the form. No
+        // list means every type, which is what every form did before.
+        var offered = field.TryGetProperty("types", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray()
+                .Where(t => t.ValueKind == JsonValueKind.String)
+                .Select(t => t.GetString()!)
+                .ToHashSet(StringComparer.Ordinal)
+            : null;
+
+        Types = new ObservableCollection<TypeOption>(types
+            .Where(t => t.IsActive)
+            .Where(t => offered is null || offered.Count == 0 || offered.Contains(t.Name))
+            .Select(t => new TypeOption(t, localizer)));
     }
 
     public ObservableCollection<TypeOption> Types { get; }

@@ -114,6 +114,9 @@ public class ApplicationsController(ApplicationsService applications) : Controll
                         "No such classification type, or it is no longer offered."),
                 ClassificationService.Failure.UnknownBranch =>
                     (StatusCodes.Status400BadRequest, "unknown_branch", "No such branch."),
+                ClassificationService.Failure.TypeNotOffered =>
+                    (StatusCodes.Status400BadRequest, "type_not_offered",
+                        "The Applications form does not offer that type."),
                 _ => (StatusCodes.Status400BadRequest, "classification_refused",
                     "The message's classification was refused."),
             },

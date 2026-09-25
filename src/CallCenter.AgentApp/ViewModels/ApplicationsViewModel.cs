@@ -393,6 +393,7 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
         "bad_time" => "applications.errors.bad_time",
         "unknown_type" or "unknown_branch" or "classification_refused" => "applications.errors.classification_refused",
         "message_not_found" => "applications.errors.message_not_found",
+        "type_not_offered" => "classification.typeNotOffered",
         "edit_window_closed" => "classification.tooOld",
         "not_your_call" => "classification.notYours",
         _ => "classification.saveFailed",

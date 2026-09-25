@@ -187,6 +187,9 @@ public class ClassificationController(
             ClassificationService.Failure.BadName =>
                 (StatusCodes.Status400BadRequest, "bad_name",
                     "The type needs a name in both languages, and it must not already exist."),
+            ClassificationService.Failure.TypeNotOffered =>
+                (StatusCodes.Status400BadRequest, "type_not_offered",
+                    "This form does not offer that type. Pick one of the types it offers."),
             _ => (StatusCodes.Status400BadRequest, "invalid_request", "It could not be saved."),
         };
 

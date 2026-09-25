@@ -184,6 +184,53 @@ describe('classification form editor', () => {
     expect(published.direction).toBe('In')
   })
 
+  it('lets each form offer its own types, by name, and keeps at least one', async () => {
+    // S-40: the supervisor chooses which call types each form offers. The
+    // outbound form drops Order; the inbound form is not touched.
+    const fetchMock = stubApi()
+    renderPage()
+
+    const outbound = (await screen.findByText('Questions for outgoing calls')).closest(
+      '.card',
+    )! as HTMLElement
+
+    // The type question's row comes first, so its boxes are the first of each name.
+    const offered = (name: string) => within(outbound).getAllByRole('checkbox', { name })[0]
+    expect(within(outbound).getByText('Types this form offers:')).toBeInTheDocument()
+    expect(offered('Order')).toBeChecked()
+
+    fireEvent.click(offered('Order'))
+    fireEvent.click(offered('Spare'))
+    // Complaint is the last one left, so it cannot be unticked.
+    expect(offered('Complaint')).toBeDisabled()
+
+    fireEvent.click(within(outbound).getByRole('button', { name: 'Publish form' }))
+    await waitFor(() =>
+      expect(bodyOf(fetchMock, 'PUT', '/classifications/form')).not.toBeNull(),
+    )
+
+    const published = bodyOf(fetchMock, 'PUT', '/classifications/form')
+    expect(published.direction).toBe('Out')
+    const type = published.definition.fields.find((f: { kind: string }) => f.kind === 'type')
+    expect(type.types).toEqual(['Complaint'])
+  })
+
+  it('stores no list when every type is ticked, so a new type joins the form', async () => {
+    stubApi()
+    renderPage()
+
+    const outbound = (await screen.findByText('Questions for outgoing calls')).closest(
+      '.card',
+    )! as HTMLElement
+    const offered = (name: string) => within(outbound).getAllByRole('checkbox', { name })[0]
+
+    fireEvent.click(offered('Order'))
+    fireEvent.click(offered('Order'))
+
+    // Back to every type: nothing changed, so there is nothing to publish.
+    expect(within(outbound).getByRole('button', { name: 'Publish form' })).toBeDisabled()
+  })
+
   it('publishes the outgoing questions as their own form', async () => {
     // A call the agent placed asks different questions. Publishing the
     // outbound card must not touch the inbound form.

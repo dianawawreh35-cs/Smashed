@@ -232,6 +232,68 @@ public class ApplicationsTests(CallCenterApiFactory factory)
         }
     }
 
+    [DatabaseFact]
+    public async Task Each_form_offers_only_the_types_the_supervisor_chose_and_the_server_holds_to_it()
+    {
+        // S-40, Dia 25 Sep: which call types each form offers is chosen by hand.
+        var s = await ScenarioAsync();
+        var message = await s.MessageAsync(s.WhatsApp, DateTimeOffset.UtcNow.AddMinutes(-5));
+        var current = (await s.Agent.GetFromJsonAsync<ClassificationFormDto>("/api/classifications/form?direction=None"))!;
+
+        static JsonDocument Offering(params string[] names) => JsonDocument.Parse(JsonSerializer.Serialize(new
+        {
+            fields = new object[]
+            {
+                new { key = "type", kind = "type", required = true, types = names },
+                new { key = "notes", kind = "textarea" },
+            },
+        }));
+
+        // A list that names no type, or a type that does not exist, is a form
+        // nobody could save: refused, and the current form is untouched.
+        foreach (var bad in new[] { Offering(), Offering("NoSuchType") })
+        {
+            var refused = await s.Supervisor.PutAsJsonAsync("/api/classifications/form", new PublishFormRequest(bad, Directions.None));
+            refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await Code(refused)).Should().Be("bad_form");
+        }
+
+        int? published = null;
+        try
+        {
+            var response = await s.Supervisor.PutAsJsonAsync("/api/classifications/form",
+                new PublishFormRequest(Offering("Complaint"), Directions.None));
+            response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+            var form = (await response.Content.ReadFromJsonAsync<ClassificationFormDto>())!;
+            published = form.Version;
+
+            // The Applications form no longer offers Order: refused, for the
+            // supervisor too, so no report counts an order the form does not ask.
+            var order = await s.Supervisor.PutAsJsonAsync($"/api/classifications/{message}",
+                new SaveClassificationRequest(s.OrderType, s.BranchId, 20m, null, FormVersion: form.Version));
+            order.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await Code(order)).Should().Be("type_not_offered");
+
+            // Nor when the message is recorded with its classification.
+            var recorded = await s.Agent.PostAsJsonAsync("/api/communications/applications", new RecordApplicationRequest(
+                s.WhatsApp, s.CustomerMobile, null, null, new SaveClassificationRequest(s.OrderType, s.BranchId, 20m, null)));
+            (await Code(recorded)).Should().Be("type_not_offered");
+
+            var complaint = await s.Agent.PutAsJsonAsync($"/api/classifications/{message}",
+                new SaveClassificationRequest(s.ComplaintType, s.BranchId, null, "cold", FormVersion: form.Version));
+            complaint.StatusCode.Should().Be(HttpStatusCode.OK, await complaint.Content.ReadAsStringAsync());
+
+            // Each form has its own list: an inbound call is still an order.
+            var call = await s.Supervisor.PutAsJsonAsync($"/api/classifications/{s.AnsweredCall}",
+                new SaveClassificationRequest(s.OrderType, s.BranchId, 30m, null));
+            call.StatusCode.Should().Be(HttpStatusCode.OK, await call.Content.ReadAsStringAsync());
+        }
+        finally
+        {
+            await RestoreCurrentFormAsync(Directions.None, current.Version, published);
+        }
+    }
+
     /// <summary>
     /// Makes <paramref name="previous"/> the current form for its direction again
     /// and removes <paramref name="published"/>, which nothing was classified

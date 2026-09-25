@@ -462,6 +462,7 @@ public partial class ClassificationFormViewModel(
                 {
                     Message = Localizer[result.ErrorCode switch
                     {
+                        "type_not_offered" => "classification.typeNotOffered",
                         "edit_window_closed" => "classification.tooOld",
                         "not_your_call" => "classification.notYours",
                         _ => "classification.saveFailed",

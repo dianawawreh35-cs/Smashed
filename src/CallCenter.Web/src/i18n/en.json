@@ -344,7 +344,7 @@
     "fieldsIn": "Questions for incoming calls",
     "fieldsOut": "Questions for outgoing calls",
     "fieldsHint": "Reorder with the arrows. Publishing creates a new version and leaves existing classifications alone.",
-    "fieldsOutHint": "Asked on calls an agent places. The call types are the same as above; the questions are its own.",
+    "fieldsOutHint": "Asked on calls an agent places. Its questions, and which of the call types above it offers, are its own.",
     "labelAr": "Arabic label",
     "labelEn": "English label",
     "key": "Key",
@@ -386,7 +386,10 @@
       "server_unreachable": "The server could not be reached."
     },
     "fieldsApp": "Questions for messages (applications)",
-    "fieldsAppHint": "Asked when an agent records a conversation from WhatsApp, Facebook, Instagram or another app. The types are the same as above; the questions are its own."
+    "fieldsAppHint": "Asked when an agent records a conversation from WhatsApp, Facebook, Instagram or another app. Its questions, and which of the call types above it offers, are its own.",
+    "typesOffered": "Types this form offers:",
+    "typesOfferedHint": "Untick a type to take it off this form. A new type joins a form only when ticked here, unless every box is ticked.",
+    "typesOfferedKeepOne": "A form must offer at least one type."
   },
   "calls": {
     "heading": "Calls",
@@ -482,8 +485,10 @@
         "not_answered": "Only an answered call is classified.",
         "unknown_type": "That type is no longer offered. Choose another.",
         "unknown_branch": "That branch no longer exists. Choose another.",
-        "call_not_found": "That call is no longer on the server."
-      }
+        "call_not_found": "That call is no longer on the server.",
+        "type_not_offered": "This form does not offer that type. Choose another."
+      },
+      "notOfferedType": "This form no longer offers the call's type. Choose another type to save."
     }
   },
   "applications": {

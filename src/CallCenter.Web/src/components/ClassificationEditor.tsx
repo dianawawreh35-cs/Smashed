@@ -58,11 +58,18 @@ export default function ClassificationEditor({
   const selectedType = form.types.find((ty) => ty.id === answers[typeKey])
   const isComplaint = selectedType?.name.toLowerCase() === 'complaint'
 
-  // A type the supervisor has since hidden cannot be put on a call (the server
-  // refuses it), but a call that has it still shows it, so it can be read.
+  // The types this form offers (S-40): every type unless the supervisor ticked
+  // which. Matched on the name, so a relabelled type stays on the form.
+  const listed = typeField?.types && typeField.types.length > 0 ? typeField.types : null
+  const onThisForm = (name: string) => listed === null || listed.includes(name)
+
+  // A type the supervisor has since hidden, or taken off this form, cannot be
+  // put on a call (the server refuses it), but a call that has it still shows
+  // it, so it can be read.
   const offeredTypes = useMemo(
-    () => form.types.filter((ty) => ty.isActive || ty.id === existing?.typeId),
-    [form.types, existing?.typeId],
+    () => form.types.filter((ty) =>
+      (ty.isActive && (listed === null || listed.includes(ty.name))) || ty.id === existing?.typeId),
+    [form.types, existing?.typeId, listed],
   )
 
   const applies = (field: FormField) =>
@@ -82,6 +89,7 @@ export default function ClassificationEditor({
     .filter((f) => typeof answers[f.key] === 'string' && answers[f.key] !== '' && Number.isNaN(Number(answers[f.key])))
     .map(labelOf)
   const inactiveType = selectedType !== undefined && !selectedType.isActive
+  const notOfferedType = selectedType !== undefined && selectedType.isActive && !onThisForm(selectedType.name)
 
   const save = useMutation({
     mutationFn: () => saveClassification(callId, toRequest(form, answers, applies, resolved, isComplaint, existing)),
@@ -89,7 +97,8 @@ export default function ClassificationEditor({
     onError: (e) => setError(t(`calls.edit.errors.${errorCode(e)}`, { defaultValue: t('calls.edit.errors.save_failed') })),
   })
 
-  const canSave = !save.isPending && missing.length === 0 && unreadable.length === 0 && !inactiveType && selectedType !== undefined
+  const canSave = !save.isPending && missing.length === 0 && unreadable.length === 0
+    && !inactiveType && !notOfferedType && selectedType !== undefined
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -124,6 +133,7 @@ export default function ClassificationEditor({
       </div>
 
       {inactiveType && <p className="notice-warning">{t('calls.edit.inactiveType')}</p>}
+      {notOfferedType && <p className="notice-warning">{t('calls.edit.notOfferedType')}</p>}
       {missing.length > 0 && (
         <p className="text-xs text-amber-300">{t('calls.edit.missing', { fields: missing.join(arabic ? '، ' : ', ') })}</p>
       )}

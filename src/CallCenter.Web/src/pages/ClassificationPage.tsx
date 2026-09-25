@@ -493,8 +493,11 @@ function FieldRow({
         </div>
       </div>
 
-      {/* Which call types this question is asked for. Nothing ticked means
-          always, which is the common case and so needs no ticking. */}
+      {field.kind === 'type' ? (
+        <OfferedTypes field={field} types={types} onChange={(list) => onChange({ types: list })} />
+      ) : (
+      /* Which call types this question is asked for. Nothing ticked means
+          always, which is the common case and so needs no ticking. */
       <div className="flex flex-wrap items-center gap-3">
         <span className="field-hint">{t('classification.askedFor')}</span>
         {types.map((type) => {
@@ -517,6 +520,7 @@ function FieldRow({
           )
         })}
       </div>
+      )}
 
       {field.kind === 'select' && (
         <SelectOptions
@@ -525,6 +529,72 @@ function FieldRow({
         />
       )}
     </li>
+  )
+}
+
+/**
+ * Which call types a form offers (S-40), chosen by the supervisor per form.
+ *
+ * Stored on the type question as a list of type *names*, the same way
+ * showWhenType is, so relabelling a type never takes it off a form. No list
+ * means every type, which is what every form did before and what a form with
+ * all the boxes ticked goes back to: a type added later then joins it
+ * without anyone remembering to tick it. At least one box stays ticked,
+ * because a form that offers no type can never be saved (the server refuses
+ * it too). Hidden types are left out unless the form already lists one.
+ */
+function OfferedTypes({
+  field,
+  types,
+  onChange,
+}: {
+  field: FormField
+  types: ClassificationType[]
+  onChange: (types: string[] | undefined) => void
+}) {
+  const { t, i18n } = useTranslation()
+  const arabic = i18n.language.startsWith('ar')
+  const listed = field.types && field.types.length > 0 ? field.types : null
+  const shown = types.filter((ty) => ty.isActive || listed?.includes(ty.name))
+  const isOn = (name: string) => listed === null || listed.includes(name)
+  const onCount = shown.filter((ty) => isOn(ty.name)).length
+
+  function toggle(name: string, on: boolean) {
+    const next = new Set(shown.filter((ty) => isOn(ty.name)).map((ty) => ty.name))
+    if (on) next.add(name)
+    else next.delete(name)
+    // Every box ticked is "all types", stored as no list.
+    const all = shown.every((ty) => next.has(ty.name))
+    onChange(all ? undefined : shown.map((ty) => ty.name).filter((n) => next.has(n)))
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="field-hint">{t('classification.typesOffered')}</span>
+        {shown.map((type) => {
+          const on = isOn(type.name)
+          const last = on && onCount === 1
+          return (
+            <label
+              key={type.id}
+              className="flex items-center gap-1.5 text-xs text-slate-300"
+              title={last ? t('classification.typesOfferedKeepOne') : undefined}
+            >
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={last}
+                onChange={(e) => toggle(type.name, e.target.checked)}
+                className="accent-brand-500"
+              />
+              {arabic ? type.labelAr : type.labelEn}
+            </label>
+          )
+        })}
+      </div>
+      <p className="field-hint">{t('classification.typesOfferedHint')}</p>
+    </div>
   )
 }
 

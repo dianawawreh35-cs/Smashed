@@ -5180,6 +5180,54 @@ one current form per direction. A full run against `callcenter_test` then left
 `callcenter` identical, row for row, and `callcenter_test` with no test rows.
 357 server tests and 143 shared tests pass.
 
+## 2026-09-25 — Each form offers the call types the supervisor chooses (S-40)
+
+Dia, 25 Sep: *I want to be able to choose what call types each one has
+manually* — inbound, outbound and Applications. Until now the three forms
+shared one list, and the only control was hiding a type, which took it off
+all three at once. An outbound call-back offered "Order"; a WhatsApp message
+offered "Wrong number".
+
+**The list is part of the form, not of the type.** The form's type question
+carries `"types": [...]`, the names of the types that form offers. So it is
+versioned with the form: publishing a narrower list changes the next
+classification, not the old ones, and publishing the old version puts it
+back. The list holds **names**, as `showWhenType` does, so relabelling a type
+never takes it off a form. The alternative, a column on
+`classification_types` per form, needed a migration and would have changed
+old calls' forms retroactively.
+
+**No list means every type.** Every existing form works unchanged, and the
+designer stores no list when every box is ticked, so a form that offers all
+types also offers one added later without anyone remembering. A form with a
+list has to be ticked to take a new type; the hint under the boxes says so.
+
+**Held on the server too, for supervisors as well.** `SaveAsync` refuses a
+type the form does not offer (`type_not_offered`), using the version the
+client drew, or the direction's current form. The alternative, filtering only
+on screen, would let the reports count an outbound "order" the outbound form
+no longer asks. Publishing refuses a list that is empty (a form nobody could
+save) or names a type that does not exist. The one tick box left cannot be
+unticked.
+
+**An old call keeps its type.** A call classified as an Order before the form
+stopped offering it still reads as an Order in the web editor, with a note to
+choose another type before Save; the Agent App shows the same refusal in
+words. Same treatment as a type hidden since.
+
+**The reports are unchanged.** There is still one list of types, so an Order
+is counted as an Order whichever form it came from.
+
+**Tested.** Web: 4 new (a form offers only its listed types; an old call's
+type the form dropped is shown and blocks Save; the designer writes the list
+by name for one form only and keeps one box; ticking everything stores no
+list). Server: 1 new, against `callcenter_test` — an empty list and an unknown
+name are refused on publish; the Applications form limited to Complaint
+refuses an Order from the supervisor and from the record endpoint, takes a
+Complaint, and an inbound call is still an Order; the form that was current is
+put back afterwards. 358 server, 143 shared and 107 web tests pass; the web
+build and lint pass. **Not yet seen running:** checklist 1.3b.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

@@ -151,6 +151,7 @@
     "fieldFollowUp": "Follow-up required",
     "stillNeeded": "Still needed:",
     "tooOld": "This call can no longer be changed. Ask a supervisor.",
+    "typeNotOffered": "This form no longer offers that type. Pick another one.",
     "notYours": "That call belongs to another agent.",
     "classifyHeading": "Classify an earlier call"
   },

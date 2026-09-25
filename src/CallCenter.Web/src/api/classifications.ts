@@ -51,6 +51,12 @@ export interface FormField {
    * labels, so renaming a type never makes a field disappear.
    */
   showWhenType?: string[]
+  /**
+   * On the type question only: the type *names* this form offers (S-40).
+   * Absent means every type. Chosen per form on the Classification page, and
+   * enforced by the server as well.
+   */
+  types?: string[]
   options?: FieldOption[]
 }
 

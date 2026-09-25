@@ -60,6 +60,12 @@ public class ClassificationService(
 
         /// <summary>The name is missing, or already taken.</summary>
         BadName,
+
+        /// <summary>
+        /// The form the call is classified on does not offer this type (S-40):
+        /// the supervisor chose which types each form lists.
+        /// </summary>
+        TypeNotOffered,
     }
 
     // ---- the form ----------------------------------------------------------
@@ -166,6 +172,23 @@ public class ClassificationService(
             return (null, Failure.BadForm);
         }
 
+        // A listed type that does not exist would be a choice nobody could
+        // ever save. Names, not ids, like showWhenType: renaming a type's
+        // label never takes it off a form.
+        if (OfferedTypes(definition) is { } listed)
+        {
+            var known = await db.ClassificationTypes.Select(t => t.Name).ToListAsync(ct);
+            var unknown = listed.Where(name => !known.Contains(name)).ToList();
+
+            if (unknown.Count > 0)
+            {
+                logger.LogWarning(
+                    "Refused a {Direction} form definition: it offers types that do not exist ({Types})",
+                    direction, string.Join(", ", unknown));
+                return (null, Failure.BadForm);
+            }
+        }
+
         // Versions are numbered across both directions: a classification
         // points at a version, and one sequence means the number alone says
         // which questions were asked.
@@ -244,6 +267,21 @@ public class ClassificationService(
                 reason = $"the field {key.GetString()} has no kind this system can draw";
                 return false;
             }
+
+            // The type question may say which types this form offers. Left
+            // out, it offers them all; given, it must name at least one, or
+            // the form could never be saved.
+            if (kind.GetString() == "type" && field.TryGetProperty("types", out var offered))
+            {
+                if (offered.ValueKind != JsonValueKind.Array
+                    || offered.GetArrayLength() == 0
+                    || offered.EnumerateArray().Any(t =>
+                        t.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(t.GetString())))
+                {
+                    reason = "the type question's list of types is empty or not a list of names";
+                    return false;
+                }
+            }
         }
 
         // The type is what every report groups by, and a form without it would
@@ -316,6 +354,15 @@ public class ClassificationService(
         if (type is null || !type.IsActive)
         {
             return (null, Failure.UnknownType);
+        }
+
+        // S-40: each form offers the types the supervisor chose for it. Checked
+        // here as well as on screen, and for supervisors too, so a report never
+        // counts an outbound "order" the outbound form does not offer.
+        if (await OfferedTypesAsync(communication, request.FormVersion, ct) is { } offered
+            && !offered.Contains(type.Name))
+        {
+            return (null, Failure.TypeNotOffered);
         }
 
         if (request.BranchId is { } branchId
@@ -526,6 +573,60 @@ public class ClassificationService(
             .ToListAsync(ct);
 
         return (changes, null);
+    }
+
+    /// <summary>
+    /// The type names a form offers, or null when it offers every type (S-40).
+    /// </summary>
+    /// <remarks>
+    /// Stored on the form's type question as <c>"types": ["Order", …]</c>, so
+    /// the list is versioned with the rest of the form: publishing a narrower
+    /// list does not change what an old call was classified as.
+    /// </remarks>
+    public static IReadOnlySet<string>? OfferedTypes(JsonDocument definition)
+    {
+        if (!definition.RootElement.TryGetProperty("fields", out var fields)
+            || fields.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var field in fields.EnumerateArray())
+        {
+            if (field.ValueKind == JsonValueKind.Object
+                && field.TryGetProperty("kind", out var kind) && kind.GetString() == "type"
+                && field.TryGetProperty("types", out var types) && types.ValueKind == JsonValueKind.Array
+                && types.GetArrayLength() > 0)
+            {
+                return types.EnumerateArray()
+                    .Where(t => t.ValueKind == JsonValueKind.String)
+                    .Select(t => t.GetString()!)
+                    .ToHashSet(StringComparer.Ordinal);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// What the form this communication is classified on offers: the version
+    /// the client drew when it says, otherwise its direction's current form.
+    /// A message's direction is None, which is the Applications form.
+    /// </summary>
+    private async Task<IReadOnlySet<string>?> OfferedTypesAsync(
+        Communication communication, int? formVersion, CancellationToken ct)
+    {
+        var direction = NormaliseDirection(communication.Direction);
+
+        var form = formVersion is { } version
+            ? await db.FormDefinitions.AsNoTracking()
+                .FirstOrDefaultAsync(f => f.Version == version && f.Direction == direction, ct)
+            : null;
+
+        form ??= await db.FormDefinitions.AsNoTracking()
+            .FirstOrDefaultAsync(f => f.IsCurrent && f.Direction == direction, ct);
+
+        return form is null ? null : OfferedTypes(form.Definition);
     }
 
     /// <summary>

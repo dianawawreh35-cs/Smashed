@@ -35,7 +35,6 @@ export interface ChannelReportRow {
   channelId: string
   channel: string
   messages: number
-  unclassified: number
   byType: TypeCount[]
 }
 
@@ -63,7 +62,6 @@ export interface AgentReportRow {
   messages: number
   orders: number
   orderValue: number
-  unclassified: number
 }
 
 export interface IssuesReportRow {

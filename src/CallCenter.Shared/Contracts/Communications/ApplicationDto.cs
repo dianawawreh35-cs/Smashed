@@ -33,8 +33,10 @@ namespace CallCenter.Shared.Contracts.Communications;
 /// </param>
 /// <param name="Classification">
 /// What the message was about, saved in the same request so a recorded message
-/// is classified at once. Null leaves it unclassified, as skipping a call does
-/// (A-41), and the agent's list marks it.
+/// is classified at once. <b>Required</b> (Dia, 25 Sep): a message is typed by
+/// an agent who knows what it was, so unlike a call it is never recorded
+/// unclassified. The server refuses one without it (<c>classification_required</c>).
+/// Nullable only so that leaving it out gets that answer rather than a bare 400.
 /// </param>
 public record RecordApplicationRequest(
     [Required] Guid? ChannelId,

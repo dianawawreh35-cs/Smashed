@@ -73,7 +73,6 @@ public class ApplicationReportsService(CallCenterDbContext db)
                 g.Key.ChannelId,
                 g.Key.Channel,
                 g.Count(),
-                g.Count(r => r.TypeName is null),
                 g.Where(r => r.TypeName is not null)
                     .GroupBy(r => r.TypeName!)
                     .Select(t => new TypeCountDto(t.Key, t.First().TypeLabelAr!, t.First().TypeLabelEn!, t.Count()))
@@ -147,7 +146,7 @@ public class ApplicationReportsService(CallCenterDbContext db)
             .ToList();
     }
 
-    /// <summary>Per agent: recorded, orders, value, and what they have not classified (R-15's message half).</summary>
+    /// <summary>Per agent: recorded, orders and their value (R-15's message half).</summary>
     public async Task<IReadOnlyList<AgentReportRowDto>> ByAgentAsync(Filter filter, CancellationToken ct = default)
     {
         var rows = await RowsAsync(filter, ct);
@@ -160,8 +159,7 @@ public class ApplicationReportsService(CallCenterDbContext db)
                 g.Key.Item2,
                 g.Count(),
                 g.Count(r => r.IsOrder),
-                g.Where(r => r.IsOrder).Sum(r => r.Value),
-                g.Count(r => r.TypeName is null)))
+                g.Where(r => r.IsOrder).Sum(r => r.Value)))
             .OrderByDescending(r => r.Messages).ThenBy(r => r.Agent)
             .ToList();
     }

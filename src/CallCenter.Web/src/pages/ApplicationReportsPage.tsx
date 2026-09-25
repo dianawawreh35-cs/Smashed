@@ -149,7 +149,6 @@ export default function ApplicationReportsPage() {
   const channelColumns: ReportColumn<ChannelReportRow>[] = [
     { key: 'channel', label: c('channel'), value: (r) => r.channel },
     { key: 'messages', label: c('messages'), value: (r) => r.messages, numeric: true, total: true },
-    { key: 'unclassified', label: c('unclassified'), value: (r) => r.unclassified, numeric: true, total: true },
     ...typeNames.map((ty): ReportColumn<ChannelReportRow> => ({
       key: `type:${ty.typeName}`,
       label: arabic ? ty.labelAr : ty.labelEn,
@@ -178,7 +177,6 @@ export default function ApplicationReportsPage() {
     { key: 'messages', label: c('messages'), value: (r) => r.messages, numeric: true, total: true },
     { key: 'orders', label: c('orders'), value: (r) => r.orders, numeric: true, total: true },
     { key: 'orderValue', label: c('orderValue'), value: (r) => r.orderValue, format: (r) => money(r.orderValue), numeric: true, total: true },
-    { key: 'unclassified', label: c('unclassified'), value: (r) => r.unclassified, numeric: true, total: true },
   ]
 
   const issuesColumns: ReportColumn<IssuesReportRow>[] = [
@@ -260,7 +258,6 @@ export default function ApplicationReportsPage() {
           x: (r) => r.channel,
           series: [
             { key: 'messages', label: c('messages'), colour: SERIES_COLOURS[0] },
-            { key: 'unclassified', label: c('unclassified'), colour: SERIES_COLOURS[1] },
           ],
         }}
       />
@@ -326,7 +323,6 @@ export default function ApplicationReportsPage() {
           series: [
             { key: 'messages', label: c('messages'), colour: SERIES_COLOURS[0] },
             { key: 'orders', label: c('orders'), colour: SERIES_COLOURS[1] },
-            { key: 'unclassified', label: c('unclassified'), colour: SERIES_COLOURS[2] },
           ],
         }}
       />

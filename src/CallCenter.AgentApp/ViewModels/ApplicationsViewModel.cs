@@ -176,7 +176,8 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Whether the Applications form reached the app at sign-in. Without it a
-    /// message can still be recorded, unclassified, and the screen says why.
+    /// message cannot be recorded, since it would have no type, and the screen
+    /// says why.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FormUnavailable))]
@@ -242,10 +243,10 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
     private bool CanRecord => !IsRecording;
 
     /// <summary>
-    /// Sends the message, with its classification when the form was filled in
-    /// (A-70). A form left blank records the message unclassified, as skipping
-    /// a call's form does (A-41); a form half filled is refused here, before
-    /// the server sees it, with what is missing named.
+    /// Sends the message with its classification (A-70). The type is required
+    /// and the form must be complete: both are refused here, before the server
+    /// sees them, with what is missing named. A message is never recorded
+    /// unclassified (Dia, 25 Sep).
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanRecord))]
     private async Task RecordAsync()
@@ -272,7 +273,25 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (Classification.HasType && !Classification.IsComplete)
+        // Dia, 25 Sep: a message is always recorded with its type. Unlike a
+        // call, which happens to the agent and may be skipped (A-41), the agent
+        // has just read it and knows what it was. The server refuses one
+        // without it too (classification_required).
+        if (!FormLoaded)
+        {
+            // Nothing to classify with, so nothing is sent: a message typed by
+            // hand can wait for the form, as it waits for the server (A-70).
+            RecordMessageKey = "applications.formUnavailable";
+            return;
+        }
+
+        if (!Classification.HasType)
+        {
+            RecordMessageKey = "applications.errors.typeRequired";
+            return;
+        }
+
+        if (!Classification.IsComplete)
         {
             // The form says what is missing, under its fields.
             RecordMessageKey = "applications.errors.formIncomplete";
@@ -393,6 +412,7 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
         "bad_time" => "applications.errors.bad_time",
         "unknown_type" or "unknown_branch" or "classification_refused" => "applications.errors.classification_refused",
         "message_not_found" => "applications.errors.message_not_found",
+        "classification_required" => "applications.errors.typeRequired",
         "type_not_offered" => "classification.typeNotOffered",
         "edit_window_closed" => "classification.tooOld",
         "not_your_call" => "classification.notYours",

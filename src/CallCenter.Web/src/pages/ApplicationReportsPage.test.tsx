@@ -12,14 +12,14 @@ import i18n from '../i18n'
  */
 
 const BY_CHANNEL = [
-  { channelId: 'ch-wa', channel: 'WhatsApp', messages: 12, unclassified: 2,
+  { channelId: 'ch-wa', channel: 'WhatsApp', messages: 12,
     byType: [{ typeName: 'Order', labelAr: 'طلب', labelEn: 'Order', count: 9 }, { typeName: 'Complaint', labelAr: 'شكوى', labelEn: 'Complaint', count: 1 }] },
-  { channelId: 'ch-ig', channel: 'Instagram', messages: 5, unclassified: 0,
+  { channelId: 'ch-ig', channel: 'Instagram', messages: 5,
     byType: [{ typeName: 'Order', labelAr: 'طلب', labelEn: 'Order', count: 5 }] },
 ]
 const ORDERS = [{ key: 'ch-wa', label: 'WhatsApp', orders: 9, orderValue: 540.5, average: 60.06 }]
 const TREND = [{ bucket: '2026-09-24', messages: 7, orders: 4, orderValue: 200 }, { bucket: '2026-09-25', messages: 10, orders: 5, orderValue: 340.5 }]
-const BY_AGENT = [{ agentId: 'a1', agent: 'Sara', messages: 17, orders: 9, orderValue: 540.5, unclassified: 2 }]
+const BY_AGENT = [{ agentId: 'a1', agent: 'Sara', messages: 17, orders: 9, orderValue: 540.5 }]
 const ISSUES = [{ channelId: 'ch-wa', channel: 'WhatsApp', messages: 12, cancellations: 1, complaints: 1 }]
 const CHANNELS = [
   { id: 'ch-phone', name: 'Phone', isSystem: true, sortOrder: 0, isActive: true, inUse: true },
@@ -98,7 +98,8 @@ describe('application reports page', () => {
     const byChannel = card('Messages per channel')
     const wa = (await within(byChannel).findByText('WhatsApp')).closest('tr')!
     expect(within(wa).getByText('12')).toBeInTheDocument()
-    expect(within(wa).getByText('2')).toBeInTheDocument()
+    // No "not classified" count: a message is always recorded with its type (25 Sep).
+    expect(within(byChannel).queryByRole('columnheader', { name: 'Not classified' })).not.toBeInTheDocument()
     // Per type within the channel, as columns.
     expect(within(byChannel).getByRole('columnheader', { name: 'Complaint' })).toBeInTheDocument()
     expect(within(wa).getByText('9')).toBeInTheDocument()
@@ -108,6 +109,7 @@ describe('application reports page', () => {
     const agents = card('Per agent')
     const sara = (await within(agents).findByText('Sara')).closest('tr')!
     expect(within(sara).getByText('540.50')).toBeInTheDocument()
+    expect(within(agents).queryByRole('columnheader', { name: 'Not classified' })).not.toBeInTheDocument()
 
     const trend = card('Messages over time')
     expect(await within(trend).findByText('2026-09-25')).toBeInTheDocument()
@@ -197,9 +199,9 @@ describe('application reports page', () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
     const text = await readBlob(saved!)
     const lines = text.trim().split('\r\n')
-    expect(lines[0]).toBe('Channel,Messages,Not classified,Order,Complaint')
-    expect(lines[1]).toBe('WhatsApp,12,2,9,1')
-    expect(lines[2]).toBe('Instagram,5,0,5,0')
+    expect(lines[0]).toBe('Channel,Messages,Order,Complaint')
+    expect(lines[1]).toBe('WhatsApp,12,9,1')
+    expect(lines[2]).toBe('Instagram,5,5,0')
     expect(lines).toHaveLength(3)
   })
 })

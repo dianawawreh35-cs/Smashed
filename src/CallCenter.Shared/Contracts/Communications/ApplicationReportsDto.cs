@@ -20,7 +20,6 @@ public record ChannelReportRowDto(
     Guid ChannelId,
     string Channel,
     int Messages,
-    int Unclassified,
     IReadOnlyList<TypeCountDto> ByType);
 
 /// <summary>
@@ -52,14 +51,16 @@ public record TrendPointDto(
     int Orders,
     decimal OrderValue);
 
-/// <summary>What one agent recorded, and what they still owe (A-71, R-15).</summary>
+/// <summary>
+/// What one agent recorded (R-15). No "not classified" count: a message is
+/// always recorded with its type (Dia, 25 Sep).
+/// </summary>
 public record AgentReportRowDto(
     Guid AgentId,
     string Agent,
     int Messages,
     int Orders,
-    decimal OrderValue,
-    int Unclassified);
+    decimal OrderValue);
 
 /// <summary>The messages that went wrong, per channel: cancellations and complaints (R-14, R-17).</summary>
 public record IssuesReportRowDto(

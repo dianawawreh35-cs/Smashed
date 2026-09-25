@@ -66,6 +66,9 @@ public class ApplicationsService(
         /// </summary>
         BadTime,
 
+        /// <summary>No classification was sent: a message is always recorded with one.</summary>
+        ClassificationRequired,
+
         /// <summary>No such message.</summary>
         NotFound,
 
@@ -95,9 +98,13 @@ public class ApplicationsService(
     /// One request rather than two, so a message is never left half-recorded:
     /// if the classification is refused (a hidden type, a branch that does not
     /// exist) the message is not written either, and the agent sees why with
-    /// everything still on screen. A message recorded without a classification
-    /// is simply unclassified, as a skipped call is (A-41), and the agent's list
-    /// and the per-agent report both show it.
+    /// everything still on screen.
+    ///
+    /// <b>A message is never recorded unclassified</b> (Dia, 25 Sep). A call
+    /// can be skipped (A-41) because it happens to the agent, mid-shift; a
+    /// message is typed by an agent who has just read it and knows what it was.
+    /// So the classification is required, and the reports have no
+    /// "not classified" count for messages.
     /// </remarks>
     public async Task<Outcome> RecordAsync(
         RecordApplicationRequest request, Guid actingUserId, bool actorIsSupervisor,
@@ -121,6 +128,11 @@ public class ApplicationsService(
         if (!TimeIsAllowed(startedAt, now, actorIsSupervisor))
         {
             return new Outcome(null, Failure.BadTime);
+        }
+
+        if (request.Classification is null)
+        {
+            return new Outcome(null, Failure.ClassificationRequired);
         }
 
         var message = new Communication

@@ -539,7 +539,6 @@
     "columns": {
       "channel": "Channel",
       "messages": "Messages",
-      "unclassified": "Not classified",
       "group": "Group",
       "orders": "Orders",
       "orderValue": "Order value",
@@ -552,7 +551,7 @@
     "sections": {
       "byChannel": {
         "title": "Messages per channel",
-        "hint": "How many arrived on each app, how many are still unclassified, and what they were about."
+        "hint": "How many arrived on each app, and what they were about."
       },
       "orders": {
         "title": "Orders and order value",
@@ -564,7 +563,7 @@
       },
       "byAgent": {
         "title": "Per agent",
-        "hint": "What each agent recorded, how many were orders, and how many they have not yet classified."
+        "hint": "What each agent recorded, and how many were orders."
       },
       "issues": {
         "title": "Cancellations and complaints",

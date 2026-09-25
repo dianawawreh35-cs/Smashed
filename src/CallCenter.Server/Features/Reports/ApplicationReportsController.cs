@@ -46,7 +46,7 @@ public class ApplicationReportsController(ApplicationReportsService reports) : C
         [FromQuery] string? groupBy, CancellationToken ct) =>
         Ok(await reports.TrendAsync(Filter(from, to, agentId, branchId, channelId, typeId), groupBy, ct));
 
-    /// <summary>Per agent: messages recorded, orders, order value, unclassified.</summary>
+    /// <summary>Per agent: messages recorded, orders, order value.</summary>
     [HttpGet("by-agent")]
     [ProducesResponseType<IReadOnlyList<AgentReportRowDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<AgentReportRowDto>>> ByAgent(

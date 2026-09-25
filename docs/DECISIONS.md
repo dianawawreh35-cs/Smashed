@@ -5253,6 +5253,38 @@ Application reports stay as they are, and nothing that was built is removed.
 Agent App builds; 143 shared tests (labels) pass. Checklist Round 2,
 "Applications".
 
+## 2026-09-25 — A message is always recorded with its type (A-70)
+
+Dia, looking at the Per agent report: *the app order can't be not classified,
+as it is already classified when entered.* It could be. The Agent App sent a
+message without a classification when the agent pressed Record on a blank
+form, the way a skipped call is left unclassified (A-41), and also when the
+Applications form had not loaded at sign-in. Either put it in the reports'
+"not classified" count.
+
+**The skip rule was borrowed from calls, and it does not fit messages.** A
+call happens to the agent mid-shift, and the form may have to wait until the
+customer has gone. A message is typed by an agent who has just read it and
+knows what it was. So the type is now required:
+
+- **The Agent App** refuses Record until a type is chosen and the form is
+  complete, and says which. With the Applications form not loaded it records
+  nothing and says to sign in again: a message typed by hand can wait for the
+  form, as it waits for the server (it is not queued, 25 Sep).
+- **The server** refuses a message sent without a classification
+  (`classification_required`), and writes nothing.
+- **The reports** drop "not classified": the column in *Messages per app*, and
+  the column and bar in *Per agent*. The field is gone from both report rows.
+
+A message recorded before this and left unclassified would still read as
+unclassified in App logs and could be classified there; the development
+database had none.
+
+**Tested.** Server: 1 new, a message sent without a type is refused and leaves
+no row; the recording tests now send one. Web: the two report tests check
+there is no "Not classified" column. 359 server (on `callcenter_test`), 143
+shared and 107 web tests pass; the web build and lint pass.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

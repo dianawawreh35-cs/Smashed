@@ -13,7 +13,7 @@
     "time": "Time",
     "timeHint": "HH:mm, today. Set it back if the customer wrote earlier.",
     "classifyHeading": "What was the message about?",
-    "formUnavailable": "The Applications form could not be loaded at sign-in, so the message will be recorded without a classification. Sign out and in again to fetch it.",
+    "formUnavailable": "The Applications form could not be loaded at sign-in, so a message cannot be recorded yet. Sign out and in again to fetch it.",
     "record": "Record message",
     "clear": "Clear",
     "recorded": "Message recorded.",
@@ -37,14 +37,15 @@
       "noChannel": "Choose which app the message came on.",
       "no_customer": "Enter the customer's number.",
       "badTimeFormat": "Enter the time as HH:mm, for example 14:30.",
-      "formIncomplete": "The classification is half filled in: complete it, or clear the type to record the message unclassified.",
+      "formIncomplete": "The classification is not complete: fill in what is still needed below.",
       "offline": "The server could not be reached, so the message was not recorded. What you typed is kept: press Record again once it is back.",
       "unknown_channel": "That app is no longer offered. Pick another, or refresh.",
       "phone_channel": "A phone conversation is a call, and calls are logged on their own.",
       "unknown_contact": "That customer no longer exists.",
       "bad_time": "The time must be today and not in the future. Ask a supervisor for another day.",
       "classification_refused": "The classification was refused - the form may have changed. Refresh and try again.",
-      "message_not_found": "That message no longer exists."
+      "message_not_found": "That message no longer exists.",
+      "typeRequired": "Choose what the message was about before recording it."
     }
   },
   "call": {

@@ -218,8 +218,8 @@ Needs a second supervisor account; add one in Users if there is only one.
 ### 1.8 Applications, Application reports, Channels (A-70 to A-73, S-41) — never run
 
 Built 25 Sep. Record two or three messages from the Agent App first (Round 2,
-"Applications"), one of them an order with a value, one a complaint, one left
-unclassified, so there is something to see.
+"Applications"), one of them an order with a value, one a complaint, one an inquiry, so
+there is something to see.
 
 - [ ] **Applications is in the sidebar right after Calls,** and **Application
       reports** right after it. Applications lists the messages, newest first,
@@ -232,12 +232,11 @@ unclassified, so there is something to see.
 - [ ] **Open a message** (double-click, or Open). It opens **under its row**
       with no jump: the customer, the channel, the agent, "Message" as the
       status, no recording player, no extension or duration. Its
-      classification is shown with **Edit**; the unclassified one shows
-      **Classify**. Edit one and save: the row updates, and Changes lists you.
+      classification is shown with **Edit**. Edit one and save: the row updates, and Changes lists you.
 - [ ] **Application reports.** Five cards, each a table and, where numeric, a
       chart: messages per channel with a column per type; orders and value
       grouped by channel / branch / agent / day; a trend per day / week / month
-      / hour; per agent with what is still unclassified; cancellations and
+      / hour; per agent (messages, orders, value); cancellations and
       complaints per channel. The figures match what you recorded. Presets
       Today / This week / This month / Custom, and channel, agent, branch,
       type, all apply as soon as they change.
@@ -360,10 +359,10 @@ must be running: a message is not queued offline (Dia, 25 Sep).
       **same app and the same branch still selected** (A-73). Switch to **App
       logs**: the message is at the top of the list with a green "Classified"
       chip.
-- [ ] **Record one with no type chosen.** It is recorded and shows the amber
-      "Not classified" chip, like a skipped call. **Record one with a type but a
-      required field empty:** an amber "half filled in" message and nothing is
-      sent.
+- [ ] **Press Record with no type chosen.** Nothing is sent, and an amber line
+      says to choose what the message was about. A message is always recorded
+      with its type (Dia, 25 Sep). **Record one with a type but a required
+      field empty:** an amber "not complete" message and nothing is sent.
 - [ ] **Set the time to a future hour** (23:59) and record: the server refuses
       with an amber message about the time. Type "abc" as the time: "Enter the
       time as HH:mm". Set it to an hour ago and record: accepted, and the row

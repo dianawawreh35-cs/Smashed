@@ -96,6 +96,9 @@ public class ApplicationsController(ApplicationsService applications) : Controll
             ApplicationsService.Failure.BadTime =>
                 (StatusCodes.Status400BadRequest, "bad_time",
                     "The time must be today and not in the future. Ask a supervisor for another day."),
+            ApplicationsService.Failure.ClassificationRequired =>
+                (StatusCodes.Status400BadRequest, "classification_required",
+                    "Choose what the message was about. A message is always recorded with its type."),
             ApplicationsService.Failure.NotFound =>
                 (StatusCodes.Status404NotFound, "message_not_found", "No such message."),
             ApplicationsService.Failure.NotAnApplication =>

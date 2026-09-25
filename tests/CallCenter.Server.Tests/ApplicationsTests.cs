@@ -82,6 +82,23 @@ public class ApplicationsTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
+    public async Task A_message_is_never_recorded_without_its_type()
+    {
+        // Dia, 25 Sep: a message is typed by an agent who knows what it was,
+        // so, unlike a call, it is never left unclassified. Refused, and
+        // nothing is written.
+        var s = await ScenarioAsync();
+        var before = await s.CountMessagesAsync();
+
+        var response = await s.Agent.PostAsJsonAsync("/api/communications/applications",
+            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, null, null));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Code(response)).Should().Be("classification_required");
+        (await s.CountMessagesAsync()).Should().Be(before);
+    }
+
+    [DatabaseFact]
     public async Task The_Phone_channel_and_a_message_with_nobody_on_it_are_refused()
     {
         var s = await ScenarioAsync();
@@ -104,14 +121,14 @@ public class ApplicationsTests(CallCenterApiFactory factory)
 
         // Some apps never show a number: the agent picks the contact instead.
         var response = await s.Agent.PostAsJsonAsync("/api/communications/applications",
-            new RecordApplicationRequest(s.WhatsApp, null, s.ContactId, null, null));
+            new RecordApplicationRequest(s.WhatsApp, null, s.ContactId, null, s.Classified));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         var saved = (await response.Content.ReadFromJsonAsync<CommunicationDto>())!;
 
         saved.ContactId.Should().Be(s.ContactId);
         saved.RemoteNumberRaw.Should().Be(s.CustomerMobile);
-        saved.IsClassified.Should().BeFalse("nothing was filled in, so it is unclassified, as a skipped call is");
+        saved.IsClassified.Should().BeTrue();
     }
 
     [DatabaseFact]
@@ -122,22 +139,22 @@ public class ApplicationsTests(CallCenterApiFactory factory)
 
         // Recorded at 11:20 about a message from 11:00: the reports keep the hour.
         var earlier = await s.Agent.PostAsJsonAsync("/api/communications/applications",
-            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddMinutes(-1), null));
+            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddMinutes(-1), s.Classified));
         earlier.StatusCode.Should().Be(HttpStatusCode.OK, await earlier.Content.ReadAsStringAsync());
 
         var future = await s.Agent.PostAsJsonAsync("/api/communications/applications",
-            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddHours(2), null));
+            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddHours(2), s.Classified));
         future.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Code(future)).Should().Be("bad_time");
 
         var otherDay = await s.Agent.PostAsJsonAsync("/api/communications/applications",
-            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddDays(-2), null));
+            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddDays(-2), s.Classified));
         otherDay.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Code(otherDay)).Should().Be("bad_time");
 
         // Other days are the supervisor's.
         var supervisorBackfill = await s.Supervisor.PostAsJsonAsync("/api/communications/applications",
-            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddDays(-2), null));
+            new RecordApplicationRequest(s.WhatsApp, s.CustomerMobile, null, now.AddDays(-2), s.Classified));
         supervisorBackfill.StatusCode.Should().Be(HttpStatusCode.OK, await supervisorBackfill.Content.ReadAsStringAsync());
     }
 
@@ -426,11 +443,9 @@ public class ApplicationsTests(CallCenterApiFactory factory)
         byChannel.Should().HaveCount(2);
         var whatsApp = byChannel.First(r => r.ChannelId == s.WhatsApp);
         whatsApp.Messages.Should().Be(3);
-        whatsApp.Unclassified.Should().Be(0);
         whatsApp.ByType.Select(t => (t.TypeName, t.Count)).Should().Equal(("Order", 2), ("Complaint", 1));
         var facebook = byChannel.First(r => r.ChannelId == s.Facebook);
         facebook.Messages.Should().Be(2);
-        facebook.Unclassified.Should().Be(1);
 
         // Orders: the cancellation's value is not revenue.
         var orders = await s.ReportAsync<List<OrdersReportRowDto>>("orders");
@@ -462,7 +477,6 @@ public class ApplicationsTests(CallCenterApiFactory factory)
         me.Messages.Should().Be(5);
         me.Orders.Should().Be(2);
         me.OrderValue.Should().Be(50m);
-        me.Unclassified.Should().Be(1);
 
         var issues = await s.ReportAsync<List<IssuesReportRowDto>>("issues");
         issues.First(r => r.ChannelId == s.WhatsApp).Complaints.Should().Be(1);
@@ -589,6 +603,9 @@ public class ApplicationsTests(CallCenterApiFactory factory)
         public required Guid CancellationType { get; init; }
         public required int FormVersion { get; init; }
         public required Guid AnsweredCall { get; init; }
+
+        /// <summary>A complete classification, for a message a test records: one is always required.</summary>
+        public SaveClassificationRequest Classified => new(ComplaintType, BranchId, null, null);
 
         /// <summary>The supervisor's search, always narrowed to this scenario's agent.</summary>
         public async Task<CallSearchPageDto> SearchAsync(string query)

@@ -18,9 +18,12 @@ namespace CallCenter.Server.Tests;
 /// </summary>
 /// <remarks>
 /// <b>Every test makes its own rows, named so they cannot collide</b>: a random
-/// login, a random mobile number, a random SIP Call-ID. Nothing is cleaned up
-/// and nothing depends on the order tests run in, so a database that has seen a
-/// hundred runs gives the same answers as a fresh one. A test that needs "the
+/// login, a random mobile number, a random SIP Call-ID. Nothing depends on the
+/// order tests run in, so a database that has seen a hundred runs gives the same
+/// answers as a fresh one. <b>Everything is removed when the run ends</b>
+/// (<see cref="TestSweeper"/>, since 25 Sep): the names are how the sweep finds
+/// them, so keep to them, and make contacts through <see cref="CreateContactAsync"/>
+/// rather than straight into the table, because a contact has no pattern to find. A test that needs "the
 /// only contact with this number" gets it by making the number up, never by
 /// assuming the table is empty.
 /// </remarks>
@@ -103,6 +106,9 @@ public class TestData(CallCenterApiFactory factory)
 
         db.Contacts.Add(contact);
         await db.SaveChangesAsync();
+
+        // Contacts have no test-only pattern, so the sweep is told about them.
+        TestSweeper.Contacts.Add(contact.Id);
         return contact;
     }
 

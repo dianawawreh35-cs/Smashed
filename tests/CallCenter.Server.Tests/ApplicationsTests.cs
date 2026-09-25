@@ -26,28 +26,9 @@ namespace CallCenter.Server.Tests;
 /// earlier runs left can leak in.
 /// </remarks>
 [Collection(ApiCollection.Name)]
-public class ApplicationsTests(CallCenterApiFactory factory) : IAsyncLifetime
+public class ApplicationsTests(CallCenterApiFactory factory)
 {
     private readonly TestData data = new(factory);
-
-    /// <summary>The channels this test made, removed when it ends.</summary>
-    private readonly List<Guid> channels = [];
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    /// <summary>
-    /// Channels are the one thing these tests make that a person sees: they are
-    /// the dropdown on the Settings page and in the Agent App, and a hundred
-    /// runs left a hundred "WhatsApp 1a2b3c4d" rows there (25 Sep). Everything
-    /// else a test creates is named so it cannot collide and is left, as the
-    /// TestData rules say; the channels and the messages on them are removed.
-    /// </summary>
-    public Task DisposeAsync() => data.QueryAsync(async db =>
-    {
-        await db.Communications.Where(c => channels.Contains(c.ChannelId)).ExecuteDeleteAsync();
-        await db.Channels.Where(c => channels.Contains(c.Id)).ExecuteDeleteAsync();
-        return 0;
-    });
 
     // ---- recording (A-70) --------------------------------------------------
 
@@ -230,12 +211,46 @@ public class ApplicationsTests(CallCenterApiFactory factory) : IAsyncLifetime
         saved.TypeId.Should().Be(s.ComplaintType);
         saved.FormVersion.Should().Be(form.Version);
 
-        // The supervisor's third tab publishes to the same direction.
-        var published = await s.Supervisor.PutAsJsonAsync("/api/classifications/form",
-            new PublishFormRequest(form.Definition, Directions.None));
-        published.StatusCode.Should().Be(HttpStatusCode.OK, await published.Content.ReadAsStringAsync());
-        (await published.Content.ReadFromJsonAsync<ClassificationFormDto>())!.Direction.Should().Be(Directions.None);
+        // The supervisor's third tab publishes to the same direction. Publishing
+        // is real: it makes the new version current for every agent. So the
+        // form that was current is put back afterwards, whatever happens, or a
+        // test run would change the questions the restaurant's agents are asked
+        // (it did, 25 Sep).
+        int? publishedVersion = null;
+        try
+        {
+            var published = await s.Supervisor.PutAsJsonAsync("/api/classifications/form",
+                new PublishFormRequest(form.Definition, Directions.None));
+            published.StatusCode.Should().Be(HttpStatusCode.OK, await published.Content.ReadAsStringAsync());
+            var dto = (await published.Content.ReadFromJsonAsync<ClassificationFormDto>())!;
+            publishedVersion = dto.Version;
+            dto.Direction.Should().Be(Directions.None);
+        }
+        finally
+        {
+            await RestoreCurrentFormAsync(Directions.None, form.Version, publishedVersion);
+        }
     }
+
+    /// <summary>
+    /// Makes <paramref name="previous"/> the current form for its direction again
+    /// and removes <paramref name="published"/>, which nothing was classified
+    /// against. Cleared first: one current form per direction is a unique index.
+    /// </summary>
+    private Task RestoreCurrentFormAsync(string direction, int previous, int? published) => data.QueryAsync(async db =>
+    {
+        await db.FormDefinitions.Where(f => f.Direction == direction && f.IsCurrent)
+            .ExecuteUpdateAsync(x => x.SetProperty(f => f.IsCurrent, false));
+        await db.FormDefinitions.Where(f => f.Version == previous)
+            .ExecuteUpdateAsync(x => x.SetProperty(f => f.IsCurrent, true));
+
+        if (published is { } version && !await db.Classifications.AnyAsync(c => c.FormVersion == version))
+        {
+            await db.FormDefinitions.Where(f => f.Version == version).ExecuteDeleteAsync();
+        }
+
+        return 0;
+    });
 
     // ---- the supervisor's search (S-02) -------------------------------------
 
@@ -665,9 +680,6 @@ public class ApplicationsTests(CallCenterApiFactory factory) : IAsyncLifetime
                 FacebookName: facebook.Name, Branch: branch.Id, Order: order, Complaint: complaint,
                 Cancellation: cancellation, Form: form.Version, Answered: answered.Id);
         });
-
-        // After the save: the ids come from the database, so before it they are empty.
-        channels.AddRange([ids.WhatsApp, ids.Facebook]);
 
         return new Scenario(data)
         {

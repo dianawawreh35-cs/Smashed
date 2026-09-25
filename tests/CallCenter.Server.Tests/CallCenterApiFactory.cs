@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Xunit;
 
 namespace CallCenter.Server.Tests;
 
@@ -34,8 +35,90 @@ namespace CallCenter.Server.Tests;
 /// the schema is built before the first test, so those endpoints answer for
 /// real instead of failing to connect.
 /// </remarks>
-public class CallCenterApiFactory : WebApplicationFactory<Program>
+public class CallCenterApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    /// <summary>
+    /// Before the first test: remove whatever an earlier run left, so a run that
+    /// crashed before its own sweep is harmless (<see cref="TestSweeper"/>).
+    /// </summary>
+    public Task InitializeAsync()
+    {
+        RefuseTheDevelopmentDatabase();
+        return SweepAsync();
+    }
+
+    /// <summary>
+    /// Stops the run before any test if it was pointed at the database the
+    /// apps use on this machine.
+    /// </summary>
+    /// <remarks>
+    /// DEVELOPING.md §5 has always said to use <c>callcenter_test</c>. On 25 Sep
+    /// the suite was run against <c>callcenter</c> anyway, and it filled the
+    /// supervisor's screens with test agents and channels, published a form
+    /// agents were then asked, and ran the real retention job over real
+    /// recordings. A rule in a document did not hold, so it is a check. CI's own
+    /// throwaway database is also called <c>callcenter</c>; GitHub sets
+    /// <c>CI=true</c>, which is how it is told apart.
+    /// </remarks>
+    private static void RefuseTheDevelopmentDatabase()
+    {
+        if (!HasDatabase || Environment.GetEnvironmentVariable("CI") == "true")
+        {
+            return;
+        }
+
+        var database = new Npgsql.NpgsqlConnectionStringBuilder(
+            Environment.GetEnvironmentVariable("ConnectionStrings__Default")).Database;
+
+        if (string.Equals(database, "callcenter", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "The database tests were pointed at 'callcenter', the database the apps use. "
+                + "Run them against 'callcenter_test' (DEVELOPING.md, section 5).");
+        }
+    }
+
+    /// <summary>Where this run's recordings are written. Removed with the run.</summary>
+    public static readonly string RecordingsPath =
+        Path.Combine(Path.GetTempPath(), "callcenter-tests", Guid.NewGuid().ToString("N"));
+
+    /// <summary>After the last test: remove every row this run made.</summary>
+    async Task IAsyncLifetime.DisposeAsync()
+    {
+        await SweepAsync();
+        DeleteRecordings();
+        await base.DisposeAsync();
+    }
+
+    private static void DeleteRecordings()
+    {
+        try
+        {
+            if (Directory.Exists(RecordingsPath))
+            {
+                Directory.Delete(RecordingsPath, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // A file still open is left for the OS's temp cleaner; never fail a run over it.
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private async Task SweepAsync()
+    {
+        if (!HasDatabase)
+        {
+            return;
+        }
+
+        await using var scope = Services.CreateAsyncScope();
+        await TestSweeper.SweepAsync(scope.ServiceProvider.GetRequiredService<CallCenterDbContext>());
+    }
+
     /// <summary>The signing key these tests issue and validate tokens with.</summary>
     public const string SigningKey = "test-only-signing-key-0123456789abcdefghij";
 
@@ -55,6 +138,10 @@ public class CallCenterApiFactory : WebApplicationFactory<Program>
             .UseSetting("Database:MigrateOnStartup", HasDatabase ? "true" : "false")
             .UseSetting("Jwt:SigningKey", SigningKey)
             .UseSetting("Security:SipSecretKey", "test-only-sip-secret-key")
+            // A folder of this run's own for the audio the recording tests
+            // upload, deleted when the run ends. It was the test project's bin
+            // folder, where 70 WAV files had piled up by 25 Sep.
+            .UseSetting("Recordings:Path", RecordingsPath)
             .ConfigureTestServices(services =>
             {
                 services.RemoveAll<AccountTokenCheck>();

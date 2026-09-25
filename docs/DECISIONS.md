@@ -5129,6 +5129,57 @@ the agent's own list; **a message in the contact's history beside the calls,
 with its channel**; every report's figures against rows the test made; and
 channels. 357 server tests with the database, 143 shared, all passing.
 
+## 2026-09-25 — The tests remove what they make, and refuse the dev database
+
+Dia opened Settings › Channels and found a hundred "WhatsApp 1a2b3c4d" rows,
+then the test agents in Users: *a lot of things aren't cleaned*. The count on
+the development database that afternoon: 305 test agents with 143 sessions,
+186 test calls, 120 test contacts, 106 test branches, 17 test types, 117 test
+forms, 12 recording-test agents, and 92 WAV files under the test project's
+`bin` folder.
+
+**Two causes, and the first was a mistake, not a design.** DEVELOPING.md §5
+says to run the database tests against `callcenter_test` and never against
+`callcenter`. The Applications work that day ran them against `callcenter`.
+That did more than leave rows: one test publishes a form, which made a test
+version the Applications form every agent was asked, and the retention test
+runs the real retention job, with a five-day period, over every recording in
+the database. Dia's real recordings survived only because they were a day old.
+
+The second cause was the design. `TestData` made every row under a name that
+could not collide and deliberately cleaned nothing up, on the grounds that
+cleanup is one more thing to get wrong. Correct for the answers the tests
+give; wrong for the database they leave, and the scratch database had filled
+the same way, only out of sight.
+
+**What changed:**
+
+- **The suite refuses a database called `callcenter`** before the first test
+  (`CallCenterApiFactory`). A rule in a document did not hold, so it is a
+  check. CI's own throwaway database has the same name; GitHub sets `CI=true`,
+  and the check lets that through.
+- **Every run removes what it made**, at the end and again at the start, so a
+  crashed run is harmless (`TestSweeper`). It finds test rows by the names the
+  tests already gave them: logins `test-` and `rec-agent-`, SIP Call-IDs
+  `…@test` and `rec-…@pbx`, `Test branch` and `TestType`/`AccessType` plus a
+  suffix, channels with an eight-hex-digit suffix, forms numbered from 100,000.
+  Contacts have no pattern, because the tests give them real-looking names so
+  matching is tested honestly; `TestData.CreateContactAsync` registers the ones
+  it makes. The sweep never deletes a current form, and a real row a test
+  account touched keeps its place and loses the author.
+- **Recordings go to a temporary folder of the run's own**, deleted with it.
+- **The two tests that change shared state put it back.** The Applications
+  form test restores the form that was current and removes the one it
+  published; the retention test restores the period it found rather than
+  setting 90.
+
+**The development database was cleaned by hand** of everything listed above.
+After it: 2 users (`supervisor`, `dia20`), `dia20`'s 71 real calls and 11 live
+recordings, the 15,289 seeded contacts, the 4 branches, the 8 channels, and
+one current form per direction. A full run against `callcenter_test` then left
+`callcenter` identical, row for row, and `callcenter_test` with no test rows.
+357 server tests and 143 shared tests pass.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

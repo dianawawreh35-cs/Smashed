@@ -116,6 +116,13 @@ public class RecordingRetentionTests
         await _recordings.RunRetentionAsync();
         _recordings.Stored(recording.Path).Should().BeTrue("ten days is inside the default ninety");
 
+        // Put back what it was, not the default: the setting is the database's,
+        // and a run should leave it as it found it.
+        var previous = await _data.QueryAsync(db => db.Settings
+            .Where(s => s.Key == RecordingRetention.RetentionDaysKey)
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync());
+
         await _recordings.SetRetentionDaysAsync(5);
 
         try
@@ -129,7 +136,8 @@ public class RecordingRetentionTests
         }
         finally
         {
-            await _recordings.SetRetentionDaysAsync(RecordingRetention.DefaultRetentionDays);
+            await _recordings.SetRetentionDaysAsync(
+                int.TryParse(previous, out var days) ? days : RecordingRetention.DefaultRetentionDays);
         }
     }
 

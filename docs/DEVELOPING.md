@@ -162,9 +162,14 @@ Remove-Item Env:ConnectionStrings__Default
 
 The test host migrates that database on startup. Every test makes its own
 users, contacts and calls under random names, so running the suite a hundred
-times against the same database gives the same answers as a fresh one. Nothing
-needs clearing between runs. **Never point it at `callcenter`**: the tests would
-fill your dev data with test agents.
+times against the same database gives the same answers as a fresh one. **The run
+removes everything it made** when it ends, and again before it starts in case the
+last one crashed (`TestSweeper`); recordings go to a temporary folder of the run's
+own and are deleted with it. **Never point it at `callcenter`**: the tests would
+fill your dev data with test agents, and the retention test runs the real job
+over every recording in the database. Since 25 Sep the suite refuses to start
+against a database of that name, except in CI (`CI=true`), whose throwaway
+database has the same name.
 
 ## 6. What a green build does not prove
 

@@ -1,7 +1,7 @@
 # App communications: the conversations that don't arrive by phone (A-70 to A-73)
 
-> **Replaced by `14-messages-A70-A73.md` (25 Sep).** Dia wants messages on
-> their own screens in both apps and with their own reports. Use prompt 14, not
+> **Replaced by `14-applications-A70-A73.md` (25 Sep).** Dia wants application communications
+> on their own screens in both apps and with their own reports. Use prompt 14, not
 > this one.
 
 First read `docs/prompts/00-house-rules.md` and follow it.

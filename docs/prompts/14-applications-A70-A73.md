@@ -1,4 +1,4 @@
-# Messages: the conversations that don't arrive by phone (A-70 to A-73)
+# Applications: the conversations that don't arrive by phone (A-70 to A-73)
 
 First read `docs/prompts/00-house-rules.md` and follow it. **This prompt replaces
 `09-app-communications-A70-A73.md`.** Dia changed the shape of the feature on 25
@@ -21,14 +21,20 @@ tables.
 
 ## Dia's three requirements, which shape everything
 
+**The name is "Applications"** (Dia, 25 Sep): the Agent App section, the
+supervisor page and its reports are all called that, not "Messages". In the text
+below, "a message" means one application communication: a `communications` row
+with `kind = 'App'`.
+
 1. **Its own screen in the Agent App, separate from the Call log.** A new rail
-   section, *Messages*, with the agent's messages and a way to record one. The
-   Call log stays calls only.
-2. **Its own page in the supervisor web app, separate from Calls.** *Messages*
-   in the sidebar: every agent's messages, searchable, each opening under its
-   row as calls do. The Calls page stays calls only.
-3. **Its own reports.** A *Message reports* page in the supervisor app, about
-   messages, not calls.
+   section, **Applications**, with the agent's application communications and a
+   way to record one. The Call log stays calls only.
+2. **Its own page in the supervisor web app, separate from Calls.**
+   **Applications** in the sidebar: every agent's application communications,
+   searchable, each opening under its row as calls do. The Calls page stays calls
+   only.
+3. **Its own reports.** An **Application reports** page in the supervisor app,
+   about application communications, not calls.
 
 Separate **screens** and **reports**, not a separate **table**. That's the one
 thing prompt 09 got right and it still stands. `communications` was designed for
@@ -67,7 +73,7 @@ designing a `messages` table, stop.
   common set: period (day, week, month, custom), agent, branch, channel, type,
   and a per day / week / month grouping where it applies.
 
-### Agent App: *Messages*, its own rail section
+### Agent App: *Applications*, its own rail section
 
 - **Record a message:** channel, the customer's number (the contact found the
   way the pop-up finds one, through `PhoneNormalizer`; an unknown number can be
@@ -82,12 +88,12 @@ designing a `messages` table, stop.
 
 ### Supervisor web app
 
-- ***Messages*** page, in the sidebar near Calls: search and filters as above,
+- ***Applications*** page, in the sidebar near Calls: search and filters as above,
   each message opening under its row with its classification, **Edit** and
   **Classify** exactly as calls have them (reuse `ClassificationEditor` and the
   details panel's patterns: no scroll on open, no selected word on double-click,
   the panel drawn from the row at once).
-- ***Message reports*** page. At least:
+- ***Application reports*** page. At least:
   - messages per channel, and per type within each channel;
   - orders and order value per channel, per branch, per agent, per day (the
     message half of R-12 and R-13);
@@ -113,7 +119,8 @@ These change what the client gets. Ask; don't guess.
    message is typed by the agent, who can simply wait. Recommend queue or not.
 3. **Can an agent delete a message?** Calls can't be deleted. My instinct: edit
    within the window, never delete.
-4. **The Arabic names** for *Messages* and *Message reports* in both apps.
+4. **The Arabic names** for *Applications* and *Application reports* in both
+   apps (التطبيقات and تقارير التطبيقات are the obvious ones; confirm).
 5. **Does "time" on a message mean when it was recorded, or can the agent set
    when the customer wrote?** Matters for the per-hour reports.
 
@@ -136,7 +143,7 @@ Everything in the house rules, and specifically:
   and that **calls-only screens return no messages**.
 - **A test that a message appears in the contact's history beside calls**
   (A-72). It is the requirement most likely to be quietly missed.
-- Web tests for the Messages page, the reports page (figures, filters, export)
+- Web tests for the Applications page, the reports page (figures, filters, export)
   and the channel management.
 - The Agent App screens are UI: add checklist steps and **ask for a screenshot in
   both languages** before calling them done.

@@ -4914,6 +4914,221 @@ delivery area, which nothing does (A-13 matches numbers, not places), and the
 agent already finds the branch and price on the Delivery tab in a few
 keystrokes. Not to be picked up again unless the client asks for it.
 
+## 2026-09-25 — Applications: the conversations that don't arrive by phone (A-70 to A-73, S-41)
+
+Customers reach Smashed Burger on WhatsApp, Facebook, Instagram and Wheels as
+well as by phone, and until today an agent who took an order on WhatsApp had
+nowhere to put it. Prompt 09 was written for this on 24 Sep; Dia reshaped it on
+25 Sep and prompt 14 replaced it. Three requirements shaped everything: **its
+own screen in the Agent App**, separate from the Call log; **its own page in
+the supervisor app**, separate from Calls; **its own reports**. And one name:
+**Applications** (التطبيقات), not Messages. In this entry "a message" is one
+application communication.
+
+### Separate screens, one table
+
+A message is a `communications` row with `kind = 'App'`, `direction = 'None'`
+and `status = 'Logged'`, filed under the app's channel. The schema was designed
+for exactly this on 14 September — the three values, `CommunicationKinds.App`,
+`Directions.None` and `CommunicationStatuses.Logged`, existed in Shared and had
+never been written. So a contact's history shows calls and messages together
+(A-72) with one query, a combined report later is one query, and nothing needed
+a second schema. The temptation was a `messages` table with its own columns;
+it would have meant a second classification, a second edit window and a second
+history, every one of them a place for the two to drift.
+
+The cost of one table is that **every calls-only screen had to be told**. The
+call search now defaults to `kind=Call` and the Applications page asks for
+`kind=App`; the Agent App's call log and the caller card's recent list filter
+to calls; the reports are filtered by kind at the query. A test records a
+message and checks all three stay clean, because this is the class of bug that
+nobody notices until an agent's WhatsApp order shows up twice in the day's
+count.
+
+### Five decisions Dia made before a line was written
+
+Asked, as the prompt said to, and answered on 25 Sep:
+
+1. **A third form, "Applications"**, not the inbound form and not one per
+   channel. It lives under `form_definitions.direction = 'None'`, beside `In`
+   and `Out`, so the per-direction machinery of 24 Sep (`FormPerDirection`)
+   carried it with a three-line change to `NormaliseDirection`. It starts as a
+   copy of the inbound form (`FormDefinitionAppV1`) because a WhatsApp order is
+   the same conversation as a phone order; the supervisor drops or adds
+   questions on its own tab without touching the call forms. Migration
+   `FormForApplications` adds it to a database that predates it. Per channel
+   would have meant five forms to maintain and a channel dimension in the
+   designer and every report that nothing else has.
+2. **Not queued offline.** Calls queue because they happen whether or not the
+   server is up (A-04). A message is typed after the fact by an agent who can
+   wait a minute, and recording one needs the server anyway to find the
+   contact and offer the channel list. Refusing plainly and keeping what was
+   typed cannot lose or duplicate anything; a queue could do both.
+3. **Never deleted.** The same rule as calls: an agent edits their own within
+   `CallEditWindow`, a supervisor always, and a wrong entry becomes *Other*
+   with a note. Nothing else in the system deletes a communication, and a
+   delete that exists only here would be the odd door.
+4. **Arabic names:** التطبيقات and تقارير التطبيقات. Not "طلبات التطبيقات":
+   Dia's own reminder the same afternoon — *apps isn't just orders, it may be
+   complaints* — and the type list is the calls' full list.
+5. **The time is when the customer wrote.** It defaults to now, and an agent
+   may set it back within the same day, so a message from 11:00 recorded at
+   11:20 keeps its hour in the per-hour report. Never forward, and other days
+   are the supervisor's (`bad_time`). Measured in local time, the same day the
+   edit window is measured in. An edit that leaves the time alone is not
+   judged on it, or with the window set to *Always* an agent could not fix
+   yesterday's channel.
+
+### The server
+
+`ApplicationsService` records (`POST /api/communications/applications`), edits
+(`PUT …/{id}`) and lists an agent's own (`GET …/mine`). **Recording and
+classifying are one request and one transaction**: if the classification is
+refused (a hidden type, a branch that does not exist) the message is not
+written either, so nothing is ever half-recorded and the agent sees why with
+everything still on screen. A message recorded without a classification is
+simply unclassified, as a skipped call is (A-41). The customer is the contact
+the agent chose, or the number matched the way the pop-up matches a caller
+(A-13, `CommunicationsService.MatchContactAsync`); an unknown number is kept as
+typed with no contact. Phone is refused as a channel: a phone conversation is
+a call.
+
+Two things blocked classifying a message and both are gone: the classify
+endpoint refused anything not `Answered`, and now allows an App row (which is
+always `Logged`) through `ClassificationService.CanBeClassified`, one function
+so the endpoint and the screens cannot disagree; and the forms were per
+direction, which the third form answers.
+
+The transaction taught one thing worth writing down: Npgsql's retrying
+execution strategy refuses a transaction opened by hand unless it runs inside
+`CreateExecutionStrategy().ExecuteAsync`. The first version answered 500 to
+every recording.
+
+**Channels (S-41, the channel half).** `ChannelsService`: add, rename, reorder,
+hide, never delete. Renaming is safe because every row holds the id; a test
+renames a channel and reads the new name back off an old message. **Phone is a
+system channel and can be neither renamed nor hidden** (409 `system_channel`),
+because `LogCallAsync` files every call under it by name and a renamed Phone
+would stop every call being logged with a 500 nobody could explain. Names are
+unique whatever the case. Branch management (the other half of S-41) is still
+not built.
+
+**Reports.** `ApplicationReportsService` answers five: messages per channel and
+per type within it; orders and order value per channel, branch, agent or day
+(R-12, R-13's message half); a trend per day, week, month or hour; per agent
+with what they have not classified; cancellations and complaints per channel.
+All take S-07's common filters. The database narrows to exactly the rows asked
+about and the server groups them, because a day, a week and an hour are the
+restaurant's and bucketing a `timestamptz` by local date inside PostgreSQL
+through EF is where the 20 September 500 came from; at a few dozen messages a
+day a year is a few thousand rows. Only a message classified as an order
+counts as an order: a cancellation with a value typed by mistake is not
+revenue, and a test checks it. The filter carries a `kind`, so the call
+reports (R-01 and on, not this task) can group the same rows later.
+
+**What the caller card keeps.** Its recent list is calls only, as the prompt
+asked; its three totals still count messages, because a WhatsApp order is one
+of this customer's orders. A test pins both.
+
+### The Agent App: *Applications*, its own rail section
+
+Right under the Call log, which stays calls only. One screen, two halves: a
+card to record a message and the agent's own list (A-71), with an opened
+message drawn under the list rather than over it, the call log's pattern from
+24 Sep so nothing jumps.
+
+**The number box is the quick entry (A-73).** After a typing pause the
+customer is looked up the way the pop-up looks a caller up, through the
+server's `PhoneNormalizer` rules; a known number shows the name and address, an
+unknown one offers **Save as new customer**, the A-11 form. That form is
+`CallerViewModel` on its own instance (the pop-up's is a singleton, and sharing
+it would have put the message's customer on the next call); the pop-up's
+markup for it is inline in `CallPopupWindow.xaml`, so the Applications view
+carries a copy bound to the same commands rather than a change to the pop-up.
+The one addition to `CallerViewModel` is a `ContactId`, so the message can be
+recorded against the contact the agent found or saved instead of the server
+matching the number a second time. The app and the last message's branch stay
+selected between messages, per session.
+
+**One form, three ways in.** `ClassificationFormViewModel` was not copied. It
+gained a collect-only mode, `BeginForApplication`, which draws the Applications
+form with nowhere to send it and hands the answers back as a
+`SaveClassificationRequest`, so a message and its classification go to the
+server in one request and one transaction. Opening a recorded message uses the
+same path as opening a logged call, with the Applications form in place of a
+direction's. The request-building code moved into one private method both
+paths use, so the two cannot build it differently. A half-filled form is
+refused on the laptop with the form's own "still needed" line; a blank one
+records the message unclassified, as a skip does (A-41).
+
+**Nothing queued, nothing deleted.** With the server unreachable the card says
+so and keeps what was typed. Today's messages are editable, older rows greyed
+with a note; the server still enforces the window, and a supervisor edits any
+from the web app.
+
+### The supervisor app: *Applications*, *Application reports*, and Channels
+
+**Applications** sits after Calls in the sidebar and is the call search with
+`kind=App`: the same endpoint, the same page pattern, a channel filter in place
+of result, direction and recording, and each message opening under its row in
+the same details panel a call uses. The panel learnt what a message is: it
+shows the channel where a call has its direction and queue, hides the player,
+the extension and the duration since nobody spoke, and opens the Applications
+form for Edit and Classify. The Calls page sends no kind and so stays calls
+only; a test opens a message and checks the form it fetches is the `None` one
+and never the inbound one. The filter controls and the pager moved out of
+`CallsPage` into `SearchControls` so both pages share them.
+
+**Application reports** is five cards on one page, each a table and, where the
+figures are numeric, a chart, each with **Export CSV** (S-05, S-06). The
+table, chart and export are one component, `ReportCard`, so the call reports
+can be the same page with a different kind. The CSV is built from the rows on
+screen, which here is right: the rows *are* the report, not a page of a list,
+and the filters are S-07's, applied by the server. It carries a byte-order mark
+so Excel reads the Arabic. The period presets are Today, This week (Monday,
+matching the server's week buckets), This month and Custom.
+
+**The chart library is recharts.** It was already in `package.json`, unused
+since the project began, so nothing was added; this is its first import. The
+`dataviz` skill's rules were followed: bars for categories, a line for the
+trend, no pies, one axis per chart (a count never shares an axis with an order
+value), a three-colour palette validated against the card's surface for
+contrast and colour-vision deficiency. In Arabic the category axis is reversed
+and the value axis moves to the right, with the SVG kept `dir="ltr"` so text
+anchors do not mirror. `ResponsiveContainer` was avoided because it needs
+`ResizeObserver`, which jsdom does not have; a small hook measures the card
+instead. The build now warns that the one JavaScript chunk is 789 kB, of which
+recharts is about 200; splitting the reports route would quiet it, and is not
+done.
+
+**Channels live on the Settings page**, a card under the system settings
+rather than a route of their own: the list changes rarely and the sidebar has
+ten entries. Add, rename in place, move up and down, show or hide; Phone's
+name is plain text with no hide box and a line saying why. Nothing deletes.
+
+**The Classification page has a third card**, Applications, for the `None`
+form, working exactly like the two call forms. **A contact's history** gained a
+Channel column and opens a message like a call; a message reads "Message"
+(رسالة) where a call has its result, and an unclassified message is marked as a
+skipped call is.
+
+103 web tests, 25 of them new, and `npm run build` and lint pass.
+
+### Tested
+
+`ApplicationsTests`, 13 cases against a real database, each with its own
+agent, channels and customer and every search and report narrowed to that
+agent: the row's three values and the contact match; a refused classification
+leaving no row behind; Phone and an empty customer refused; a chosen contact
+lending its number; the time rules for agents and supervisors; the edit window
+(the test sets `agent.edit_window` to *SameDay* for its own run and restores
+it, because the development database has it widened to *Always*); classifying
+a message on the `None` form and publishing that form; the search by kind,
+channel, type, value and number; **calls-only screens return no messages**;
+the agent's own list; **a message in the contact's history beside the calls,
+with its channel**; every report's figures against rows the test made; and
+channels. 357 server tests with the database, 143 shared, all passing.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

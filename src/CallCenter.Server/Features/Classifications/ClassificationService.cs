@@ -128,13 +128,19 @@ public class ClassificationService(
     }
 
     /// <summary>
-    /// <see cref="Directions.Out"/> when that is what was asked for, otherwise
-    /// <see cref="Directions.In"/>. There is no form for app entries.
+    /// <see cref="Directions.Out"/> or <see cref="Directions.None"/> when that
+    /// is what was asked for, otherwise <see cref="Directions.In"/>.
     /// </summary>
+    /// <remarks>
+    /// <c>None</c> is the Applications form (A-70): a message has no direction,
+    /// and it has its own questions, designed beside the two call forms in the
+    /// Classification page. Dia, 25 Sep: a third form, not the inbound one and
+    /// not one per channel.
+    /// </remarks>
     public static string NormaliseDirection(string? direction) =>
-        string.Equals(direction, Directions.Out, StringComparison.OrdinalIgnoreCase)
-            ? Directions.Out
-            : Directions.In;
+        string.Equals(direction, Directions.Out, StringComparison.OrdinalIgnoreCase) ? Directions.Out
+        : string.Equals(direction, Directions.None, StringComparison.OrdinalIgnoreCase) ? Directions.None
+        : Directions.In;
 
     /// <summary>
     /// Publishes a new version of the form (S-40).
@@ -258,8 +264,12 @@ public class ClassificationService(
     };
 
     /// <summary>The fields the system was built around, for a database with no form row.</summary>
-    private static JsonDocument DefaultForm(string direction) => JsonDocument.Parse(
-        direction == Directions.Out ? SeedData.FormDefinitionOutV1 : SeedData.FormDefinitionV1);
+    private static JsonDocument DefaultForm(string direction) => JsonDocument.Parse(direction switch
+    {
+        Directions.Out => SeedData.FormDefinitionOutV1,
+        Directions.None => SeedData.FormDefinitionAppV1,
+        _ => SeedData.FormDefinitionV1,
+    });
 
     // ---- classifying -------------------------------------------------------
 
@@ -285,8 +295,9 @@ public class ClassificationService(
         // Only an answered call is classified. A missed, rejected or unanswered call takes a
         // note instead (CommunicationsService.SaveNotesAsync); classifying it
         // would put an "order" or a "complaint" into the reports for a call on
-        // which nobody spoke.
-        if (communication.Status != CommunicationStatuses.Answered)
+        // which nobody spoke. A message (A-70) is always classified: it is
+        // Logged, never Answered, and somebody wrote it.
+        if (!CanBeClassified(communication))
         {
             return (null, Failure.NotAnswered);
         }
@@ -516,6 +527,14 @@ public class ClassificationService(
 
         return (changes, null);
     }
+
+    /// <summary>
+    /// An answered call, or a message (A-40, A-70). One place for the rule, so
+    /// the endpoint and the screens cannot disagree about it.
+    /// </summary>
+    public static bool CanBeClassified(Communication communication) =>
+        communication.Status == CommunicationStatuses.Answered
+        || (communication.Kind == CommunicationKinds.App && communication.Status == CommunicationStatuses.Logged);
 
     /// <summary>
     /// Whether this user may write this classification, and why not (A-42).

@@ -203,6 +203,56 @@ Needs a second supervisor account; add one in Users if there is only one.
 
 ---
 
+### 1.8 Applications, Application reports, Channels (A-70 to A-73, S-41) — never run
+
+Built 25 Sep. Record two or three messages from the Agent App first (Round 2,
+"Applications"), one of them an order with a value, one a complaint, one left
+unclassified, so there is something to see.
+
+- [ ] **Applications is in the sidebar right after Calls,** and **Application
+      reports** right after it. Applications lists the messages, newest first,
+      with a Channel column and no phone calls in it. **Calls has no message
+      rows** and its count is unchanged. *If a message shows on Calls:* tell me
+      at once; the kind filter has failed.
+- [ ] **Filters:** number or name, dates, channel (Phone is not offered),
+      agent, branch, type, notes text, order value from/to, classified. Each
+      narrows the count. Typing does not search; Search does.
+- [ ] **Open a message** (double-click, or Open). It opens **under its row**
+      with no jump: the customer, the channel, the agent, "Message" as the
+      status, no recording player, no extension or duration. Its
+      classification is shown with **Edit**; the unclassified one shows
+      **Classify**. Edit one and save: the row updates, and Changes lists you.
+- [ ] **Application reports.** Five cards, each a table and, where numeric, a
+      chart: messages per channel with a column per type; orders and value
+      grouped by channel / branch / agent / day; a trend per day / week / month
+      / hour; per agent with what is still unclassified; cancellations and
+      complaints per channel. The figures match what you recorded. Presets
+      Today / This week / This month / Custom, and channel, agent, branch,
+      type, all apply as soon as they change.
+- [ ] **Export CSV** on any card downloads a file that opens in Excel with the
+      Arabic readable (the file carries a byte-order mark). The rows are the
+      table's rows.
+- [ ] **The charts in Arabic** run from the right, with the value axis on the
+      right. *If a chart's bars are mirrored against its labels:* tell me.
+- [ ] **Settings › Channels.** The list has Phone first and the four apps.
+      **Phone has no rename box and no hide tick**, with a hint saying why.
+      Rename WhatsApp to "WhatsApp Business": every message on it, in
+      Applications and in a contact's history, now says the new name. Hide
+      Instagram: it leaves the Agent App's dropdown at the next sign-in and the
+      Applications filter, and an old Instagram message still says Instagram.
+      Add "Telegram"; add it again: refused as already taken.
+- [ ] **Classification page has a third card, Applications,** beside inbound
+      and outbound. Remove a question from it and publish: the Agent App's
+      record card stops asking it at the next sign-in, and the two call forms
+      are unchanged.
+- [ ] **A contact's history** (Contacts, open a customer who has a message)
+      lists the message beside their calls with a **Channel** column: Phone on
+      the calls, the app on the message. Open the message from there: the
+      same panel as above.
+- [ ] **Everything above in Arabic.** Take screenshots of Applications with a
+      message open, Application reports, Settings › Channels and the
+      Classification page in **each language**.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.
@@ -268,6 +318,61 @@ Sign in as `dia20`. None of this needs a call.
       language, and the phone status must no longer show registered.
       *If it stays on the main screen with failed lookups:* the Agent App is an
       old build. Check the `bin` date. Sign in with the new password afterwards.
+
+---
+
+### Applications: recording a message (A-70 to A-73) — never run
+
+Built 25 Sep. A message is a WhatsApp, Facebook, Instagram or Wheels
+conversation the agent records by hand. None of this needs a call. The API
+must be running: a message is not queued offline (Dia, 25 Sep).
+
+- [ ] **The rail has a new section, التطبيقات / Applications, right under
+      Call log.** Click it. Left: a card "Record a message" with App (a
+      dropdown, **no "Phone" in it**, the first app pre-selected), the
+      customer's number (already focused), Time (now, HH:mm), then the
+      Applications classification form, and Record / Clear. Right: the filter
+      row and an empty list saying there are no messages yet. *If any label
+      shows as a raw key such as `applications.record`:* the label is missing
+      in that language; tell me which.
+- [ ] **Type a known customer's number** (one from Contacts) and pause. Their
+      name and address appear under the box. **Type an unknown number:** "New
+      customer — not in contacts" and a **Save as new customer** button
+      (A-11); press it, fill the name, save: the name appears and the form
+      closes. *If the lookup never answers:* the API is down or the number is
+      under six digits.
+- [ ] **Record a classified message.** Pick a type and branch, fill any
+      required field, press **Record message**. A green "Message recorded";
+      the number clears, the time resets to now, and the form redraws with the
+      **same app and the same branch still selected** (A-73). The message is at
+      the top of the list with a green "Classified" chip.
+- [ ] **Record one with no type chosen.** It is recorded and shows the amber
+      "Not classified" chip, like a skipped call. **Record one with a type but a
+      required field empty:** an amber "half filled in" message and nothing is
+      sent.
+- [ ] **Set the time to a future hour** (23:59) and record: the server refuses
+      with an amber message about the time. Type "abc" as the time: "Enter the
+      time as HH:mm". Set it to an hour ago and record: accepted, and the row
+      shows that hour.
+- [ ] **Open a row** (double-click, or its Open button). Under the list,
+      **without the list moving**: a details line, App / Number / Time boxes
+      with Save changes, then the classification form prefilled. Change the
+      time and save: "Message updated" and the row's time changes. Fix the
+      classification on the "Not classified" row and save: its chip turns
+      green.
+- [ ] **Filters.** Type part of a name or number and pause: the list narrows.
+      Pick From / To dates: it narrows. "Clear filters" appears and resets.
+- [ ] **Stop the API and press Record.** An amber offline message, and
+      everything typed is still there. Start the API, press Record again:
+      recorded. Nothing is sent twice.
+- [ ] **The call log has none of these.** Switch to Call log: no message rows
+      appear there, and the count of calls is unchanged.
+- [ ] **Switch language.** Every label on the screen changes: rail, headings,
+      column headers, chips, messages. **Take a screenshot of the section in
+      each language** with one recorded message open.
+- [ ] *(Another day.)* **A message from an earlier day** opens with the App /
+      Number / Time boxes greyed and a note that it was written on an earlier
+      day. The supervisor can still change it from the web app.
 
 ---
 
@@ -660,6 +765,6 @@ These cannot be checked on this laptop, and each has burned a project somewhere.
 ## What is not on this list because it is not built
 
 Not testable yet, and listed so the gaps are not mistaken for failures:
-classification (A-40, S-40), branch management (S-41), caller identity in the pop-up (A-16, A-11), blacklist export
+classification (A-40, S-40), branch management (S-41; channels are built), caller identity in the pop-up (A-16, A-11), blacklist export
 (S-46), click-to-call, merging contacts, and contact import
 from Excel. `DECISIONS.md` holds the live list.

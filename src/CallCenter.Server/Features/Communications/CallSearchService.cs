@@ -1,5 +1,6 @@
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
+using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Phone;
 using CallCenter.Shared.Text;
@@ -36,8 +37,17 @@ public class CallSearchService(CallCenterDbContext db)
     /// <param name="From">Inclusive instant. The browser sends the start of the day it means, in its own time zone.</param>
     /// <param name="To">Exclusive instant: the start of the day after the last one wanted.</param>
     /// <param name="Notes">Text in the classification's notes or the call's own note.</param>
+    /// <param name="Kind">
+    /// <c>Call</c> or <c>App</c>. The Calls page asks for calls and the
+    /// Applications page for messages (A-70); neither may show the other's
+    /// rows, so this is never blank in practice. Null means both, for a
+    /// combined view later.
+    /// </param>
+    /// <param name="ChannelId">Which app, for messages (S-02's channel filter).</param>
     public record Filter(
         string? Query = null,
+        string? Kind = CommunicationKinds.Call,
+        Guid? ChannelId = null,
         Guid? AgentId = null,
         Guid? BranchId = null,
         Guid? TypeId = null,
@@ -100,6 +110,10 @@ public class CallSearchService(CallCenterDbContext db)
 
     private static IQueryable<Communication> Apply(IQueryable<Communication> calls, Filter f)
     {
+        // Calls-only screens must not start returning messages, and the
+        // Applications page must not show calls (A-70).
+        if (!string.IsNullOrWhiteSpace(f.Kind)) calls = calls.Where(c => c.Kind == f.Kind);
+        if (f.ChannelId is { } channel) calls = calls.Where(c => c.ChannelId == channel);
         if (f.AgentId is { } agent) calls = calls.Where(c => c.AgentId == agent);
         if (f.BranchId is { } branch) calls = calls.Where(c => c.BranchId == branch);
         if (f.TypeId is { } type) calls = calls.Where(c => c.Classification != null && c.Classification.TypeId == type);
@@ -215,5 +229,7 @@ public class CallSearchService(CallCenterDbContext db)
             c.Classification != null && c.Classification.Notes != null ? c.Classification.Notes : c.Notes,
             c.Classification != null,
             c.Recording != null && c.Recording.DeletedAt == null,
-            c.Recording != null && c.Recording.DeletedAt != null));
+            c.Recording != null && c.Recording.DeletedAt != null,
+            c.ChannelId,
+            c.Channel.Name));
 }

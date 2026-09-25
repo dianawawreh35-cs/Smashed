@@ -179,6 +179,8 @@ both.
 
 Notes
 - One table for phone and app makes every report one query (`kind`/`channel_id` splits them).
+- A message (A-70, since 2026-09-25) is `kind = 'App'`, `direction = 'None'`, `status = 'Logged'`, `source = 'Manual'`, filed under the app's `channel_id`, with `started_at` the time the customer wrote (defaults to when it was recorded; an agent may set it back within the day). No `sip_call_id`, `extension`, `answered_at`, `ended_at` or recording. Its classification, edit window and history are exactly a call's. Written by `ApplicationsService`; searched with `kind=App` on the call search; the call log, the caller card's recent list and the Calls page filter to `kind = 'Call'`.
+- `channels` is managed by the supervisor since 2026-09-25 (S-41): add, rename, reorder, hide, never delete. Phone (`is_system`) can be neither renamed nor hidden, because `CommunicationsService.LogCallAsync` files every call under it by name.
 - Reconciliation: an AMI/CDR record and an Agent App record for the same call are joined on `pbx_unique_id` when the app can see it, otherwise on `remote_normalised` + time window; the reconciler merges wait_sec/queue_name into the agent's row.
 
 ---
@@ -253,7 +255,7 @@ Form definition JSON shape (stored in `form_definitions.definition`):
   ]
 }
 ```
-Built-in kinds `type`, `branch`, `number`(order_value), `textarea`(notes), `checkbox`(follow_up) map to real columns; any other field goes to `custom_values`. Editing a form creates a new version and sets `is_current` for its direction; old classifications keep their `form_version` so history renders correctly. Inbound and outbound calls have separate forms (added 2026-09-24): `GET /api/classifications/form?direction=Out` returns the outbound one, and the Agent App draws whichever matches the call's direction. The types are shared.
+Built-in kinds `type`, `branch`, `number`(order_value), `textarea`(notes), `checkbox`(follow_up) map to real columns; any other field goes to `custom_values`. Editing a form creates a new version and sets `is_current` for its direction; old classifications keep their `form_version` so history renders correctly. Inbound and outbound calls have separate forms (added 2026-09-24): `GET /api/classifications/form?direction=Out` returns the outbound one, and the Agent App draws whichever matches the call's direction. The types are shared. Messages (A-70, `kind = 'App'`) have a third form under `direction = 'None'` (added 2026-09-25, migration `FormForApplications`): `GET /api/classifications/form?direction=None`. It starts as a copy of the inbound form and the supervisor edits it on its own tab. A classification is allowed on an Answered call or on an App row (which is always `Logged`); the check is `ClassificationService.CanBeClassified`.
 
 ---
 
@@ -443,6 +445,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)
 - form_definitions v1: the JSON above without the `reason` field (direction `In`)
 - form_definitions, outbound: `type`, `notes`, `follow_up` (direction `Out`), numbered after whatever exists. The migration `FormPerDirection` adds it to a database that predates it.
+- form_definitions, applications: a copy of v1 (direction `None`), for messages (A-70). The migration `FormForApplications` adds it to a database that predates it.
 - settings: `recording.retention_days=90`, `agent.idle_logout_minutes=240`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `cdr.interval_seconds=300`, `cdr.last_offset=0`, `agent.call_log_days=7`
   - `cdr.last_offset` is the byte position in `Master.csv` the importer has read to (SRS S-55). It is state, not configuration, and is kept here so a restart resumes rather than re-reads. A file shorter than this value means the log rotated: reset to 0 and log it.
   - `callback.extension` and `pbx.ami.enabled` were **removed on 2026-09-21**. Both belonged to approaches ruled out in SRS 4.5, and a setting the supervisor can edit that changes nothing is worse than a missing one.

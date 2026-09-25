@@ -24,10 +24,12 @@ import { errorCodeOf } from '../api/users'
  * complaints has to name the complaint type, so editing them apart would mean
  * holding one in your head while changing the other.
  *
- * There are two sets of questions, one for calls that come in and one for
- * calls the agent places: a call-back or a confirmation is not an order, and
- * asking for a branch and an order value on it was noise. The types are shared
- * because the reports count by type whichever way the call went.
+ * There are three sets of questions: one for calls that come in, one for
+ * calls the agent places — a call-back or a confirmation is not an order, and
+ * asking for a branch and an order value on it was noise — and one for
+ * messages (A-70), the conversations on WhatsApp and the other apps, which have
+ * no direction and are recorded rather than answered. The types are shared
+ * because the reports count by type whichever way the conversation went.
  *
  * Publishing writes a **new version**. Existing classifications keep the
  * version they were captured under, so a complaint classified in January still
@@ -46,6 +48,11 @@ export default function ClassificationPage() {
   const { data: outbound } = useQuery({
     queryKey: ['classification-form', 'Out'],
     queryFn: () => getClassificationForm('Out'),
+  })
+
+  const { data: messages } = useQuery({
+    queryKey: ['classification-form', 'None'],
+    queryFn: () => getClassificationForm('None'),
   })
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['classification-form'] })
@@ -75,6 +82,15 @@ export default function ClassificationPage() {
               version={outbound.version}
               fields={outbound.definition.fields}
               types={outbound.types}
+              onPublished={refresh}
+            />
+          )}
+          {messages && (
+            <FieldsCard
+              direction="None"
+              version={messages.version}
+              fields={messages.definition.fields}
+              types={messages.types}
               onPublished={refresh}
             />
           )}
@@ -251,6 +267,13 @@ function TypesCard({
   )
 }
 
+/** Each form's heading and its hint, by the direction it is published under. */
+const FORM_LABELS: Record<FormDirection, { title: string; hint: string }> = {
+  In: { title: 'classification.fieldsIn', hint: 'classification.fieldsHint' },
+  Out: { title: 'classification.fieldsOut', hint: 'classification.fieldsOutHint' },
+  None: { title: 'classification.fieldsApp', hint: 'classification.fieldsAppHint' },
+}
+
 /** Every kind of question the form can ask, and what it is called. */
 const KINDS: FieldKind[] = ['text', 'textarea', 'number', 'select', 'checkbox']
 
@@ -312,11 +335,9 @@ function FieldsCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-slate-100">
-            {t(direction === 'Out' ? 'classification.fieldsOut' : 'classification.fieldsIn')}
+            {t(FORM_LABELS[direction].title)}
           </h3>
-          <p className="field-hint">
-            {t(direction === 'Out' ? 'classification.fieldsOutHint' : 'classification.fieldsHint')}
-          </p>
+          <p className="field-hint">{t(FORM_LABELS[direction].hint)}</p>
         </div>
         <span className="badge-muted">{t('classification.version', { version })}</span>
       </div>

@@ -16,7 +16,9 @@
     "delivery": "Delivery",
     "menu": "Menu",
     "classification": "Classification",
-    "calls": "Calls"
+    "calls": "Calls",
+    "applications": "Applications",
+    "applicationReports": "Application reports"
   },
   "login": {
     "heading": "Sign in",
@@ -220,7 +222,8 @@
       "Ringing": "Ringing",
       "Logged": "Logged",
       "NoAnswer": "Not answered"
-    }
+    },
+    "channel": "Channel"
   },
   "delivery": {
     "heading": "Delivery areas",
@@ -381,7 +384,9 @@
       "invalid_request": "It could not be saved.",
       "server_error": "The server had a problem.",
       "server_unreachable": "The server could not be reached."
-    }
+    },
+    "fieldsApp": "Questions for messages (applications)",
+    "fieldsAppHint": "Asked when an agent records a conversation from WhatsApp, Facebook, Instagram or another app. The types are the same as above; the questions are its own."
   },
   "calls": {
     "heading": "Calls",
@@ -479,6 +484,111 @@
         "unknown_branch": "That branch no longer exists. Choose another.",
         "call_not_found": "That call is no longer on the server."
       }
+    }
+  },
+  "applications": {
+    "heading": "Applications",
+    "intro": "Every conversation that reached you through an app rather than by phone, from every agent. Filter, then open one to see what it was.",
+    "filters": "Search messages",
+    "failed": "The messages could not be loaded. Check the server is running.",
+    "empty": "No messages match.",
+    "emptyHint": "Widen the dates, or clear a filter.",
+    "count": "{{count}} messages",
+    "count_one": "1 message",
+    "count_other": "{{count}} messages",
+    "message": "Message",
+    "columns": {
+      "channel": "Channel"
+    },
+    "details": {
+      "heading": "Message details"
+    }
+  },
+  "applicationReports": {
+    "heading": "Application reports",
+    "intro": "What arrived through the apps: how much, on which channel, from whom, and what it was worth. Messages only; calls have their own reports.",
+    "filters": "Report filters",
+    "period": "Period",
+    "presets": {
+      "today": "Today",
+      "week": "This week",
+      "month": "This month",
+      "custom": "Custom"
+    },
+    "from": "From",
+    "to": "To",
+    "groupBy": "Group by",
+    "groups": {
+      "channel": "Channel",
+      "branch": "Branch",
+      "agent": "Agent",
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "hour": "Hour of day"
+    },
+    "export": "Export CSV",
+    "empty": "Nothing in this period.",
+    "failed": "This report could not be loaded.",
+    "total": "Total",
+    "columns": {
+      "channel": "Channel",
+      "messages": "Messages",
+      "unclassified": "Not classified",
+      "group": "Group",
+      "orders": "Orders",
+      "orderValue": "Order value",
+      "average": "Average order",
+      "period": "Period",
+      "agent": "Agent",
+      "cancellations": "Cancellations",
+      "complaints": "Complaints"
+    },
+    "sections": {
+      "byChannel": {
+        "title": "Messages per channel",
+        "hint": "How many arrived on each app, how many are still unclassified, and what they were about."
+      },
+      "orders": {
+        "title": "Orders and order value",
+        "hint": "Orders taken through the apps and what they came to, grouped as you choose."
+      },
+      "trend": {
+        "title": "Messages over time",
+        "hint": "Messages and orders per day, week, month, or hour of the day."
+      },
+      "byAgent": {
+        "title": "Per agent",
+        "hint": "What each agent recorded, how many were orders, and how many they have not yet classified."
+      },
+      "issues": {
+        "title": "Cancellations and complaints",
+        "hint": "The messages that went wrong, per channel."
+      }
+    }
+  },
+  "channels": {
+    "heading": "Channels",
+    "intro": "The apps a customer can reach you on. Agents pick one when they record a message. Renaming is safe: messages keep the channel by its id.",
+    "name": "Name",
+    "order": "Order",
+    "shown": "Status",
+    "offered": "Offered",
+    "hidden": "Hidden",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "add": "Add channel",
+    "newName": "New channel",
+    "inUse": "In use",
+    "phoneHint": "Built in: every call is filed under Phone, so it cannot be renamed or hidden.",
+    "hiddenHint": "A hidden channel is not offered to agents, but its messages stay in the history and the reports.",
+    "errors": {
+      "system_channel": "Phone is built in: every call is filed under it, so it cannot be renamed or hidden.",
+      "bad_name": "The channel needs a name, and no other channel may already have it.",
+      "channel_not_found": "That channel no longer exists.",
+      "invalid_request": "The channel could not be saved.",
+      "server_error": "The server reported an error. Please try again.",
+      "server_unreachable": "The server could not be reached."
     }
   }
 }

@@ -23,6 +23,11 @@ public partial class HomeView : UserControl
         // The call log first: it is what an agent checks between calls, and
         // what they work through at the end of a shift (A-50, A-41).
         AddSection("nav.callLog", new CallLogView(services.GetRequiredService<CallLogViewModel>()));
+
+        // A-70: conversations that came on an app rather than by phone. Its own
+        // section, next to the call log, which stays calls only.
+        AddSection("nav.applications", new ApplicationsView(services.GetRequiredService<ApplicationsViewModel>()));
+
         AddSection("nav.contacts", new ContactsView(services.GetRequiredService<ContactsViewModel>()));
 
         // A-20: ringing a number that is not already on a screen somewhere.

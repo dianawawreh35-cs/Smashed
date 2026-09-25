@@ -29,19 +29,39 @@ public class ClassificationCatalog(ApiClient api, ILogger<ClassificationCatalog>
     public ClassificationFormDto? Outbound { get; private set; }
 
     /// <summary>
+    /// The form for a message - a conversation on WhatsApp or another app
+    /// (A-70). A third form, designed on its own by the supervisor, because a
+    /// message has no direction and its questions are its own. Null when it
+    /// could not be fetched.
+    /// </summary>
+    public ClassificationFormDto? Applications { get; private set; }
+
+    /// <summary>
     /// The form for a call in the given direction. Kept as two forms rather
     /// than one with rules, because an outbound call is a different
     /// conversation and the supervisor designs it separately (S-40).
     /// </summary>
     public ClassificationFormDto? FormFor(bool outbound) => outbound ? Outbound : Inbound;
 
+    /// <summary>
+    /// The form for a direction as the server names it: In, Out or None, the
+    /// last being a message's (A-70).
+    /// </summary>
+    public ClassificationFormDto? FormFor(string direction) => direction switch
+    {
+        Directions.Out => Outbound,
+        Directions.None => Applications,
+        _ => Inbound,
+    };
+
     /// <summary>Whether a form can be drawn at all.</summary>
-    public bool IsReady => Inbound is not null || Outbound is not null;
+    public bool IsReady => Inbound is not null || Outbound is not null || Applications is not null;
 
     public async Task LoadAsync(CancellationToken ct = default)
     {
         Inbound = await FetchAsync(Directions.In, ct);
         Outbound = await FetchAsync(Directions.Out, ct);
+        Applications = await FetchAsync(Directions.None, ct);
     }
 
     private async Task<ClassificationFormDto?> FetchAsync(string direction, CancellationToken ct)

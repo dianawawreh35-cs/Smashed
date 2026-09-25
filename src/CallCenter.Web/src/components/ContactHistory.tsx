@@ -8,15 +8,16 @@ import CallDetails from './CallDetails'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
 /**
- * A contact's history of calls, newest first (A-62).
+ * A contact's history, newest first (A-62): calls and messages together, each
+ * message with its channel (A-72).
  *
- * Every agent's calls, not only the viewer's: the panel exists to show the
+ * Every agent's, not only the viewer's: the panel exists to show the
  * customer's whole relationship with the restaurant, and half of it would be
  * misleading.
  *
- * **Any call opens under its own row**, by double-click or its Open button, in
- * the same panel as the call search: facts, classification, history, and the
- * recording with its holds marked. It opens where it is, without scrolling the
+ * **Any call or message opens under its own row**, by double-click or its Open
+ * button, in the same panel as the call search: facts, classification, history,
+ * and for a call the recording with its holds marked. It opens where it is, without scrolling the
  * page, as every list in the app now does (24 Sep). This is the supervisor app,
  * so every agent's recording plays here; A-62's restriction on recordings is
  * the Agent App's.
@@ -50,6 +51,7 @@ export default function ContactHistory({ contactId }: { contactId: string }) {
           <tr>
             <th>{t('history.when')}</th>
             <th>{t('history.status')}</th>
+            <th>{t('history.channel')}</th>
             <th>{t('history.duration')}</th>
             <th>{t('history.queue')}</th>
             <th>{t('history.agent')}</th>
@@ -66,7 +68,7 @@ export default function ContactHistory({ contactId }: { contactId: string }) {
               />
               {call.id === openId && (
                 <tr>
-                  <td colSpan={6} className="bg-ink-950/60 p-3">
+                  <td colSpan={7} className="bg-ink-950/60 p-3">
                     {/* w-0 min-w-full: as wide as the table and never wider,
                         so opening a call cannot make every column jump. */}
                     <div className="w-0 min-w-full">
@@ -85,6 +87,9 @@ export default function ContactHistory({ contactId }: { contactId: string }) {
 
 function HistoryRow({ call, open, onToggle }: { call: Communication; open: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation()
+  // A message: a communications row with kind App (A-70). Its status is
+  // always Logged, which says nothing a reader wants; "Message" does.
+  const isMessage = call.kind === 'App'
 
   return (
     // Double-click is a shortcut, never the only way in: the Open button does
@@ -98,19 +103,22 @@ function HistoryRow({ call, open, onToggle }: { call: Communication; open: boole
         {new Date(call.startedAt).toLocaleString(i18n.language)}
       </td>
       <td>
-        <span className={badgeFor(call.status)}>
-          {t(`history.statuses.${call.status}`, { defaultValue: call.status })}
+        <span className={isMessage ? 'badge-muted' : badgeFor(call.status)}>
+          {isMessage
+            ? t('applications.message')
+            : t(`history.statuses.${call.status}`, { defaultValue: call.status })}
         </span>
         {/* A-41: a call nobody has classified is worth seeing from here too —
             the supervisor chasing it is as likely to be on this page as in a
-            report. */}
-        {call.status === 'Answered' && !call.isClassified && (
+            report. A message recorded without its form is the same debt (A-70). */}
+        {(call.status === 'Answered' || isMessage) && !call.isClassified && (
           <span className="badge-muted ms-2">{t('history.unclassified')}</span>
         )}
         {/* A missed or rejected call is never classified; the agent's note
             on why is what it carries instead. */}
         {call.notes && <div className="mt-1 text-xs text-slate-400">{call.notes}</div>}
       </td>
+      <td className="text-slate-400">{call.channelName}</td>
       {/* Blank rather than 0:00 for a call that was never answered: a zero
           duration reads as a call that connected and was silent. */}
       <td className="tabular text-slate-400">
@@ -130,8 +138,8 @@ function HistoryRow({ call, open, onToggle }: { call: Communication; open: boole
 }
 
 /**
- * What the history already knows about a call, in the shape the call panel
- * draws from at once. Branch, type and order value are left for the panel to
+ * What the history already knows about a call or message, in the shape the
+ * panel draws from at once. Branch, type and order value are left for the panel to
  * fetch with the classification, which it does whenever the call is classified.
  */
 function asCallRow(call: Communication): CallRow {
@@ -157,6 +165,8 @@ function asCallRow(call: Communication): CallRow {
     isClassified: call.isClassified,
     hasRecording: call.hasRecording ?? false,
     recordingExpired: call.recordingExpired ?? false,
+    channelId: null,
+    channelName: call.channelName ?? null,
   }
 }
 

@@ -73,6 +73,10 @@ try
     builder.Services.AddSingleton<CallCenter.Server.Features.Communications.RecordingStore>();
     builder.Services.AddScoped<CommunicationsService>();
     builder.Services.AddScoped<CallSearchService>();
+    // A-70 to A-73: messages, the channels they arrive on, and their reports.
+    builder.Services.AddScoped<CallCenter.Server.Features.Applications.ApplicationsService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Channels.ChannelsService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Reports.ApplicationReportsService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Communications.RecordingRetention>();
 
     // A-33: the nightly pass that deletes recordings older than

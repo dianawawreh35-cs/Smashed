@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { callClassification, callDetails, classificationHistory } from '../api/calls'
 import type { CallClassification, CallRow, ClassificationChange } from '../api/calls'
 import { getClassificationForm } from '../api/classifications'
-import type { FormField } from '../api/classifications'
+import type { FormDirection, FormField } from '../api/classifications'
 import { formatClock } from '../lib/recordingWav'
 import ClassificationEditor from './ClassificationEditor'
 import RecordingPlayer from './RecordingPlayer'
@@ -31,11 +31,18 @@ import RecordingPlayer from './RecordingPlayer'
  * whole panel when opened near the bottom of the window, and that movement was
  * the part that still felt wrong (24 Sep). It opens where it is, and the
  * supervisor scrolls if they want to see more.
+ *
+ * **A message opens here too** (A-70, A-72): the same panel, with the channel
+ * where a call has its direction and queue, and no recording, extension or
+ * duration, since nobody spoke. Its classification uses the messages form
+ * (direction `None`), and Edit / Classify work as they do on a call.
  */
 export default function CallDetails({ row, onClose }: { row: CallRow; onClose: () => void }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
   const id = row.id
+  // A message: a communications row with kind App (A-70).
+  const isMessage = row.kind === 'App'
 
   const details = useQuery({ queryKey: ['calls', 'details', id], queryFn: () => callDetails(id) })
   const queryClient = useQueryClient()
@@ -56,8 +63,8 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
   })
   // For the questions' labels. The current form's, for the call's own
   // direction: an answer to a question since removed shows under its key
-  // rather than not at all.
-  const direction = row.direction === 'Out' ? 'Out' : 'In'
+  // rather than not at all. A message has no direction and its own form.
+  const direction: FormDirection = isMessage ? 'None' : row.direction === 'Out' ? 'Out' : 'In'
   const form = useQuery({
     queryKey: ['classification', 'form', direction],
     queryFn: () => getClassificationForm(direction),
@@ -82,14 +89,19 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
   const when = (at: string | null | undefined) => (at ? new Date(at).toLocaleString(i18n.language) : '')
 
   return (
-    <section className="card animate-fade-in" aria-label={t('calls.details.heading')}>
+    <section
+      className="card animate-fade-in"
+      aria-label={t(isMessage ? 'applications.details.heading' : 'calls.details.heading')}
+    >
       <div className="card-header">
         <div>
           <h2 className="font-semibold text-slate-100">
             {summary.contactName ?? summary.remoteNumberRaw ?? t('calls.unknownCaller')}
           </h2>
           <p className="text-sm text-slate-400">
-            <span dir="ltr">{summary.remoteNumberRaw}</span> · {when(summary.startedAt)}
+            <span dir="ltr">{summary.remoteNumberRaw}</span>
+            {isMessage && summary.channelName && <> · {summary.channelName}</>}
+            {' '}· {when(summary.startedAt)}
           </p>
         </div>
         <button type="button" className="btn-ghost btn-sm" onClick={onClose}>
@@ -99,32 +111,44 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
 
       <div className="card-body space-y-6">
         {details.isError && <p className="notice-error">{t('calls.details.failed')}</p>}
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
-          <Fact label={t('calls.columns.agent')} value={summary.agentDisplayName} />
-          <Fact label={t('calls.details.extension')} value={pending ?? extra?.extension} ltr />
-          <Fact label={t('calls.columns.direction')} value={t(`calls.directions.${summary.direction}`)} />
-          <Fact
-            label={t('calls.columns.status')}
-            value={t(`history.statuses.${summary.status}`, { defaultValue: summary.status })}
-          />
-          <Fact label={t('calls.details.queue')} value={pending ?? extra?.queueName} />
-          <Fact label={t('calls.details.answeredAt')} value={pending ?? when(extra?.answeredAt)} />
-          <Fact label={t('calls.details.endedAt')} value={pending ?? when(extra?.endedAt)} />
-          <Fact
-            label={t('calls.columns.duration')}
-            value={summary.durationSec === null ? null : formatClock(summary.durationSec)}
-            ltr
-          />
-        </dl>
+        {isMessage ? (
+          // What there is to know about a message that the classification does
+          // not say: who took it, on which app. The phone facts have no meaning.
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
+            <Fact label={t('calls.columns.agent')} value={summary.agentDisplayName} />
+            <Fact label={t('applications.columns.channel')} value={summary.channelName} />
+            <Fact label={t('calls.columns.status')} value={t('applications.message')} />
+          </dl>
+        ) : (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
+            <Fact label={t('calls.columns.agent')} value={summary.agentDisplayName} />
+            <Fact label={t('calls.details.extension')} value={pending ?? extra?.extension} ltr />
+            <Fact label={t('calls.columns.direction')} value={t(`calls.directions.${summary.direction}`)} />
+            <Fact
+              label={t('calls.columns.status')}
+              value={t(`history.statuses.${summary.status}`, { defaultValue: summary.status })}
+            />
+            <Fact label={t('calls.details.queue')} value={pending ?? extra?.queueName} />
+            <Fact label={t('calls.details.answeredAt')} value={pending ?? when(extra?.answeredAt)} />
+            <Fact label={t('calls.details.endedAt')} value={pending ?? when(extra?.endedAt)} />
+            <Fact
+              label={t('calls.columns.duration')}
+              value={summary.durationSec === null ? null : formatClock(summary.durationSec)}
+              ltr
+            />
+          </dl>
+        )}
 
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-slate-200">{t('calls.details.recording')}</h3>
-          <RecordingPlayer
-            communicationId={summary.id}
-            hasRecording={summary.hasRecording}
-            expired={summary.recordingExpired}
-          />
-        </div>
+        {!isMessage && (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-200">{t('calls.details.recording')}</h3>
+            <RecordingPlayer
+              communicationId={summary.id}
+              hasRecording={summary.hasRecording}
+              expired={summary.recordingExpired}
+            />
+          </div>
+        )}
 
         {callNotes && (
           <div>
@@ -133,8 +157,9 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
           </div>
         )}
 
-        {/* Only an answered call is classified (A-40): nobody spoke on the rest. */}
-        {summary.status === 'Answered' && (
+        {/* Only an answered call is classified (A-40): nobody spoke on the rest.
+            A message always is (A-70): recording one is what classifying it means. */}
+        {(summary.status === 'Answered' || isMessage) && (
           <div>
             <div className="mb-2 flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-200">{t('calls.details.classification')}</h3>

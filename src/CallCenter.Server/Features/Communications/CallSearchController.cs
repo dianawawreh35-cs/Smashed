@@ -1,4 +1,5 @@
 using CallCenter.Server.Features.Auth;
+using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +23,14 @@ namespace CallCenter.Server.Features.Communications;
 [Authorize(AuthPolicies.SupervisorOnly)]
 public class CallSearchController(CallSearchService search) : ControllerBase
 {
-    /// <summary>Calls matching every filter given, newest first, a page at a time.</summary>
+    /// <summary>
+    /// Calls — or, with <c>kind=App</c>, messages (A-70) — matching every filter
+    /// given, newest first, a page at a time.
+    /// </summary>
+    /// <param name="kind">
+    /// <c>Call</c> (the default, so the Calls page never shows a message) or
+    /// <c>App</c> for the Applications page.
+    /// </param>
     [HttpGet("search")]
     [ProducesResponseType<CallSearchPageDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CallSearchPageDto>> Search(
@@ -39,12 +47,14 @@ public class CallSearchController(CallSearchService search) : ControllerBase
         [FromQuery] decimal? maxOrder,
         [FromQuery] bool? hasRecording,
         [FromQuery] bool? classified,
+        [FromQuery] Guid? channelId,
+        [FromQuery] string kind = CommunicationKinds.Call,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = CallSearchService.DefaultPageSize,
         CancellationToken ct = default) =>
         Ok(await search.SearchAsync(
             new CallSearchService.Filter(
-                q, agentId, branchId, typeId, status, direction, from, to, notes,
+                q, kind, channelId, agentId, branchId, typeId, status, direction, from, to, notes,
                 minOrder, maxOrder, hasRecording, classified),
             page,
             pageSize,

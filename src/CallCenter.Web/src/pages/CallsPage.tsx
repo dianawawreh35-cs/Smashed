@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import type { FormEvent } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { searchCalls, startOfDay, startOfNextDay } from '../api/calls'
@@ -8,6 +8,7 @@ import { listClassificationTypes } from '../api/classifications'
 import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
 import CallDetails from '../components/CallDetails'
+import { FilterSelect as Select, Pager } from '../components/SearchControls'
 import { formatClock } from '../lib/recordingWav'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
@@ -300,35 +301,5 @@ function Row({ row, open, onToggle }: { row: CallRow; open: boolean; onToggle: (
         </button>
       </td>
     </tr>
-  )
-}
-
-function Select<T extends string>({
-  label, value, onChange, children,
-}: { label: string; value: T; onChange: (value: T) => void; children: ReactNode }) {
-  const { t } = useTranslation()
-  return (
-    <label className="field">
-      <span className="field-label">{label}</span>
-      <select className="input" value={value} onChange={(e) => onChange(e.target.value as T)}>
-        <option value="">{t('calls.filter.any')}</option>
-        {children}
-      </select>
-    </label>
-  )
-}
-
-function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (page: number) => void }) {
-  const { t } = useTranslation()
-  return (
-    <div className="flex items-center gap-2">
-      <button type="button" className="btn-ghost btn-sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-        {t('calls.previous')}
-      </button>
-      <span dir="ltr">{page} / {pages}</span>
-      <button type="button" className="btn-ghost btn-sm" disabled={page >= pages} onClick={() => onPage(page + 1)}>
-        {t('calls.next')}
-      </button>
-    </div>
   )
 }

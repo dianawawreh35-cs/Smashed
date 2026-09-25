@@ -402,6 +402,90 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
     }
 
     /// <summary>
+    /// The ways a customer can reach the restaurant (S-41), active ones only.
+    /// Phone is among them and the Applications screen leaves it out: a phone
+    /// conversation is a call, and the server refuses it anyway (A-70).
+    /// </summary>
+    public Task<Result<IReadOnlyList<ChannelDto>>> GetChannelsAsync(CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<ChannelDto>>(
+            () => new HttpRequestMessage(HttpMethod.Get, "api/channels"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// Records a message - a conversation on WhatsApp, Facebook or another app
+    /// (A-70) - with its classification in the same request, so a recorded
+    /// message is classified at once.
+    /// </summary>
+    /// <remarks>
+    /// Sent directly, never queued (Dia, 25 Sep): the agent typed it and can
+    /// wait for the server, and a queue would resend something that is not
+    /// idempotent. A failure comes back as a value and the screen keeps what
+    /// was typed.
+    /// </remarks>
+    public Task<Result<CommunicationDto>> RecordApplicationAsync(
+        RecordApplicationRequest request, CancellationToken ct = default) =>
+        SendAsync<CommunicationDto>(
+            () => new HttpRequestMessage(HttpMethod.Post, "api/communications/applications")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// Changes a message's channel, customer or time (A-71). The server decides
+    /// whether the agent still may: <c>edit_window_closed</c> otherwise.
+    /// </summary>
+    public Task<Result<CommunicationDto>> EditApplicationAsync(
+        Guid id, EditApplicationRequest request, CancellationToken ct = default) =>
+        SendAsync<CommunicationDto>(
+            () => new HttpRequestMessage(HttpMethod.Put, $"api/communications/applications/{id}")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// The signed-in agent's own messages (A-71), newest first. As with the
+    /// call log, no agent id is sent: the token decides whose these are (A-52).
+    /// </summary>
+    /// <param name="from">Inclusive lower bound on when the message was written.</param>
+    /// <param name="to">A date, not an instant: the whole of that day is included.</param>
+    /// <param name="query">Number or customer name.</param>
+    public Task<Result<IReadOnlyList<CommunicationDto>>> GetMyApplicationsAsync(
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? query = null,
+        int limit = 100,
+        CancellationToken ct = default)
+    {
+        var parameters = new List<string> { $"limit={limit}" };
+
+        if (from is { } start)
+        {
+            parameters.Add($"from={Uri.EscapeDataString(start.ToString("o"))}");
+        }
+
+        if (to is { } end)
+        {
+            parameters.Add($"to={Uri.EscapeDataString(end.ToString("o"))}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            parameters.Add($"q={Uri.EscapeDataString(query.Trim())}");
+        }
+
+        return SendAsync<IReadOnlyList<CommunicationDto>>(
+            () => new HttpRequestMessage(
+                HttpMethod.Get, $"api/communications/applications/mine?{string.Join("&", parameters)}"),
+            authenticated: true,
+            ct);
+    }
+
+    /// <summary>
     /// Which branch delivers to a place and what it costs (A-65). Read-only:
     /// only a supervisor changes these (S-58).
     /// </summary>

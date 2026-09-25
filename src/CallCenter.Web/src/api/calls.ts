@@ -30,6 +30,9 @@ export interface CallRow {
   hasRecording: boolean
   /** Recorded, and the audio has since been deleted by retention (A-33). */
   recordingExpired: boolean
+  /** Which app a message came on (A-70). Null for a call. */
+  channelId: string | null
+  channelName: string | null
 }
 
 export interface CallPage {
@@ -81,7 +84,14 @@ export interface ClassificationChange {
 
 /** Every filter is optional; blank ones are left off the query. */
 export interface CallFilters {
+  /**
+   * Call (the default, and what the Calls page sends) or App. Two kinds share
+   * the table, one screen each (A-70): the Calls page must never start
+   * showing messages.
+   */
+  kind?: 'Call' | 'App'
   q?: string
+  channelId?: string
   agentId?: string
   branchId?: string
   typeId?: string

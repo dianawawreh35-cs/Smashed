@@ -59,11 +59,13 @@ export interface FormDefinition {
 }
 
 /**
- * Which calls a form is for. Inbound and outbound calls have their own forms:
- * a call the agent placed is a different conversation from an order coming in.
- * The types are shared between them.
+ * Which conversations a form is for. Inbound and outbound calls have their own
+ * forms: a call the agent placed is a different conversation from an order
+ * coming in. `None` is the third form, for messages (A-70): a conversation on
+ * WhatsApp or another app has no direction and its own questions. The types
+ * are shared between all three.
  */
-export type FormDirection = 'In' | 'Out'
+export type FormDirection = 'In' | 'Out' | 'None'
 
 export interface ClassificationForm {
   version: number

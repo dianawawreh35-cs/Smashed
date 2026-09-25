@@ -168,6 +168,10 @@ public partial class App : Application
         services.AddTransient<CallLogViewModel>();
         // One per call log, with it: the recording of the call opened there (A-51).
         services.AddTransient<RecordingPlayerViewModel>();
+        // A-70: recording a message and the agent's own list. It takes two
+        // classification forms, one for the message being recorded and one for
+        // the message opened from the list, so the transient above matters.
+        services.AddTransient<ApplicationsViewModel>();
         services.AddTransient<DeliveryViewModel>();
         // Singleton: the point of it is that a picture fetched on one visit to
         // the menu is still there on the next.

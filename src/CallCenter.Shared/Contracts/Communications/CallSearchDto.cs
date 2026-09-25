@@ -9,8 +9,8 @@ namespace CallCenter.Shared.Contracts.Communications;
 /// was and what it was worth, without opening each one.
 /// </remarks>
 /// <param name="Kind">
-/// <c>Call</c> today. App communications (A-70) will join the same list, which
-/// is why the search is over communications rather than calls.
+/// <c>Call</c> or <c>App</c>: the search is over communications, and the
+/// Calls and Applications pages each ask for their own kind (A-70).
 /// </param>
 /// <param name="Notes">
 /// The classification's notes for a classified call, otherwise the call's own
@@ -43,7 +43,10 @@ public record CallSearchRowDto(
     string? Notes,
     bool IsClassified,
     bool HasRecording,
-    bool RecordingExpired);
+    bool RecordingExpired,
+    /// <summary>Which channel (A-72): Phone for a call, the app for a message.</summary>
+    Guid? ChannelId = null,
+    string? ChannelName = null);
 
 /// <summary>A page of <see cref="CallSearchRowDto"/>, newest first, with how many match in all.</summary>
 public record CallSearchPageDto(

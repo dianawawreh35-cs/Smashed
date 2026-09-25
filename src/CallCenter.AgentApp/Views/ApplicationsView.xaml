@@ -1,0 +1,535 @@
+<UserControl x:Class="CallCenter.AgentApp.Views.ApplicationsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
+             FlowDirection="{Binding Localizer.FlowDirection}"
+             FontFamily="{StaticResource UiFont}"
+             Background="{StaticResource Bg}">
+
+  <UserControl.Resources>
+    <!-- Every text cell trims with an ellipsis and carries its full value in
+         the tooltip, as the call log's do. -->
+    <Style x:Key="TrimmedCell" TargetType="TextBlock">
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Resources>
+
+  <!-- Two columns: the message being recorded on the start side, the agent's
+       own list beside it (A-70, A-71). Side by side rather than stacked,
+       because the form with its classification is as tall as the list, and
+       stacking them left one of the two off the screen. -->
+  <Grid x:Name="Root" Margin="28,24">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="370" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0" Grid.ColumnSpan="2">
+      <TextBlock Text="{Binding Localizer[nav.applications]}" Style="{StaticResource Heading}" />
+      <TextBlock Text="{Binding Localizer[applications.intro]}" Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <!-- ===== Record a message (A-70) ===================================== -->
+    <ScrollViewer Grid.Row="1" Grid.Column="0"
+                  Margin="0,18,18,0"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="{Binding Localizer[applications.recordHeading]}"
+                     Foreground="{StaticResource Text}"
+                     FontWeight="SemiBold"
+                     Margin="0,0,0,12" />
+
+          <!-- A-73: the channel stays selected from one message to the next. -->
+          <TextBlock Text="{Binding Localizer[applications.channel]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+          <ComboBox ItemsSource="{Binding Channels}"
+                    SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"
+                    DisplayMemberPath="Name" />
+
+          <!-- A-73: the number box is the quick entry. Pausing after typing
+               looks the customer up, as the pop-up does for a caller. -->
+          <TextBlock Text="{Binding Localizer[applications.number]}" Style="{StaticResource FieldLabel}" Margin="0,10,0,4" />
+          <TextBox x:Name="NumberBox"
+                   Text="{Binding Number, UpdateSourceTrigger=PropertyChanged}"
+                   FontFamily="{StaticResource MonoFont}"
+                   FlowDirection="LeftToRight"
+                   ToolTip="{Binding Localizer[applications.numberHint]}" />
+
+          <!-- Who it is (A-10 rules, reused): found, looking, nobody on file,
+               or could not check. Never blank once a number is typed. -->
+          <TextBlock Text="{Binding Customer.Name}"
+                     Foreground="{StaticResource Text}"
+                     FontWeight="SemiBold"
+                     TextWrapping="Wrap"
+                     Margin="0,6,0,0"
+                     Visibility="{Binding Customer.HasName, Converter={StaticResource BoolToVisibility}}" />
+          <TextBlock Text="{Binding Customer.Address}"
+                     Style="{StaticResource Subtle}"
+                     TextWrapping="Wrap"
+                     Margin="0,2,0,0"
+                     Visibility="{Binding Customer.HasAddress, Converter={StaticResource BoolToVisibility}}" />
+          <Border Background="{StaticResource Warning}"
+                  CornerRadius="{StaticResource CornerSmall}"
+                  Padding="8,2"
+                  Margin="0,6,0,0"
+                  HorizontalAlignment="Left"
+                  Visibility="{Binding Customer.IsVip, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding Localizer[caller.vip]}" FontSize="11" FontWeight="Bold" Foreground="#1A1200" />
+          </Border>
+          <TextBlock Text="{Binding Customer.StatusText}"
+                     Style="{StaticResource Subtle}"
+                     FontStyle="Italic"
+                     TextWrapping="Wrap"
+                     Margin="0,6,0,0"
+                     Visibility="{Binding Customer.HasStatus, Converter={StaticResource BoolToVisibility}}" />
+
+          <!-- A-11: a number nobody has can be saved as a customer from here,
+               with the same form the pop-up offers. A button until asked for. -->
+          <Button Content="{Binding Localizer[caller.saveAsNew]}"
+                  Style="{StaticResource SmallButton}"
+                  HorizontalAlignment="Left"
+                  Margin="0,6,0,0"
+                  Command="{Binding Customer.OpenNewCustomerCommand}"
+                  Visibility="{Binding Customer.CanOfferNewCustomer, Converter={StaticResource BoolToVisibility}}" />
+
+          <StackPanel Margin="0,10,0,0"
+                      Visibility="{Binding Customer.IsFormOpen, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding Localizer[contacts.name]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+            <TextBox Text="{Binding Customer.FormName, UpdateSourceTrigger=PropertyChanged}"
+                     LostFocus="OnNewCustomerNameLostFocus" />
+
+            <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
+            <Border Margin="0,8,0,0"
+                    Padding="10,8"
+                    Background="#2A2412"
+                    BorderBrush="{StaticResource Warning}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CornerSmall}"
+                    Visibility="{Binding Customer.SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
+              <StackPanel>
+                <TextBlock Text="{Binding Customer.SameNameMessage}" FontSize="11" Foreground="#E8C56B" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding Customer.SameName}" Margin="0,6,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Margin="0,0,0,6">
+                        <TextBlock FontSize="11" Text="{Binding Name}" Foreground="{StaticResource Text}" />
+                        <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
+                                          RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                Style="{StaticResource SmallButton}"
+                                HorizontalAlignment="Left"
+                                Margin="0,3,0,0"
+                                Command="{Binding DataContext.Customer.AddToExistingCommand,
+                                          RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <TextBlock Text="{Binding Localizer[contacts.address]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
+            <TextBox Text="{Binding Customer.FormAddress, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Text="{Binding Localizer[contacts.notes]}" Style="{StaticResource FieldLabel}" Margin="0,8,0,4" />
+            <TextBox Text="{Binding Customer.FormNotes, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MinHeight="44" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+              <Button Content="{Binding Localizer[caller.saveCustomer]}"
+                      Style="{StaticResource PrimaryButton}"
+                      MinWidth="120"
+                      Command="{Binding Customer.SaveNewCustomerCommand}" />
+              <Button Content="{Binding Localizer[contacts.cancel]}"
+                      Style="{StaticResource GhostButton}"
+                      MinWidth="90"
+                      Margin="10,0,0,0"
+                      Command="{Binding Customer.CancelNewCustomerCommand}" />
+            </StackPanel>
+
+            <TextBlock Text="{Binding Customer.FormMessage}"
+                       Foreground="{StaticResource Warning}"
+                       FontSize="11"
+                       Margin="0,6,0,0"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding Customer.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
+          </StackPanel>
+
+          <!-- When the customer wrote. Now by default; an agent may set it
+               back within today, and the server refuses anything else. -->
+          <TextBlock Text="{Binding Localizer[applications.time]}" Style="{StaticResource FieldLabel}" Margin="0,10,0,4" />
+          <TextBox Text="{Binding TimeText, UpdateSourceTrigger=PropertyChanged}"
+                   Width="90"
+                   HorizontalAlignment="Left"
+                   FontFamily="{StaticResource MonoFont}"
+                   FlowDirection="LeftToRight"
+                   ToolTip="{Binding Localizer[applications.timeHint]}" />
+
+          <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,14,0,12" />
+
+          <!-- The Applications form (A-70): the same fields a call's form has,
+               designed on their own by the supervisor. Read when Record is
+               pressed and sent with the message. -->
+          <TextBlock Text="{Binding Localizer[applications.classifyHeading]}"
+                     Foreground="{StaticResource Text}"
+                     FontWeight="SemiBold"
+                     Margin="0,0,0,10" />
+
+          <TextBlock Text="{Binding FormUnavailable}"
+                     Foreground="{StaticResource Warning}"
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     Margin="0,0,0,8"
+                     Visibility="{Binding FormUnavailable, Converter={StaticResource NotNullToVisibility}}" />
+
+          <ItemsControl ItemsSource="{Binding Classification.Fields}">
+            <ItemsControl.ItemContainerStyle>
+              <Style TargetType="ContentPresenter">
+                <Setter Property="Visibility"
+                        Value="{Binding AppliesNow, Converter={StaticResource BoolToVisibility}}" />
+              </Style>
+            </ItemsControl.ItemContainerStyle>
+          </ItemsControl>
+
+          <TextBlock Text="{Binding Classification.Missing}"
+                     Foreground="{StaticResource Warning}"
+                     FontSize="11"
+                     TextWrapping="Wrap" />
+
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="{Binding Localizer[applications.record]}"
+                    Style="{StaticResource PrimaryButton}"
+                    MinWidth="140"
+                    Command="{Binding RecordCommand}" />
+            <Button Content="{Binding Localizer[applications.clear]}"
+                    Style="{StaticResource GhostButton}"
+                    MinWidth="90"
+                    Margin="10,0,0,0"
+                    Command="{Binding ClearFormCommand}" />
+          </StackPanel>
+
+          <!-- Recorded, or why not. A refusal keeps what was typed on screen. -->
+          <TextBlock Text="{Binding RecordMessage}"
+                     Foreground="{StaticResource Warning}"
+                     FontSize="11"
+                     Margin="0,8,0,0"
+                     TextWrapping="Wrap"
+                     Visibility="{Binding RecordFailed, Converter={StaticResource BoolToVisibility}}" />
+          <TextBlock Text="{Binding RecordMessage}"
+                     Foreground="{StaticResource Success}"
+                     FontSize="11"
+                     Margin="0,8,0,0"
+                     TextWrapping="Wrap"
+                     Visibility="{Binding RecordFailed, Converter={StaticResource InverseBoolToVisibility}}" />
+        </StackPanel>
+      </Border>
+    </ScrollViewer>
+
+    <!-- ===== The agent's own messages (A-71) ============================= -->
+    <Grid Grid.Row="1" Grid.Column="1" Margin="0,18,0,0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <!-- The list keeps at least this much once a message is opened; the
+             opened message below scrolls instead (see FitOpenMessage). -->
+        <RowDefinition Height="*" MinHeight="{x:Static local:ApplicationsView.MinListHeight}" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Grid Grid.Row="0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Every filter is sent to the server, so these search the whole
+             history rather than the page already fetched. -->
+        <StackPanel Orientation="Horizontal">
+          <TextBox Width="200"
+                   Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="{Binding Localizer[applications.searchHint]}" />
+          <TextBlock Text="{Binding Localizer[callLog.from]}"
+                     Style="{StaticResource Subtle}"
+                     VerticalAlignment="Center"
+                     Margin="12,0,6,0" />
+          <DatePicker SelectedDate="{Binding From}" Width="120" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Localizer[callLog.to]}"
+                     Style="{StaticResource Subtle}"
+                     VerticalAlignment="Center"
+                     Margin="10,0,6,0" />
+          <DatePicker SelectedDate="{Binding To}" Width="120" VerticalAlignment="Center" />
+          <Button Content="{Binding Localizer[callLog.clearFilters]}"
+                  Style="{StaticResource GhostButton}"
+                  Margin="10,0,0,0"
+                  VerticalAlignment="Center"
+                  Command="{Binding ClearFiltersCommand}"
+                  Visibility="{Binding HasFilters, Converter={StaticResource BoolToVisibility}}" />
+        </StackPanel>
+
+        <Button Grid.Column="1"
+                Content="{Binding Localizer[callLog.refresh]}"
+                Style="{StaticResource GhostButton}"
+                VerticalAlignment="Center"
+                Command="{Binding RefreshCommand}"
+                IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+      </Grid>
+
+      <Border Grid.Row="1"
+              Margin="0,12,0,0"
+              Style="{StaticResource Card}"
+              Padding="0">
+        <Grid>
+          <StackPanel HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Visibility="{Binding HasMessages, Converter={StaticResource InverseBoolToVisibility}}">
+            <TextBlock Text="{Binding Localizer[applications.emptyTitle]}"
+                       Foreground="{StaticResource TextMuted}"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding StatusMessage}"
+                       Style="{StaticResource Subtle}"
+                       Foreground="{StaticResource TextFaint}"
+                       Margin="0,6,0,0"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
+          </StackPanel>
+
+          <!-- Sorting off and horizontal scrolling disabled for the reasons
+               the call log's grid gives: formatted strings do not sort, and a
+               star column cannot be measured against infinite width. -->
+          <DataGrid ItemsSource="{Binding Messages}"
+                    CanUserSortColumns="False"
+                    HorizontalScrollBarVisibility="Disabled"
+                    Margin="6"
+                    Visibility="{Binding HasMessages, Converter={StaticResource BoolToVisibility}}">
+            <DataGrid.InputBindings>
+              <!-- Double-click opens, as every other list here does; the Open
+                   button is for the agent who does not know that. -->
+              <MouseBinding MouseAction="LeftDoubleClick"
+                            Command="{Binding OpenCommand}"
+                            CommandParameter="{Binding SelectedItem,
+                                               RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+            </DataGrid.InputBindings>
+
+            <DataGrid.Columns>
+              <DataGridTextColumn x:Name="WhenColumn" Width="Auto" MaxWidth="120" Binding="{Binding When}"
+                                  FontFamily="{StaticResource MonoFont}"
+                                  ElementStyle="{StaticResource TrimmedCell}" />
+              <DataGridTextColumn x:Name="ChannelColumn" Width="Auto" MinWidth="80" MaxWidth="130" Binding="{Binding Channel}"
+                                  ElementStyle="{StaticResource TrimmedCell}" />
+              <DataGridTextColumn x:Name="WhoColumn" Width="*" MinWidth="100" Binding="{Binding Who}"
+                                  ElementStyle="{StaticResource TrimmedCell}" />
+              <DataGridTextColumn x:Name="NumberColumn" Width="Auto" MaxWidth="140" Binding="{Binding Number}"
+                                  FontFamily="{StaticResource MonoFont}"
+                                  ElementStyle="{StaticResource TrimmedCell}" />
+
+              <!-- Classified or not (A-41 rule, reused): a chip either way, so
+                   a glance shows the work left. -->
+              <DataGridTemplateColumn Width="Auto" MinWidth="100" MaxWidth="180">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                      <Border Padding="7,2"
+                              CornerRadius="{StaticResource CornerSmall}"
+                              Background="#2A2412"
+                              VerticalAlignment="Center"
+                              Visibility="{Binding IsUnclassified, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding DataContext.Localizer[callLog.unclassified],
+                                          RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource Warning}" />
+                      </Border>
+                      <Border Padding="7,2"
+                              CornerRadius="{StaticResource CornerSmall}"
+                              Background="#14261B"
+                              VerticalAlignment="Center"
+                              Visibility="{Binding IsClassified, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding DataContext.Localizer[applications.classified],
+                                          RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource Success}" />
+                      </Border>
+                      <TextBlock Text="{Binding Notes}"
+                                 ToolTip="{Binding Notes}"
+                                 MaxWidth="70"
+                                 FontSize="11"
+                                 Foreground="{StaticResource TextMuted}"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center"
+                                 Margin="6,0,0,0"
+                                 Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+
+              <DataGridTemplateColumn Width="Auto" MinWidth="70">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Button Content="{Binding DataContext.Localizer[applications.open],
+                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            Style="{StaticResource SmallButton}"
+                            Margin="2"
+                            Command="{Binding DataContext.OpenCommand,
+                                      RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            CommandParameter="{Binding}" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Border>
+
+      <!-- The opened message, under the list so the list never moves (A-71):
+           its details, editable today, and its classification form. -->
+      <ScrollViewer x:Name="OpenMessage"
+                    Grid.Row="2"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <Border Margin="0,12,0,0"
+                  Style="{StaticResource Card}"
+                  Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Opened.Who}"
+                           Foreground="{StaticResource Text}"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Opened.Channel}"
+                           Style="{StaticResource Subtle}"
+                           Margin="12,0,0,0" />
+                <TextBlock Text="{Binding Opened.StartedAt}"
+                           Style="{StaticResource Subtle}"
+                           FontFamily="{StaticResource MonoFont}"
+                           FlowDirection="LeftToRight"
+                           Margin="12,0,0,0" />
+              </StackPanel>
+
+              <Button Grid.Column="1" Grid.RowSpan="2"
+                      Content="{Binding Localizer[applications.close]}"
+                      Style="{StaticResource GhostButton}"
+                      VerticalAlignment="Top"
+                      Command="{Binding CloseMessageCommand}" />
+
+              <!-- A-71: today's messages are edited here; older ones are
+                   greyed out and say why. -->
+              <TextBlock Grid.Row="1"
+                         Text="{Binding Localizer[applications.readOnly]}"
+                         Style="{StaticResource Subtle}"
+                         Foreground="{StaticResource Warning}"
+                         TextWrapping="Wrap"
+                         Margin="0,6,0,0"
+                         Visibility="{Binding CanEditOpened, Converter={StaticResource InverseBoolToVisibility}}" />
+
+              <StackPanel Grid.Row="2" Grid.ColumnSpan="2"
+                          Orientation="Horizontal"
+                          Margin="0,10,0,0"
+                          IsEnabled="{Binding CanEditOpened}">
+                <StackPanel>
+                  <TextBlock Text="{Binding Localizer[applications.channel]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+                  <ComboBox ItemsSource="{Binding Channels}"
+                            SelectedItem="{Binding EditChannel, Mode=TwoWay}"
+                            DisplayMemberPath="Name"
+                            MinWidth="140" />
+                </StackPanel>
+                <StackPanel Margin="10,0,0,0">
+                  <TextBlock Text="{Binding Localizer[applications.number]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+                  <TextBox Text="{Binding EditNumber, UpdateSourceTrigger=PropertyChanged}"
+                           Width="160"
+                           FontFamily="{StaticResource MonoFont}"
+                           FlowDirection="LeftToRight" />
+                </StackPanel>
+                <StackPanel Margin="10,0,0,0">
+                  <TextBlock Text="{Binding Localizer[applications.time]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+                  <TextBox Text="{Binding EditTimeText, UpdateSourceTrigger=PropertyChanged}"
+                           Width="80"
+                           FontFamily="{StaticResource MonoFont}"
+                           FlowDirection="LeftToRight" />
+                </StackPanel>
+                <Button Content="{Binding Localizer[applications.save]}"
+                        Style="{StaticResource PrimaryButton}"
+                        MinWidth="120"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Bottom"
+                        Command="{Binding SaveEditCommand}" />
+              </StackPanel>
+
+              <TextBlock Grid.Row="3" Grid.ColumnSpan="2"
+                         Text="{Binding EditMessage}"
+                         Style="{StaticResource Subtle}"
+                         Margin="0,6,0,0"
+                         TextWrapping="Wrap"
+                         Visibility="{Binding EditMessage, Converter={StaticResource NotNullToVisibility}}" />
+            </Grid>
+          </Border>
+
+          <!-- The message's classification, prefilled (A-71). Its own form
+               instance, so the one being recorded on the left is untouched. -->
+          <Border Margin="0,12,0,0"
+                  Style="{StaticResource Card}"
+                  Visibility="{Binding OpenedClassification.IsOpen, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+              <TextBlock Text="{Binding Localizer[applications.classifyHeading]}"
+                         Foreground="{StaticResource Text}"
+                         FontWeight="SemiBold"
+                         Margin="0,0,0,12" />
+
+              <ItemsControl ItemsSource="{Binding OpenedClassification.Fields}">
+                <ItemsControl.ItemContainerStyle>
+                  <Style TargetType="ContentPresenter">
+                    <Setter Property="Visibility"
+                            Value="{Binding AppliesNow, Converter={StaticResource BoolToVisibility}}" />
+                  </Style>
+                </ItemsControl.ItemContainerStyle>
+              </ItemsControl>
+
+              <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                <Button Content="{Binding Localizer[classification.save]}"
+                        Style="{StaticResource PrimaryButton}"
+                        MinWidth="120"
+                        Command="{Binding OpenedClassification.SaveCommand}" />
+                <Button Content="{Binding Localizer[applications.close]}"
+                        Style="{StaticResource GhostButton}"
+                        MinWidth="100"
+                        Margin="10,0,0,0"
+                        Command="{Binding CloseMessageCommand}" />
+              </StackPanel>
+
+              <TextBlock Text="{Binding OpenedClassification.Missing}"
+                         Foreground="{StaticResource Warning}"
+                         FontSize="11"
+                         Margin="0,8,0,0"
+                         TextWrapping="Wrap" />
+
+              <TextBlock Text="{Binding OpenedClassification.Message}"
+                         Style="{StaticResource Subtle}"
+                         Margin="0,4,0,0"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</UserControl>

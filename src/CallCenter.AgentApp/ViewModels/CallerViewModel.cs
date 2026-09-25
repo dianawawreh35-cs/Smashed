@@ -146,6 +146,13 @@ public partial class CallerViewModel : ObservableObject
     /// <summary>The "Save as new customer" button: only for a number nobody has, and not once it is open.</summary>
     public bool CanOfferNewCustomer => State is Lookup.NewCustomer && !IsFormOpen;
 
+    /// <summary>
+    /// Who the number belongs to, once found or saved. For the Applications
+    /// screen (A-70), which records a message against the contact rather than
+    /// leaving the server to match the number a second time.
+    /// </summary>
+    public Guid? ContactId { get; private set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasName))]
     private string? _name;
@@ -263,6 +270,7 @@ public partial class CallerViewModel : ObservableObject
             ResetForm();
 
             State = Lookup.None;
+            ContactId = null;
             Name = null;
             Address = null;
             Notes = null;
@@ -353,6 +361,7 @@ public partial class CallerViewModel : ObservableObject
 
     private void Show(ContactDto contact) => Set(() =>
     {
+        ContactId = contact.Id;
         Name = contact.Name;
         Address = contact.Address;
 

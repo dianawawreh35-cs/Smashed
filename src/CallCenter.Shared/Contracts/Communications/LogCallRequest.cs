@@ -89,13 +89,23 @@ public record CommunicationDto(
     bool IsClassified,
     string? Notes,
     bool HasRecording,
-    bool RecordingExpired)
+    bool RecordingExpired,
+    /// <summary>
+    /// Which channel it came on (A-72): Phone for a call, the app's name for a
+    /// message. Null only for a row written before channels were reported.
+    /// </summary>
+    string? ChannelName = null)
 {
     /// <summary>
-    /// Only an answered call is classified (A-40). Anything else had no
-    /// conversation, so there is nothing for the form to describe.
+    /// Only an answered call is classified (A-40): anything else had no
+    /// conversation, so there is nothing for the form to describe. A message
+    /// (A-70) always is — the agent typed it because somebody wrote.
     /// </summary>
-    public bool CanBeClassified => Status == CommunicationStatuses.Answered;
+    public bool CanBeClassified =>
+        Status == CommunicationStatuses.Answered || Kind == CommunicationKinds.App;
+
+    /// <summary>A message rather than a call (A-70).</summary>
+    public bool IsApplication => Kind == CommunicationKinds.App;
 
     /// <summary>
     /// Only an answered call is recorded (A-30), incoming or outgoing: the

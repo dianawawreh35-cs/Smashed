@@ -34,12 +34,14 @@ export interface Communication {
   hasRecording: boolean
   /** Recorded, and retention has since deleted the audio (A-33). */
   recordingExpired: boolean
+  /** Which app a message came on (A-72). Null for a call. */
+  channelName: string | null
 }
 
 /**
- * One contact's history, newest first (A-62). Every agent's calls, not just the
- * viewer's — the point of the panel is the customer's whole relationship with
- * the restaurant.
+ * One contact's history, newest first (A-62): calls and messages together
+ * (A-72). Every agent's, not just the viewer's — the point of the panel is the
+ * customer's whole relationship with the restaurant.
  */
 export const communicationsForContact = (contactId: string, limit = 100) =>
   api.get<Communication[]>(`/communications/by-contact/${contactId}`, { query: { limit } })

@@ -4,6 +4,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { listSettings, settingProblems, updateSettings } from '../api/settings'
 import type { Setting } from '../api/settings'
+import ChannelsCard from '../components/ChannelsCard'
+
+/**
+ * Settings: the system values (S-47), and below them the channel list (S-41),
+ * which is a setting in the same sense — changed rarely, by the supervisor,
+ * read by every agent's app.
+ */
+export default function SettingsPage() {
+  return (
+    <div className="max-w-3xl space-y-8">
+      <SystemSettings />
+      <ChannelsCard />
+    </div>
+  )
+}
 
 /**
  * System settings (S-47).
@@ -12,7 +27,7 @@ import type { Setting } from '../api/settings'
  * nothing — a screen that could half-apply would be worse than one that makes
  * you fix the bad field first.
  */
-export default function SettingsPage() {
+function SystemSettings() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
@@ -53,7 +68,7 @@ export default function SettingsPage() {
   const hasProblems = Object.keys(problems).length > 0
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6 max-w-3xl">
+    <form onSubmit={onSubmit} className="space-y-6">
       <div>
         <h2 className="page-title">{t('settings.heading')}</h2>
         <p className="page-subtitle">{t('settings.intro')}</p>

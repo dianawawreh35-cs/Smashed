@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
+using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Contacts;
 using CallCenter.Shared.Phone;
 using CallCenter.Shared.Text;
@@ -508,9 +509,14 @@ public class ContactsService(CallCenterDbContext db, ContactCallLinker calls, IL
         int Count(string name) =>
             counts.FirstOrDefault(c => c.Name == name)?.Count ?? 0;
 
+        // Calls only: the card is what the pop-up shows about a caller, and a
+        // message (A-70) has no direction, status or duration worth a row
+        // here. The totals above include messages, because a WhatsApp order
+        // is still one of this customer's orders.
         var history = await db.Communications
             .AsNoTracking()
             .Where(c => c.ContactId == contactId)
+            .Where(c => c.Kind == CommunicationKinds.Call)
             .OrderByDescending(c => c.StartedAt)
             .Take(recent)
             .Select(c => new CallerHistoryDto(

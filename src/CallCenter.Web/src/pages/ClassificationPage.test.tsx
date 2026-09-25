@@ -65,6 +65,19 @@ const OUTBOUND_FORM = {
   },
 }
 
+/** The messages form (A-70): a third set of questions, published under direction None. */
+const MESSAGES_FORM = {
+  ...FORM,
+  version: 1,
+  direction: 'None',
+  definition: {
+    fields: [
+      { key: 'type', kind: 'type', required: true },
+      { key: 'branch', kind: 'branch', required: true },
+    ],
+  },
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -83,7 +96,9 @@ function stubApi() {
       return jsonResponse(FORM)
     }
     if (url.includes('/classifications/form')) {
-      return jsonResponse(url.includes('direction=Out') ? OUTBOUND_FORM : FORM)
+      return jsonResponse(
+        url.includes('direction=Out') ? OUTBOUND_FORM : url.includes('direction=None') ? MESSAGES_FORM : FORM,
+      )
     }
     if (url.includes('/classifications/types')) return jsonResponse(FORM.types)
     return jsonResponse(null, 204)
@@ -190,6 +205,32 @@ describe('classification form editor', () => {
     expect(published.direction).toBe('Out')
     expect(published.definition.fields.map((f: { key: string }) => f.key)).toContain('notes')
     expect(published.definition.fields.some((f: { key: string }) => f.key === 'branch')).toBe(false)
+  })
+
+  it('publishes the messages questions as a third form, under direction None', async () => {
+    // A message has no direction (A-70). Its card must publish its own form
+    // and leave the two call forms alone.
+    const fetchMock = stubApi()
+    renderPage()
+
+    const messages = (await screen.findByText('Questions for messages (applications)')).closest(
+      '.card',
+    )! as HTMLElement
+    expect(within(messages).getByText('Version 1')).toBeInTheDocument()
+
+    fireEvent.click(within(messages).getByRole('button', { name: 'Add question' }))
+    fireEvent.click(within(messages).getByRole('button', { name: 'Publish form' }))
+
+    await waitFor(() =>
+      expect(bodyOf(fetchMock, 'PUT', '/classifications/form')).not.toBeNull(),
+    )
+
+    const published = bodyOf(fetchMock, 'PUT', '/classifications/form')
+    expect(published.direction).toBe('None')
+    expect(published.definition.fields.map((f: { key: string }) => f.key)).toEqual(
+      expect.arrayContaining(['type', 'branch']),
+    )
+    expect(published.definition.fields).toHaveLength(3)
   })
 
   it('cannot publish until something changes', async () => {

@@ -457,6 +457,16 @@ public static class SeedData
         """;
 
     /// <summary>
+    /// The first Applications form (A-70): what an agent records about a
+    /// message on WhatsApp, Facebook, Instagram or Wheels. It starts as a copy
+    /// of the inbound form, since a WhatsApp order is the same conversation as
+    /// a phone order; the supervisor changes it on its own tab of the
+    /// Classification page without touching the call forms (Dia, 25 Sep).
+    /// Stored under direction <c>None</c>, which is what a message has.
+    /// </summary>
+    public const string FormDefinitionAppV1 = FormDefinitionV1;
+
+    /// <summary>
     /// Defaults the supervisor can change without a deployment. Blank values are
     /// site-specific and filled in during installation.
     /// </summary>

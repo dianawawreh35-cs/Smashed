@@ -148,10 +148,22 @@ public partial class ClassificationFormViewModel(
     /// otherwise rather than a form that will not save.
     /// </remarks>
     /// <param name="isOutbound">Whether the call was one this agent placed; it picks the form.</param>
-    public async Task BeginForLoggedCallAsync(
-        Guid communicationId, bool isOutbound = false, CancellationToken ct = default)
+    public Task BeginForLoggedCallAsync(
+        Guid communicationId, bool isOutbound = false, CancellationToken ct = default) =>
+        BeginForSavedAsync(communicationId, catalog.FormFor(isOutbound), ct);
+
+    /// <summary>
+    /// Opens the form for a message already recorded (A-71): the same path as a
+    /// logged call, drawn from the Applications form rather than a direction's
+    /// (A-70). Saving goes to <c>PUT /api/classifications/{id}</c> as a call's does.
+    /// </summary>
+    public Task BeginForLoggedApplicationAsync(Guid communicationId, CancellationToken ct = default) =>
+        BeginForSavedAsync(communicationId, catalog.Applications, ct);
+
+    private async Task BeginForSavedAsync(
+        Guid communicationId, ClassificationFormDto? form, CancellationToken ct)
     {
-        _form = catalog.FormFor(isOutbound);
+        _form = form;
 
         if (_form is null)
         {
@@ -193,6 +205,56 @@ public partial class ClassificationFormViewModel(
         SaveCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(Missing));
     }
+
+    /// <summary>
+    /// Draws the Applications form for a message about to be recorded (A-70),
+    /// without anywhere to send it: the message does not exist yet, so the
+    /// Applications screen reads the answers with <see cref="BuildRequest"/>
+    /// and sends them in the same request as the message itself.
+    /// </summary>
+    /// <returns>False when the form never loaded; the screen then says so.</returns>
+    public bool BeginForApplication()
+    {
+        _form = catalog.Applications;
+        _sipCallId = null;
+        _extension = null;
+        _communicationId = null;
+
+        if (_form is null)
+        {
+            logger.LogWarning("A message cannot be classified: the Applications form was never loaded");
+            IsOpen = false;
+            Fields.Clear();
+            return false;
+        }
+
+        Build();
+
+        IsSaved = false;
+        IsSaving = false;
+        IsReadOnly = false;
+        Message = string.Empty;
+        IsOpen = true;
+
+        return true;
+    }
+
+    /// <summary>The agent has chosen a type: the form has been started, not left blank.</summary>
+    public bool HasType => Fields.OfType<TypeFieldViewModel>().FirstOrDefault()?.Selected is not null;
+
+    /// <summary>
+    /// Every required field that applies has an answer, so the form can be sent.
+    /// </summary>
+    public bool IsComplete =>
+        HasType && Fields.Where(f => f.AppliesNow).All(f => f.IsSatisfied);
+
+    /// <summary>
+    /// The answers as the server takes them, or null while the form is not
+    /// complete. For the Applications screen, which sends them with the
+    /// message (A-70) rather than through <see cref="SaveCommand"/>.
+    /// </summary>
+    public SaveClassificationRequest? BuildRequest() =>
+        _form is null || !IsComplete ? null : BuildClassification();
 
     /// <summary>
     /// Puts an existing classification back on screen (A-42).
@@ -302,6 +364,8 @@ public partial class ClassificationFormViewModel(
             {
                 SaveCommand.NotifyCanExecuteChanged();
                 OnPropertyChanged(nameof(Missing));
+                OnPropertyChanged(nameof(IsComplete));
+                OnPropertyChanged(nameof(HasType));
             };
         }
 
@@ -382,30 +446,10 @@ public partial class ClassificationFormViewModel(
 
         try
         {
-            var type = Fields.OfType<TypeFieldViewModel>().First();
-            var branch = Fields.OfType<BranchFieldViewModel>().FirstOrDefault();
-
-            // The built-in fields have their own columns because the reports
-            // group by them; everything the supervisor added travels together.
-            var custom = Fields
-                .Where(f => f.AppliesNow)
-                .Where(f => f is not TypeFieldViewModel and not BranchFieldViewModel)
-                .Where(f => f.Key is not ("order_value" or "notes" or "follow_up"))
-                .Where(f => f.Value is not null)
-                .ToDictionary(f => f.Key, f => f.Value!);
-
             var request = new SaveClassificationByCallRequest(
                 _sipCallId,
                 _extension,
-                new SaveClassificationRequest(
-                    TypeId: type.Selected!.Type.Id,
-                    BranchId: branch?.Selected?.Branch.Id,
-                    OrderValue: FieldValue("order_value") as decimal?,
-                    Notes: FieldValue("notes") as string,
-                    FollowUp: FieldValue("follow_up") as bool? ?? false,
-                    Resolved: null,
-                    FormVersion: _form.Version,
-                    CustomValues: JsonSerializer.SerializeToDocument(custom)));
+                BuildClassification());
 
             if (_communicationId is { } communicationId)
             {
@@ -462,6 +506,32 @@ public partial class ClassificationFormViewModel(
     {
         logger.LogInformation("A call was left unclassified by the agent");
         Close();
+    }
+
+    /// <summary>What the fields say, in the shape the server takes.</summary>
+    private SaveClassificationRequest BuildClassification()
+    {
+        var type = Fields.OfType<TypeFieldViewModel>().First();
+        var branch = Fields.OfType<BranchFieldViewModel>().FirstOrDefault();
+
+        // The built-in fields have their own columns because the reports
+        // group by them; everything the supervisor added travels together.
+        var custom = Fields
+            .Where(f => f.AppliesNow)
+            .Where(f => f is not TypeFieldViewModel and not BranchFieldViewModel)
+            .Where(f => f.Key is not ("order_value" or "notes" or "follow_up"))
+            .Where(f => f.Value is not null)
+            .ToDictionary(f => f.Key, f => f.Value!);
+
+        return new SaveClassificationRequest(
+            TypeId: type.Selected!.Type.Id,
+            BranchId: branch?.Selected?.Branch.Id,
+            OrderValue: FieldValue("order_value") as decimal?,
+            Notes: FieldValue("notes") as string,
+            FollowUp: FieldValue("follow_up") as bool? ?? false,
+            Resolved: null,
+            FormVersion: _form!.Version,
+            CustomValues: JsonSerializer.SerializeToDocument(custom));
     }
 
     private object? FieldValue(string key) =>

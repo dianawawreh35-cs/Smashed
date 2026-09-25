@@ -299,10 +299,15 @@ public class CommunicationsService(
         int limit = 100,
         CancellationToken ct = default)
     {
-        var days = await settings.GetIntAsync("agent.call_log_days", DefaultCallLogDays, ct);
+        var days = await CallLogDaysAsync(ct);
         var earliest = DateTimeOffset.UtcNow.AddDays(-days);
 
-        var calls = db.Communications.Where(c => c.AgentId == agentId);
+        // Calls only: the agent's messages (A-70) have their own screen, and a
+        // WhatsApp order in the call log would be counted twice by anyone
+        // reading both.
+        var calls = db.Communications
+            .Where(c => c.AgentId == agentId)
+            .Where(c => c.Kind == CommunicationKinds.Call);
 
         // The window always applies. A caller asking for more gets the window;
         // a caller asking for less gets what they asked for.
@@ -522,7 +527,7 @@ public class CommunicationsService(
 
     /// <summary>
     /// Every communication for one contact, newest first — the history panel
-    /// (A-62).
+    /// (A-62). Calls and messages both, each with its channel (A-72).
     /// </summary>
     public async Task<IReadOnlyList<CommunicationDto>> ForContactAsync(
         Guid contactId, int limit = 100, CancellationToken ct = default)
@@ -542,10 +547,17 @@ public class CommunicationsService(
     }
 
     /// <summary>
+    /// How far back an agent's own lists reach, in days: the call log (A-50) and
+    /// the Applications list (A-71) share the supervisor's one setting.
+    /// </summary>
+    public Task<int> CallLogDaysAsync(CancellationToken ct) =>
+        settings.GetIntAsync("agent.call_log_days", DefaultCallLogDays, ct);
+
+    /// <summary>
     /// The contact a number belongs to, by the same two steps as caller lookup
     /// (A-13): the normalised form, then the last nine digits.
     /// </summary>
-    private async Task<Guid?> MatchContactAsync(string? number, CancellationToken ct)
+    public async Task<Guid?> MatchContactAsync(string? number, CancellationToken ct)
     {
         var normalised = PhoneNormalizer.Normalize(number);
         if (string.IsNullOrEmpty(normalised))
@@ -577,14 +589,14 @@ public class CommunicationsService(
             : null;
     }
 
-    private async Task<CommunicationDto> ToDtoAsync(Communication call, CancellationToken ct) =>
+    public async Task<CommunicationDto> ToDtoAsync(Communication call, CancellationToken ct) =>
         (await ToDtosAsync([call], ct))[0];
 
     /// <summary>
     /// Names for the contacts and agents in one pass, rather than a query per
     /// row: a call log of a hundred rows should not be a hundred round trips.
     /// </summary>
-    private async Task<IReadOnlyList<CommunicationDto>> ToDtosAsync(
+    public async Task<IReadOnlyList<CommunicationDto>> ToDtosAsync(
         IReadOnlyList<Communication> calls, CancellationToken ct)
     {
         var contactIds = calls.Where(c => c.ContactId is not null).Select(c => c.ContactId!.Value).Distinct().ToList();
@@ -621,6 +633,14 @@ public class CommunicationsService(
             .Where(u => agentIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
 
+        // A-72: a contact's history names the channel on every row, so a
+        // WhatsApp order is told apart from a phone one. Five rows at most.
+        var channelIds = calls.Select(c => c.ChannelId).Distinct().ToList();
+        var channelNames = await db.Channels
+            .AsNoTracking()
+            .Where(ch => channelIds.Contains(ch.Id))
+            .ToDictionaryAsync(ch => ch.Id, ch => ch.Name, ct);
+
         return calls.Select(c => new CommunicationDto(
             c.Id,
             c.Kind,
@@ -640,7 +660,8 @@ public class CommunicationsService(
             classifiedSet.Contains(c.Id),
             c.Notes,
             HasRecording: recorded.TryGetValue(c.Id, out var gone) && !gone,
-            RecordingExpired: recorded.TryGetValue(c.Id, out var expired) && expired))
+            RecordingExpired: recorded.TryGetValue(c.Id, out var expired) && expired,
+            ChannelName: channelNames.TryGetValue(c.ChannelId, out var channel) ? channel : null))
             .ToList();
     }
 }

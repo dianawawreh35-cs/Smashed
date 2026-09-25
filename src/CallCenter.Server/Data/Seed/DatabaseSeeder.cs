@@ -548,6 +548,8 @@ public class DatabaseSeeder(
                  {
                      (Directions.In, SeedData.FormDefinitionV1),
                      (Directions.Out, SeedData.FormDefinitionOutV1),
+                     // A-70: the Applications form, for messages.
+                     (Directions.None, SeedData.FormDefinitionAppV1),
                  })
         {
             if (existing.Any(f => f.Direction == direction))

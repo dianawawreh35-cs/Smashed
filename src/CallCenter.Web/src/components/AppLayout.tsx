@@ -29,6 +29,10 @@ export default function AppLayout() {
   const sections = [
     { to: '/dashboard', label: t('nav.dashboard') },
     { to: '/calls', label: t('nav.calls') },
+    // Applications, and their reports, beside Calls: the same conversations by
+    // another route (A-70). Their own pages, so Calls stays calls only.
+    { to: '/applications', label: t('nav.applications') },
+    { to: '/application-reports', label: t('nav.applicationReports') },
     { to: '/contacts', label: t('nav.contacts') },
     { to: '/delivery', label: t('nav.delivery') },
     { to: '/menu', label: t('nav.menu') },

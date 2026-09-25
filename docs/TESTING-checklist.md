@@ -347,6 +347,11 @@ must be running: a message is not queued offline (Dia, 25 Sep).
       the filter row and the agent's list, empty at first. *If any label shows
       as a raw key such as `applications.record` or `nav.appLogs`:* the label is
       missing in that language; tell me which.
+- [ ] **The record form uses the page.** One wide card: the app, the number
+      and the time on the start side, "What was the message about?" beside
+      them, and Record and Clear across the bottom. On a very wide screen it
+      stops at about 1,100 pixels, at the start edge, rather than stretching.
+      In Arabic the two halves swap sides.
 - [ ] **Type a known customer's number** (one from Contacts) and pause. Their
       name and address appear under the box. **Type an unknown number:** "New
       customer — not in contacts" and a **Save as new customer** button

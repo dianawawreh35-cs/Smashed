@@ -26,12 +26,36 @@
                   Margin="0,18,0,0"
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
-      <Border Style="{StaticResource Card}" MaxWidth="560" HorizontalAlignment="Left">
-        <StackPanel>
-          <TextBlock Text="{Binding Localizer[applications.recordHeading]}"
+      <!-- The whole page since App logs became its own tab (Dia, 25 Sep):
+           the message on the start side, what it was about beside it, and
+           Record under both. Up to 1100 wide and at the start edge, so on a
+           large screen a line of the form is still one glance. -->
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" MaxWidth="1100" />
+        </Grid.ColumnDefinitions>
+
+      <Border Style="{StaticResource Card}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+
+          <TextBlock Grid.ColumnSpan="3"
+                     Text="{Binding Localizer[applications.recordHeading]}"
                      Foreground="{StaticResource Text}"
                      FontWeight="SemiBold"
                      Margin="0,0,0,12" />
+
+          <!-- ===== The message: which app, who, when ===== -->
+          <StackPanel Grid.Row="1" Grid.Column="0">
 
           <!-- A-73: the channel stays selected from one message to the next. -->
           <TextBlock Text="{Binding Localizer[applications.channel]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
@@ -160,7 +184,15 @@
                    FlowDirection="LeftToRight"
                    ToolTip="{Binding Localizer[applications.timeHint]}" />
 
-          <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,14,0,12" />
+          </StackPanel>
+
+          <Border Grid.Row="1" Grid.Column="1"
+                  Width="1"
+                  Margin="24,0"
+                  Background="{StaticResource BorderSoft}" />
+
+          <!-- ===== What it was about ===== -->
+          <StackPanel Grid.Row="1" Grid.Column="2">
 
           <!-- The Applications form (A-70): the same fields a call's form has,
                designed on their own by the supervisor. Read when Record is
@@ -190,8 +222,11 @@
                      Foreground="{StaticResource Warning}"
                      FontSize="11"
                      TextWrapping="Wrap" />
+          </StackPanel>
 
-          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+          <!-- ===== Record, under both halves ===== -->
+          <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Margin="0,16,0,0">
+          <StackPanel Orientation="Horizontal">
             <Button Content="{Binding Localizer[applications.record]}"
                     Style="{StaticResource PrimaryButton}"
                     MinWidth="140"
@@ -216,8 +251,10 @@
                      Margin="0,8,0,0"
                      TextWrapping="Wrap"
                      Visibility="{Binding RecordFailed, Converter={StaticResource InverseBoolToVisibility}}" />
-        </StackPanel>
+          </StackPanel>
+        </Grid>
       </Border>
+      </Grid>
     </ScrollViewer>
 
   </Grid>

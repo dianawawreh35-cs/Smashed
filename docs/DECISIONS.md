@@ -1843,7 +1843,7 @@ controller rather than working around it.
 The price does not appear on the call pop-up. That needs the caller's address
 matched to an area, and address matching does not exist — A-13 matches phone
 numbers, not places. The agent looks it up on the Delivery tab, which is what
-was asked for.
+was asked for. **Dropped from scope on 25 Sep 2026** (see that day's entry).
 
 ## 2026-09-21 — Two settings that did nothing are gone
 
@@ -4903,6 +4903,17 @@ supervisor changes another agent's classification from three days ago, and it
 is recorded under their name. 78 web tests, 344 server tests with the database,
 the build and lint pass.
 
+---
+
+## 2026-09-25 — The delivery price on the call pop-up is dropped
+
+Dia, 25 Sep: remove it. It was never a requirement. A-65 asks for the Delivery
+tab lookup, which is built. It had sat in "Where to pick up" as a possible
+extra since 20 Sep. It would have needed the caller's address matched to a
+delivery area, which nothing does (A-13 matches numbers, not places), and the
+agent already finds the branch and price on the Delivery tab in a few
+keystrokes. Not to be picked up again unless the client asks for it.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -4928,7 +4939,6 @@ and what comes after:
 | POS customer lookup by phone: a regular check of recent unknown callers, maybe a pop-up prefill | — | the POS endpoint and its details (24 Sep entry) |
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
-| Delivery price on the call pop-up | A-65, A-10 | address matching, which does not exist |
 
 **A-17 works against the real PBX**, confirmed by test calls, and since A-14 the
 rejection is recorded too — a blocked call is reported with status Blocked, so it

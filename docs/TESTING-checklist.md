@@ -266,10 +266,12 @@ there is something to see.
 
 ### 1.9 The dashboard, Call reports, and exporting the calls (S-20, R-01 to R-18, S-05, S-06) — never run
 
-Built 26 Sep. The development database has `dia20`'s real calls (answered,
-missed, rejected, blocked, a few outgoing) and a handful of messages, which is
-enough to see every card with something in it. **Choose This month or a custom
-range from mid-September**, since most of those calls are older than this week.
+Built 26 Sep. `dia20`'s real calls are enough to see every card with
+something in it, but not what a working restaurant looks like. For that, **add
+the demo data** (`tools/demo-data/README.md`): 90 days of realistic traffic
+under five demo agents, removed afterwards with one command and leaving the
+real calls exactly as they were. With it, *This month* and a custom 90-day
+range both have plenty; without it, choose a range from mid-September.
 
 - [ ] **The dashboard is the first page after signing in.** Six tiles for
       today: Communications (large, with "N calls, M messages" under it),

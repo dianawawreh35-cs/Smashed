@@ -372,6 +372,11 @@ must be running: a message is not queued offline (Dia, 25 Sep).
       time and save: "Message updated" and the row's time changes. Fix the
       classification on the "Not classified" row and save: its chip turns
       green.
+- [ ] **The list reads as one row per message** on a wide screen: time, app,
+      customer and number sit together at the start, then the chip and a whole
+      **Open** button. A customer nobody has on file reads "Not in contacts",
+      dimmed, rather than the number twice. *Reported 25 Sep:* Open was cut
+      off at the bottom and the customer column stretched across the table.
 - [ ] **Filters.** Type part of a name or number and pause: the list narrows.
       Pick From / To dates: it narrows. "Clear filters" appears and resets.
 - [ ] **Stop the API and press Record.** An amber offline message, and

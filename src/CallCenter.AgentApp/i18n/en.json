@@ -28,6 +28,7 @@
     "save": "Save changes",
     "readOnly": "Written on an earlier day, so it can no longer be changed. Ask a supervisor.",
     "noNumber": "No number",
+    "notInContacts": "Not in contacts",
     "empty": "Record a message on the left; it appears here at once.",
     "emptyTitle": "No messages yet",
     "noMatches": "No messages match that.",

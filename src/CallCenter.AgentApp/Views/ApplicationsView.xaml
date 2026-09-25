@@ -14,6 +14,23 @@
       <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+
+    <!-- The customer: dimmed when nobody is on file, so the names stand out. -->
+    <Style x:Key="WhoCell" TargetType="TextBlock" BasedOn="{StaticResource TrimmedCell}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsUnknown}" Value="True">
+          <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <!-- The Open button's cell. The theme's rows are 44 high and its cells
+         pad 9 above and below, which leaves 26 for the content; the button
+         needs about 29, so it was drawn with its bottom cut off (Dia's
+         screenshot, 25 Sep). This cell keeps the side padding only. -->
+    <Style x:Key="ButtonCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+      <Setter Property="Padding" Value="8,0" />
+    </Style>
   </UserControl.Resources>
 
   <!-- Two columns: the message being recorded on the start side, the agent's
@@ -326,8 +343,12 @@
                                   ElementStyle="{StaticResource TrimmedCell}" />
               <DataGridTextColumn x:Name="ChannelColumn" Width="Auto" MinWidth="80" MaxWidth="130" Binding="{Binding Channel}"
                                   ElementStyle="{StaticResource TrimmedCell}" />
-              <DataGridTextColumn x:Name="WhoColumn" Width="*" MinWidth="100" Binding="{Binding Who}"
-                                  ElementStyle="{StaticResource TrimmedCell}" />
+              <!-- Sized to the name, not to the window. It was the one star
+                   column, so on a wide screen it took most of the table and
+                   pushed the number, the chip and Open to the far edge. The
+                   spare width now goes to the empty column at the end. -->
+              <DataGridTextColumn x:Name="WhoColumn" Width="Auto" MinWidth="160" MaxWidth="320" Binding="{Binding Who}"
+                                  ElementStyle="{StaticResource WhoCell}" />
               <DataGridTextColumn x:Name="NumberColumn" Width="Auto" MaxWidth="140" Binding="{Binding Number}"
                                   FontFamily="{StaticResource MonoFont}"
                                   ElementStyle="{StaticResource TrimmedCell}" />
@@ -372,19 +393,23 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
 
-              <DataGridTemplateColumn Width="Auto" MinWidth="70">
+              <DataGridTemplateColumn Width="Auto" MinWidth="70" CellStyle="{StaticResource ButtonCell}">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate>
                     <Button Content="{Binding DataContext.Localizer[applications.open],
                                       RelativeSource={RelativeSource AncestorType=DataGrid}}"
                             Style="{StaticResource SmallButton}"
-                            Margin="2"
+                            VerticalAlignment="Center"
                             Command="{Binding DataContext.OpenCommand,
                                       RelativeSource={RelativeSource AncestorType=DataGrid}}"
                             CommandParameter="{Binding}" />
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
+
+              <!-- Takes whatever width is left, so the columns before it stay
+                   together at the start of the row. -->
+              <DataGridTemplateColumn Width="*" />
             </DataGrid.Columns>
           </DataGrid>
         </Grid>

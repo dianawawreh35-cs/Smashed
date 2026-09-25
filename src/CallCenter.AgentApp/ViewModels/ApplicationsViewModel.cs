@@ -773,10 +773,17 @@ public class MessageRow(CommunicationDto message, Localizer localizer)
     /// <summary>Which app it came on (A-72).</summary>
     public string Channel => message.ChannelName ?? string.Empty;
 
-    /// <summary>The customer's name, or the number when nobody is on file.</summary>
+    /// <summary>
+    /// The customer's name, or "Not in contacts" when nobody is on file. Not the
+    /// number: it has its own column beside this one, and printing it twice in
+    /// one row was half of what made the list read as cramped (25 Sep).
+    /// </summary>
     public string Who => string.IsNullOrWhiteSpace(message.ContactName)
-        ? message.RemoteNumberRaw ?? localizer["applications.noNumber"]
+        ? localizer["applications.notInContacts"]
         : message.ContactName!;
+
+    /// <summary>No contact: the name column is dimmed, so a real name stands out.</summary>
+    public bool IsUnknown => string.IsNullOrWhiteSpace(message.ContactName);
 
     public string Number => message.RemoteNumberRaw ?? string.Empty;
 

@@ -37,10 +37,16 @@
        own list beside it (A-70, A-71). Side by side rather than stacked,
        because the form with its classification is as tall as the list, and
        stacking them left one of the two off the screen. -->
+  <!-- Scrolls sideways only when the window is narrower than the list needs:
+       the columns are never cut (Dia, 25 Sep). Root is given a real width in
+       code, never infinity, so its star columns still resolve (22 Sep). -->
+  <ScrollViewer x:Name="Frame"
+                HorizontalScrollBarVisibility="Auto"
+                VerticalScrollBarVisibility="Disabled">
   <Grid x:Name="Root" Margin="28,24">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="370" />
-      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="*" MinWidth="{x:Static local:ApplicationsView.MinListWidth}" />
     </Grid.ColumnDefinitions>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -338,24 +344,30 @@
             </DataGrid.InputBindings>
 
             <DataGrid.Columns>
-              <DataGridTextColumn x:Name="WhenColumn" Width="Auto" MaxWidth="120" Binding="{Binding When}"
+              <DataGridTextColumn x:Name="WhenColumn" Width="116" Binding="{Binding When}"
                                   FontFamily="{StaticResource MonoFont}"
                                   ElementStyle="{StaticResource TrimmedCell}" />
-              <DataGridTextColumn x:Name="ChannelColumn" Width="Auto" MinWidth="80" MaxWidth="130" Binding="{Binding Channel}"
+              <DataGridTextColumn x:Name="ChannelColumn" Width="140" Binding="{Binding Channel}"
                                   ElementStyle="{StaticResource TrimmedCell}" />
-              <!-- Sized to the name, not to the window. It was the one star
-                   column, so on a wide screen it took most of the table and
-                   pushed the number, the chip and Open to the far edge. The
-                   spare width now goes to the empty column at the end. -->
-              <DataGridTextColumn x:Name="WhoColumn" Width="Auto" MinWidth="160" MaxWidth="320" Binding="{Binding Who}"
+              <!-- Every column is a fixed width, measured (25 Sep) against its
+                   longest text in both languages in the app's fonts, plus the
+                   cells' 12 of padding each side: the time 84, the longest app
+                   75, "غير موجود في جهات الاتصال" 154, "+970 569 498 581" 122,
+                   the chip 80, Open 51. Fixed rather than Auto so nothing is
+                   ever cut; they add up to MinListWidth. Only a customer name
+                   longer than about 30 letters, or an app name the supervisor
+                   makes longer than "WhatsApp Business", trims, with the whole
+                   of it in the tooltip. The spare width goes to the empty
+                   column at the end, so the columns stay together. -->
+              <DataGridTextColumn x:Name="WhoColumn" Width="220" Binding="{Binding Who}"
                                   ElementStyle="{StaticResource WhoCell}" />
-              <DataGridTextColumn x:Name="NumberColumn" Width="Auto" MaxWidth="140" Binding="{Binding Number}"
+              <DataGridTextColumn x:Name="NumberColumn" Width="156" Binding="{Binding Number}"
                                   FontFamily="{StaticResource MonoFont}"
                                   ElementStyle="{StaticResource TrimmedCell}" />
 
               <!-- Classified or not (A-41 rule, reused): a chip either way, so
                    a glance shows the work left. -->
-              <DataGridTemplateColumn Width="Auto" MinWidth="100" MaxWidth="180">
+              <DataGridTemplateColumn Width="112">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate>
                     <StackPanel Orientation="Horizontal">
@@ -379,21 +391,12 @@
                                    FontSize="11"
                                    Foreground="{StaticResource Success}" />
                       </Border>
-                      <TextBlock Text="{Binding Notes}"
-                                 ToolTip="{Binding Notes}"
-                                 MaxWidth="70"
-                                 FontSize="11"
-                                 Foreground="{StaticResource TextMuted}"
-                                 TextTrimming="CharacterEllipsis"
-                                 VerticalAlignment="Center"
-                                 Margin="6,0,0,0"
-                                 Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
 
-              <DataGridTemplateColumn Width="Auto" MinWidth="70" CellStyle="{StaticResource ButtonCell}">
+              <DataGridTemplateColumn Width="80" CellStyle="{StaticResource ButtonCell}">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate>
                     <Button Content="{Binding DataContext.Localizer[applications.open],
@@ -557,4 +560,5 @@
       </ScrollViewer>
     </Grid>
   </Grid>
+  </ScrollViewer>
 </UserControl>

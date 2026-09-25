@@ -16,6 +16,16 @@ public partial class ApplicationsView : UserControl
     /// <summary>The least the opened message gets, however small the window.</summary>
     private const double MinOpenMessageHeight = 120;
 
+    /// <summary>
+    /// The width the list needs to show every column whole (Dia, 25 Sep): the
+    /// six fixed columns (824, see the grid), the grid's margin (12), a vertical
+    /// scrollbar (17) and the card's border, rounded up.
+    /// </summary>
+    public const double MinListWidth = 860;
+
+    /// <summary>The record card's column and the gap after it, as the markup sets them.</summary>
+    private const double RecordColumnWidth = 370 + 18;
+
     private readonly ApplicationsViewModel _viewModel;
 
     public ApplicationsView(ApplicationsViewModel viewModel)
@@ -50,6 +60,30 @@ public partial class ApplicationsView : UserControl
         };
 
         Root.SizeChanged += (_, _) => FitOpenMessage();
+
+        // A width from the first layout pass, before the scroller has a size of
+        // its own to report; FitWidth widens it to the window as soon as it does.
+        Root.Width = RecordColumnWidth + MinListWidth;
+        Frame.SizeChanged += (_, _) => FitWidth();
+    }
+
+    /// <summary>
+    /// Gives the content the window's width, or the list's minimum when the
+    /// window is narrower, in which case the section scrolls sideways.
+    /// </summary>
+    /// <remarks>
+    /// Raising the window's own minimum instead would have needed about 1,515
+    /// pixels, wider than a 1366-pixel laptop screen, and for every section,
+    /// not only this one. A width is always set, never left to the scroller:
+    /// a ScrollViewer offers its content unlimited width, and a star column
+    /// cannot be measured against that (22 Sep, the call log's grid).
+    /// </remarks>
+    private void FitWidth()
+    {
+        var margins = Root.Margin.Left + Root.Margin.Right;
+        var available = Frame.ViewportWidth > 0 ? Frame.ViewportWidth : Frame.ActualWidth;
+
+        Root.Width = Math.Max(RecordColumnWidth + MinListWidth, available - margins);
     }
 
     /// <summary>

@@ -377,6 +377,12 @@ must be running: a message is not queued offline (Dia, 25 Sep).
       **Open** button. A customer nobody has on file reads "Not in contacts",
       dimmed, rather than the number twice. *Reported 25 Sep:* Open was cut
       off at the bottom and the customer column stretched across the table.
+- [ ] **Nothing in the list is cut, at any window width.** Shrink the window
+      to its smallest: every column still shows its whole text, and the
+      Applications section scrolls sideways instead (below about 1,515 pixels
+      wide). Widen it again: the scrollbar goes and the columns stay together.
+      Check an unknown customer in Arabic, "غير موجود في جهات الاتصال", the
+      widest text in the list. *If any cell ends in "…":* tell me which.
 - [ ] **Filters.** Type part of a name or number and pause: the list narrows.
       Pick From / To dates: it narrows. "Clear filters" appears and resets.
 - [ ] **Stop the API and press Record.** An amber offline message, and

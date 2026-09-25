@@ -29,6 +29,9 @@ export default function AppLayout() {
   const sections = [
     { to: '/dashboard', label: t('nav.dashboard') },
     { to: '/calls', label: t('nav.calls') },
+    // The call reports right under Calls, as the application reports sit
+    // under Applications (Dia, 25 Sep).
+    { to: '/call-reports', label: t('nav.callReports') },
     // Applications, and their reports, beside Calls: the same conversations by
     // another route (A-70). Their own pages, so Calls stays calls only.
     { to: '/applications', label: t('nav.applications') },

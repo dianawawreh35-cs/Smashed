@@ -2,13 +2,14 @@ import { Fragment, useState } from 'react'
 import type { FormEvent } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { searchCalls, startOfDay, startOfNextDay } from '../api/calls'
+import { exportCalls, searchCalls, startOfDay, startOfNextDay } from '../api/calls'
 import type { CallFilters, CallRow } from '../api/calls'
 import { listClassificationTypes } from '../api/classifications'
 import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
 import CallDetails from '../components/CallDetails'
 import { FilterSelect as Select, Pager } from '../components/SearchControls'
+import { downloadBlob } from '../lib/csv'
 import { formatClock } from '../lib/recordingWav'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
@@ -83,6 +84,7 @@ export default function CallsPage() {
   const [filters, setFilters] = useState<CallFilters>({})
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<'idle' | 'busy' | 'failed'>('idle')
 
   const results = useQuery({
     queryKey: ['calls', 'search', filters, page],
@@ -106,6 +108,18 @@ export default function CallsPage() {
     setDraft(EMPTY)
     setFilters({})
     setPage(1)
+  }
+
+  /** R-02 in full (S-05): the filters applied, every match, as the server writes it. */
+  async function onExport() {
+    setExporting('busy')
+    try {
+      const blob = await exportCalls(filters, arabic ? 'ar' : 'en')
+      downloadBlob(`calls-${new Date().toISOString().slice(0, 10)}`, blob)
+      setExporting('idle')
+    } catch {
+      setExporting('failed')
+    }
   }
 
   const total = results.data?.total ?? 0
@@ -205,7 +219,14 @@ export default function CallsPage() {
         <div className="card overflow-x-auto">
           <div className="flex items-center justify-between px-4 py-3 text-sm text-slate-400">
             <span>{t('calls.count', { count: total })}</span>
-            <Pager page={page} pages={pages} onPage={setPage} />
+            <div className="flex items-center gap-3">
+              {exporting === 'failed' && <span className="text-red-300">{t('calls.exportFailed')}</span>}
+              <button type="button" className="btn-ghost btn-sm" onClick={onExport} disabled={exporting === 'busy'}
+                title={t('calls.exportHint')}>
+                {exporting === 'busy' ? t('calls.exporting') : t('calls.export', { count: total })}
+              </button>
+              <Pager page={page} pages={pages} onPage={setPage} />
+            </div>
           </div>
           <table className="table">
             <thead>

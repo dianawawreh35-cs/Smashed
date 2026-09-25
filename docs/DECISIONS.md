@@ -5285,6 +5285,233 @@ no row; the recording tests now send one. Web: the two report tests check
 there is no "Not classified" column. 359 server (on `callcenter_test`), 143
 shared and 107 web tests pass; the web build and lint pass.
 
+## 2026-09-26 — Call reports and the dashboard (R-01 to R-18, S-05 to S-07, S-20)
+
+The supervisor could search calls and hear them, and had no figures. Now the
+home page is a **dashboard** of today and a chosen period, **Call reports**
+(تقارير المكالمات) sits right under Calls with every report from R-01 to R-18
+except R-11's call-back time, and the **Calls page exports its whole filtered
+result**, which is R-02. Prompt 15.
+
+### Seven decisions Dia made before a line was written
+
+1. **Calls only, except where the point is the comparison.** R-01 counts
+   calls against messages; R-12, R-13 and R-14 compare the phone with the
+   apps; the dashboard shows communications by channel. Everything else is
+   calls. Application reports stays as it was. R-14 is read as one of the
+   comparisons, because "per channel" is in its definition and a
+   per-channel rate of calls alone is one row.
+2. **One page, grouped**, not a page per report: one filter bar, six tabs —
+   Overview (R-01, R-02, R-03, R-04 per day, R-10), Orders and channels
+   (R-12, R-13, R-14), Customers (R-04's recurring, R-16), Agents (R-15,
+   R-04 per agent), Problems (R-05, R-17, R-11), Data quality (R-18). The
+   tab is in the address (`?tab=problems`), so a supervisor can bookmark it.
+3. **Missed is inbound Missed plus Rejected, every row.** I suggested counting
+   a caller once when a colleague answered them from the queue a moment
+   later; Dia chose every row. It is simpler to check against the Calls page,
+   and the figure is labelled on the card.
+4. **R-20, R-21 and abandoned calls are left off until the CDR import
+   (S-55)**, not shown greyed. R-11's card says abandoned calls join when the
+   PBX's call records are imported.
+5. **CSV, not `.xlsx`**, for "export to Excel". It opens in Excel with the
+   Arabic intact (the byte-order mark), and needs no library on the server.
+6. **Agents online is an open session.** I pointed out that 82 of the 93
+   sessions on the development database were never closed, because quitting
+   the Agent App does not sign out, and offered "heard from in the last five
+   minutes" (a column and a migration). Dia chose the open session. The tile
+   says what it counts, and the gap is under Open items.
+7. **No call-back time in R-11 for now.** Dia: it depends on abandoned calls,
+   not on missed or rejected ones. So R-11 is the missed count, its rate, and
+   the list. The SRS row is amended.
+
+### The words, and where each is written
+
+Each is defined once in the server (`CallReportsService`, the "words" block,
+and `CallReportsDto.cs`) and named on the card where a supervisor would
+wonder.
+
+- **Missed**: an incoming call with status Missed or Rejected. **Never
+  NoAnswer**, which is an outgoing call the customer did not pick up (A-21).
+  A Do-not-disturb refusal is logged Missed (see the SRS correction below), so
+  it counts.
+- **Answered**: status Answered. R-01's Answered and Missed are incoming
+  calls; R-15's Handled is answered in both directions.
+- **Average call duration**: `duration_sec`, which is talk time (answered to
+  ended), over answered calls only.
+- **An order**: classified as type Order. **Order value**: the
+  classification's value, on orders only; a cancellation with a value typed on
+  it is not revenue (a test checks it).
+- **Unclassified**: an answered call with no classification (A-41). Messages
+  are always classified (25 Sep).
+- **A customer** is a contact. A call from a number nobody saved is not a
+  customer's: it is left out of recurring, top and inactive customers and of
+  new vs returning, and listed under R-18 instead.
+- **New and returning** (R-16): new means somebody here saved the contact in
+  that period; returning, that it existed before. **A contact nobody here
+  saved — the 15,289 from the old system — is always returning.** Found while
+  writing the checklist: "saved in that period" alone would have made all of
+  them new in the month the system goes live, since the seed saved them then.
+  The seed leaves `created_by` empty and everything saved in the apps fills
+  it, so that is the test.
+- **Follow-up status** (R-05, R-17): the classification's own *Follow-up
+  required* tick and the supervisor's *Resolved* tick. Open is a complaint
+  not marked resolved. `follow_up_tasks` has never been written to, so there is
+  nothing there to read.
+- **Duplicate contacts** (R-18): the same normalised name (ة and ه alike,
+  A-80), not deleted or merged. The same number cannot happen (unique index).
+  A shared name is a question, not a fault: the old system's book already has
+  1,056 of them.
+- **Internal calls** (S-48) are left out of every figure, as the SRS has
+  always said and nothing applied until now. They stay in the Calls page and
+  in R-02's export, which are the record.
+- **Inactive customers** (R-16) are measured back from today over every order
+  ever, not within the period; the agent and branch filters still apply.
+- **Peak hours** (R-10) count incoming calls only: the calls agents make are
+  not demand.
+
+### One set of machinery, not two
+
+As the prompt asked, nothing was copied from the application reports:
+
+- **`ReportScope`** holds S-07's filter (`ReportFilter`, with a kind that is
+  null for the comparisons), the internal numbers, and the restaurant's day,
+  week and hour. The application reports' `Filter` moved there.
+- **`ReportCube`** (next section) counts for both sets of reports.
+  `ApplicationReportsService` was moved onto it, and R-13 in the call reports
+  *is* its orders report with no kind, so that report exists once.
+- **`ReportCard`** draws every report on both pages, and **the filter bar**
+  moved out of the Application reports page into `ReportFilterBar`, which the
+  call reports and the dashboard use too. The Application reports page is
+  unchanged to look at, and its tests pass untouched.
+- **R-02 is the call search.** `GET /api/communications/search/export` takes
+  exactly the search's filters (one `SearchQuery` class for both, so they
+  cannot drift) and streams every match as CSV, headings and words in the
+  supervisor's language. It is built on the server because a list's export
+  from the browser would be a page of it (20 Sep). The report cards export in
+  the browser because their rows are the whole report.
+
+### Speed (N-02): measured, then moved into SQL
+
+`tools/report-probe` fills a scratch database with a year of synthetic
+traffic (180,310 communications: 166,068 calls, 14,242 messages, 133,366
+classifications) and times every endpoint over the full year. The first
+version fetched the rows a filter named and grouped them in C#, as the
+application reports did:
+
+| Report, one year | Rows fetched and grouped in C# | Grouped in SQL, 64 MB work_mem |
+|---|---|---|
+| R-01 per day | 3.03 s | 0.44 s |
+| R-01 per month | 3.28 s | 0.38 s |
+| R-03 per type | 3.29 s | 0.20 s |
+| R-04 per day / per agent | 3.47 / 3.51 s | 0.28 / 0.22 s |
+| R-04 recurring customers (15,240) | 3.31 s | 0.53 s |
+| R-05 complaints per branch | 3.61 s | 0.21 s |
+| R-05 repeat complainers | 3.69 s | 0.47 s |
+| R-13 order value per channel | 3.31 s | 0.21 s |
+| S-20 the four period charts | 4.36 s | 0.81 s |
+| R-10, R-11, R-12, R-14, R-15, R-16, R-18 | — (built on SQL) | 0.17 – 0.56 s |
+| Lists: complaints (9,657), missed (25,312), cancellations | 0.11 s | unchanged |
+| S-20 today | 0.03 s | 0.05 s |
+| **R-02 export, every call of the year (166,068 rows)** | 3.32 s | **2.83 s** |
+
+Everything that read the year was inside N-02's five seconds and over the
+two the task set, so it moved. Three things were learnt on the way:
+
+- **Moving rows was the cost, then the plan was.** Grouping in SQL first
+  brought R-01 only to 2.9 s. `EXPLAIN ANALYZE` showed PostgreSQL misjudging
+  the rows (23,000 expected, 90,000 found), choosing to sort and group, and
+  the sort spilling to disk under the default 4 MB `work_mem`. With 64 MB it
+  hashes in memory: the same query in 342 ms. `ReportCube` sets 64 MB on its
+  own connection for the one query; Npgsql's pool resets a connection's
+  session (DISCARD ALL) when it is handed back, so nothing else inherits it.
+- **The restaurant's day stays .NET's.** Bucketing by local date in
+  PostgreSQL would use PostgreSQL's time-zone rules for Hebron, and Palestine
+  sets its clock-change dates late. So .NET cuts the period where the offset
+  changes (`ReportCube.Segments`) and the query adds the offset it is given.
+  A test checks the pieces join without gaps and each has its own offset.
+  An epoch-arithmetic version was tried and was slower (680 ms).
+- **The filters are written twice, deliberately**: once in LINQ
+  (`ReportScope.Narrow`, for the lists) and once in SQL (`ReportCube`, for
+  the figures). The acceptance test compares a list with the figures over one
+  known day, which is what would catch them drifting.
+
+**The export stays over two seconds**: 2.8 s for a whole year of calls. It is
+a list, so there is nothing to group, and it reads every row, so no index
+helps. It is a file download, inside N-02's five, and streamed, so memory
+does not grow with it. Not changed.
+
+No index was added: every report reads the whole period, and the one index a
+period needs (`ix_comm_started`) already exists. No migration.
+
+### Charts (S-06), following the dataviz guidance
+
+Bars for categories, a line for time (a single day is a bar, since a line
+needs two points), never two measures of different scale on one axis, the
+three validated series colours of 25 Sep in fixed order, a legend only for
+two or more series. **R-10 is a heat table**: the table itself, each cell
+printed with its number, shaded in the brand blue from faint to strong, an
+empty hour left plain, and a "fewer … more" scale under it. The strongest
+shade is capped at 60% so the cell's ink keeps 5.7:1 contrast (at 75% it fell
+to 3.9:1). **The dashboard's figures are stat tiles**, not charts: each is one
+number, and Communications is the one large figure.
+
+**Found and built: charts download as an image.** S-06 says charts "can be
+downloaded as an image for presentations", and neither report page could.
+Every chart, the dashboard's included, now has *Download image*: the SVG
+painted onto a canvas at twice its size, on the card's dark background, as a
+PNG. Recharts draws its legend as HTML outside the SVG, so the legend is
+painted onto the picture separately; a picture of two lines would otherwise
+tell them apart by colour alone. Not covered by a test, because the test
+browser has no canvas; checklist 1.9.
+
+### A correction to the SRS: Do not disturb is logged Missed
+
+A-18 said a call turned away by Do not disturb "is logged **Busy**". There is
+no Busy status; the Agent App has always logged it **Missed**
+(`CallLogReporter`), which is also what a second call during a call is. The
+SRS was wrong, not the code, and the row is corrected. It matters here because
+it means those refusals are in the missed figures.
+
+### Not built, and why
+
+- **R-19**, the daily e-mail: a *Could*, not this task.
+- **R-20, R-21, and the abandoned half of R-11**: need the CDR import (S-55).
+  Left off rather than shown empty (decision 4).
+- **R-11's time until called back**: decision 7.
+- **Agents online** counts sign-ins never signed out (decision 6).
+
+### Tested
+
+Server, against `callcenter_test` (`CallReportsTests`):
+
+- **The acceptance line as a test.** One known day, a random one years back
+  so nothing else falls on it: two agents, two branches, answered and missed
+  and rejected and blocked and not-answered calls, orders with values,
+  complaints with a follow-up and a resolution two hours later, an
+  unclassified call, a message, an internal call, and a call the next day.
+  R-01 to R-05 are checked figure by figure **for each branch**, the
+  period's edge, and R-02's export against the search: the same 11 rows, a
+  byte-order mark, a comma in a note quoted, the Arabic headings.
+- **Phase 2 on the same day**, each definition's edge: a NoAnswer not
+  counted as missed; the internal call in no figure; the unknown numbers not
+  customers; a cancellation's value not revenue; talk time averaged over
+  answered calls only; a contact nobody saved never new; inactive measured
+  from today; two contacts whose names differ only by ة and ه listed as one
+  name.
+- **The dashboard's today** by difference, before and after five
+  communications and one sign-in; **the clock segments** without a database.
+- `ApplicationsTests`' report test passes unchanged on the new machinery.
+
+Web: 10 new — the call reports' figures and totals, the branch filter sent to
+every card, groupings sent to the server, only the open tab fetched, a
+complaint's follow-up status and its export row by row, the heat table's
+cells and shading, the Phase 2 tabs, Arabic; the dashboard's tiles and its
+period; the Calls page's full export sent with the applied filters and no
+page.
+
+**363 server tests (on `callcenter_test`), 143 shared and 117 web pass; the web
+build and lint pass. Not yet seen running**: checklist 1.9.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -5310,11 +5537,14 @@ and what comes after:
 | POS customer lookup by phone: a regular check of recent unknown callers, maybe a pop-up prefill | — | the POS endpoint and its details (24 Sep entry) |
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
+| Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
+| Agents online counts only live apps: close the session when the app quits, or record when each session was last heard from | S-20 | Dia's decision, 26 Sep: an open session for now. 82 of 93 on the dev database were never closed |
+| R-20, R-21, abandoned calls in R-11, and R-11's time until called back | R-11, R-20, R-21 | the CDR import (S-55) |
 
 **A-17 works against the real PBX**, confirmed by test calls, and since A-14 the
 rejection is recorded too — a blocked call is reported with status Blocked, so it
-reaches the supervisor's reports as the requirement asks. Nothing displays it
-yet, which is the general gap below rather than one of A-17's.
+reaches the supervisor's reports as the requirement asks: the Calls page lists
+it, and R-01 counts it in its own column (26 Sep).
 
 One piece of A-17 stays open and cannot be closed in the Agent App:
 **declining is not hanging up.** The PBX decides what the caller hears next, so
@@ -5433,9 +5663,6 @@ there at all. See the 19 September CDR entry.
   command that works is
   `Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'"` and reading the
   command line.
-- **Nothing displays the calls being recorded.** The rows accumulate and no
-  screen reads them, so a mistake in what is stored would not be visible to
-  anybody until the reports are built.
 - **Step 10 of the server runbook still describes the old agent setup**: two
   extensions per agent and a default branch. One extension per agent came in on
   17 September, and `users.default_branch_id` has been dropped. Rewrite it

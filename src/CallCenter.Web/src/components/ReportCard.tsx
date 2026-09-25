@@ -11,7 +11,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { downloadCsv, toCsv } from '../lib/csv'
+import { chartToPng } from '../lib/chartImage'
+import { downloadBlob, downloadCsv, toCsv } from '../lib/csv'
 import type { CsvCell } from '../lib/csv'
 
 /**
@@ -34,6 +35,26 @@ export interface ReportColumn<T> {
   numeric?: boolean
   /** Summed in a last row. Only for a count or an amount, never an average. */
   total?: boolean
+  /**
+   * A heat table's cell (S-06, R-10): shaded by its value against the largest
+   * in the heat columns, one hue, more is brighter.
+   */
+  heat?: boolean
+}
+
+/**
+ * A heat cell's shade: the first series colour, the brand blue, from nearly
+ * the card's own surface for "almost none" to strong for the most (dataviz:
+ * sequential is one hue, light to dark — on this dark card, faint to bright).
+ * Zero is left unshaded, so an empty hour reads as empty. The number is
+ * always printed, in the brightest ink: the shade adds, it never carries the
+ * value alone. Capped at 60% so that ink keeps 5.7:1 on the strongest shade
+ * (at 75% it fell to 3.9:1, under the 4.5 small text needs).
+ */
+function heatStyle(value: number, max: number): React.CSSProperties | undefined {
+  if (value <= 0 || max <= 0) return undefined
+  const alpha = 0.1 + 0.5 * (value / max)
+  return { backgroundColor: `rgba(79, 140, 255, ${alpha.toFixed(3)})`, color: '#f1f5f9' }
 }
 
 export interface ReportSeries<T> {
@@ -68,6 +89,7 @@ export default function ReportCard<T>({
   error,
   chart,
   exportName,
+  limit,
   children,
 }: {
   title: string
@@ -79,6 +101,12 @@ export default function ReportCard<T>({
   chart?: ReportChartSpec<T>
   /** The file name without .csv. */
   exportName: string
+  /**
+   * For a report that is a list (the complaints, the customers): how many rows
+   * to draw. The export still holds every row, and the card says so, because
+   * a year of complaints is a file to open, not a page to scroll.
+   */
+  limit?: number
   /** Controls that belong to this report alone, such as its grouping. */
   children?: React.ReactNode
 }) {
@@ -91,6 +119,11 @@ export default function ReportCard<T>({
 
   const number = (v: CsvCell) => (typeof v === 'number' ? v.toLocaleString(i18n.language) : (v ?? ''))
   const totals = columns.some((c) => c.total)
+  const shown = rows && limit !== undefined && rows.length > limit ? rows.slice(0, limit) : rows
+  const heatColumns = columns.filter((c) => c.heat)
+  const heatMax = rows && heatColumns.length > 0
+    ? Math.max(0, ...rows.flatMap((r) => heatColumns.map((c) => Number(c.value(r)) || 0)))
+    : 0
 
   return (
     <section className="card" aria-label={title}>
@@ -119,7 +152,7 @@ export default function ReportCard<T>({
           // Held at reduced opacity while a new slice loads, not replaced by a
           // skeleton: the layout must not jump every time a filter changes.
           <div className={loading ? 'opacity-60 transition' : 'transition'}>
-            {chart && <ReportChart rows={rows} spec={chart} />}
+            {chart && <ReportChart rows={rows} spec={chart} imageName={exportName} />}
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
@@ -130,10 +163,11 @@ export default function ReportCard<T>({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, i) => (
+                  {shown!.map((row, i) => (
                     <tr key={i}>
                       {columns.map((c) => (
-                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined} dir={c.numeric ? 'ltr' : undefined}>
+                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined} dir={c.numeric ? 'ltr' : undefined}
+                          style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax) : undefined}>
                           {c.format ? c.format(row) : number(c.value(row))}
                         </td>
                       ))}
@@ -155,6 +189,22 @@ export default function ReportCard<T>({
                 </tbody>
               </table>
             </div>
+            {heatMax > 0 && (
+              // The scale, so the shade is never the only way to read a cell:
+              // the number is in it, and this says which way the shade runs.
+              <div className="mt-2 flex items-center gap-2 text-xs text-slate-400" aria-hidden="true">
+                <span>{t('callReports.fewer')}</span>
+                {[0.25, 0.5, 0.75, 1].map((f) => (
+                  <span key={f} className="inline-block h-3 w-6 rounded-sm" style={heatStyle(f, 1)} />
+                ))}
+                <span>{t('callReports.more')}</span>
+              </div>
+            )}
+            {shown !== rows && (
+              <p className="mt-2 text-sm text-slate-400">
+                {t('callReports.limited', { shown: shown!.length, total: rows.length })}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -182,11 +232,30 @@ const CHART_HEIGHT = 240
  * on the right, so the chart reads the way the Arabic table beside it does.
  * The SVG itself is drawn left-to-right, or the text anchors would mirror.
  */
-function ReportChart<T>({ rows, spec }: { rows: T[]; spec: ReportChartSpec<T> }) {
-  const { i18n } = useTranslation()
+export function ReportChart<T>({ rows, spec, imageName }: {
+  rows: T[]
+  spec: ReportChartSpec<T>
+  /** The picture's file name without .png (S-06: a chart can be downloaded as an image). */
+  imageName: string
+}) {
+  const { t, i18n } = useTranslation()
   const rtl = i18n.dir() === 'rtl'
   const ref = useRef<HTMLDivElement>(null)
   const width = useWidth(ref)
+  const [saving, setSaving] = useState<'idle' | 'busy' | 'failed'>('idle')
+
+  async function onDownload() {
+    const svg = ref.current?.querySelector('svg.recharts-surface') as SVGSVGElement | null
+    if (!svg) return
+    setSaving('busy')
+    try {
+      const legend = spec.series.map((s) => ({ label: s.label, colour: s.colour }))
+      downloadBlob(`${imageName}.png`, await chartToPng(svg, legend, rtl))
+      setSaving('idle')
+    } catch {
+      setSaving('failed')
+    }
+  }
 
   const data = rows.map((row) => {
     const point: Record<string, unknown> = { x: spec.x(row) }
@@ -231,7 +300,8 @@ function ReportChart<T>({ rows, spec }: { rows: T[]; spec: ReportChartSpec<T> })
   )
 
   return (
-    <div ref={ref} dir="ltr" className="mb-4 w-full" style={{ height: CHART_HEIGHT }} data-testid="report-chart">
+    <div className="mb-4">
+    <div ref={ref} dir="ltr" className="w-full" style={{ height: CHART_HEIGHT }} data-testid="report-chart">
       {width > 0 && spec.kind === 'bar' && (
         <BarChart width={width} height={CHART_HEIGHT} data={data} barGap={2} barCategoryGap="30%">
           {axes}
@@ -258,6 +328,13 @@ function ReportChart<T>({ rows, spec }: { rows: T[]; spec: ReportChartSpec<T> })
           ))}
         </LineChart>
       )}
+    </div>
+    <div className="mt-1 flex items-center justify-end gap-2 text-sm">
+      {saving === 'failed' && <span className="text-red-300">{t('callReports.imageFailed')}</span>}
+      <button type="button" className="btn-quiet btn-sm" onClick={onDownload} disabled={saving === 'busy' || width === 0}>
+        {t('callReports.downloadImage')}
+      </button>
+    </div>
     </div>
   )
 }

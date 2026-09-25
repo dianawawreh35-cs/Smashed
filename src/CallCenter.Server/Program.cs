@@ -77,6 +77,8 @@ try
     builder.Services.AddScoped<CallCenter.Server.Features.Applications.ApplicationsService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Channels.ChannelsService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Reports.ApplicationReportsService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Reports.CallReportsService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Reports.ReportCube>();
     builder.Services.AddScoped<CallCenter.Server.Features.Communications.RecordingRetention>();
 
     // A-33: the nightly pass that deletes recordings older than

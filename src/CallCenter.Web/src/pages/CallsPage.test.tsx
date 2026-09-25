@@ -76,6 +76,10 @@ function recordingWithHold(): ArrayBuffer {
 /** The server, by URL. */
 function server() {
   return vi.fn().mockImplementation(async (url: string) => {
+    if (url.startsWith('/api/communications/search/export')) {
+      return { ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'content-type': 'text/csv' }),
+        blob: async () => new Blob(['Date,Time'], { type: 'text/csv' }) } as unknown as Response
+    }
     if (url.startsWith('/api/communications/search')) return jsonResponse({ rows: [ROW, EXPIRED], total: 2, page: 1, pageSize: 50 })
     if (url === '/api/communications/c1') return jsonResponse(DETAILS(ROW))
     if (url === '/api/communications/c2') return jsonResponse(DETAILS(EXPIRED))
@@ -99,7 +103,8 @@ function renderPage() {
 }
 
 const searches = (fetchMock: ReturnType<typeof vi.fn>) =>
-  fetchMock.mock.calls.map(([url]) => String(url)).filter((url) => url.startsWith('/api/communications/search'))
+  fetchMock.mock.calls.map(([url]) => String(url))
+    .filter((url) => url.startsWith('/api/communications/search') && !url.startsWith('/api/communications/search/export'))
 
 beforeEach(async () => {
   setToken('supervisor-token')
@@ -233,5 +238,28 @@ describe('calls page', () => {
 
     expect(await screen.findByText(/deleted when its retention period ended/)).toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/recordings/c2'))).toBe(false)
+  })
+
+  it('exports every call matching the applied filters from the server, not the page on screen (R-02, S-05)', async () => {
+    const fetchMock = server()
+    vi.stubGlobal('fetch', fetchMock)
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderPage()
+    await screen.findAllByRole('row')
+
+    fireEvent.change(screen.getByLabelText('Number or name'), { target: { value: '0599' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(searches(fetchMock).at(-1)).toContain('q=0599'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export all 2 (CSV)' }))
+
+    await waitFor(() => expect(click).toHaveBeenCalled())
+    const exported = fetchMock.mock.calls.map(([url]) => String(url)).find((url) => url.startsWith('/api/communications/search/export'))!
+    const query = new URL(exported, 'http://x').searchParams
+    expect(query.get('q')).toBe('0599')
+    expect(query.get('lang')).toBe('en')
+    // The whole result: no page, no page size.
+    expect(query.has('page')).toBe(false)
+    expect(query.has('pageSize')).toBe(false)
   })
 })

@@ -264,6 +264,72 @@ there is something to see.
       message open, Application reports, Settings › Channels and the
       Classification page in **each language**.
 
+### 1.9 The dashboard, Call reports, and exporting the calls (S-20, R-01 to R-18, S-05, S-06) — never run
+
+Built 26 Sep. The development database has `dia20`'s real calls (answered,
+missed, rejected, blocked, a few outgoing) and a handful of messages, which is
+enough to see every card with something in it. **Choose This month or a custom
+range from mid-September**, since most of those calls are older than this week.
+
+- [ ] **The dashboard is the first page after signing in.** Six tiles for
+      today: Communications (large, with "N calls, M messages" under it),
+      Orders (with "worth …"), Complaints, Missed calls, Unclassified calls,
+      Agents online. Under them, today by type and by channel. Then a period
+      bar (presets and dates only, no agent or branch) and four charts: per
+      day (a line), per type, per channel, per hour (all 24 hours).
+      *If Agents online looks too high:* expected. It counts sign-ins that
+      were never signed out, and closing the Agent App does not sign out
+      (decision of 26 Sep); tell me the number and I'll say whether it's that.
+- [ ] **Make a call and miss it**, or record a message in the Agent App: the
+      tile changes within a minute without reloading.
+- [ ] **Call reports is in the sidebar right after Calls.** One filter bar,
+      then six tabs: Overview, Orders and channels, Customers, Agents,
+      Problems, Data quality. Changing a filter or a tab updates the cards
+      with no jump.
+- [ ] **Overview.** *Communications* per day / week / month: calls, messages,
+      incoming, outgoing, answered, missed, blocked. **Check one day against
+      the Calls page:** filter Calls to that day and count the missed and
+      rejected incoming ones; the report's Missed is that number. An
+      outgoing call nobody answered is **not** in it. The card under it links
+      to Calls. *Calls per type* has a share column that adds to 100%.
+      *Peak hours* is a grid of hours by weekday, each cell with its number,
+      the busy ones a stronger blue, empty ones plain, with a "fewer … more"
+      scale under it.
+- [ ] **Branch filter.** Pick a branch: every card on the tab changes, and
+      the Communications total is the Calls page's count for that branch and
+      period (incoming + outgoing), plus messages.
+- [ ] **Orders and channels.** Orders per channel (Phone and each app, with
+      shares), orders over time phone vs apps, order value by channel /
+      branch / agent / day, cancellation rate, and the list of cancellations
+      with their notes.
+- [ ] **Customers.** Recurring customers (called more than once), new vs
+      returning per month (the old system's customers are *returning*), top
+      50 by orders or by value, and customers to win back with a number of
+      days you can change. None of them lists a number nobody saved.
+- [ ] **Agents.** Per agent: handled, incoming answered, outgoing made,
+      average talk time as m:ss, orders, value, unclassified, missed.
+- [ ] **Problems.** Complaints with follow-up and status; complaints per
+      branch / agent with hours to resolve and per 100 orders; repeat
+      complainers; missed calls per day / hour / agent with the rate; every
+      missed call with its note.
+- [ ] **Data quality.** Four figures, the numbers nobody saved, and the
+      names more than one contact shares (about a thousand from the old
+      system; that is the old data, not a fault).
+- [ ] **Export CSV** on any card, opened in Excel: Arabic readable, the same
+      rows as the table. On a long list (over 200 rows) the card says it shows
+      the first 200 and the export has them all; check the file has more.
+- [ ] **Download image** under any chart saves a PNG on the dark card
+      background. Open it: the bars or lines are there, and a chart with two
+      series has its legend drawn under it. *If the picture is blank or has
+      no text:* tell me which chart and which browser.
+- [ ] **Calls page: Export all N (CSV).** Filter to a few days, press it:
+      a file downloads with **every** matching call, not the 50 on the page
+      (the row count is N). Headings are in the language you're reading in.
+      Try it in both languages.
+- [ ] **Everything above in Arabic.** Screenshots, **in each language**, of:
+      the dashboard; Call reports' Overview (Peak hours visible); the
+      Problems tab; and one chart's downloaded picture.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.

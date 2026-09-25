@@ -113,6 +113,16 @@ export const searchCalls = (filters: CallFilters, page: number, pageSize = 50) =
     query: { ...filters, page, pageSize } as Record<string, string | number | boolean | undefined>,
   })
 
+/**
+ * R-02: every call matching the filters, as the CSV the server builds (S-05).
+ * The whole result, not the page on screen: exporting a page would lie the
+ * way filtering one does (20 Sep). Headings in the supervisor's language.
+ */
+export const exportCalls = (filters: CallFilters, lang: string) =>
+  requestBlob('/communications/search/export', {
+    query: { ...filters, lang } as Record<string, string | number | boolean | undefined>,
+  })
+
 export const callDetails = (id: string) => api.get<CallDetails>(`/communications/${id}`)
 
 export const callClassification = (id: string) => api.get<CallClassification>(`/classifications/${id}`)

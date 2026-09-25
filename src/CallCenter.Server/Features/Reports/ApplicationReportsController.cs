@@ -65,7 +65,7 @@ public class ApplicationReportsController(ApplicationReportsService reports) : C
         Ok(await reports.IssuesAsync(Filter(from, to, agentId, branchId, channelId, typeId), ct));
 
     /// <summary>Messages only. The call reports will pass <see cref="CommunicationKinds.Call"/> here when they are built.</summary>
-    private static ApplicationReportsService.Filter Filter(
+    private static ReportFilter Filter(
         DateTimeOffset? from, DateTimeOffset? to, Guid? agentId, Guid? branchId, Guid? channelId, Guid? typeId) =>
         new(from, to, agentId, branchId, channelId, typeId, CommunicationKinds.App);
 }

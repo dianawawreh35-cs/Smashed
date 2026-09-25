@@ -82,6 +82,17 @@ public class CallSearchService(CallCenterDbContext db)
         return new CallSearchPageDto(rows, total, page, pageSize);
     }
 
+    /// <summary>
+    /// Every call matching <paramref name="filter"/>, newest first, unpaged: R-02,
+    /// "all calls with all details", exported in full (S-05). Streamed, so a
+    /// year of calls is never held in memory at once.
+    /// </summary>
+    public IAsyncEnumerable<CallSearchRowDto> ExportAsync(Filter filter) =>
+        Project(Apply(db.Communications.AsNoTracking(), filter)
+                .OrderByDescending(c => c.StartedAt)
+                .ThenBy(c => c.Id))
+            .AsAsyncEnumerable();
+
     /// <summary>One call in full, or null when there is no such call.</summary>
     public async Task<CallDetailsDto?> DetailsAsync(Guid id, CancellationToken ct = default)
     {

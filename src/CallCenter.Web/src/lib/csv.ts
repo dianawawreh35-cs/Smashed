@@ -37,11 +37,19 @@ export function toCsv(headers: string[], rows: CsvCell[][]): string {
 
 /** Hands the browser the file to save, as a download of the given name. */
 export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  downloadBlob(filename, new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+}
+
+/**
+ * The same, for a file built elsewhere: R-02's full list from the server
+ * (S-05), or a chart drawn as a picture (S-06). A name without an extension
+ * gets `.csv`.
+ */
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = filename.endsWith('.csv') ? filename : `${filename}.csv`
+  anchor.download = /\.[a-z0-9]+$/i.test(filename) ? filename : `${filename}.csv`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

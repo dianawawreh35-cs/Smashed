@@ -18,7 +18,8 @@
     "classification": "Classification",
     "calls": "Calls",
     "applications": "Applications",
-    "applicationReports": "Application reports"
+    "applicationReports": "Application reports",
+    "callReports": "Call reports"
   },
   "login": {
     "heading": "Sign in",
@@ -38,7 +39,33 @@
   },
   "dashboard": {
     "heading": "Dashboard",
-    "placeholder": "No metrics wired up yet."
+    "intro": "Today at a glance, then the chosen period in four charts. Calls and application messages together.",
+    "today": "Today",
+    "failed": "The figures could not be loaded. Check the server is running.",
+    "tiles": {
+      "communications": "Communications",
+      "split": "{{calls}} calls, {{messages}} messages",
+      "orders": "Orders",
+      "worth": "worth {{value}}",
+      "complaints": "Complaints",
+      "missed": "Missed calls",
+      "missedNote": "Incoming calls missed or rejected. An outgoing call nobody picked up is not counted.",
+      "unclassified": "Unclassified calls",
+      "unclassifiedNote": "Answered calls with no type yet.",
+      "agentsOnline": "Agents online",
+      "agentsOnlineNote": "Signed in to the Agent App. An agent who closed the app without signing out still counts."
+    },
+    "byType": "Today by type",
+    "byChannel": "Today by channel",
+    "nothingToday": "Nothing yet today.",
+    "period": "The period",
+    "communications": "Communications",
+    "charts": {
+      "perDay": "Communications per day",
+      "perType": "Per type",
+      "perChannel": "Per channel",
+      "perHour": "Per hour of the day"
+    }
   },
   "common": {
     "notConnected": "Not connected",
@@ -489,7 +516,11 @@
         "type_not_offered": "This form does not offer that type. Choose another."
       },
       "notOfferedType": "This form no longer offers the call's type. Choose another type to save."
-    }
+    },
+    "export": "Export all {{count}} (CSV)",
+    "exportHint": "Every call that matches the filters, not only this page. Opens in Excel.",
+    "exporting": "Exporting…",
+    "exportFailed": "The export could not be made. Check the server is running."
   },
   "applications": {
     "heading": "Applications",
@@ -594,5 +625,192 @@
       "server_error": "The server reported an error. Please try again.",
       "server_unreachable": "The server could not be reached."
     }
+  },
+  "callReports": {
+    "heading": "Call reports",
+    "intro": "The calls: how many, what they were about, who took them, and what went wrong. Calls only, except where a report compares the phone with the apps.",
+    "limited": "Showing the first {{shown}} of {{total}}. Export CSV has them all.",
+    "resolved": "Resolved",
+    "open": "Open",
+    "tabs": {
+      "overview": "Overview",
+      "orders": "Orders and channels",
+      "customers": "Customers",
+      "agents": "Agents",
+      "problems": "Problems",
+      "quality": "Data quality"
+    },
+    "columns": {
+      "period": "Period",
+      "communications": "Communications",
+      "calls": "Calls",
+      "messages": "Messages",
+      "inbound": "Incoming",
+      "outbound": "Outgoing",
+      "answered": "Answered",
+      "missed": "Missed",
+      "blocked": "Blocked",
+      "type": "Type",
+      "share": "Share",
+      "orders": "Orders",
+      "orderValue": "Order value",
+      "customer": "Customer",
+      "number": "Number",
+      "lastCall": "Last call",
+      "complaints": "Complaints",
+      "when": "When",
+      "agent": "Agent",
+      "branch": "Branch",
+      "notes": "Notes",
+      "followUp": "Follow-up",
+      "status": "Status",
+      "resolved": "Resolved",
+      "open": "Open",
+      "hoursToResolve": "Hours to resolve",
+      "perHundredOrders": "Per 100 orders",
+      "hour": "Hour",
+      "total": "Total",
+      "channel": "Channel",
+      "phoneOrders": "Phone orders",
+      "appOrders": "App orders",
+      "phoneValue": "Phone value",
+      "appValue": "App value",
+      "average": "Average order",
+      "cancellations": "Cancellations",
+      "cancellationRate": "Cancellation rate",
+      "customers": "Customers",
+      "new": "New",
+      "returning": "Returning",
+      "lastOrder": "Last order",
+      "handled": "Handled",
+      "inboundAnswered": "Incoming answered",
+      "outboundMade": "Outgoing made",
+      "averageDuration": "Average talk time",
+      "unclassified": "Unclassified",
+      "missedOnly": "Missed",
+      "rejected": "Rejected",
+      "missedRate": "Missed rate",
+      "measure": "Measure",
+      "count": "Count",
+      "firstCall": "First call",
+      "name": "Name",
+      "contacts": "Contacts",
+      "numbers": "Numbers"
+    },
+    "sections": {
+      "summary": {
+        "title": "Communications",
+        "hint": "Calls and application messages in each period. Answered and missed are incoming calls; missed counts missed and rejected, never an outgoing call nobody picked up. Internal calls are left out."
+      },
+      "list": {
+        "title": "Every call, with all its details",
+        "hint": "The full list is the Calls page: filter it there, then Export for every matching call.",
+        "link": "Open Calls"
+      },
+      "byType": {
+        "title": "Calls per type",
+        "hint": "What the classified calls were about, and each type's share of them. Unclassified calls are not in the shares."
+      },
+      "breakdown": {
+        "title": "Calls per day, agent or branch",
+        "hint": "Calls, answered and missed, and what they were about, grouped as you choose. An order is a call classified as Order."
+      },
+      "byAgent": {
+        "title": "Calls per agent",
+        "hint": "What each agent's calls were: answered, missed, and their types."
+      },
+      "recurring": {
+        "title": "Recurring customers",
+        "hint": "Customers who called more than once in the period, most calls first. A number nobody saved is not a customer."
+      },
+      "complaints": {
+        "title": "Complaints",
+        "hint": "Every complaint call, newest first. Follow-up is the agent's tick; Resolved is set by a supervisor on the call."
+      },
+      "complaintsBy": {
+        "title": "Complaints per branch and agent",
+        "hint": "How many, how many needed a follow-up and how many are resolved, the hours from the call to its resolution, and complaints per 100 orders."
+      },
+      "repeat": {
+        "title": "Repeat complainers",
+        "hint": "Customers who complained more than once in the period."
+      },
+      "peakHours": {
+        "title": "Peak hours",
+        "hint": "Incoming calls in each hour of each weekday, for staffing: the stronger the blue, the busier. Calls the agents made are not demand and are not counted."
+      },
+      "ordersByChannel": {
+        "title": "Orders by channel",
+        "hint": "Phone against each app: how many orders, what they came to, and each channel's share of all orders."
+      },
+      "ordersTrend": {
+        "title": "Orders over time, phone and apps",
+        "hint": "Orders taken by phone and through the apps in each day, week or month."
+      },
+      "orderValue": {
+        "title": "Order value",
+        "hint": "Total and average order value, phone and apps together, grouped as you choose. A cancellation with a value on it is not revenue."
+      },
+      "cancellations": {
+        "title": "Cancellation rate",
+        "hint": "Cancellations against orders, phone and apps together, per branch, channel or agent."
+      },
+      "cancellationList": {
+        "title": "Cancellations, with their notes",
+        "hint": "Every cancellation in the period, newest first, by phone or through an app."
+      },
+      "customerBase": {
+        "title": "New and returning customers",
+        "hint": "Customers who called in each period. New means first saved in that period; the customers carried over from the old system count as returning."
+      },
+      "topCustomers": {
+        "title": "Top customers",
+        "hint": "The 50 customers with the most orders, or the most order value, in the period."
+      },
+      "inactive": {
+        "title": "Customers to win back",
+        "hint": "Customers who have ordered before but not in the last days you choose, counted back from today over every order they ever placed — not only the period above."
+      },
+      "productivity": {
+        "title": "Agent productivity",
+        "hint": "Per agent: calls handled (answered, in and out), average talk time over answered calls, orders and their value, answered calls left unclassified, and missed calls on their extension."
+      },
+      "missed": {
+        "title": "Missed calls",
+        "hint": "Incoming calls missed or rejected, and their share of all incoming calls. An outgoing call nobody picked up is not a missed call. Calls abandoned in the queue will join once the PBX's call records are imported."
+      },
+      "missedList": {
+        "title": "Every missed call",
+        "hint": "Newest first, with the note the agent left on it."
+      },
+      "quality": {
+        "title": "Data quality",
+        "hint": "What is missing or doubtful in the period. Unclassified calls can be found on the Calls page with Classified: No."
+      },
+      "unknownNumbers": {
+        "title": "Numbers nobody saved",
+        "hint": "Numbers that called or were called and are not on any contact, most calls first."
+      },
+      "duplicateNames": {
+        "title": "Names shared by more than one contact",
+        "hint": "Contacts with the same name, however it is spelt. A shared name is a question, not a mistake: common names are common. Merging two contacts is not built yet (A-63). Not limited to the period."
+      }
+    },
+    "fewer": "fewer",
+    "more": "more",
+    "rankBy": "Rank by",
+    "rank": {
+      "orders": "Orders",
+      "value": "Order value"
+    },
+    "days": "No order in (days)",
+    "quality": {
+      "unclassified": "Answered calls not classified",
+      "unknownCalls": "Calls from numbers nobody saved",
+      "unknownNumbers": "Different numbers nobody saved",
+      "duplicateNames": "Names shared by more than one contact"
+    },
+    "downloadImage": "Download image",
+    "imageFailed": "The picture could not be made."
   }
 }

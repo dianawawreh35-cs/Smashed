@@ -60,7 +60,7 @@ public class SeedDataTests
     public void Channels_match_the_schema_and_only_phone_is_a_system_channel()
     {
         SeedData.Channels.Select(c => c.Name)
-            .Should().Equal("Phone", "WhatsApp", "Facebook", "Instagram", "Wheels");
+            .Should().Equal("Phone", "WhatsApp", "Facebook", "Instagram", "Wheels", "Yummy", "FoodOnTime", "PalEat");
 
         SeedData.Channels.Where(c => c.IsSystem).Select(c => c.Name)
             .Should().ContainSingle("calls are always attributed to Phone, so it cannot be deleted")

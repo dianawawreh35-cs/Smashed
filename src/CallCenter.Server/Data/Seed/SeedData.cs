@@ -399,6 +399,10 @@ public static class SeedData
         ("Facebook", false),
         ("Instagram", false),
         ("Wheels", false),
+        // Dia, 25 Sep: the three other delivery apps the restaurant is on.
+        ("Yummy", false),
+        ("FoodOnTime", false),
+        ("PalEat", false),
     ];
 
     /// <summary>

@@ -26,9 +26,28 @@ namespace CallCenter.Server.Tests;
 /// earlier runs left can leak in.
 /// </remarks>
 [Collection(ApiCollection.Name)]
-public class ApplicationsTests(CallCenterApiFactory factory)
+public class ApplicationsTests(CallCenterApiFactory factory) : IAsyncLifetime
 {
     private readonly TestData data = new(factory);
+
+    /// <summary>The channels this test made, removed when it ends.</summary>
+    private readonly List<Guid> channels = [];
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Channels are the one thing these tests make that a person sees: they are
+    /// the dropdown on the Settings page and in the Agent App, and a hundred
+    /// runs left a hundred "WhatsApp 1a2b3c4d" rows there (25 Sep). Everything
+    /// else a test creates is named so it cannot collide and is left, as the
+    /// TestData rules say; the channels and the messages on them are removed.
+    /// </summary>
+    public Task DisposeAsync() => data.QueryAsync(async db =>
+    {
+        await db.Communications.Where(c => channels.Contains(c.ChannelId)).ExecuteDeleteAsync();
+        await db.Channels.Where(c => channels.Contains(c.Id)).ExecuteDeleteAsync();
+        return 0;
+    });
 
     // ---- recording (A-70) --------------------------------------------------
 
@@ -646,6 +665,9 @@ public class ApplicationsTests(CallCenterApiFactory factory)
                 FacebookName: facebook.Name, Branch: branch.Id, Order: order, Complaint: complaint,
                 Cancellation: cancellation, Form: form.Version, Answered: answered.Id);
         });
+
+        // After the save: the ids come from the database, so before it they are empty.
+        channels.AddRange([ids.WhatsApp, ids.Facebook]);
 
         return new Scenario(data)
         {

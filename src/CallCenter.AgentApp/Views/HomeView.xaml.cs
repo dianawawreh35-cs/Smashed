@@ -25,8 +25,13 @@ public partial class HomeView : UserControl
         AddSection("nav.callLog", new CallLogView(services.GetRequiredService<CallLogViewModel>()));
 
         // A-70: conversations that came on an app rather than by phone. Its own
-        // section, next to the call log, which stays calls only.
-        AddSection("nav.applications", new ApplicationsView(services.GetRequiredService<ApplicationsViewModel>()));
+        // section, next to the call log, which stays calls only. Recording one
+        // is Applications; the agent's own list is App logs, a tab of its own
+        // (Dia, 25 Sep). One view model for both, so what is recorded in one is
+        // listed in the other the moment it is saved.
+        var applications = services.GetRequiredService<ApplicationsViewModel>();
+        AddSection("nav.applications", new ApplicationsView(applications));
+        AddSection("nav.appLogs", new AppLogsView(applications));
 
         AddSection("nav.contacts", new ContactsView(services.GetRequiredService<ContactsViewModel>()));
 

@@ -5228,6 +5228,31 @@ Complaint, and an inbound call is still an Order; the form that was current is
 put back afterwards. 358 server, 143 shared and 107 web tests pass; the web
 build and lint pass. **Not yet seen running:** checklist 1.3b.
 
+---
+
+## 2026-09-25 — In the Agent App, App logs is its own tab, beside Applications
+
+Dia, 25 Sep, on seeing Applications: the agent's list of their own application
+conversations goes in **its own tab, App logs** (سجل التطبيقات), not beside the
+recording form. The Agent App only. The supervisor app's Applications page and
+Application reports stay as they are, and nothing that was built is removed.
+
+- **Applications** is now only the card for recording one (A-70), at most 560
+  wide, not stretched across the window.
+- **App logs** is the agent's own list with its filters and the opened message
+  under it (A-71): today's edited there, older ones read only. It is the same
+  markup and behaviour as before, moved. It refreshes each time the tab is
+  shown, so it is current however long the agent spent recording.
+- **One view model for both** (`ApplicationsViewModel`, registered transient,
+  resolved once in `HomeView` and given to both views). So a message recorded in
+  Applications is in App logs the moment it is saved, and the two can never
+  disagree. Two instances would have meant two lists and two sets of channels.
+- The list no longer shares the width with the form, so App logs scrolls sideways
+  only below about 900 pixels rather than 1,515.
+
+Agent App builds; 143 shared tests (labels) pass. Checklist Round 2,
+"Applications".
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

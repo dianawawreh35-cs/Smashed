@@ -339,14 +339,15 @@ Built 25 Sep. A message is a WhatsApp, Facebook, Instagram or Wheels
 conversation the agent records by hand. None of this needs a call. The API
 must be running: a message is not queued offline (Dia, 25 Sep).
 
-- [ ] **The rail has a new section, التطبيقات / Applications, right under
-      Call log.** Click it. Left: a card "Record a message" with App (a
+- [ ] **The rail has two new sections under Call log: التطبيقات /
+      Applications, then سجل التطبيقات / App logs** (split 25 Sep at Dia's
+      request). **Applications** holds only the card "Record a message": App (a
       dropdown, **no "Phone" in it**, the first app pre-selected), the
       customer's number (already focused), Time (now, HH:mm), then the
-      Applications classification form, and Record / Clear. Right: the filter
-      row and an empty list saying there are no messages yet. *If any label
-      shows as a raw key such as `applications.record`:* the label is missing
-      in that language; tell me which.
+      Applications classification form, and Record / Clear. **App logs** holds
+      the filter row and the agent's list, empty at first. *If any label shows
+      as a raw key such as `applications.record` or `nav.appLogs`:* the label is
+      missing in that language; tell me which.
 - [ ] **Type a known customer's number** (one from Contacts) and pause. Their
       name and address appear under the box. **Type an unknown number:** "New
       customer — not in contacts" and a **Save as new customer** button
@@ -356,8 +357,9 @@ must be running: a message is not queued offline (Dia, 25 Sep).
 - [ ] **Record a classified message.** Pick a type and branch, fill any
       required field, press **Record message**. A green "Message recorded";
       the number clears, the time resets to now, and the form redraws with the
-      **same app and the same branch still selected** (A-73). The message is at
-      the top of the list with a green "Classified" chip.
+      **same app and the same branch still selected** (A-73). Switch to **App
+      logs**: the message is at the top of the list with a green "Classified"
+      chip.
 - [ ] **Record one with no type chosen.** It is recorded and shows the amber
       "Not classified" chip, like a skipped call. **Record one with a type but a
       required field empty:** an amber "half filled in" message and nothing is
@@ -366,7 +368,7 @@ must be running: a message is not queued offline (Dia, 25 Sep).
       with an amber message about the time. Type "abc" as the time: "Enter the
       time as HH:mm". Set it to an hour ago and record: accepted, and the row
       shows that hour.
-- [ ] **Open a row** (double-click, or its Open button). Under the list,
+- [ ] **In App logs, open a row** (double-click, or its Open button). Under the list,
       **without the list moving**: a details line, App / Number / Time boxes
       with Save changes, then the classification form prefilled. Change the
       time and save: "Message updated" and the row's time changes. Fix the
@@ -379,8 +381,7 @@ must be running: a message is not queued offline (Dia, 25 Sep).
       off at the bottom and the customer column stretched across the table.
 - [ ] **Nothing in the list is cut, at any window width.** Shrink the window
       to its smallest: every column still shows its whole text, and the
-      Applications section scrolls sideways instead (below about 1,515 pixels
-      wide). Widen it again: the scrollbar goes and the columns stay together.
+      App logs tab scrolls sideways instead (below about 900 pixels wide). Widen it again: the scrollbar goes and the columns stay together.
       Check an unknown customer in Arabic, "غير موجود في جهات الاتصال", the
       widest text in the list. *If any cell ends in "…":* tell me which.
 - [ ] **Filters.** Type part of a name or number and pause: the list narrows.

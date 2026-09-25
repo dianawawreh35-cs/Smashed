@@ -5,7 +5,7 @@
     "language": "Language"
   },
   "applications": {
-    "intro": "Conversations that came on WhatsApp, Facebook, Instagram or another app, not by phone. Record one here; your own messages are listed beside it - only yours.",
+    "intro": "Conversations that came on WhatsApp, Facebook, Instagram or another app, not by phone. Record one here; your own are listed under App logs.",
     "recordHeading": "Record a message",
     "channel": "App",
     "number": "Customer's number",
@@ -247,7 +247,8 @@
     "contacts": "Contacts",
     "delivery": "Delivery",
     "dial": "Dial",
-    "menu": "Menu"
+    "menu": "Menu",
+    "appLogs": "App logs"
   },
   "sip": {
     "idle": "Not registered",
@@ -264,5 +265,8 @@
     "registrationFailed": "Extensions refused — ask your supervisor",
     "retrying": "Cannot reach the PBX — retrying",
     "noExtension": "Signed in — no extension configured"
+  },
+  "appLogs": {
+    "intro": "Your own application conversations: today's can be edited, older ones are read only."
   }
 }

@@ -31,10 +31,10 @@ namespace CallCenter.Server.Features.Contacts;
 /// short number, where every internal extension would collide.
 /// </para>
 /// <para>
-/// <b>The POS lookup will use this.</b> A planned job will ask the restaurant's
-/// POS about recent callers nobody has on file, and create or fill in their
-/// contacts. Those contacts then need their calls, and this is how they get
-/// them (DECISIONS, 24 Sep).
+/// <b>The POS lookup uses this too</b> (A-67). <c>PosCustomerSync</c> asks the
+/// restaurant's POS about recent callers nobody has on file, and creates or
+/// fills in their contacts. Those contacts then need their calls, and this is
+/// how they get them (DECISIONS, 24 and 26 Sep).
 /// </para>
 /// </remarks>
 public class ContactCallLinker(CallCenterDbContext db, ILogger<ContactCallLinker> logger)

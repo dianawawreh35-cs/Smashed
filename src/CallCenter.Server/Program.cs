@@ -85,6 +85,17 @@ try
     // recording.retention_days and keeps their rows. It reads the setting on
     // every run, so a change on the settings screen needs no restart.
     builder.Services.AddHostedService<CallCenter.Server.Workers.RecordingRetentionWorker>();
+
+    // A-67: every few minutes, ask the restaurant POS about recent callers
+    // nobody has on file, and make or fill in their contacts. Off until
+    // PosLookup:Token is set (POS_LOOKUP_TOKEN in .env).
+    builder.Services.AddOptions<CallCenter.Server.Features.Pos.PosLookupOptions>()
+        .Bind(builder.Configuration.GetSection(CallCenter.Server.Features.Pos.PosLookupOptions.SectionName));
+    builder.Services.AddHttpClient<CallCenter.Server.Features.Pos.IPosCustomerLookup,
+        CallCenter.Server.Features.Pos.PosCustomerClient>(http => http.Timeout = TimeSpan.FromSeconds(15));
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pos.PosLookupLedger>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Pos.PosCustomerSync>();
+    builder.Services.AddHostedService<CallCenter.Server.Workers.PosLookupWorker>();
     builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();
     builder.Services.AddOptions<MenuImageOptions>()

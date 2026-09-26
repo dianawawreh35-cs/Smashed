@@ -50,6 +50,8 @@ services:
       Jwt__SigningKey: ${JWT_SECRET}
       # Encrypts the agents' SIP secrets in the users table.
       Security__SipSecretKey: ${SIP_SECRET_KEY}
+      # The POS customer lookup (A-67). Blank leaves it off.
+      PosLookup__Token: ${POS_LOOKUP_TOKEN:-}
       Recordings__Path: /data/recordings
       # The menu photographs (A-66). A folder rather than rows, because the
       # nightly rsync copies unchanged files once and pg_dump re-dumps them

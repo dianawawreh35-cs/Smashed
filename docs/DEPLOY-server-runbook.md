@@ -146,9 +146,17 @@ CDR__KEYPATH=/opt/callcenter/secrets/cdrpull
 CDR__REMOTEPATH=/var/log/asterisk/cdr-csv/Master.csv
 CDR__INTERVALSECONDS=300
 RECORDING_RETENTION_DAYS=90
+POS_LOOKUP_TOKEN=<the token the POS issued>
 TZ=Asia/Hebron
 ```
 Generate random values with `openssl rand -base64 48`.
+
+`POS_LOOKUP_TOKEN` is the bearer token for the POS's customer lookup. With it,
+every five minutes the server asks the POS about recent callers nobody has on
+file, and creates or fills in their contacts (A-67). It is not random: it is
+the value the POS side gave you, and it goes in the password manager beside the
+others. Left blank, the lookup stays off and the log says so once at startup.
+The server needs outbound HTTPS to `smashed-ps.com` for it.
 
 **The PBX address isn't in this file.** It's the `pbx.host` setting in the
 supervisor app, and it's set in step 7. Older copies had `PBX_IP` or `PBX_HOST`

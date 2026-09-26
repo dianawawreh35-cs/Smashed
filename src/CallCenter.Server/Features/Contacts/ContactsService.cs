@@ -448,7 +448,7 @@ public class ContactsService(CallCenterDbContext db, ContactCallLinker calls, IL
     /// than an empty string on purpose: a bare number saved for flagging (S-45)
     /// must not match every other nameless contact.
     /// </summary>
-    private static string? NormalisedName(string? name)
+    internal static string? NormalisedName(string? name)
     {
         var normalised = NameNormalizer.Normalize(name);
         return normalised.Length == 0 ? null : normalised;
@@ -539,7 +539,7 @@ public class ContactsService(CallCenterDbContext db, ContactCallLinker calls, IL
             Recent: history);
     }
 
-    private static JsonDocument Snapshot(Contact contact) => JsonSerializer.SerializeToDocument(new
+    internal static JsonDocument Snapshot(Contact contact) => JsonSerializer.SerializeToDocument(new
     {
         contact.Name,
         contact.Address,

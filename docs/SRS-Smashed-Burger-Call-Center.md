@@ -168,6 +168,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | A-62 | Contact details page: information plus the full history of communications (calls and app orders) from all agents, with type and notes. Recordings on this page are playable only for the viewing agent's own calls; supervisors can play all. | Must |
 | A-63 | Create and edit contacts. A phone number already on another contact is refused, and the refusal names the contact that holds it so the agent can open it instead. A **matching name** is a warning, never a refusal: when a new contact is given a name an existing contact already has, the agent is shown those contacts and chooses — add this number to that person, or save a separate contact. Names are never matched automatically: common names are common, and silently merging two customers would mix their order histories with no way to unpick them. Merging two existing contacts is a separate, deliberate action. | Must |
 | A-64 | Import contacts from Excel/CSV (initial load by the supervisor). | Should |
+| A-67 | **Contacts from the POS.** Every five minutes the server asks the restaurant's POS about the numbers that called in the last two days and have no contact, or a contact with no name or no address. A customer the POS knows becomes a contact (name, address with city, notes, and the POS's second number unless another contact already has it), and their earlier calls are attached to it as when an agent saves a contact (A-11). **The contact wins:** the POS only fills a field that is empty, never overwrites what an agent typed, and never sets VIP or Blocked (S-45). A number the POS does not know is asked about again after an hour, since the order is often entered after the call, until its calls are two days old. Extensions and foreign numbers are never sent. A POS that cannot be reached is skipped until the next run; nothing is shown to agents. Off until the POS token is set in the server's settings file. | Should |
 
 ### 3.7a Delivery areas
 
@@ -350,7 +351,7 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 - **Blocked numbers — note:** rejection by the Agent App means the PBX still receives the call and, in a queue, may offer it to other agents or send it to the failover destination after all apps reject it — so the caller may experience being held rather than cut off, and nothing the Agent App sends can change that. Blocking at the PBX level, through Issabel's own **Blacklist** screen, stops the call before it enters the queue: no ringing, no queue, no agent involved. With no inbound port to the PBX there is no way to write that list automatically, so it is loaded by hand from the S-46 export. **Recommended for every persistent nuisance caller**, not merely optional.
 - **Issabel — server side:** the PBX accepts **no inbound connections**, so AMI and database access are out (4.5). The server instead **fetches Asterisk's CDR file over SFTP** — `/var/log/asterisk/cdr-csv/Master.csv`, outbound, key-based, on a short interval — and reads from the byte offset it last reached (S-55). The only PBX-side requirements are `cdr_csv` enabled with `loguniqueid=yes` in `/etc/asterisk/cdr.conf`, and a restricted SFTP account scoped to that directory. The server reaches the PBX over the VPN, outbound only. No licensed Issabel add-on is required — the Contact Center (Asternic) module would provide the same figures ready-made, but this project does not depend on it.
 - **Messaging and delivery apps:** manual entry in this version. Automated WhatsApp Business API, Instagram/Facebook and delivery-app integrations are possible future phases (they require internet access, business verification and per-message fees).
-- **POS:** not integrated in this version; order value is entered by the agent. A future phase may import customers or order totals from the POS if it offers an export or API.
+- **POS:** customer lookup only (A-67): `GET https://smashed-ps.com/api/CustLookup/{number}` with a bearer token, outbound HTTPS from the server. The POS answers to the local form of a number only (`0599123456`; `970…` and `+970…` are "not found"), returns a list with the customer's name, two numbers, address, city, notes and a blacklist flag, and answers 404 for a number it does not know. Order value is still entered by the agent; order totals are not imported.
 
 ---
 
@@ -386,7 +387,7 @@ Calls that are abandoned while waiting in the queue, or that time out because al
 ## 9. Out of Scope (this version)
 
 - Automated integration with WhatsApp, Facebook, Instagram or delivery apps.
-- POS integration; menu, pricing or delivery management.
+- POS integration beyond the customer lookup (A-67); menu, pricing or delivery management.
 - Remote access from outside the restaurant network (can be added with a VPN).
 - IVR, queues, ring-group changes or any PBX reconfiguration beyond creating extensions.
 - Mobile apps for agents.

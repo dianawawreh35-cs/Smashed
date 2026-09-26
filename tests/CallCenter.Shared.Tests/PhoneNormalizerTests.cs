@@ -120,6 +120,21 @@ public class PhoneNormalizerTests
         PhoneNormalizer.Format(input).Should().Be(expected);
     }
 
+    [Theory]
+    [InlineData("970599123456", "0599123456")]
+    [InlineData("+970 59 912 3456", "0599123456")]
+    [InlineData("0569-498-581", "0569498581")]
+    [InlineData("97022345678", "022345678")]
+    [InlineData("972501234567", "0501234567")]
+    [InlineData("+442071234567", null)]
+    [InlineData("101", null)]
+    [InlineData("", null)]
+    public void ToNational_gives_the_number_as_dialled_at_home(string input, string? expected)
+    {
+        // The only form the POS answers to (A-67).
+        PhoneNormalizer.ToNational(input).Should().Be(expected);
+    }
+
     [Fact]
     public void Normalize_is_idempotent()
     {

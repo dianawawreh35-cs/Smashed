@@ -4600,6 +4600,9 @@ classification does, and a new call drops it unsaved.
 
 ### Planned, not built: the POS customer lookup
 
+*Item 1 was built on 26 Sep (A-67). See that day's entry, which also answers
+the questions below.*
+
 Dia, 24 Sep: the restaurant's POS system will soon offer an endpoint to look a
 customer up by phone number. The plan, **documented only, nothing built** until
 the endpoint and its details exist:
@@ -5541,6 +5544,114 @@ names now read سارة (تجريبي) and so on. The READMEs of `tools/demo-dat
 `tools/report-probe` give only that way now. Real data was never affected:
 the apps and the seed write through Npgsql, which sends UTF-8.
 
+## 2026-09-26 — Contacts from the POS (A-67)
+
+Dia, 26 Sep: the POS's lookup is ready,
+`GET https://smashed-ps.com/api/CustLookup/{number}` with a bearer token, "use
+it to look up recent calls every while and add them to the contacts". That is
+item 1 of the plan in the 24 Sep entry, now built. Item 2, the pop-up prefill,
+is not.
+
+### What the POS actually does
+
+Found by asking it, before any code:
+
+- **Only the local form works.** `0569498581` and `0569-498-581` are found.
+  `569498581`, `970569498581` and `+970569498581` are all 404. So the number
+  goes out through a new `PhoneNormalizer.ToNational` (`9705…` becomes `05…`,
+  `9702…` becomes `02…`, `972…` the same). Extensions and foreign numbers
+  have no local form and are never sent.
+- **A number it does not know is 404**, not an empty list. A 404 is the one
+  answer that means "not a customer". Any other failure (401, 5xx, a timeout)
+  stops the run and the number waits for the next one. A failed request is
+  never taken for "not a customer".
+- **About half a second an answer.** Fast enough that the pop-up prefill is
+  worth trying later; the pop-up has a one-second budget (A-81).
+- **The answer:** a list of `CU_ID`, `Name`, `Phone`, `Phone2`, `Address1`,
+  `City`, `Notes`, `CU_BL` (blacklist), `LOrder`, `TOrders`. `LOrder` read
+  13:45 in Dia's sample and 13:56 on a lookup eleven minutes later, with
+  `TOrders` 0 both times, so it may be the time of the lookup rather than of
+  the last order. Neither is used.
+
+### How it works
+
+`PosLookupWorker` runs `PosCustomerSync` every 5 minutes, starting 1 minute
+after the server does. A run:
+
+1. Takes every number that called in the **last 2 days** and has **no
+   contact**, or a contact with **no name or no address** (a bare number the
+   supervisor flagged, a customer saved in a hurry, an imported customer with
+   no address). Newest callers first, at most 100 a run.
+2. Skips any number asked about in the **last hour**. The order is usually
+   typed into the POS during or after the call, so "not found" five minutes
+   after the call often becomes "found" later. Remembered in memory, not in a
+   table: a restart asks about each recent number once more, a few dozen
+   half-second requests, and that costs less than a table that holds nothing
+   else.
+3. For a customer the POS knows:
+   - **No contact with that number** (exact, else last nine digits, as the
+     caller lookup matches, A-13): a new contact with the name, the address
+     as `City - Address1` (the city alone if there is no street, and not
+     repeated if the street already names it), the POS notes, the number in
+     its local form as primary, and `Phone2` if it is a real number no other
+     contact has (A-63). A POS record with neither name nor address makes no
+     contact.
+   - **A contact already has the number:** only its **empty** name, address
+     or notes are filled. **The contact wins.** An agent typed it after
+     speaking to the customer, which answers the 24 Sep question of which side
+     wins.
+   - Either way, `ContactCallLinker` attaches the number's calls that have no
+     contact, the same way as when an agent saves the contact.
+4. **VIP and Blocked are never touched** (S-45). `CU_BL` true is logged, not
+   acted on: blocking rejects a customer's calls, and that is the supervisor's
+   decision.
+
+`created_by` is empty on a contact the POS made, and the audit log records
+`pos-create` or `pos-fill` with no user (N-06). An agent saving the same number
+at the same moment wins: the POS's save fails on the unique number, is logged,
+and is dropped.
+
+### Configuration
+
+Section `PosLookup` in `appsettings.json`: `BaseUrl`, `Interval`, `Lookback`,
+`RetryAfter`, `MaxPerRun`, and `Token`, which is **blank in git**. Production
+sets `POS_LOOKUP_TOKEN` in `.env` (runbook step 5, `.env.example`,
+`docker-compose.yml`). This machine has it in `dotnet user-secrets`, which
+only Development reads. **No token, no requests:** the worker logs "off" once
+and stops, and that is what keeps the test host from asking the real POS about
+made-up numbers. These are file settings, not supervisor settings. There is
+nothing on the settings screen for this yet.
+
+### First run on the dev database
+
+About 88 numbers were due: 72 with no contact (70 of them demo calls) and 16
+with an incomplete contact. The demo numbers are random `059…` numbers, so one
+could belong to a real POS customer, whose contact would then carry demo calls.
+Removing the demo data deletes those calls and leaves the contact, a real
+customer, as a real call would have.
+
+**Seen running, 26 Sep 14:06**, on the dev server with the real POS: 87
+numbers asked in 11 seconds, 86 not known, 1 contact created (POS customer
+8109, Dia's own number), and 16 earlier calls attached to it. The contact
+reads ضياء نواورة, address `رام الله - ترست للتأمين - …`, notes ويلز نقدي
+(trailing spaces trimmed), number `0569498581` as primary, not blocked, no
+`created_by`, one `pos-create` audit row with no user. None of the 16
+incomplete contacts were known to the POS. **Not yet seen in the apps**:
+the contact in the Contacts tab and its calls in the history.
+
+### Tested
+
+`PosLookupTests`, 9: an unknown caller becomes a contact with both numbers,
+the address and notes, and both earlier calls (one in `+970` form) attached;
+an existing contact's name is kept, its empty address filled, and a POS
+blacklist does not block it; a number the POS did not know is not asked about
+twice within the hour, and is after it; a complete contact is not asked about;
+a POS that is down stops the run and leaves the number due; the client sends
+`0569498581` with the bearer token and reads the POS's own captured answer,
+Arabic included; 404 is "not a customer" and 401 throws; an extension or a
+foreign number is never sent. `ToNational` has 8 cases in the shared tests.
+372 server tests pass against `callcenter_test`, and 151 shared.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -5563,7 +5674,9 @@ and what comes after:
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |
-| POS customer lookup by phone: a regular check of recent unknown callers, maybe a pop-up prefill | — | the POS endpoint and its details (24 Sep entry) |
+| POS customer lookup: the regular check of recent callers | A-67 | **built 26 Sep and seen creating a contact on the dev server**. Still to see: that contact and its calls in the Contacts tab. The server needs `POS_LOOKUP_TOKEN` in `.env` when it is installed |
+| POS pop-up prefill: when our lookup finds nobody, fill the new-customer form from the POS for the agent to confirm | — | nothing. The POS answers in about half a second, inside A-81's one second (26 Sep entry) |
+| POS lookup on the supervisor's screens: last run, how many found, whether the POS is reachable | — | Dia's call. Today it is only in the server log |
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |

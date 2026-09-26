@@ -71,6 +71,19 @@ dotnet CallCenter.Server.dll --urls http://localhost:5000
 The server applies any pending database migrations on startup, so a schema
 change needs nothing more than a restart.
 
+**The POS lookup (A-67) runs only with a token.** On this machine it is in
+user-secrets, outside the repository, and only the Development environment
+reads it:
+
+```powershell
+dotnet user-secrets set "PosLookup:Token" "<token>" --project src\CallCenter.Server
+dotnet user-secrets remove "PosLookup:Token" --project src\CallCenter.Server   # to turn it off
+```
+
+With it, the dev server asks the real POS about the dev database's recent
+unknown callers, demo calls included, and creates contacts for those it knows.
+Without it, the log says "The POS customer lookup is off" once at startup.
+
 ### Agent App
 
 ```powershell

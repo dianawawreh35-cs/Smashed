@@ -158,6 +158,34 @@ public static class PhoneNormalizer
     }
 
     /// <summary>
+    /// The number as it is dialled at home: <c>0599123456</c> for
+    /// <c>970599123456</c>, <c>022345678</c> for <c>97022345678</c>. Returns
+    /// <see langword="null"/> for an extension or a foreign number, which have no
+    /// such form.
+    /// </summary>
+    /// <remarks>
+    /// The restaurant's POS stores and looks customers up by this form only;
+    /// it answers <c>970…</c>, <c>+970…</c> and the bare subscriber number with
+    /// "not found" (A-67). <c>972</c> numbers get the same treatment, since the
+    /// local form is the same whichever plan the line is on.
+    /// </remarks>
+    public static string? ToNational(string? input)
+    {
+        var normalized = Normalize(input);
+
+        foreach (var code in new[] { PalestineCountryCode, IsraelCountryCode })
+        {
+            if (normalized.StartsWith(code, StringComparison.Ordinal)
+                && normalized.Length - code.Length is 8 or 9)
+            {
+                return "0" + normalized[code.Length..];
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// <see langword="true"/> when <paramref name="input"/> normalises to a
     /// Palestinian number (country code <c>970</c>).
     /// </summary>

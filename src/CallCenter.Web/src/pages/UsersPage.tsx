@@ -12,7 +12,8 @@ import {
 } from '../api/users'
 import type { User } from '../api/users'
 import type { AgentPhone } from '../api/pbxAgents'
-import { ListenBar, PhoneBadge, useAgentPhones, useListen } from '../components/AgentPhones'
+import { ListenBar, PhoneBadge } from '../components/AgentPhones'
+import { useAgentPhones, useListen } from '../lib/agentPhones'
 
 /**
  * Accounts and extensions (S-42), and what each agent's phone is doing now

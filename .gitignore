@@ -78,6 +78,10 @@ deploy/data/*
 *.sqlite3
 *.wav
 *.gsm
+# The menu photographs a development server stores (MenuImages:Path is
+# data/menu-images, relative to the server project; Windows folds it into Data).
+# The shipped photographs are embedded from Data/Seed/MenuImages instead.
+src/CallCenter.Server/[Dd]ata/menu-images/
 
 ## ---------- OS ----------
 .DS_Store

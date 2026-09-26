@@ -426,7 +426,7 @@ Point a local API at it and confirm calls and contacts are there.
 
 **Work**
 1. Supervisor app → Users → add 5 agents: name, login, customer extension + SIP password, internal extension + SIP password, default branch. (Customer = the one the queue rings and that calls customers; internal = agents and branches. SRS 2.3.)
-2. On each of the 4 laptops: browse to `http://192.168.1.100/downloads/AgentApp-Setup.exe`, install, first-run: server address `192.168.1.100`, choose microphone/speaker, log in as an agent.
+2. On each of the 4 laptops: install the Agent App, choose microphone/speaker, log in as an agent. **The app has no screen for the server address.** It reads `Server:BaseUrl` from the `appsettings.json` beside the program, which must be `http://192.168.1.100`. The file in the repo says `http://localhost:5000`, for development, so set it in the build that goes to the laptops. The download link `http://192.168.1.100/downloads/AgentApp-Setup.exe` and the installer are not built yet (DECISIONS, open items). Until they are, copy the published folder as `RELEASING.md` describes.
 3. Windows Firewall prompt → **Allow** on private networks. If missed: Windows Security → Firewall → Allow an app → tick the Agent App.
 4. Test on each laptop: internal call between two agents (pop-up, audio both ways, recording plays back, classification form opens), then a real call from a mobile through the trunk.
 5. Log out and log in as a different agent on the same laptop; confirm the other agent's extensions register and only their calls show.

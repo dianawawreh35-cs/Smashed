@@ -4,8 +4,11 @@
 #   docker compose up -d
 #
 # The API runs with network_mode: host so it uses the host's VPN route to the
-# PBX, for the abandoned-call import (runbook step 8). It makes no SIP or audio connection:
-# the softphone runs on each agent's laptop.
+# PBX: for the abandoned-call import (runbook step 8), and for the SIP calls
+# and subscriptions made from the server's own extension (S-46, S-60, S-61,
+# S-62). Host networking also means the PBX's replies and the listen-in's
+# sound reach the API with no Docker NAT in the way. The agents' softphones
+# still run on their laptops.
 
 services:
   db:

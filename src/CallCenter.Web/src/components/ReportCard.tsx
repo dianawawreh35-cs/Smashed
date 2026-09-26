@@ -157,12 +157,12 @@ export default function ReportCard<T>({
               <table className="table">
                 <thead>
                   <tr>
-                    {/* A number's heading sits over its numbers, at the end of
-                        the column. `!` because `.table thead th` sets text-start
-                        and outranks a plain utility: without it every heading sat
-                        at the start while its numbers sat at the end. */}
+                    {/* A number column is centred, heading and figures alike, so
+                        each figure sits under its heading in either language
+                        (Dia, 26 Sep). `!` because `.table thead th` sets
+                        text-start and outranks a plain utility. */}
                     {columns.map((c) => (
-                      <th key={c.key} className={c.numeric ? '!text-end' : undefined}>{c.label}</th>
+                      <th key={c.key} className={c.numeric ? '!text-center' : undefined}>{c.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -170,10 +170,9 @@ export default function ReportCard<T>({
                   {shown!.map((row, i) => (
                     <tr key={i}>
                       {columns.map((c) => (
-                        // The cell ends where the page ends (the left in Arabic),
-                        // like its heading; only the figure itself is kept
-                        // left-to-right, so 1,587.74 reads the same in both.
-                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined}
+                        // Centred under its heading; only the figure itself is
+                        // held left-to-right, so 1,587.74 reads the same in both.
+                        <td key={c.key} className={c.numeric ? 'tabular text-center' : undefined}
                           style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax) : undefined}>
                           {c.numeric
                             ? <span dir="ltr">{c.format ? c.format(row) : number(c.value(row))}</span>
@@ -185,7 +184,7 @@ export default function ReportCard<T>({
                   {totals && (
                     <tr className="font-semibold text-slate-100">
                       {columns.map((c, i) => (
-                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined}>
+                        <td key={c.key} className={c.numeric ? 'tabular text-center' : undefined}>
                           {i === 0
                             ? t('applicationReports.total')
                             : c.total

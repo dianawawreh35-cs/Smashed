@@ -5520,13 +5520,16 @@ showed two faults.
 **Every number heading sat at the start of its column while its numbers sat
 at the end**, on every report card on both report pages since 25 Sep. The
 card gave number headings `text-end`, and `.table thead th` in `index.css`
-sets `text-start`, which is the more specific rule and won. Now `!text-end`.
-Arabic had a second fault on top: the number cells carried `dir="ltr"`, so
-their "end" was the right while the page's end is the left, and a heading
-fixed alone would have sat on the other side from its figures. The cell now
-follows the page's direction and only the figure inside it is held
-left-to-right, so "1,587.74" still reads as it should. The dashboard's two
-small tables had the same cell. A test pins both.
+sets `text-start`, which is the more specific rule and won. Arabic had a
+second fault on top: the number cells carried `dir="ltr"`, so their "end" was
+the right while the page's end is the left. **Number columns are now
+centred**, heading and figures alike (Dia's choice, after first seeing them
+aligned to the end): `!text-center` on the heading, to beat the table's rule,
+and `text-center` on the cells, which reads the same in both directions. Only
+the figure inside a cell is held left-to-right, so "1,587.74" still reads as
+it should. The dashboard's two small tables have no headings and keep their
+figures at the end of the line. A test pins the centring and the figure's
+direction.
 
 **The demo agents' and demo customers' names read "Ø³Ø§Ø±Ø©"**, as did the
 complaint notes. The data, not the screen: the demo SQL had been piped in

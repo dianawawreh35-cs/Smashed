@@ -6337,9 +6337,17 @@ Nobody has heard a recording through a browser.
 
 ## Must fix before handover
 
-**Empty as of 2026-09-20.** All four items are closed — see the decision entries
-for 19 and 20 September. Nothing on this list is a reason the system could not be
-handed over; the open items above are work, not blockers.
+- **The server has no backups (N-07, runbook step 9).** Found 26 Sep at the
+  first update: `/mnt/backup` does not exist, so no second disk was ever
+  mounted, and `rsync` was not installed (it was missing from step 1's list,
+  now fixed). The database, the recordings and the menu photographs live on
+  one disk. Needs a second disk (USB or SSD), step 9 done, the nightly cron
+  checked, and the restore test the contract makes an acceptance item. Before
+  v0.3.0 the database was dumped by hand to
+  `/opt/callcenter/backups/db-before-v0.3.0.sql.gz` (1.7 MB), on the same disk.
+
+The four items open on 2026-09-20 are closed; see the decision entries for 19
+and 20 September. The open items above are work, not blockers.
 
 Add to this list only what would make a handover irresponsible, not what is
 merely unfinished. It was useful because it stayed short.

@@ -32,6 +32,17 @@ function jsonResponse(body: unknown, status = 200) {
   } as unknown as Response
 }
 
+const NO_PHONES = { live: false, problem: 'not_configured', agents: [] }
+
+/**
+ * Answers the phone-status poll (S-61) with `phones`, and hands every other
+ * request to `rest`, so a test's own sequence of replies is not used up by it.
+ */
+function withPhones(rest: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>, phones: unknown = NO_PHONES) {
+  return (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).endsWith('/api/pbx/agents') ? Promise.resolve(jsonResponse(phones)) : rest(input, init)
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -55,7 +66,7 @@ afterEach(() => {
 
 describe('users page', () => {
   it('lists accounts and shows when extensions are missing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([AGENT])))
+    vi.stubGlobal('fetch', withPhones(vi.fn().mockResolvedValue(jsonResponse([AGENT]))))
 
     renderPage()
 
@@ -67,7 +78,7 @@ describe('users page', () => {
     // N-05: there is no endpoint that returns a secret, and the screen must not
     // imply otherwise - a supervisor replaces it rather than reading it.
     const configured = { ...AGENT, extension: '2001', hasSipCredentials: true, canTakeCalls: true }
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([configured])))
+    vi.stubGlobal('fetch', withPhones(vi.fn().mockResolvedValue(jsonResponse([configured]))))
 
     renderPage()
 
@@ -83,7 +94,7 @@ describe('users page', () => {
       .mockResolvedValueOnce(jsonResponse([AGENT]))
       .mockResolvedValueOnce(jsonResponse({ ...AGENT, extension: '2001' }))
       .mockResolvedValue(jsonResponse([AGENT]))
-    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('fetch', withPhones(fetchMock))
 
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Set extension' }))
@@ -103,7 +114,7 @@ describe('users page', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse([AGENT]))
       .mockResolvedValueOnce(jsonResponse({ code: 'login_taken' }, 409))
-    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('fetch', withPhones(fetchMock))
 
     renderPage()
     await screen.findByText('Sara')
@@ -114,5 +125,90 @@ describe('users page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('That username is already in use.')
+  })
+})
+
+describe('phones and listening in (S-61, S-62)', () => {
+  const TALKING = { ...AGENT, id: 'a1', displayName: 'Sara', extension: '2001', hasSipCredentials: true, canTakeCalls: true }
+  const OFF = { ...AGENT, id: 'a2', login: 'omar', displayName: 'Omar', extension: '2002', hasSipCredentials: true, canTakeCalls: true }
+  const PHONES = {
+    live: true,
+    problem: null,
+    agents: [
+      { userId: 'a1', displayName: 'Sara', extension: '2001', state: 'InCall', since: new Date().toISOString() },
+      { userId: 'a2', displayName: 'Omar', extension: '2002', state: 'Offline', since: null },
+    ],
+  }
+
+  /** Web Audio is not in jsdom; the page only needs something to hand the sound to. */
+  class SilentAudio {
+    currentTime = 0
+    destination = {}
+    createBuffer(_channels: number, length: number) {
+      return { duration: length / 8000, getChannelData: () => new Float32Array(length) }
+    }
+    createBufferSource() {
+      return { buffer: null, connect: () => undefined, start: () => undefined }
+    }
+    close() {
+      return Promise.resolve()
+    }
+  }
+
+  /** A listen-in the server keeps open: one chunk of sound, then nothing until it is stopped. */
+  function listening() {
+    let sent = false
+    return {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers({ 'content-type': 'application/octet-stream', 'X-Listen-Id': 'L1' }),
+      body: {
+        getReader: () => ({
+          read: () =>
+            sent ? new Promise(() => undefined) : ((sent = true), Promise.resolve({ done: false, value: new Uint8Array(320) })),
+        }),
+      },
+    } as unknown as Response
+  }
+
+  it('shows each agent’s phone, and Listen only for one in a call', async () => {
+    vi.stubGlobal('fetch', withPhones(vi.fn().mockResolvedValue(jsonResponse([TALKING, OFF])), PHONES))
+
+    renderPage()
+
+    expect(await screen.findByText(/In a call/)).toBeInTheDocument()
+    expect(screen.getByText('Offline')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Listen' })).toHaveLength(1)
+  })
+
+  it('listens through the server and Stop ends it', async () => {
+    vi.stubGlobal('AudioContext', SilentAudio)
+    const rest = vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(String(input).endsWith('/api/pbx/agents/a1/listen') ? listening() : jsonResponse([TALKING, OFF])),
+    )
+    vi.stubGlobal('fetch', withPhones(rest, PHONES))
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Listen' }))
+
+    expect(await screen.findByText('Listening to Sara')).toBeInTheDocument()
+    expect(rest).toHaveBeenCalledWith('/api/pbx/agents/a1/listen', expect.objectContaining({ method: 'GET' }))
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Stop listening' })[0])
+
+    await waitFor(() =>
+      expect(rest).toHaveBeenCalledWith('/api/pbx/agents/listen/L1', expect.objectContaining({ method: 'DELETE' })),
+    )
+    expect(screen.queryByText('Listening to Sara')).not.toBeInTheDocument()
+  })
+
+  it('says why phone status is missing', async () => {
+    vi.stubGlobal('fetch', withPhones(vi.fn().mockResolvedValue(jsonResponse([TALKING]))))
+
+    renderPage()
+
+    expect(await screen.findByText(/needs the server's PBX extension/)).toBeInTheDocument()
   })
 })

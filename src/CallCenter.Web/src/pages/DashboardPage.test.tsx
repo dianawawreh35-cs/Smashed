@@ -11,7 +11,8 @@ const TODAY = {
   communications: 42, calls: 37, messages: 5,
   byType: [{ typeName: 'Order', labelAr: 'طلب', labelEn: 'Order', count: 20 }],
   byChannel: [{ key: 'ch-phone', label: 'Phone', count: 37 }, { key: 'ch-wa', label: 'WhatsApp', count: 5 }],
-  orders: 20, orderValue: 1234.5, complaints: 3, missed: 4, unclassified: 6, agentsOnline: 2, abandoned: 5,
+  orders: 20, orderValue: 1234.5, complaints: 3, unclassified: 6, agentsOnline: 2, abandoned: 5, agentsInCall: 0, fromPbx: false,
+  missedRings: 4, rejectedRings: 3,
 }
 const PERIOD = {
   perDay: [{ key: '2026-09-24', label: '2026-09-24', count: 30 }, { key: '2026-09-25', label: '2026-09-25', count: 42 }],
@@ -67,7 +68,11 @@ describe('dashboard', () => {
     expect(within(tile('Communications')).getByText('37 calls, 5 messages')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('20')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('worth 1,234.50')).toBeInTheDocument()
-    expect(within(tile('Missed calls')).getByText('4')).toBeInTheDocument()
+    expect(within(tile('Abandoned calls')).getByText('5')).toBeInTheDocument()
+    // A ring one agent missed is a call the queue passed on, not an unanswered
+    // one: shown on its own, not counted in Communications (Dia, 26 Sep).
+    expect(within(tile('Missed or rejected rings')).getByText('7')).toBeInTheDocument()
+    expect(within(tile('Missed or rejected rings')).getByText(/^4 missed, 3 rejected\./)).toBeInTheDocument()
     expect(within(tile('Unclassified calls')).getByText('6')).toBeInTheDocument()
     expect(within(tile('Agents online')).getByText('2')).toBeInTheDocument()
 

@@ -1,5 +1,6 @@
 using System.Text;
 using CallCenter.Server.Data;
+using CallCenter.Shared;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -328,6 +329,15 @@ public class ReportCube(CallCenterDbContext db)
         var where = new List<string> { "true" };
         if (f.Kind is { } kind) { where.Add("c.kind = @kind"); parameters.Add(new("kind", kind)); }
         if (!f.WithRings) where.Add("c.abandoned_call_id IS NULL");
+        if (f.WithoutUntaken)
+        {
+            where.Add("NOT (c.direction = @untaken_in AND c.status = ANY(@untaken))");
+            parameters.Add(new("untaken_in", Directions.In));
+            parameters.Add(new("untaken", NpgsqlDbType.Array | NpgsqlDbType.Text)
+            {
+                Value = new[] { CommunicationStatuses.Missed, CommunicationStatuses.Rejected },
+            });
+        }
         if (f.AgentId is { } agent) { where.Add("c.agent_id = @agent"); parameters.Add(new("agent", agent)); }
         if (f.BranchId is { } branch) { where.Add("c.branch_id = @branch"); parameters.Add(new("branch", branch)); }
         if (f.ChannelId is { } channel) { where.Add("c.channel_id = @channel"); parameters.Add(new("channel", channel)); }

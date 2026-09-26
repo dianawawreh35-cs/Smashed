@@ -177,6 +177,34 @@ export async function requestBlob(
   return response.blob()
 }
 
+/**
+ * Opens a response the server keeps writing to, such as a call being
+ * listened in on (S-62), and hands back the response once the headers are in.
+ * Not `<audio src>`, which cannot carry the token. A refusal is thrown as an
+ * `ApiError` with its body, as `request` does, so its `code` can be shown.
+ */
+export async function requestStream(path: string, signal: AbortSignal): Promise<Response> {
+  const token = getToken()
+
+  const response = await fetch(buildUrl(path), {
+    credentials: 'include',
+    method: 'GET',
+    signal,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+
+  noteIfTokenRefused(response, token !== null)
+
+  if (!response.ok) {
+    const body = (response.headers.get('content-type') ?? '').includes('json')
+      ? await response.json().catch(() => null)
+      : null
+    throw new ApiError(response.status, response.statusText, body)
+  }
+
+  return response
+}
+
 export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>

@@ -11,9 +11,12 @@ import {
   updateUser,
 } from '../api/users'
 import type { User } from '../api/users'
+import type { AgentPhone } from '../api/pbxAgents'
+import { ListenBar, PhoneBadge, useAgentPhones, useListen } from '../components/AgentPhones'
 
 /**
- * Accounts and extensions (S-42).
+ * Accounts and extensions (S-42), and what each agent's phone is doing now
+ * (S-61), with listening in on a call (S-62).
  *
  * One extension per agent (SRS 2.3). Its SIP secret is write-only: the screen
  * can set one and replace one, and shows whether one is set, but never displays
@@ -25,6 +28,9 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null)
 
   const { data: users, isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers })
+  const { data: phones } = useAgentPhones()
+  const listen = useListen()
+  const phoneOf = (user: User) => phones?.agents.find((p) => p.userId === user.id)
 
   const refresh = () => {
     setError(null)
@@ -51,7 +57,13 @@ export default function UsersPage() {
         </p>
       )}
 
+      <ListenBar listening={listen.current} onStop={listen.stop} />
+
       <CreateUserForm onSubmit={(request) => create.mutate(request)} busy={create.isPending} />
+
+      {phones && !phones.live && (
+        <p className="notice">{t(`phones.problems.${phones.problem ?? 'no_answer'}`)}</p>
+      )}
 
       <div className="card overflow-x-auto">
         <table className="table">
@@ -61,6 +73,7 @@ export default function UsersPage() {
               <th>{t('users.login')}</th>
               <th>{t('users.role')}</th>
               <th>{t('users.extension')}</th>
+              <th>{t('phones.phone')}</th>
               <th>{t('users.status')}</th>
               <th />
             </tr>
@@ -70,6 +83,10 @@ export default function UsersPage() {
               <UserRow
                 key={user.id}
                 user={user}
+                phone={user.role === 'Agent' ? phoneOf(user) : undefined}
+                listeningHere={listen.current?.agentId === user.id && listen.current.status !== 'failed' && listen.current.status !== 'ended'}
+                onListen={(phone) => listen.start(phone)}
+                onStopListening={listen.stop}
                 onToggle={() => toggle.mutate(user)}
                 onChanged={refresh}
                 onError={onError}
@@ -84,11 +101,19 @@ export default function UsersPage() {
 
 function UserRow({
   user,
+  phone,
+  listeningHere,
+  onListen,
+  onStopListening,
   onToggle,
   onChanged,
   onError,
 }: {
   user: User
+  phone: AgentPhone | undefined
+  listeningHere: boolean
+  onListen: (phone: AgentPhone) => void
+  onStopListening: () => void
   onToggle: () => void
   onChanged: () => void
   onError: (e: unknown) => void
@@ -120,6 +145,9 @@ function UserRow({
             <span className="text-slate-400">{t('users.noExtension')}</span>
           )}
         </td>
+        <td className="whitespace-nowrap">
+          {user.role === 'Agent' && user.isActive && user.extension ? <PhoneBadge phone={phone} /> : null}
+        </td>
         <td>
           {user.isActive ? (
             <span className="badge-ok">{t('users.active')}</span>
@@ -128,6 +156,17 @@ function UserRow({
           )}
         </td>
         <td className="whitespace-nowrap text-end">
+          {listeningHere ? (
+            <button type="button" className="btn-danger btn-sm me-2" onClick={onStopListening}>
+              {t('phones.stop')}
+            </button>
+          ) : (
+            phone?.state === 'InCall' && (
+              <button type="button" className="btn-primary btn-sm me-2" onClick={() => onListen(phone)}>
+                {t('phones.listen')}
+              </button>
+            )
+          )}
           {user.role === 'Agent' && (
             <button
               type="button"
@@ -156,7 +195,7 @@ function UserRow({
 
       {panel !== 'none' && (
         <tr className="bg-slate-50">
-          <td colSpan={6}>
+          <td colSpan={7}>
             {panel === 'extensions' ? (
               <ExtensionForm user={user} onDone={close} onError={onError} />
             ) : (

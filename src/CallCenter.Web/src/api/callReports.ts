@@ -109,11 +109,19 @@ export interface DashboardToday {
   orders: number
   orderValue: number
   complaints: number
-  missed: number
   unclassified: number
+  /** Phones connected to the PBX when `fromPbx`; otherwise Agent App sign-ins heard from lately. */
   agentsOnline: number
-  /** Gave up in the queue today, as of the last PBX check (S-55). */
+  /** Gave up in the queue today, as of the last PBX check (S-55): the dashboard's only unanswered calls. */
   abandoned: number
+  /** On a call now (S-61). Zero when `fromPbx` is false. */
+  agentsInCall: number
+  /** The agent figures came from the PBX watch (S-61) rather than the Agent App's sign-ins. */
+  fromPbx: boolean
+  /** Rings an agent let ring out, every one. For efficiency; not part of any total. */
+  missedRings: number
+  /** Rings an agent declined, counted the same way. */
+  rejectedRings: number
 }
 
 export interface DashboardPeriod {

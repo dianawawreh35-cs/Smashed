@@ -197,15 +197,31 @@ public record DuplicateNameRowDto(string Name, int Contacts, string Numbers);
 /// <summary>A count in one bucket or category, for the dashboard's charts.</summary>
 public record CountDto(string Key, string Label, int Count);
 
-/// <summary>S-20's figures for the restaurant's today.</summary>
+/// <summary>
+/// S-20's figures for the restaurant's today. An incoming ring nobody took
+/// (Missed, Rejected) is not counted in any total here: the queue passed the
+/// call on, and it counts once, answered or abandoned (Dia, 26 Sep). Those
+/// rings are shown on their own, in <paramref name="MissedRings"/> and
+/// <paramref name="RejectedRings"/>.
+/// </summary>
 /// <param name="Communications">Calls and messages.</param>
-/// <param name="Missed">Inbound calls Missed or Rejected.</param>
-/// <param name="Abandoned">Inbound calls that gave up in the queue, as far as the last PBX check knows (S-55).</param>
+/// <param name="Abandoned">
+/// Inbound calls that gave up in the queue, as far as the last PBX check knows
+/// (S-55): the only calls the dashboard calls unanswered.
+/// </param>
 /// <param name="Unclassified">Answered calls with no classification.</param>
 /// <param name="AgentsOnline">
-/// Agents with a session not signed out (Dia, 25 Sep). Closing the app does not
-/// sign it out, so this counts an agent who went home without signing out.
+/// Agents whose phone is connected to the PBX, as the PBX watch reports it
+/// (S-61). When the watch is not working, agents with a session not signed out
+/// whose app has been heard from in the last five minutes (Dia, 26 Sep).
 /// </param>
+/// <param name="AgentsInCall">Agents on a call now (S-61). Zero when the PBX watch is not working.</param>
+/// <param name="FromPbx">Whether the agent figures came from the PBX watch rather than the Agent App's sign-ins.</param>
+/// <param name="MissedRings">
+/// Incoming rings an agent let ring out, every one, the rings of an abandoned
+/// call too (as R-15 counts them). For efficiency; not part of any total.
+/// </param>
+/// <param name="RejectedRings">Incoming rings an agent declined, counted the same way.</param>
 public record DashboardTodayDto(
     int Communications,
     int Calls,
@@ -215,12 +231,15 @@ public record DashboardTodayDto(
     int Orders,
     decimal OrderValue,
     int Complaints,
-    int Missed,
     int Unclassified,
     int AgentsOnline,
-    int Abandoned);
+    int Abandoned,
+    int AgentsInCall = 0,
+    bool FromPbx = false,
+    int MissedRings = 0,
+    int RejectedRings = 0);
 
-/// <summary>S-20's four charts for the chosen period: calls and messages together.</summary>
+/// <summary>S-20's four charts for the chosen period: calls and messages together, untaken rings left out.</summary>
 public record DashboardPeriodDto(
     IReadOnlyList<CountDto> PerDay,
     IReadOnlyList<TypeCountDto> PerType,

@@ -423,7 +423,8 @@ CREATE TABLE agent_sessions (
   app_version   text,
   logged_in_at  timestamptz NOT NULL DEFAULT now(),
   logged_out_at timestamptz,
-  logout_reason text                        -- Manual, Idle, AppClosed, Forced, PasswordReset
+  logout_reason text,                       -- Manual, Idle, AppClosed, Forced, PasswordReset
+  last_seen_at  timestamptz                 -- last request with this session's token, to the minute; online = within 5 min
 );
 CREATE INDEX ix_sessions_user ON agent_sessions(user_id, logged_in_at DESC);
 
@@ -431,7 +432,7 @@ CREATE TABLE audit_log (
   id           bigserial PRIMARY KEY,
   at           timestamptz NOT NULL DEFAULT now(),
   user_id      uuid REFERENCES users(id),
-  entity       text NOT NULL,               -- 'contact','user','settings','form','flag'
+  entity       text NOT NULL,               -- 'contact','user','settings','form','flag','queue','listen'
   entity_id    text,
   action       text NOT NULL,               -- 'create','update','merge','flag','unflag','delete'
   before       jsonb,

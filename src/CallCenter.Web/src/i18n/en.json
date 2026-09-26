@@ -48,14 +48,17 @@
       "orders": "Orders",
       "worth": "worth {{value}}",
       "complaints": "Complaints",
-      "missed": "Missed calls",
-      "missedNote": "Incoming calls missed or rejected. An outgoing call nobody picked up is not counted.",
       "unclassified": "Unclassified calls",
       "unclassifiedNote": "Answered calls with no type yet.",
       "agentsOnline": "Agents online",
-      "agentsOnlineNote": "Signed in to the Agent App. An agent who closed the app without signing out still counts.",
+      "agentsOnlineNote": "Signed in to the Agent App and heard from in the last five minutes. A laptop that was switched off or lost its network drops off by itself.",
+      "agentsOnlinePbxNote": "Agents whose phone is connected to the PBX right now.",
+      "agentsInCall": "In a call",
+      "agentsInCallNote": "Agents talking right now, as the PBX reports it. Listen in from the Users page.",
       "abandoned": "Abandoned calls",
-      "abandonedNote": "Callers who gave up waiting in the queue, as of the last check of the PBX."
+      "abandonedNote": "Callers who gave up waiting in the queue, as of the last check of the PBX. These are the calls nobody answered: a call that rang one agent and was answered by another counts once, as answered.",
+      "untaken": "Missed or rejected rings",
+      "untakenNote": "{{missed}} missed, {{rejected}} rejected. Times an agent's phone rang and they did not take it. Not counted in Communications: the queue passed the call to the next agent."
     },
     "byType": "Today by type",
     "byChannel": "Today by channel",
@@ -138,6 +141,35 @@
     "noExtension": "Not set",
     "secret": "SIP password",
     "extensionHint": "One extension per agent, used for every call. Internal calls are told apart by the internal numbers list in Settings."
+  },
+  "phones": {
+    "phone": "Phone",
+    "states": {
+      "Unknown": "Not known",
+      "Offline": "Offline",
+      "Free": "Free",
+      "Ringing": "Ringing",
+      "InCall": "In a call"
+    },
+    "listen": "Listen",
+    "stop": "Stop listening",
+    "close": "Close",
+    "connecting": "Connecting to {{name}}'s call…",
+    "listening": "Listening to {{name}}",
+    "ended": "{{name}}'s call has ended.",
+    "problems": {
+      "not_configured": "Phone status needs the server's PBX extension. Enter it on the PBX blacklist card in Settings.",
+      "no_answer": "The PBX is not answering, so phone status is not known right now. Check the server's VPN connection.",
+      "not_started": "Phone status is starting. It appears within a minute."
+    },
+    "errors": {
+      "not_configured": "Listening needs the server's PBX extension. Enter it on the PBX blacklist card in Settings.",
+      "no_extension": "{{name}} has no extension.",
+      "user_not_found": "That account no longer exists.",
+      "pbx_failed": "The PBX did not connect the call: {{error}}",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "Listening did not start. Please try again."
+    }
   },
   "settings": {
     "heading": "System settings",

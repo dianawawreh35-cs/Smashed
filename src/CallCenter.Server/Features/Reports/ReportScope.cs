@@ -23,6 +23,13 @@ namespace CallCenter.Server.Features.Reports;
 /// everywhere but the agents' own figures (R-15): the abandoned call already
 /// counts the customer once, and each ring would count them again.
 /// </param>
+/// <param name="WithoutUntaken">
+/// Also leave out every incoming ring nobody took, Missed or Rejected (Dia,
+/// 26 Sep). On the dashboard only: the queue passes a call from one agent to
+/// the next, so an untaken ring is a leg of a call that another agent
+/// answered or that was abandoned, and that row already counts it. The
+/// reports about missed calls and the agents (R-11, R-15) still count them.
+/// </param>
 public record ReportFilter(
     DateTimeOffset? From = null,
     DateTimeOffset? To = null,
@@ -31,7 +38,8 @@ public record ReportFilter(
     Guid? ChannelId = null,
     Guid? TypeId = null,
     string? Kind = CommunicationKinds.App,
-    bool WithRings = false);
+    bool WithRings = false,
+    bool WithoutUntaken = false);
 
 /// <summary>
 /// What every report agrees on, written once: which rows a filter means, which
@@ -55,6 +63,11 @@ public static class ReportScope
     {
         if (f.Kind is { } kind) q = q.Where(c => c.Kind == kind);
         if (!f.WithRings) q = q.Where(c => c.AbandonedCallId == null);
+        if (f.WithoutUntaken)
+        {
+            q = q.Where(c => !(c.Direction == Directions.In
+                && (c.Status == CommunicationStatuses.Missed || c.Status == CommunicationStatuses.Rejected)));
+        }
 
         // Instants, converted to UTC: PostgreSQL's timestamptz takes nothing
         // else from Npgsql, and a local offset here was the 20 September 500.

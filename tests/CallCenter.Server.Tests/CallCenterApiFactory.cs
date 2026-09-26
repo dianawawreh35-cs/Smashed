@@ -153,6 +153,10 @@ public class CallCenterApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
                 // run them themselves, with a dialer that only takes notes.
                 services.Remove(services.Single(d => d.ImplementationType == typeof(PbxBlacklistWorker)));
                 services.Remove(services.Single(d => d.ImplementationType == typeof(QueueAutoOpenWorker)));
+
+                // Nor may the PBX watch subscribe to a real PBX (S-61). Tests
+                // write to ExtensionWatch themselves.
+                services.Remove(services.Single(d => d.ImplementationType == typeof(ExtensionWatchWorker)));
             });
     }
 

@@ -150,14 +150,17 @@ public class CallReportsTests(CallCenterApiFactory factory)
         arabicText.Should().Contain("فائتة").And.Contain("تم الرد");
 
         // ---- S-20's charts for the chosen period: everything on the day ----
+        // but the three rings nobody took (two Missed, one Rejected): the
+        // queue passes a call on, so it counts once, answered or abandoned.
 
         var period = await d.Supervisor.GetFromJsonAsync<DashboardPeriodDto>(
             $"/api/reports/dashboard/period?from={Instant(d.Day)}&to={Instant(d.Day.AddDays(1))}");
-        period!.PerDay.Should().ContainSingle().Which.Should().Be(new CountDto(d.DayKey, d.DayKey, 13));
+        period!.PerDay.Should().ContainSingle().Which.Should().Be(new CountDto(d.DayKey, d.DayKey, 10));
         period.PerHour.Should().HaveCount(24);
-        period.PerHour.Sum(h => h.Count).Should().Be(13);
-        period.PerHour.Single(h => h.Key == "19").Count.Should().Be(2);
-        period.PerChannel.Single(c => c.Label == ChannelNames.Phone).Count.Should().Be(12);
+        period.PerHour.Sum(h => h.Count).Should().Be(10);
+        period.PerHour.Single(h => h.Key == "19").Count.Should().Be(0, "19:00's ring was missed and 19:30's rejected");
+        period.PerHour.Single(h => h.Key == "20").Count.Should().Be(2);
+        period.PerChannel.Single(c => c.Label == ChannelNames.Phone).Count.Should().Be(9);
         period.PerChannel.Single(c => c.Key == d.WhatsApp.ToString()).Count.Should().Be(1);
         period.PerType.Select(t => (t.TypeName, t.Count)).Should().BeEquivalentTo(
             [("Order", 4), ("Complaint", 2), ("Inquiry", 1)]);
@@ -183,7 +186,10 @@ public class CallReportsTests(CallCenterApiFactory factory)
         DateTimeOffset At(int minutes) => now - start > TimeSpan.FromMinutes(10) ? start.AddMinutes(minutes) : now.AddSeconds(-minutes);
 
         await d.CallAsync(d.BranchA, At(1), Directions.In, CommunicationStatuses.Answered, d.AgentOne, d.CustomerX, type: d.Order, value: 25m);
-        await d.CallAsync(d.BranchA, At(2), Directions.In, CommunicationStatuses.Missed, d.AgentOne, null);
+        // One call from Y that the queue passed along: agent one missed it,
+        // agent one's next ring was rejected, and agent two answered.
+        await d.CallAsync(d.BranchA, At(2), Directions.In, CommunicationStatuses.Missed, d.AgentOne, d.CustomerY);
+        await d.CallAsync(d.BranchA, At(2), Directions.In, CommunicationStatuses.Rejected, d.AgentOne, d.CustomerY);
         await d.CallAsync(d.BranchA, At(3), Directions.In, CommunicationStatuses.Answered, d.AgentTwo, d.CustomerY);
         await d.CallAsync(d.BranchA, At(4), Directions.Out, CommunicationStatuses.NoAnswer, d.AgentTwo, d.CustomerY);
         await d.MessageAsync(d.BranchA, At(5), d.AgentTwo, d.Complaint);
@@ -194,16 +200,42 @@ public class CallReportsTests(CallCenterApiFactory factory)
 
         var after = (await d.Supervisor.GetFromJsonAsync<DashboardTodayDto>("/api/reports/dashboard/today"))!;
 
-        (after.Communications - before.Communications).Should().Be(5);
-        (after.Calls - before.Calls).Should().Be(4);
+        (after.Communications - before.Communications).Should().Be(4, "the call passed from agent one to agent two counts once");
+        (after.Calls - before.Calls).Should().Be(3);
         (after.Messages - before.Messages).Should().Be(1);
         (after.Orders - before.Orders).Should().Be(1);
         (after.OrderValue - before.OrderValue).Should().Be(25m);
         (after.Complaints - before.Complaints).Should().Be(1);
-        (after.Missed - before.Missed).Should().Be(1, "the NoAnswer is not a missed call");
+        (after.Abandoned - before.Abandoned).Should().Be(0, "every call was answered in the end");
+        (after.MissedRings - before.MissedRings).Should().Be(1, "shown for efficiency, though not in the totals");
+        (after.RejectedRings - before.RejectedRings).Should().Be(1);
         (after.Unclassified - before.Unclassified).Should().Be(1);
         (after.AgentsOnline - before.AgentsOnline).Should().Be(1);
         after.ByChannel.Single(c => c.Key == d.WhatsApp.ToString()).Count.Should().Be(1);
+    }
+
+    [DatabaseFact]
+    public async Task An_agent_whose_app_went_quiet_is_not_online_until_it_is_heard_from_again()
+    {
+        var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+        var (agent, login) = await data.SignInAsync(await data.CreateUserAsync());
+        var sessionId = login.SessionId!.Value;
+
+        async Task<int> OnlineAsync() =>
+            (await supervisor.GetFromJsonAsync<DashboardTodayDto>("/api/reports/dashboard/today"))!.AgentsOnline;
+
+        // The laptop lost power six minutes ago: the session is still open, but
+        // nothing has come from it since.
+        await data.QueryAsync(db => db.AgentSessions.Where(s => s.Id == sessionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastSeenAt, DateTimeOffset.UtcNow.AddMinutes(-6))));
+        var quiet = await OnlineAsync();
+
+        // The app's next block-list refresh, as it makes every two minutes.
+        (await agent.GetAsync("/api/contacts/blocked-numbers")).EnsureSuccessStatusCode();
+
+        var lastSeen = await data.QueryAsync(db => db.AgentSessions.Where(s => s.Id == sessionId).Select(s => s.LastSeenAt).SingleAsync());
+        lastSeen.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
+        (await OnlineAsync() - quiet).Should().Be(1);
     }
 
     // ---- Phase 2: R-10 to R-18, on the same known day ----------------------------

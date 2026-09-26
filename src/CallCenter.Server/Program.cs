@@ -110,9 +110,20 @@ try
     // The PBX's blacklist follows the Blocked flag (*30 / *31), and the
     // supervisor opens and closes the queue (*280). Off until that extension is
     // entered on the settings screen.
-    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.IPbxFeatureDialer,
-        CallCenter.Server.Features.Pbx.SipFeatureDialer>();
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.SipFeatureDialer>();
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.IPbxFeatureDialer>(
+        sp => sp.GetRequiredService<CallCenter.Server.Features.Pbx.SipFeatureDialer>());
     builder.Services.AddScoped<CallCenter.Server.Features.Pbx.PbxFeatureLine>();
+
+    // S-61 and S-62: from the same extension, the server keeps the PBX telling
+    // it what each agent's phone is doing, and a supervisor can listen in on a
+    // call (*222 and the extension).
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.IPbxCallListener>(
+        sp => sp.GetRequiredService<CallCenter.Server.Features.Pbx.SipFeatureDialer>());
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.ExtensionWatch>();
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.ListenSessions>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Pbx.PbxListenService>();
+    builder.Services.AddHostedService<CallCenter.Server.Workers.ExtensionWatchWorker>();
     builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.PbxBlacklistGate>();
     builder.Services.AddScoped<CallCenter.Server.Features.Pbx.PbxBlacklistSync>();
     builder.Services.AddHostedService<CallCenter.Server.Workers.PbxBlacklistWorker>();
@@ -268,6 +279,7 @@ try
 
     app.UseRouting();
     app.UseAuthentication();
+    app.Use(SessionPresence.StampAsync);
     app.UseAuthorization();
 
     app.MapHealthChecks("/health").AllowAnonymous();

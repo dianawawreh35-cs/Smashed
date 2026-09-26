@@ -23,6 +23,14 @@ public class AgentSession
 
     public DateTimeOffset? LoggedOutAt { get; set; }
 
+    /// <summary>
+    /// The last request the app made with this session's token, to within
+    /// <see cref="Features.Auth.SessionPresence.WriteEvery"/>. What "online"
+    /// is judged by: a laptop that crashed or lost power never signs out, but
+    /// it stops being heard from.
+    /// </summary>
+    public DateTimeOffset? LastSeenAt { get; set; }
+
     /// <summary>Manual, Idle, AppClosed or Forced.</summary>
     public string? LogoutReason { get; set; }
 }

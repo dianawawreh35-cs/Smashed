@@ -1,4 +1,7 @@
+using System.Buffers.Binary;
 using System.Net;
+using System.Threading.Channels;
+using SIPSorcery.Media;
 using SIPSorcery.Net;
 using SIPSorcery.SIP;
 using SIPSorcery.SIP.App;
@@ -53,8 +56,35 @@ public interface IPbxFeatureDialer
 }
 
 /// <summary>
+/// Listens in on an agent's call through the PBX's <c>*222</c> (S-62). An
+/// interface so the listening screen can be tested without a PBX.
+/// </summary>
+public interface IPbxCallListener
+{
+    /// <summary>
+    /// Dials <paramref name="code"/> (<c>*222</c> and the extension) and returns
+    /// once the PBX has answered. The caller disposes the call to hang up.
+    /// </summary>
+    /// <exception cref="PbxFeatureException">The PBX did not answer, or refused the call.</exception>
+    Task<IPbxListenCall> ListenAsync(PbxExtension from, string code, CancellationToken ct);
+}
+
+/// <summary>A listen-in call in progress (S-62). Disposing it hangs up.</summary>
+public interface IPbxListenCall : IAsyncDisposable
+{
+    /// <summary>
+    /// What the PBX sends, as it arrives: 16-bit little-endian mono samples at
+    /// 8 kHz, one 20 ms packet per item. Completes when the call ends.
+    /// </summary>
+    ChannelReader<byte[]> Audio { get; }
+
+    /// <summary>Completes when the PBX hangs up.</summary>
+    Task Ended { get; }
+}
+
+/// <summary>
 /// Places feature-code calls from the server's extension and answers their
-/// prompts (S-46, S-60).
+/// prompts (S-46, S-60), and places the listen-in calls (S-62).
 /// </summary>
 /// <remarks>
 /// <b>The steps,</b> as tried by hand on 26 Sep. <c>*30</c> / <c>*31</c>: hear
@@ -77,7 +107,7 @@ public interface IPbxFeatureDialer
 /// <b>Keys go as RFC 2833 events,</b> not tones in the audio: that is what the
 /// PBX asks for in its SDP, and what survives G.711 unchanged.
 /// </remarks>
-public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDialer> logger) : IPbxFeatureDialer
+public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDialer> logger) : IPbxFeatureDialer, IPbxCallListener
 {
     public const string AddCode = "*30";
     public const string RemoveCode = "*31";
@@ -199,6 +229,140 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
                 // The call did what it did; tidying it up must not change the answer.
                 logger.LogDebug(ex, "PBX feature code: the call did not close cleanly");
             }
+        }
+    }
+
+    public async Task<IPbxListenCall> ListenAsync(PbxExtension from, string code, CancellationToken ct)
+    {
+        var transport = new SIPTransport();
+        transport.AddSIPChannel(new SIPUDPChannel(new IPEndPoint(IPAddress.Any, 0)));
+
+        var rtp = CreateMedia();
+        var agent = new SIPUserAgent(transport, null);
+
+        // A second of audio at most waits for the browser; beyond that the
+        // oldest goes, so a slow connection hears the call late by a second,
+        // not by more and more.
+        var audio = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(50)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+        });
+        var hungUp = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        string? failure = null;
+
+        agent.ClientCallFailed += (_, error, response) =>
+            failure = response is null ? error : $"{(int)response.Status} {response.ReasonPhrase}";
+        agent.OnCallHungup += _ =>
+        {
+            hungUp.TrySetResult();
+            audio.Writer.TryComplete();
+        };
+
+        rtp.OnRtpPacketReceived += (_, media, packet) =>
+        {
+            if (media == SDPMediaTypesEnum.audio && Pcm(packet.Header.PayloadType, packet.Payload) is { } pcm)
+            {
+                audio.Writer.TryWrite(pcm);
+            }
+        };
+
+        try
+        {
+            logger.LogInformation("PBX listen: dialling {Code} from extension {Extension}", code, from.Extension);
+
+            var answered = await agent.Call($"sip:{code}@{from.Host}", from.Extension, from.Secret, rtp, RingTimeoutSeconds);
+            if (!answered)
+            {
+                throw new PbxFeatureException(failure switch
+                {
+                    null => $"The PBX did not answer {code}.",
+                    var f when f.StartsWith("401") || f.StartsWith("403") || f.StartsWith("407") =>
+                        $"The PBX refused extension {from.Extension} ({f}). Check its number and password in Settings.",
+                    var f when f.StartsWith("404") =>
+                        $"The PBX does not know {code} ({f}). Check that the listen-in code is set up in Issabel.",
+                    var f => $"The PBX refused {code} ({f}).",
+                }, answered: false);
+            }
+
+            ct.ThrowIfCancellationRequested();
+            var silence = SendSilence(rtp, CancellationToken.None);
+            return new ListenCall(agent, rtp, transport, silence, audio, hungUp.Task, logger);
+        }
+        catch
+        {
+            Close(agent, rtp, transport, logger);
+            throw;
+        }
+    }
+
+    /// <summary>A G.711 packet as 16-bit little-endian samples, or null for anything else (such as a key event).</summary>
+    public static byte[]? Pcm(int payloadType, byte[] payload)
+    {
+        if (payloadType is not (PromptListener.PcmuPayloadType or PromptListener.PcmaPayloadType) || payload.Length == 0)
+        {
+            return null;
+        }
+
+        var pcm = new byte[payload.Length * 2];
+        for (var i = 0; i < payload.Length; i++)
+        {
+            var sample = payloadType == PromptListener.PcmuPayloadType
+                ? MuLawDecoder.MuLawToLinearSample(payload[i])
+                : ALawDecoder.ALawToLinearSample(payload[i]);
+            BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), sample);
+        }
+
+        return pcm;
+    }
+
+    private static void Close(SIPUserAgent agent, RTPSession rtp, SIPTransport transport, ILogger logger)
+    {
+        try
+        {
+            if (agent.IsCallActive)
+            {
+                agent.Hangup();
+            }
+
+            rtp.Close("done");
+            transport.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "PBX listen: the call did not close cleanly");
+        }
+    }
+
+    private sealed class ListenCall(
+        SIPUserAgent agent,
+        RTPSession rtp,
+        SIPTransport transport,
+        IDisposable silence,
+        Channel<byte[]> audio,
+        Task hungUp,
+        ILogger logger) : IPbxListenCall
+    {
+        private int _closed;
+
+        public ChannelReader<byte[]> Audio => audio.Reader;
+
+        public Task Ended => hungUp;
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _closed, 1) == 1)
+            {
+                return;
+            }
+
+            silence.Dispose();
+            audio.Writer.TryComplete();
+            Close(agent, rtp, transport, logger);
+
+            // Long enough for the BYE to leave before the port closes under it.
+            await Task.Delay(200);
+            logger.LogInformation("PBX listen: hung up");
         }
     }
 

@@ -1,6 +1,9 @@
 using CallCenter.Server.Data;
+using CallCenter.Server.Features.Auth;
+using CallCenter.Server.Features.Pbx;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
+using CallCenter.Shared.Contracts.Pbx;
 using CallCenter.Shared.Text;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,7 +28,7 @@ namespace CallCenter.Server.Features.Reports;
 /// missed calls) are rows, not figures, and are read through
 /// <see cref="ReportScope.Narrow"/>.
 /// </remarks>
-public class CallReportsService(CallCenterDbContext db, ReportCube cube)
+public class CallReportsService(CallCenterDbContext db, ReportCube cube, ExtensionWatch watch, PbxListenService listen)
 {
     /// <summary>What every status-based figure needs to know about a cell.</summary>
     private const CubeBy Outcome = CubeBy.Kind | CubeBy.Direction | CubeBy.Status;
@@ -591,23 +594,48 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
 
     /// <summary>
     /// S-20's figures for the restaurant's today: calls and messages together,
-    /// since the dashboard is the whole picture; missed and unclassified are
-    /// calls' own words.
+    /// since the dashboard is the whole picture; abandoned and unclassified are
+    /// calls' own words. The rings nobody took are not counted in any total
+    /// (Dia, 26 Sep): the queue passed the call on, and it counts once,
+    /// answered by somebody or abandoned (<see cref="ReportFilter.WithoutUntaken"/>).
+    /// They are shown beside the totals instead, for how efficient the agents are.
     /// </summary>
     public async Task<DashboardTodayDto> TodayAsync(CancellationToken ct = default)
     {
         var (start, end) = ReportScope.Today();
-        var today = new ReportFilter(start, end, Kind: null);
+        var today = new ReportFilter(start, end, Kind: null, WithoutUntaken: true);
         var cells = await cube.CountAsync(today, Outcome | CubeBy.Channel | CubeBy.Type, ct);
         var names = await cube.NamesAsync(ct);
 
-        // Dia, 25 Sep: an open session. Closing the app does not close one,
-        // so this includes an agent who went home without signing out.
+        // The rings nobody took, shown on their own and never added to the
+        // totals above (Dia, 26 Sep): how often a ringing phone went
+        // unanswered is how efficient the agents are. Every ring, as R-15
+        // counts them, the rings of an abandoned call too.
+        var rings = await cube.CountAsync(Calls(today) with { WithoutUntaken = false, WithRings = true }, Outcome, ct);
+
+        // An open session whose app has been heard from lately (Dia, 26 Sep).
+        // A laptop that crashed or lost power never signs out, but it drops
+        // off here within five minutes.
+        var onlineSince = SessionPresence.OnlineSince(DateTimeOffset.UtcNow);
         var online = await db.AgentSessions.AsNoTracking()
-            .Where(s => s.LoggedOutAt == null && s.User.Role == UserRoles.Agent && s.User.IsActive)
+            .Where(s => s.LoggedOutAt == null
+                        && s.LastSeenAt >= onlineSince
+                        && s.User.Role == UserRoles.Agent
+                        && s.User.IsActive)
             .Select(s => s.UserId)
             .Distinct()
             .CountAsync(ct);
+
+        // S-61: when the PBX watch is working, its word is better than the
+        // app's: a phone connected to the PBX is one that can take a call.
+        var inCall = 0;
+        var fromPbx = watch.IsLive;
+        if (fromPbx)
+        {
+            var phones = (await listen.PhonesAsync(ct)).Agents;
+            online = phones.Count(p => p.State is PhoneStates.Free or PhoneStates.Ringing or PhoneStates.InCall);
+            inCall = phones.Count(p => p.State == PhoneStates.InCall);
+        }
 
         return new DashboardTodayDto(
             cells.Sum(c => c.N),
@@ -618,20 +646,24 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
             cells.Sum(c => c.Orders),
             cells.Sum(c => c.OrderValue),
             cells.Sum(c => c.Complaints),
-            Count(cells, IsMissed),
             cells.Sum(Unclassified),
             online,
-            Count(cells, IsAbandoned));
+            Count(cells, IsAbandoned),
+            inCall,
+            fromPbx,
+            Count(rings, c => IsInbound(c) && c.Status == CommunicationStatuses.Missed),
+            Count(rings, c => IsInbound(c) && c.Status == CommunicationStatuses.Rejected));
     }
 
     /// <summary>
     /// S-20's four charts for the chosen period: communications per day (every
     /// day of the period, quiet ones as zero, so the line does not skip them),
-    /// per type, per channel, and per hour of the day (all 24).
+    /// per type, per channel, and per hour of the day (all 24). Untaken rings
+    /// left out, as today's are.
     /// </summary>
     public async Task<DashboardPeriodDto> PeriodAsync(ReportFilter filter, CancellationToken ct = default)
     {
-        var f = CallsAndMessages(filter);
+        var f = CallsAndMessages(filter) with { WithoutUntaken = true };
         var names = await cube.NamesAsync(ct);
         var perDay = (await cube.CountAsync(f, CubeBy.Day, ct)).ToDictionary(c => ReportScope.Day(c.Day!.Value), c => c.N);
         var perHour = (await cube.CountAsync(f, CubeBy.Hour, ct)).ToDictionary(c => c.Hour!.Value, c => c.N);

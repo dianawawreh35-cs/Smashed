@@ -6089,6 +6089,171 @@ Not changed: the web app's sidebar still shows the letter "S" on the brand
 blue, and the brand blue (#4F8CFF) is still the accent in both apps, which the
 client chose on 20 Sep. The logo's black and yellow are only in the icon.
 
+## 2026-09-26 — Agents online means heard from in the last five minutes (S-20)
+
+Dia asked whether the server can tell who is online, with a fix that needs no
+change to the Agent App. This replaces decision 6 of the call-reports entry
+(an open session).
+
+**The problem.** Quitting the Agent App signs out now, but a laptop that crashes,
+loses power or drops off the network never does. Its session stayed open, and
+the agent counted as online for good.
+
+**No new heartbeat was needed.** While an agent is signed in, the app already
+asks for the block list every two minutes (`BlockListCache.RefreshInterval`), and
+every request carries the session id in its token (`sid`). So the server records
+when it last heard from each session:
+
+- `agent_sessions.last_seen_at`, a new nullable column (migration
+  `AddSessionLastSeen`). It is set at sign-in, then by `SessionPresence.StampAsync`,
+  a step in the request pipeline straight after authentication.
+- **At most one write a minute per session.** It is a single conditional
+  `UPDATE` that touches no row when the session was stamped less than a minute
+  ago or has been signed out.
+- **Online** = an open session, heard from in the last five minutes
+  (`SessionPresence.OnlineWindow`), for an enabled agent. That is two and a half
+  refreshes, so one missed refresh does not drop anybody and two do.
+
+**Laptops already installed need nothing.** Only the server changes.
+
+**Worth knowing:**
+
+- Sessions open before the upgrade have no `last_seen_at`, so they stop counting
+  at once. An agent who is really signed in comes back within two minutes, on
+  the next refresh.
+- An agent who leaves the app open and walks away still counts. This measures
+  whether the app is running and connected, not whether someone is at the desk.
+- Supervisors and the web app have no session, so they are not counted, as
+  before.
+
+**Tested:** `CallReportsTests.An_agent_whose_app_went_quiet_is_not_online_until_it_is_heard_from_again`,
+against `callcenter_test`. A session last heard from six minutes ago is not
+counted, and one block-list request brings it back.
+
+## 2026-09-26 — The dashboard counts a call once, and only abandoned calls are unanswered (S-20)
+
+Dia: missed and rejected calls were each counted as a separate communication,
+though one call may simply have gone from one agent to another. The only calls
+really not answered are the abandoned ones.
+
+**Why it happened.** The Agent App saves every ring it sees (A-14). When the
+queue rings agent one, who does not take it, and then agent two, who does,
+that is two rows: a Missed row and an Answered row. The rings of a call that
+was abandoned were already left out (they point at it through
+`abandoned_call_id`, S-55). The rings of a call someone *answered* were not.
+So the dashboard counted that call twice under Communications, and once more
+under Missed calls.
+
+**What changed, on the dashboard only:**
+
+- `ReportFilter.WithoutUntaken`: leaves out every incoming Missed or Rejected
+  row, in the cube's SQL and in `ReportScope.Narrow` alike. Only S-20's two
+  queries (`TodayAsync`, `PeriodAsync`) set it.
+- So Communications, Calls, Today by channel and the period charts (per day,
+  per channel, per hour) count each call once, answered or abandoned.
+- **The Missed calls tile became "Missed or rejected rings": shown, not
+  counted.** Dia, later the same day: the rings matter when judging how
+  efficient the call centre is, so they stay on the dashboard, but in no
+  total. `DashboardTodayDto.MissedRings` and `RejectedRings` count every
+  untaken ring today, the rings of an abandoned call too (as R-15 does), and
+  the tile shows their sum with "N missed, M rejected" under it. Its note
+  says they are not in Communications. The Abandoned tile's note says those
+  are the calls nobody answered.
+
+**What did not change.** The call reports keep counting missed and rejected
+rings. R-11 is the report about them, and R-15 counts each agent's own
+untaken rings. **R-01 and R-04 still count a passed-on call twice**, the same
+way the dashboard did (their Missed column, and their totals). That is open
+below, for Dia to decide.
+
+**Worth knowing:** a Missed ring whose abandoned call the PBX import has not
+fetched yet was counted until the import linked it. Now it is never counted,
+so the Abandoned tile catches up at the next check and nothing is counted
+twice meanwhile. Blocked rows are unchanged: they still count as calls.
+
+**Tested:** `CallReportsTests.The_dashboard_counts_what_happened_today_and_the_agents_signed_in`
+(one call missed by agent one, rejected by them, answered by agent two:
++1 communication, not +3, and +1 missed and +1 rejected ring) and the period
+charts on the known day (10, not 13), against `callcenter_test`;
+`DashboardPage.test.tsx` checks the rings tile and its split.
+
+## 2026-09-26 — Phones from the PBX, and listening in with *222 (S-61, S-62)
+
+Dia asked whether the server could tell which agents are online and which are
+in a call **without changing the Agent App**, and then to listen in on a call
+through the PBX's `*222` and the extension, "like the block and queue control".
+
+**How the server finds out: it subscribes, as a desk phone's busy lamp does.**
+From its own extension (2011 on the dev PBX, the one `*30` and `*280` are
+dialled from), it sends the PBX a SUBSCRIBE for each agent's extension, and the
+PBX sends a NOTIFY with the state at once and again at every change. Outbound,
+on the SIP port the laptops already use, so SRS 4.5 still holds.
+
+**Tried first, with `tools/presence-probe`, against the real PBX (Issabel,
+Asterisk 11, chan_sip), 26 Sep:**
+
+- 2001 in a call reported `confirmed`; hung up at 22:05:32, reported
+  `terminated` within a second.
+- The **dialog** report says `terminated` for a phone that is switched off
+  too: 2009 and 2011 (neither connected) read exactly like a free 2001. So it
+  is paired with the **presence** report, which said `open` / "Ready" for
+  2001 and `closed` / "Not online" for 2009 and 2011.
+- The first run got no answer at all. The VPN was off.
+
+**What was built**
+
+- `PbxSubscriber` keeps a presence and a dialog subscription per active
+  agent's extension, renewed every minute (half the 120 s it asks for). A
+  refusal, a subscription the PBX ended, or one it no longer knows (481)
+  starts that subscription again from scratch. An extension the PBX refuses
+  outright (404 for 2901–2905, the demo agents) is asked about again every
+  five minutes, and logged once.
+- `ExtensionWatch` (in memory) turns the two reports into one state: in a call
+  or ringing from dialog, otherwise offline or free from presence. A report not
+  renewed for 2.5 minutes turns **not known**, so the screen never shows an
+  old call. Each change is one log line: `PBX watch: 2001 is now InCall`.
+- `ExtensionWatchWorker` re-reads the agents and the server's extension every
+  15 s. Off until that extension is set up, as the blacklist is.
+- `GET /api/pbx/agents` for the Users page, which asks every 3 s and shows a
+  **Phone** column, with how long for a call.
+- The dashboard: **Agents online** is now the phones connected to the PBX when
+  the watch is working (the heartbeat of the entry above is the fallback),
+  and an **In a call** tile appears beside it.
+- **Listening:** `GET /api/pbx/agents/{id}/listen` dials `*222` + extension
+  from the server's extension (`SipFeatureDialer.ListenAsync`) and, once the
+  PBX answers, streams the call's sound to the browser as raw 16-bit 8 kHz
+  samples, 100 ms at a time. The browser plays it through Web Audio,
+  ¼ second behind so a late packet leaves no gap, and drops sound rather than
+  fall more than 1.5 s behind.
+- **Stopping, as Dia insisted:** Stop listening, leaving or closing the page,
+  the call ending, or one hour, whichever is first. Stop aborts the stream and
+  also sends `DELETE /api/pbx/agents/listen/{id}`, so a connection slow to
+  close still ends. The server hangs up its call every time. A supervisor can
+  stop only their own listen-in.
+- **Audit:** `audit_log` rows with entity `listen`, action `start` and `stop`,
+  who listened to whom, the extension, the seconds and why it ended
+  (`stopped`, `page_closed`, `call_ended`, `time_limit`).
+
+**Seen running on the dev server, 26 Sep 22:34:** subscribed as 2011, "2001 is
+now Free" within a second, the demo extensions refused with 404 as expected.
+
+**Not yet seen:** a state change through the server (only through the probe),
+ringing (`early`), and listening at all: `*222` has never been dialled from
+the server's extension, and no sound has yet gone from the PBX to a browser.
+**Nor from inside Docker** on the production server: there the PBX's NOTIFYs
+and the listen-in's sound have to find their way back in to the container. The
+one-minute renewal should keep that path open. `tools/presence-probe` can be
+run there first.
+
+**Tested:** `PbxNotifyTests` (the bodies the PBX sent), `ExtensionWatchTests`
+(the states, the clock, going stale), `PbxAgentsTests` against
+`callcenter_test` (the list and the dashboard figures from a written watch;
+agents refused; listening with no extension set up; the packets arriving
+whole, `*222` + extension dialled, audited start and stop; Stop by another
+supervisor refused, by the owner ending the stream and hanging up).
+`UsersPage.test.tsx`: the badges, Listen shown only for a call, Stop sending
+the DELETE.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -6118,7 +6283,7 @@ and what comes after:
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
-| Agents online counts only live apps: close the session when the app quits, or record when each session was last heard from | S-20 | Dia's decision, 26 Sep: an open session for now. 82 of 93 on the dev database were never closed |
+| R-01 and R-04 count a passed-on call twice: should their totals and Missed column leave out untaken rings, as the dashboard now does? | R-01, R-04 | Dia's call. `WithoutUntaken` does it in one line each (26 Sep entry) |
 | Call-back tasks for abandoned calls | S-51 | nothing — the abandoned calls exist, and R-20 already shows who was rung back |
 | R-21, the queue service level | R-21 | saving the answered calls' wait too: the same PBX report has it |
 

@@ -171,6 +171,7 @@ before there is a machine to test against.
 | `v0.2.0` | 2026-09-26 | **Never published.** The release job had no database, the database-backed tests hung, and the run was cancelled. Use `v0.2.1`. |
 | `v0.2.1` | 2026-09-26 | The first version for the server: everything built to date, including calls, contacts, classification, the reports with printing, the POS contact lookup and the abandoned calls from the PBX. The release job now runs the tests against Postgres, as CI does. |
 | `v0.2.2` | 2026-09-26 | The Smashed logo as the supervisor app's browser-tab icon, and as the Agent App's icon (the Agent App is built separately, see below). |
+| `v0.3.0` | 2026-09-26 | The PBX's blacklist follows the Blocked flag (S-46) and the dashboard opens and closes the queue (S-60). Each agent's phone as the PBX sees it, offline, free, ringing or in a call, on the Users page and the dashboard (S-61), and listening in on a call with `*222` (S-62). Agents online counts only apps heard from lately; the dashboard counts a call passed between agents once. One migration (`agent_sessions.last_seen_at`). The Agent App is unchanged. |
 
 ---
 

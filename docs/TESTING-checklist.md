@@ -275,13 +275,19 @@ range both have plenty; without it, choose a range from mid-September.
 
 - [ ] **The dashboard is the first page after signing in.** Six tiles for
       today: Communications (large, with "N calls, M messages" under it),
-      Orders (with "worth …"), Complaints, Missed calls, Unclassified calls,
-      Agents online. Under them, today by type and by channel. Then a period
+      Orders (with "worth …"), Complaints, Abandoned calls, Missed or
+      rejected rings (with "N missed, M rejected"), Unclassified calls,
+      Agents online. **A ring one agent did not take is shown, not counted**
+      (26 Sep). To check it: ring the queue, let it ring the first agent
+      without answering, and answer on the second. Communications and the
+      Phone line under Today by channel each go up by one, not two, and
+      Missed or rejected rings goes up by one. Under them, today by type and by channel. Then a period
       bar (presets and dates only, no agent or branch) and four charts: per
       day (a line), per type, per channel, per hour (all 24 hours).
-      *If Agents online looks too high:* expected. It counts sign-ins that
-      were never signed out, and closing the Agent App does not sign out
-      (decision of 26 Sep); tell me the number and I'll say whether it's that.
+      *Agents online* counts agents whose Agent App has been heard from in
+      the last five minutes. To check it: sign in on a laptop and the number
+      goes up at once. Pull that laptop's network cable (or switch it off
+      without signing out), and within five minutes it goes back down.
 - [ ] **Make a call and miss it**, or record a message in the Agent App: the
       tile changes within a minute without reloading.
 - [ ] **Call reports is in the sidebar right after Calls.** One filter bar,
@@ -344,6 +350,39 @@ range both have plenty; without it, choose a range from mid-September.
 - [ ] **Everything above in Arabic.** Screenshots, **in each language**, of:
       the dashboard; Call reports' Overview (Peak hours visible); the
       Problems tab; and one chart's downloaded picture.
+
+### 1.10 Phones and listening in (S-61, S-62) — built 26 Sep, needs the VPN and a phone
+
+The server's extension must be set up (the PBX blacklist card in Settings).
+
+- [ ] **Users page, Phone column.** An agent signed in to the Agent App shows
+      **Free** within a few seconds of the page opening. One whose phone is not
+      connected shows **Offline**. The demo agents (2901–2905) show **Not
+      known**: the PBX does not have those extensions.
+      *If every agent says Not known and a note says the PBX is not
+      answering:* the server's VPN is off, or the server's extension's
+      password is wrong. The server log says which (`PBX watch:` lines).
+- [ ] **Ring an agent.** Their row shows **Ringing**, then **In a call** with a
+      timer once they answer, then **Free** when they hang up. Each within
+      about three seconds.
+- [ ] **Sign out of the Agent App.** That row goes to **Offline** within a few
+      seconds. Then pull a signed-in laptop's network cable instead: it goes
+      Offline once the PBX notices, which may take a minute or two. Tell me how
+      long it took.
+- [ ] **Dashboard.** Agents online matches the Users page, and an **In a call**
+      tile shows how many are talking.
+- [ ] **Listen.** While an agent is on a call, press **Listen** on their row.
+      A bar says "Listening to …" with a timer, and you hear both sides of the
+      call, a fraction of a second behind. The agent and the customer hear
+      nothing different.
+      *If the bar shows an error from the PBX:* `*222` did not work from the
+      server's extension. The message has the PBX's answer (404 means the code
+      is not set up for that extension).
+      *If the bar says Listening but there is no sound:* the call's audio is not
+      getting back to the server. Tell me.
+- [ ] **Stop listening** ends it at once. So must leaving the Users page, and
+      closing the tab. When the call itself ends, the bar says so.
+- [ ] **Everything above in Arabic.**
 
 ## Round 2 — the Agent App, without a phone
 

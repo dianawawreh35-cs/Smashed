@@ -18,8 +18,15 @@ const TODAY_REFRESH_MS = 60_000
  * figures, then four charts for a chosen period — communications per day, per type, per channel, per hour.
  *
  * Calls and messages together, because the dashboard is the whole picture;
- * missed and unclassified are calls' own words and say so. **Today** is the
+ * abandoned and unclassified are calls' own words and say so. **Today** is the
  * restaurant's, worked out by the server, whatever period the charts show.
+ *
+ * Missed and rejected rings are shown, not counted (Dia, 26 Sep): the queue
+ * passes a call from agent to agent, so a ring one agent missed is usually a
+ * call another answered. The server leaves those rings out of every total
+ * and chart here, and a call nobody answered is an abandoned one; but how
+ * often a ringing phone went untaken is how efficient the agents are, so the
+ * rings have a tile of their own.
  *
  * The figures are stat tiles, not charts: each is one number, and a chart of
  * one number is a worse way to read it (dataviz). The communications count
@@ -69,10 +76,16 @@ export default function DashboardPage() {
               <Tile label={t('dashboard.tiles.orders')} value={d ? n(d.orders) : undefined}
                 note={d ? t('dashboard.tiles.worth', { value: money(d.orderValue) }) : undefined} />
               <Tile label={t('dashboard.tiles.complaints')} value={d ? n(d.complaints) : undefined} />
-              <Tile label={t('dashboard.tiles.missed')} value={d ? n(d.missed) : undefined} note={t('dashboard.tiles.missedNote')} />
               <Tile label={t('dashboard.tiles.abandoned')} value={d ? n(d.abandoned) : undefined} note={t('dashboard.tiles.abandonedNote')} />
+              <Tile label={t('dashboard.tiles.untaken')} value={d ? n(d.missedRings + d.rejectedRings) : undefined}
+                note={d ? t('dashboard.tiles.untakenNote', { missed: n(d.missedRings), rejected: n(d.rejectedRings) }) : undefined} />
               <Tile label={t('dashboard.tiles.unclassified')} value={d ? n(d.unclassified) : undefined} note={t('dashboard.tiles.unclassifiedNote')} />
-              <Tile label={t('dashboard.tiles.agentsOnline')} value={d ? n(d.agentsOnline) : undefined} note={t('dashboard.tiles.agentsOnlineNote')} />
+              <Tile label={t('dashboard.tiles.agentsOnline')} value={d ? n(d.agentsOnline) : undefined}
+                note={t(d?.fromPbx ? 'dashboard.tiles.agentsOnlinePbxNote' : 'dashboard.tiles.agentsOnlineNote')} />
+              {/* S-61: only the PBX knows who is on a call. */}
+              {d?.fromPbx && (
+                <Tile label={t('dashboard.tiles.agentsInCall')} value={n(d.agentsInCall)} note={t('dashboard.tiles.agentsInCallNote')} />
+              )}
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">

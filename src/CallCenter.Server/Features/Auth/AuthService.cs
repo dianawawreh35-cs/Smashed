@@ -66,12 +66,14 @@ public class AuthService(
         AgentSession? session = null;
         if (user.Role == UserRoles.Agent && fromAgentApp)
         {
+            var now = DateTimeOffset.UtcNow;
             session = new AgentSession
             {
                 UserId = user.Id,
                 LaptopId = request.LaptopId!.Trim(),
                 AppVersion = request.AppVersion,
-                LoggedInAt = DateTimeOffset.UtcNow,
+                LoggedInAt = now,
+                LastSeenAt = now,
             };
 
             db.AgentSessions.Add(session);

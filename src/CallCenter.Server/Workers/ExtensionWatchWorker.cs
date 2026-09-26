@@ -41,6 +41,9 @@ public sealed class ExtensionWatchWorker(
 
     private PbxSubscriber? _subscriber;
 
+    /// <summary>Whether "off until set up" has been logged since the extension was last there.</summary>
+    private bool _saidOff;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
@@ -92,10 +95,20 @@ public sealed class ExtensionWatchWorker(
                     _subscriber.Dispose();
                     _subscriber = null;
                 }
+                else if (!_saidOff)
+                {
+                    // Once, so an empty log is never the only clue (found on
+                    // the server's first v0.3.0 start, 26 Sep).
+                    logger.LogInformation(
+                        "PBX watch: off until the server's extension is entered on the PBX blacklist card in Settings");
+                }
 
+                _saidOff = true;
                 watch.Failing(ExtensionWatch.Problems.NotConfigured);
                 return;
             }
+
+            _saidOff = false;
 
             if (_subscriber is not null && _subscriber.Line != line)
             {

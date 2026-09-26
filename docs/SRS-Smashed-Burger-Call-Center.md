@@ -33,7 +33,7 @@ The call center takes orders, cancellations, complaints and inquiries by phone t
 - Record every call and classify every communication (phone and app) by type.
 - Keep one shared customer list for all agents.
 - Give the supervisor search, reports and statistics for any time period.
-- Run entirely on the restaurant's local network with no monthly software fees.
+- Run entirely on the call center's local network with no monthly software fees.
 
 ### 1.4 Definitions
 
@@ -42,7 +42,7 @@ The call center takes orders, cancellations, complaints and inquiries by phone t
 | Agent | Call-center employee taking calls and app orders. |
 | Supervisor | Manager who reviews data, reports and configuration through the web app. |
 | Agent App | Windows desktop application installed on each agent's laptop: softphone + call log + contacts + app orders. |
-| Server | Mini PC on the restaurant LAN hosting the database, recordings, API and supervisor web app. |
+| Server | Mini PC on the call center LAN hosting the database, recordings, API and supervisor web app. |
 | Classification | The type (Order, Cancellation, Complaint, Inquiry, …) and notes assigned to a call or app communication. |
 | Communication | A phone call or an app-based interaction (WhatsApp, Facebook, Instagram, delivery app). |
 | Branch | One of the restaurant's four branches the order or call relates to (list managed by the supervisor). |
@@ -54,7 +54,7 @@ The call center takes orders, cancellations, complaints and inquiries by phone t
 ### 2.1 Components
 
 - **Agent App (Windows desktop):** registers to the Issabel PBX across the VPN as the agent's SIP extensions, handles inbound and outbound calls, records calls, shows the incoming-call pop-up, holds the agent's call log, the shared contacts and the App Orders tab.
-- **Server (mini PC, restaurant LAN):** PostgreSQL database, recordings storage, REST API used by the Agent Apps, nightly backups. It also needs its own VPN connection to the PBX for the call capture in 4.5 — see the note in 2.4.
+- **Server (mini PC, call center LAN):** PostgreSQL database, recordings storage, REST API used by the Agent Apps, nightly backups. It also needs its own VPN connection to the PBX for the call capture in 4.5 — see the note in 2.4.
 - **Supervisor Web App:** browser application served by the server for search, reports, statistics, recordings access and configuration of the classification form.
 - **Issabel PBX (hosted by the telephony provider):** not operated by the restaurant and not modified by this project. It accepts **no inbound connections**, so this system only ever talks to it outbound — SIP registration from the agents' laptops and from the server (4.5). Issabel's own screens, such as the Blacklist, are used by whoever administers it, not by this system.
 - **VPN to the provider:** what the extensions register across. Every agent laptop runs a VPN client, and the server needs one too.
@@ -95,7 +95,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 
 ### 2.4 Assumptions and constraints
 
-- Five agents work on four Windows 10/11 laptops with headsets; some agents share a laptop across shifts. Laptops and server are on the same restaurant LAN; the PBX is not — it is reached over the VPN.
+- Five agents work on four Windows 10/11 laptops with headsets; some agents share a laptop across shifts. Laptops and server are on the same call center LAN; the PBX is not — it is reached over the VPN. The branches are on separate networks and never reach the server: nobody at a branch uses the Agent App or the supervisor app.
 - The restaurant operates four branches; every call and app communication is assigned to a branch.
 - The provider's Issabel gives two SIP extensions per agent (see 2.3) and delivers caller ID on incoming calls. Registration and audio travel over the VPN.
 - **Each agent laptop runs a VPN client.** The agent must be connected before the phone works; a laptop that is not connected can still use contacts, the call log and the App Orders tab, but cannot make or receive calls.
@@ -343,7 +343,7 @@ The Calls Detail report's own Status column: *Success* or *Abandoned*. Read agai
 
 | ID | Requirement | Priority |
 |---|---|---|
-| N-01 | Network dependency: the database, recordings, API and supervisor app run on the restaurant LAN and keep working with no internet at all — call log, contacts, classification, app orders and reports are unaffected. Telephony is different: the PBX is reached across the internet over the VPN, so calls depend on the internet line, the VPN and the provider. Losing any of them stops calls; it stops nothing else. | Must |
+| N-01 | Network dependency: the database, recordings, API and supervisor app run on the call center LAN and keep working with no internet at all — call log, contacts, classification, app orders and reports are unaffected. Telephony is different: the PBX is reached across the internet over the VPN, so calls depend on the internet line, the VPN and the provider. Losing any of them stops calls; it stops nothing else. | Must |
 | N-02 | Performance: pop-up under 1 s; report generation under 5 s for one year of data at the expected volume (up to ~500 communications/day). | Must |
 | N-03 | Capacity: 5 agents initially, designed for up to 20 without changes; one server. | Must |
 | N-04 | Availability: the phone function of the Agent App never depends on the server being up (see A-04). It does depend on the VPN and the provider (N-01), which are outside the developer's control — the agreed uptime and support hours for them are the client's arrangement with the provider (see 12.3). | Must |
@@ -401,7 +401,7 @@ The Calls Detail report's own Status column: *Success* or *Abandoned*. Read agai
 
 - Automated integration with WhatsApp, Facebook, Instagram or delivery apps.
 - POS integration beyond the customer lookup (A-67); menu, pricing or delivery management.
-- Remote access from outside the restaurant network (can be added with a VPN).
+- Remote access for agents or the supervisor from outside the call center network. (The developer administers the server over Tailscale — runbook step 3. That is maintenance access, not a user feature.)
 - IVR, queues, ring-group changes or any PBX reconfiguration beyond creating extensions.
 - Mobile apps for agents.
 - Payment processing.

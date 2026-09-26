@@ -498,7 +498,7 @@ public static class SeedData
         // Filled in at installation, once the client's PBX person has confirmed them.
 
         // The PBX is the provider's Issabel, reached over the VPN, so this is its
-        // address on the VPN rather than one on the restaurant LAN.
+        // address on the VPN rather than one on the call center LAN.
         ("pbx.host", ""),
 
         // The other agents' and the branches' extension numbers (S-48). A call

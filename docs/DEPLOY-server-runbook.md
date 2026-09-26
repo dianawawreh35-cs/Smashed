@@ -1,22 +1,28 @@
 # Server Deployment Runbook — Restaurant Call Center System
 
-Target: mini PC (Intel i5, SSD) on the restaurant LAN. Ubuntu Server 26.04 LTS + Docker Compose.
-Example addresses used below — replace with the real ones:
+Target: mini PC (Intel i5, SSD) on the call center LAN. Ubuntu Server 26.04 LTS + Docker Compose.
+Addresses used below. Rows marked *example* are still to be confirmed on site:
 
-| Item | Example |
+| Item | Value |
 |---|---|
-| Server IP | `192.168.1.100` |
-| Router / gateway | `192.168.1.1` |
-| PBX address on the VPN | `10.8.0.1` |
-| Server address on the VPN | `10.8.0.20` |
+| Server IP | `192.168.1.100` (confirmed) |
+| Router / gateway | `192.168.1.1` *example* |
+| PBX address on the VPN | `10.8.0.1` *example* |
+| Server address on the VPN | `10.8.0.20` *example* |
 | LAN | `192.168.1.0/24` |
+
+**The server is LAN-only, with outbound internet (confirmed).** Nothing reaches
+it from outside the call center: the firewall admits the LAN only and the router
+forwards no ports. It can reach out through the router, which is what the
+Docker install, `./update.sh --pull`, the POS lookup (`smashed-ps.com`) and the
+server's VPN to the PBX all rely on.
 
 Estimated time: about 1 hour, plus waiting for the telephony provider in step 8.
 
 > **The PBX is not on your network.** It is an Issabel system run by an external
-> telephony provider and reached over a VPN. Each agent laptop runs a VPN client.
-> The server would need its own VPN connection for step 8 — but step 8 is
-> deferred, so nothing in this runbook needs it today.
+> telephony provider and reached over a VPN. Each agent laptop runs a VPN client,
+> and the server needs its own VPN connection for the abandoned-call import in
+> step 8. Everything else works without it.
 
 ---
 
@@ -72,13 +78,17 @@ Also reserve `192.168.1.100` in the router's DHCP settings so it never gives tha
 
 ## Step 3 — Updates, time zone, firewall
 
-**What it does:** brings the system up to date, sets the local clock (so call timestamps are correct), and turns on a firewall that allows only the ports you need and only from the restaurant LAN. Everything else is closed.
+**What it does:** brings the system up to date, sets the local clock (so call timestamps are correct), and turns on a firewall that allows only the ports you need and only from the call center LAN. Everything else is closed.
 
 **Work**
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo timedatectl set-timezone Asia/Hebron
-sudo apt install -y ufw curl unzip
+sudo apt install -y ufw curl unzip nano
+
+# Remote administration over Tailscale (see below) - add this BEFORE enabling
+# the firewall if you are connected that way, or ufw cuts off your own session
+sudo ufw allow in on tailscale0
 
 # SSH for you; 80 is the supervisor web app, 5000 the API and healthcheck
 sudo ufw allow from 192.168.1.0/24 to any port 22 proto tcp
@@ -96,7 +106,19 @@ call-back extension on the server. That feature was removed on 19 September 2026
 Port 80 is what lets the supervisor open the dashboard by typing the server
 address on its own, with no port number after it. Nothing listens on 5001, so
 it is no longer opened. None of these ports are forwarded on the router: the
-system is reachable from the restaurant LAN only.
+system is reachable from the call center LAN only. The restaurant branches are
+on separate networks and don't need it.
+
+**Remote administration: Tailscale.** The server is also in the developer's
+Tailscale network as `smashed-callcenter`, and advertises `192.168.1.100/32`
+as a subnet route. So from the office, `ssh smashed@192.168.1.100` and
+`http://192.168.1.100` reach it through Tailscale, not through the router. That
+traffic arrives on the `tailscale0` interface from a `100.x` address, not from
+`192.168.1.x`, which is why it gets its own `ufw` rule above. Only devices in
+that Tailscale account can use this path. Nothing is opened to the internet.
+In the Tailscale admin console, **disable key expiry** for
+`smashed-callcenter`. Otherwise the remote path drops after 180 days until
+someone signs it in again at the call center.
 
 ---
 
@@ -230,16 +252,22 @@ docker compose logs -f api
 ```
 
 **Option B — let the server fetch them (needs internet on site).** Log in once,
-because the API image is private:
+because the API image is private. Git isn't needed on the server. Creating the
+read-only token it logs in with is covered in
+[RELEASING.md](RELEASING.md#pulling-a-private-image-needs-a-login):
 ```bash
-echo <your-github-token> | docker login ghcr.io -u dianawawreh35-cs --password-stdin
-./update.sh v1.0 --pull
+read -s T && echo "$T" | docker login ghcr.io -u dianawawreh35-cs --password-stdin; unset T
+chmod +x update.sh backup.sh
+./update.sh v1.0 --pull --no-backup
 ```
 That pulls the image, starts it, waits for `/health`, and rolls back if it does
 not come up. `postgres:16` is fetched from Docker Hub automatically.
+`--no-backup` is for this first install only. The script backs up before every
+update, and with no database yet (and no backup disk until step 9) that backup
+would fail and stop the install. Leave it off every later update.
 
 > Even with internet on site, Option A is worth preferring for the **first**
-> install: it removes any dependency on the restaurant's connection working on
+> install: it removes any dependency on the call center's connection working on
 > the day, and guarantees the exact `postgres:16` build you tested rather than
 > whatever the tag points at that week.
 

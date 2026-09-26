@@ -5895,6 +5895,39 @@ chosen, "Branch: Nablus". 119 web tests pass; the build and lint pass. The
 paper itself cannot be tested here: checklist 1.9, "Print one report" and
 "Print page".
 
+## 2026-09-26 — Where the server sits, and how it is reached
+
+Settled with Dia while installing the server:
+
+- **The server is at the call center, not at a restaurant.** It is at
+  `192.168.1.100` on the call center's LAN, with the agents' laptops. The
+  restaurant branches are on separate networks, and **nobody at a branch uses
+  the Agent App or the supervisor app**, so they never need to reach it. The
+  SRS (goals, glossary, architecture, 2.4, N-01, section 9), the runbook and `RELEASING.md` said
+  "restaurant LAN" and now say "call center LAN". "The restaurant" still means
+  the client wherever the business is meant.
+- **LAN-only inbound, outbound internet allowed.** Nothing reaches the server
+  from outside, and the router forwards no ports. It can reach out, for the
+  Docker install, `update.sh --pull`, the POS lookup and its VPN to the PBX.
+- **Remote administration is over Tailscale.** Dia put the server in their own
+  Tailscale network as `smashed-callcenter`, advertising `192.168.1.100/32`.
+  That traffic arrives on `tailscale0` from a `100.x` address, so the runbook's
+  firewall (step 3) gained `ufw allow in on tailscale0`, **added before
+  `ufw enable`**. The LAN-only rules would otherwise have cut off the
+  session enabling them. This is maintenance access for the developer. SRS 9
+  still keeps remote access for users out of scope.
+- **The server pulls its image with its own read-only token** (classic PAT,
+  `read:packages` only), never the developer's `gh` login, which can push.
+  Written up in `RELEASING.md`.
+- `RELEASING.md` and the release workflow's summary still used
+  `admin@192.168.1.50`, an address from before the server existed. Both now say
+  `smashed@192.168.1.100`.
+- **A first install with `update.sh --pull` needs `--no-backup`.** The runbook's
+  Option B said `./update.sh v1.0 --pull`, which runs `backup.sh` first. On a
+  new server there is no database to dump and no backup disk yet, so it would
+  have stopped the install before pulling anything. The runbook now says
+  `--no-backup`, for the first install only.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

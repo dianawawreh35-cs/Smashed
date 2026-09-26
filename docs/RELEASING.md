@@ -1,16 +1,16 @@
 # Releasing
 
-How code gets from this repository to the restaurant's server.
+How code gets from this repository to the call centre's server.
 
 There are two different actions and it matters which one you mean:
 
-| You say | What happens | Changes the restaurant? |
+| You say | What happens | Changes the call centre? |
 | --- | --- | --- |
 | **"push"** | commit + push to GitHub. CI builds and tests it. | no |
 | **"release"** / **"release v1.2"** | push, then tag a version. GitHub builds and publishes the image. | no |
 | **"deploy"** | copy the image to the server and run `update.sh`. | **yes** |
 
-Nothing reaches the restaurant until you explicitly say *deploy*.
+Nothing reaches the call centre until you explicitly say *deploy*.
 
 ---
 
@@ -70,12 +70,12 @@ permanent version number.
 
 ---
 
-## "deploy" — put it on the restaurant's server
+## "deploy" — put it on the call centre's server
 
 **This is the only step that affects people taking orders.** Do it when the
 call centre is quiet, never mid-service.
 
-Two routes — pick whichever suits the restaurant's network.
+Two routes — pick whichever suits the call centre's network.
 
 **A. Carry it over** (no internet needed on site). On your machine:
 
@@ -83,13 +83,13 @@ Two routes — pick whichever suits the restaurant's network.
 docker pull ghcr.io/dianawawreh35-cs/callcenter-api:v1.2
 docker tag  ghcr.io/dianawawreh35-cs/callcenter-api:v1.2 callcenter-api:v1.2
 docker save callcenter-api:v1.2 -o callcenter-api-v1.2.tar
-scp callcenter-api-v1.2.tar admin@192.168.1.50:/opt/callcenter/
+scp callcenter-api-v1.2.tar smashed@192.168.1.100:/opt/callcenter/
 ```
 
 Then on the server:
 
 ```bash
-ssh admin@192.168.1.50
+ssh smashed@192.168.1.100
 cd /opt/callcenter
 ./update.sh v1.2
 ```
@@ -97,7 +97,7 @@ cd /opt/callcenter
 **B. Let the server fetch it** (needs internet on site, and the login below):
 
 ```bash
-ssh admin@192.168.1.50
+ssh smashed@192.168.1.100
 cd /opt/callcenter
 ./update.sh v1.2 --pull
 ```
@@ -111,11 +111,36 @@ Full context in [DEPLOY-server-runbook.md](DEPLOY-server-runbook.md).
 
 ### Pulling a private image needs a login
 
-Once, on whichever machine pulls:
+Neither git nor the GitHub CLI is needed on the server. Docker only needs a
+token that lets it download the image.
+
+**Your laptop** is already signed in to GitHub through `gh`. Give that sign-in
+package access once (it opens the browser), then hand it to Docker:
 
 ```bash
-echo $GITHUB_TOKEN | docker login ghcr.io -u dianawawreh35-cs --password-stdin
+gh auth refresh -s read:packages
+gh auth token | docker login ghcr.io -u dianawawreh35-cs --password-stdin
 ```
+
+**The server** gets its own token, so it never holds the laptop's, which can
+push code:
+
+1. On GitHub: Settings → Developer settings → Personal access tokens →
+   **Tokens (classic)** → Generate new token. Name it `callcenter-server`,
+   tick **only `read:packages`**, and choose an expiry (no expiry means
+   updates never stop working because a date passed). Fine-grained tokens
+   don't work with the image store yet, so it has to be a classic one.
+2. Copy it into the password manager.
+3. On the server, type it where it won't land in the shell history:
+
+```bash
+read -s T && echo "$T" | docker login ghcr.io -u dianawawreh35-cs --password-stdin; unset T
+```
+
+Paste the token at the blank prompt and press Enter. It should say `Login
+Succeeded`. Docker remembers it from then on. If the token expires or is
+revoked, `./update.sh --pull` fails at the download step and the running
+version keeps serving. Make a new token and log in again.
 
 ---
 
@@ -125,7 +150,7 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u dianawawreh35-cs --password-stdin
 someone saved a file. The gap between *release* and *deploy* is the point: it is
 where you decide the moment.
 
-**GitHub cannot reach the server** — it sits behind the restaurant's router on a
+**GitHub cannot reach the server** — it sits behind the call centre's router on a
 private address. So even with `--pull`, the server only ever fetches when you
 tell it to; nothing can be pushed to it from outside. Daily operation needs no
 internet at all (SRS N-01); `--pull` needs it only at the moment of an update,

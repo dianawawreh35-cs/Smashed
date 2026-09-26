@@ -127,7 +127,7 @@ jobs:
             echo "docker pull $IMAGE:$VERSION"
             echo "docker tag  $IMAGE:$VERSION callcenter-api:$VERSION"
             echo "docker save callcenter-api:$VERSION -o callcenter-api-$VERSION.tar"
-            echo "scp callcenter-api-$VERSION.tar admin@192.168.1.50:/opt/callcenter/"
+            echo "scp callcenter-api-$VERSION.tar smashed@192.168.1.100:/opt/callcenter/"
             echo '```'
             echo ""
             echo "**Then on the server:**"

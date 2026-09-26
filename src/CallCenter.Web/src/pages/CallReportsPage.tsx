@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { OrdersReportRow, ReportFilters, TypeCount } from '../api/applicationReports'
+import { fetchAbandoned, getAbandonedImport } from '../api/pbx'
 import {
+  abandonedCalls,
+  abandonedList,
   agentProductivity,
   callBreakdown,
   callSummary,
@@ -28,6 +31,9 @@ import {
   unknownNumbers,
 } from '../api/callReports'
 import type {
+  AbandonedCallRow,
+  AbandonedGrouping,
+  AbandonedRow,
   AgentProductivityRow,
   BreakdownGrouping,
   CallBreakdownRow,
@@ -56,7 +62,7 @@ import { Grouping, ReportFilterBar } from '../components/ReportFilters'
 import { localDate, useReportFilters } from '../lib/reportFilters'
 
 /** The groups the reports are shown in (Dia, 25 Sep): one page, one filter bar, a tab each. */
-const TABS = ['overview', 'orders', 'customers', 'agents', 'problems', 'quality'] as const
+const TABS = ['overview', 'orders', 'customers', 'agents', 'problems', 'abandoned', 'quality'] as const
 type Tab = (typeof TABS)[number]
 
 /** How many rows of a list report are drawn; the export holds them all. */
@@ -65,9 +71,10 @@ const LIST_LIMIT = 200
 /**
  * The call reports (R-01 to R-18): calls only, except where the point is the
  * comparison with the apps (R-01's calls vs app, R-12 to R-14; Dia, 25 Sep).
- * R-19 (the daily e-mail) is not here, and neither are R-20, R-21 or the
- * abandoned half of R-11: they need the PBX's call records (S-55), and until
- * those are imported they are left off rather than shown empty (Dia, 25 Sep).
+ * R-19 (the daily e-mail) is not here, and neither is R-21, the service level:
+ * it needs the wait time of the answered calls too, and the PBX import saves
+ * only the abandoned ones (S-55). The abandoned calls have a tab of their own
+ * (R-20), with a button that downloads the chosen period from the PBX now.
  *
  * One filter bar (S-07) scopes every tab, and only the open tab's reports are
  * fetched. Each report is a `ReportCard`: the server's rows as a table, a
@@ -114,6 +121,7 @@ export default function CallReportsPage() {
         {tab === 'customers' && <Customers filters={filters} />}
         {tab === 'agents' && <Agents filters={filters} />}
         {tab === 'problems' && <Problems filters={filters} />}
+        {tab === 'abandoned' && <Abandoned filters={filters} />}
         {tab === 'quality' && <Quality filters={filters} />}
       </div>
     </div>
@@ -155,6 +163,9 @@ function typeColumns<T extends { byType: TypeCount[] }>(rows: T[] | undefined, a
   }))
 }
 
+/** Seconds as m:ss — a wait, or a talk time. Blank when there is none. */
+const clock = (s: number | null) => (s === null ? '' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`)
+
 /** The customer, or the number when the contact has no name. */
 const customer = (r: { name?: string | null; customer?: string | null; number: string | null }) =>
   r.name ?? r.customer ?? r.number ?? ''
@@ -177,6 +188,7 @@ function Overview({ filters }: { filters: ReportFilters }) {
     { key: 'outbound', label: c('outbound'), value: (r) => r.outbound, numeric: true, total: true },
     { key: 'answered', label: c('answered'), value: (r) => r.answered, numeric: true, total: true },
     { key: 'missed', label: c('missed'), value: (r) => r.missed, numeric: true, total: true },
+    { key: 'abandoned', label: c('abandoned'), value: (r) => r.abandoned, numeric: true, total: true },
     { key: 'blocked', label: c('blocked'), value: (r) => r.blocked, numeric: true, total: true },
   ]
 
@@ -203,6 +215,7 @@ function Overview({ filters }: { filters: ReportFilters }) {
           series: [
             { key: 'answered', label: c('answered'), colour: SERIES_COLOURS[0] },
             { key: 'missed', label: c('missed'), colour: SERIES_COLOURS[1] },
+            { key: 'abandoned', label: c('abandoned'), colour: SERIES_COLOURS[3] },
             { key: 'messages', label: c('messages'), colour: SERIES_COLOURS[2] },
           ],
         }}
@@ -611,7 +624,6 @@ function CustomerBase({ filters }: { filters: ReportFilters }) {
 function Agents({ filters }: { filters: ReportFilters }) {
   const { t, c, money } = useFormat()
   const rows = useQuery({ queryKey: ['reports', 'calls', 'agents', filters], queryFn: () => agentProductivity(filters) })
-  const clock = (s: number | null) => (s === null ? '' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`)
 
   const columns: ReportColumn<AgentProductivityRow>[] = [
     { key: 'agent', label: c('agent'), value: (r) => r.agent },
@@ -657,7 +669,8 @@ function Missed({ filters }: { filters: ReportFilters }) {
     { key: 'inbound', label: c('inbound'), value: (r) => r.inbound, numeric: true, total: true },
     { key: 'missedOnly', label: c('missedOnly'), value: (r) => r.missed, numeric: true, total: true },
     { key: 'rejected', label: c('rejected'), value: (r) => r.rejected, numeric: true, total: true },
-    { key: 'total', label: c('missed'), value: (r) => r.total, numeric: true, total: true },
+    { key: 'abandoned', label: c('abandoned'), value: (r) => r.abandoned, numeric: true, total: true },
+    { key: 'total', label: c('total'), value: (r) => r.total, numeric: true, total: true },
     { key: 'rate', label: c('missedRate'), value: (r) => r.rate, format: (r) => percent(r.rate), numeric: true },
   ]
   const listColumns: ReportColumn<MissedCallRow>[] = [
@@ -681,6 +694,7 @@ function Missed({ filters }: { filters: ReportFilters }) {
           series: [
             { key: 'missed', label: c('missedOnly'), colour: SERIES_COLOURS[1] },
             { key: 'rejected', label: c('rejected'), colour: SERIES_COLOURS[2] },
+            { key: 'abandoned', label: c('abandoned'), colour: SERIES_COLOURS[3] },
           ],
         }}>
         <Grouping label={t('applicationReports.groupBy')} value={by} options={['day', 'week', 'month', 'hour', 'agent', 'branch']} onChange={setBy} />
@@ -688,6 +702,114 @@ function Missed({ filters }: { filters: ReportFilters }) {
       <ReportCard title={t('callReports.sections.missedList.title')} hint={t('callReports.sections.missedList.hint')}
         columns={listColumns} rows={list.data} loading={list.isFetching} error={list.isError}
         exportName="missed-calls" limit={LIST_LIMIT} />
+    </>
+  )
+}
+
+// ---- Abandoned: R-20 -------------------------------------------------------------------
+
+/**
+ * R-20: the calls that gave up in the queue (S-55), for the chosen period, from
+ * what the PBX import has already saved. The server checks the PBX on its own
+ * every minute or so; the Fetch button downloads the chosen period now, for a
+ * day the timer has not reached or a PBX that was out of reach.
+ */
+function Abandoned({ filters }: { filters: ReportFilters }) {
+  const { t, c, when, stamp, percent, decimal } = useFormat()
+  const queryClient = useQueryClient()
+  const [by, setBy] = useState<AbandonedGrouping>('day')
+
+  const grouped = useQuery({ queryKey: ['reports', 'calls', 'abandoned', filters, by], queryFn: () => abandonedCalls(filters, by) })
+  const list = useQuery({ queryKey: ['reports', 'calls', 'abandoned-list', filters], queryFn: () => abandonedList(filters) })
+  const status = useQuery({ queryKey: ['pbx', 'abandoned-import'], queryFn: getAbandonedImport })
+
+  const fetchNow = useMutation({
+    mutationFn: () => fetchAbandoned(filters.from, filters.to),
+    onSuccess: (result) => {
+      queryClient.setQueryData(['pbx', 'abandoned-import'], result.status)
+      // Every report may have moved: a new abandoned call, and rings no longer counted twice.
+      if (result.ok) void queryClient.invalidateQueries({ queryKey: ['reports'] })
+    },
+  })
+
+  const configured = status.data?.configured ?? false
+  const result = fetchNow.data
+  const message = !status.data
+    ? ''
+    : !configured
+      ? t('callReports.abandoned.notSetUp')
+      : fetchNow.isError
+        ? t('callReports.abandoned.failed', { error: t('dashboard.failed') })
+        : result
+          ? result.ok
+            ? t('callReports.abandoned.fetched', { from: result.from, to: result.to, abandoned: result.abandoned, added: result.added })
+            : t('callReports.abandoned.failed', { error: result.error })
+          : [
+              status.data.lastCheckedAt ? t('callReports.abandoned.lastChecked', { when: when(status.data.lastCheckedAt) }) : '',
+              t('callReports.abandoned.fetchHint'),
+            ].filter(Boolean).join(' ')
+  const failed = fetchNow.isError || (result !== undefined && !result.ok)
+
+  const groupedColumns: ReportColumn<AbandonedRow>[] = [
+    { key: 'label', label: t(`applicationReports.groups.${by}`), value: (r) => r.label },
+    { key: 'inbound', label: c('inbound'), value: (r) => r.inbound, numeric: true, total: true },
+    { key: 'abandoned', label: c('abandoned'), value: (r) => r.abandoned, numeric: true, total: true },
+    { key: 'rate', label: c('abandonedRate'), value: (r) => r.rate, format: (r) => percent(r.rate), numeric: true },
+    { key: 'averageWait', label: c('averageWait'), value: (r) => r.averageWaitSec, format: (r) => clock(r.averageWaitSec), numeric: true },
+    { key: 'maxWait', label: c('maxWait'), value: (r) => r.maxWaitSec, format: (r) => clock(r.maxWaitSec), numeric: true },
+    { key: 'calledBack', label: c('calledBack'), value: (r) => r.calledBack, numeric: true, total: true },
+    {
+      key: 'toCallBack', label: c('averageMinutesToCallBack'), value: (r) => r.averageMinutesToCallBack,
+      format: (r) => decimal(r.averageMinutesToCallBack), numeric: true,
+    },
+  ]
+  const listColumns: ReportColumn<AbandonedCallRow>[] = [
+    { key: 'hungUp', label: c('hungUp'), value: (r) => stamp(r.endedAt ?? r.startedAt), format: (r) => when(r.endedAt ?? r.startedAt) },
+    { key: 'wait', label: c('wait'), value: (r) => r.waitSec, format: (r) => clock(r.waitSec), numeric: true },
+    { key: 'customer', label: c('customer'), value: (r) => customer(r) },
+    { key: 'number', label: c('number'), value: (r) => r.number },
+    { key: 'queue', label: c('queue'), value: (r) => r.queue },
+    { key: 'rings', label: c('rings'), value: (r) => r.rings, numeric: true, total: true },
+    {
+      key: 'calledBackAt', label: c('calledBackAt'),
+      value: (r) => (r.calledBackAt ? stamp(r.calledBackAt) : ''),
+      format: (r) => (r.calledBackAt ? when(r.calledBackAt) : t('callReports.abandoned.notYet')),
+    },
+    { key: 'calledBackBy', label: c('calledBackBy'), value: (r) => r.calledBackBy },
+    { key: 'minutesToCallBack', label: c('minutesToCallBack'), value: (r) => r.minutesToCallBack, numeric: true },
+  ]
+
+  return (
+    <>
+      <section className="card card-body flex flex-wrap items-center gap-3" aria-label={t('callReports.abandoned.fetch')}>
+        <button
+          type="button"
+          className="btn-primary btn-sm"
+          disabled={!configured || fetchNow.isPending}
+          onClick={() => fetchNow.mutate()}
+        >
+          {fetchNow.isPending ? t('callReports.abandoned.fetching') : t('callReports.abandoned.fetch')}
+        </button>
+        <p role="status" className={`text-sm ${failed ? 'text-red-400' : 'text-slate-400'}`}>{message}</p>
+      </section>
+
+      <ReportCard title={t('callReports.sections.abandoned.title')} hint={t('callReports.sections.abandoned.hint')}
+        columns={groupedColumns} rows={grouped.data} loading={grouped.isFetching} error={grouped.isError}
+        exportName={`abandoned-by-${by}`}
+        chart={{
+          kind: by !== 'hour' && (grouped.data?.length ?? 0) > 1 ? 'line' : 'bar',
+          x: (r) => r.label,
+          series: [
+            { key: 'abandoned', label: c('abandoned'), colour: SERIES_COLOURS[3] },
+            { key: 'calledBack', label: c('calledBack'), colour: SERIES_COLOURS[0] },
+          ],
+        }}>
+        <Grouping label={t('applicationReports.groupBy')} value={by} options={['day', 'week', 'month', 'hour']} onChange={setBy} />
+      </ReportCard>
+
+      <ReportCard title={t('callReports.sections.abandonedList.title')} hint={t('callReports.sections.abandonedList.hint')}
+        columns={listColumns} rows={list.data} loading={list.isFetching} error={list.isError}
+        exportName="abandoned-calls" limit={LIST_LIMIT} />
     </>
   )
 }

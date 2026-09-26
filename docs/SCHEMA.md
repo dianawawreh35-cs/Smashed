@@ -127,11 +127,12 @@ CREATE TABLE communications (
   answered_at        timestamptz,
   ended_at           timestamptz,
   duration_sec       int,                                         -- talk time (answered→ended)
-  wait_sec           int,                                         -- queue wait, from the CDR import (S-55)
+  wait_sec           int,                                         -- queue wait, from the PBX import (S-55)
   queue_name         text,
   extension          text,                                        -- which extension handled it
   sip_call_id        text,                                        -- from the Agent App INVITE
-  pbx_unique_id      text,                                        -- Asterisk uniqueid; the CDR import's dedupe key (needs loguniqueid=yes)
+  pbx_unique_id      text,                                        -- the PBX import's key: 'issabel:' + hang-up time|number|queue (S-55)
+  abandoned_call_id  uuid REFERENCES communications(id) ON DELETE SET NULL, -- on an untaken Agent App ring: the abandoned call it was part of (S-55)
   source             text NOT NULL CHECK (source IN ('AgentApp','AMI','CDR','Manual')),
   laptop_id          text,                                        -- machine name that logged it
   notes              varchar(4000),                               -- why a Missed/Rejected/NoAnswer call went that way (A-41); answered calls are classified instead
@@ -145,9 +146,10 @@ CREATE INDEX ix_comm_remote         ON communications(remote_normalised);
 CREATE INDEX ix_comm_status         ON communications(status);
 CREATE UNIQUE INDEX ux_comm_pbx_unique ON communications(pbx_unique_id) WHERE pbx_unique_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_comm_sip_call   ON communications(sip_call_id, extension) WHERE sip_call_id IS NOT NULL;
+CREATE INDEX ix_comm_abandoned_call    ON communications(abandoned_call_id) WHERE abandoned_call_id IS NOT NULL;
 ```
 
-> **Two values in these CHECK constraints are no longer written** (SRS 4.5, 19 Sep 2026): `source = 'AMI'`, because AMI is ruled out, and `status = 'Overflowed'`, because the call-back extension that produced it was removed. Both are **left in place deliberately** — narrowing a CHECK is a migration, it would gain nothing, and a future method could use either again. `ux_comm_pbx_unique` is what makes re-reading the same CDR rows harmless.
+> **Two values in these CHECK constraints are no longer written** (SRS 4.5, 19 Sep 2026): `source = 'AMI'`, because AMI is ruled out, and `status = 'Overflowed'`, because the call-back extension that produced it was removed. Both are **left in place deliberately** — narrowing a CHECK is a migration, it would gain nothing, and a future method could use either again. `ux_comm_pbx_unique` is what makes downloading the same day from the PBX every minute harmless.
 
 ```sql
 
@@ -181,7 +183,7 @@ Notes
 - One table for phone and app makes every report one query (`kind`/`channel_id` splits them).
 - A message (A-70, since 2026-09-25) is `kind = 'App'`, `direction = 'None'`, `status = 'Logged'`, `source = 'Manual'`, filed under the app's `channel_id`, with `started_at` the time the customer wrote (defaults to when it was recorded; an agent may set it back within the day). No `sip_call_id`, `extension`, `answered_at`, `ended_at` or recording. Its classification, edit window and history are exactly a call's. Written by `ApplicationsService`; searched with `kind=App` on the call search; the call log, the caller card's recent list and the Calls page filter to `kind = 'Call'`.
 - `channels` is managed by the supervisor since 2026-09-25 (S-41): add, rename, reorder, hide, never delete. Phone (`is_system`) can be neither renamed nor hidden, because `CommunicationsService.LogCallAsync` files every call under it by name.
-- Reconciliation: an AMI/CDR record and an Agent App record for the same call are joined on `pbx_unique_id` when the app can see it, otherwise on `remote_normalised` + time window; the reconciler merges wait_sec/queue_name into the agent's row.
+- Abandoned calls (S-55, since 2026-09-26) are `source = 'CDR'`, `status = 'Abandoned'`, `direction = 'In'`, no agent, from the PBX's Calls Detail report; `started_at` is when the caller joined the queue, `ended_at` the hang-up, `wait_sec` the time between. The Agent App's untaken rings of that call (Missed, Rejected, Blocked, same number, inside the wait) point at it through `abandoned_call_id`, and the reports leave them out of every figure but R-15's, so the customer counts once. A call every ring of which was Blocked is saved as `Blocked`. The import's own state (address, login, last check) is in `settings` under `pbx.calls.*`, outside the settings catalogue.
 
 ---
 

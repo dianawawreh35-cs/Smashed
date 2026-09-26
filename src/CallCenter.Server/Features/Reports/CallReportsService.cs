@@ -47,6 +47,9 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
 
     private static bool IsAnswered(CubeCell c) => IsCall(c) && c.Status == CommunicationStatuses.Answered;
 
+    /// <summary>S-55: a customer rang and gave up in the queue before anybody took it. From the PBX, never an agent's.</summary>
+    private static bool IsAbandoned(CubeCell c) => IsInbound(c) && c.Status == CommunicationStatuses.Abandoned;
+
     /// <summary>A-41: only an answered call is classified, so only an answered call can be unclassified.</summary>
     private static int Unclassified(CubeCell c) => IsAnswered(c) ? c.N - c.Classified : 0;
 
@@ -75,7 +78,8 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
                 Count(g, IsOutbound),
                 Count(g, c => IsInbound(c) && IsAnswered(c)),
                 Count(g, IsMissed),
-                Count(g, c => IsInbound(c) && c.Status == CommunicationStatuses.Blocked)))
+                Count(g, c => IsInbound(c) && c.Status == CommunicationStatuses.Blocked),
+                Count(g, IsAbandoned)))
             .OrderBy(r => r.Bucket)
             .ToList();
     }
@@ -239,10 +243,10 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
     // ---- R-11 -------------------------------------------------------------------------
 
     /// <summary>
-    /// R-11: missed calls, and their share of incoming calls, per day, week,
-    /// month, hour, agent or branch. Missed and rejected are shown apart and
-    /// together. The time until the customer was called back is not here
-    /// (Dia, 25 Sep): it belongs with the abandoned calls of S-55.
+    /// R-11: missed and abandoned calls, and their share of incoming calls, per
+    /// day, week, month, hour, agent or branch. Missed, rejected and abandoned
+    /// are shown apart and together. The time until the customer was called
+    /// back is R-20's, with the abandoned calls it belongs to (S-55).
     /// </summary>
     public async Task<IReadOnlyList<MissedRowDto>> MissedAsync(
         ReportFilter filter, string? groupBy, CancellationToken ct = default)
@@ -258,19 +262,22 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
                 var inbound = g.Sum(c => c.N);
                 var missed = Count(g, c => c.Status == CommunicationStatuses.Missed);
                 var rejected = Count(g, c => c.Status == CommunicationStatuses.Rejected);
-                return new MissedRowDto(g.Key.Key, g.Key.Label, inbound, missed, rejected, missed + rejected,
-                    Percent(missed + rejected, inbound));
+                var abandoned = Count(g, c => c.Status == CommunicationStatuses.Abandoned);
+                var total = missed + rejected + abandoned;
+                return new MissedRowDto(g.Key.Key, g.Key.Label, inbound, missed, rejected, abandoned, total,
+                    Percent(total, inbound));
             });
 
         return (IsTime(by) ? grouped.OrderBy(r => r.Key) : grouped.OrderByDescending(r => r.Total).ThenBy(r => r.Label)).ToList();
     }
 
-    /// <summary>R-11's list: every missed call in the period, newest first, with the note the agent left (A-41).</summary>
+    /// <summary>R-11's list: every missed and abandoned call in the period, newest first, with the note the agent left (A-41).</summary>
     public async Task<IReadOnlyList<MissedCallRowDto>> MissedListAsync(ReportFilter filter, CancellationToken ct = default)
     {
         var q = ReportScope.Narrow(db.Communications.AsNoTracking(), Calls(filter), await ReportScope.InternalNumbersAsync(db, ct))
             .Where(c => c.Direction == Directions.In
-                && (c.Status == CommunicationStatuses.Missed || c.Status == CommunicationStatuses.Rejected));
+                && (c.Status == CommunicationStatuses.Missed || c.Status == CommunicationStatuses.Rejected
+                    || c.Status == CommunicationStatuses.Abandoned));
 
         return await q
             .OrderByDescending(c => c.StartedAt).ThenBy(c => c.Id)
@@ -348,11 +355,13 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
     /// R-15: per agent, calls handled (answered, in and out), incoming calls
     /// answered, outgoing calls made, average talk time over answered calls,
     /// orders and their value, answered calls left unclassified, and missed
-    /// calls on their extension.
+    /// calls on their extension. Every ring counts here, the rings of an
+    /// abandoned call too (S-55): each was a ring on this agent's phone that
+    /// they did not take.
     /// </summary>
     public async Task<IReadOnlyList<AgentProductivityRowDto>> AgentsAsync(ReportFilter filter, CancellationToken ct = default)
     {
-        var cells = await cube.CountAsync(Calls(filter), CubeBy.Agent | Outcome, ct);
+        var cells = await cube.CountAsync(Calls(filter) with { WithRings = true }, CubeBy.Agent | Outcome, ct);
         var names = await cube.NamesAsync(ct);
 
         return cells
@@ -481,6 +490,103 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
         .Where(g => g.Count() > 1)
         .Select(g => g.Key);
 
+    // ---- R-20 -------------------------------------------------------------------------
+
+    /// <summary>
+    /// R-20: abandoned calls per day, week, month or hour of the day: how many,
+    /// their share of incoming calls, how long those callers waited, and how
+    /// many were called back and how soon (S-55). Only what the PBX import has
+    /// saved: the report is as current as the last check.
+    /// </summary>
+    public async Task<IReadOnlyList<AbandonedRowDto>> AbandonedAsync(
+        ReportFilter filter, string? groupBy, CancellationToken ct = default)
+    {
+        var by = (groupBy ?? string.Empty).ToLowerInvariant() is "week" or "month" or "hour" ? groupBy!.ToLowerInvariant() : "day";
+        var names = await cube.NamesAsync(ct);
+        var inbound = (await cube.CountAsync(Calls(filter), Outcome | Dimension(by), ct))
+            .Where(IsInbound)
+            .GroupBy(Heading(by, names))
+            .ToDictionary(g => g.Key, g => g.Sum(c => c.N));
+
+        var calls = (await AbandonedListAsync(filter, ct))
+            .GroupBy(r =>
+            {
+                var bucket = ReportScope.Bucket(ReportScope.Local(r.StartedAt), by);
+                return (Key: bucket, Label: by == "hour" ? $"{bucket}:00" : bucket);
+            })
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return inbound.Keys.Union(calls.Keys)
+            .Select(heading =>
+            {
+                var rows = calls.GetValueOrDefault(heading) ?? [];
+                var waits = rows.Where(r => r.WaitSec is not null).Select(r => r.WaitSec!.Value).ToList();
+                var back = rows.Where(r => r.MinutesToCallBack is not null).Select(r => r.MinutesToCallBack!.Value).ToList();
+                var inCount = inbound.GetValueOrDefault(heading);
+                return new AbandonedRowDto(
+                    heading.Key,
+                    heading.Label,
+                    inCount,
+                    rows.Count,
+                    Percent(rows.Count, inCount),
+                    waits.Count == 0 ? null : (int)Math.Round(waits.Average()),
+                    waits.Count == 0 ? null : waits.Max(),
+                    back.Count,
+                    back.Count == 0 ? null : (int)Math.Round(back.Average()));
+            })
+            .OrderBy(r => r.Key)
+            .ToList();
+    }
+
+    /// <summary>
+    /// R-20's list: every abandoned call in the period, newest first, with how
+    /// long the caller waited, how often the agents' phones rang with it, and
+    /// the first call anybody here made to that number afterwards (S-51's
+    /// call-back, until call-back tasks exist).
+    /// </summary>
+    public async Task<IReadOnlyList<AbandonedCallRowDto>> AbandonedListAsync(ReportFilter filter, CancellationToken ct = default)
+    {
+        var q = ReportScope.Narrow(db.Communications.AsNoTracking(), Calls(filter), await ReportScope.InternalNumbersAsync(db, ct))
+            .Where(c => c.Direction == Directions.In && c.Status == CommunicationStatuses.Abandoned);
+
+        var rows = await q
+            .OrderByDescending(c => c.StartedAt).ThenBy(c => c.Id)
+            .Select(c => new
+            {
+                c.Id,
+                c.StartedAt,
+                c.EndedAt,
+                c.WaitSec,
+                c.QueueName,
+                c.RemoteNumberRaw,
+                c.ContactId,
+                Customer = c.Contact != null ? c.Contact.Name : null,
+                Rings = db.Communications.Count(r => r.AbandonedCallId == c.Id),
+                BackAt = db.Communications
+                    .Where(o => o.Kind == CommunicationKinds.Call && o.Direction == Directions.Out
+                        && c.RemoteNormalised != null && o.RemoteNormalised == c.RemoteNormalised
+                        && o.StartedAt >= (c.EndedAt ?? c.StartedAt))
+                    .OrderBy(o => o.StartedAt)
+                    .Select(o => (DateTimeOffset?)o.StartedAt)
+                    .FirstOrDefault(),
+                BackBy = db.Communications
+                    .Where(o => o.Kind == CommunicationKinds.Call && o.Direction == Directions.Out
+                        && c.RemoteNormalised != null && o.RemoteNormalised == c.RemoteNormalised
+                        && o.StartedAt >= (c.EndedAt ?? c.StartedAt))
+                    .OrderBy(o => o.StartedAt)
+                    .Select(o => o.Agent != null ? o.Agent.DisplayName : null)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        return rows
+            .Select(r => new AbandonedCallRowDto(
+                r.Id, r.StartedAt, r.EndedAt, r.WaitSec, r.QueueName, r.RemoteNumberRaw, r.ContactId, r.Customer, r.Rings,
+                r.BackAt, r.BackBy,
+                r.BackAt is { } at ? (int)Math.Max(0, Math.Round((at - (r.EndedAt ?? r.StartedAt)).TotalMinutes)) : null))
+            .ToList();
+    }
+
     // ---- S-20, the dashboard ---------------------------------------------------
 
     /// <summary>
@@ -514,7 +620,8 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube)
             cells.Sum(c => c.Complaints),
             Count(cells, IsMissed),
             cells.Sum(Unclassified),
-            online);
+            online,
+            Count(cells, IsAbandoned));
     }
 
     /// <summary>

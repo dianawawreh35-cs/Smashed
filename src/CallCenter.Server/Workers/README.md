@@ -13,11 +13,13 @@ POS about recent callers with no contact, or with no name or address, creates
 or fills in their contacts, and attaches their calls (`Features/Pos`). It does
 nothing until `PosLookup:Token` is set.
 
-Still planned:
+`AbandonedCallImportWorker` (S-55) is built: every 20 seconds it asks
+`AbandonedCallImport` whether a check is due (`pbx.calls.interval_minutes`, one
+minute by default), and if so downloads the PBX's Calls Detail report and saves
+the abandoned calls (`Features/Pbx`). It does nothing until the PBX's address
+and login are entered on the settings screen.
 
-- **AmiListener** - persistent Asterisk Manager Interface connection, translates
-  channel events into communications and pushes screen pops over `AgentHub`.
-- **CdrImporter** - periodic reconciliation against the PBX call detail records,
-  filling gaps the live AMI feed missed.
+Not planned: an AMI listener (ruled out, S-50) and a CDR file importer (replaced
+by the Calls Detail report on 2026-09-26).
 
 See `docs/SRS-Smashed-Burger-Call-Center.md` for the governing requirements.

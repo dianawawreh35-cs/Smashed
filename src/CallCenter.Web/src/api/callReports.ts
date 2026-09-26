@@ -15,7 +15,7 @@ export type TimeGrouping = 'day' | 'week' | 'month'
 export type BreakdownGrouping = TimeGrouping | 'agent' | 'branch'
 export type ComplaintsGrouping = TimeGrouping | 'branch' | 'agent'
 
-/** R-01. Inbound = answered + missed + blocked. */
+/** R-01. Inbound = answered + missed + abandoned + blocked. */
 export interface CallSummaryRow {
   bucket: string
   communications: number
@@ -28,6 +28,8 @@ export interface CallSummaryRow {
   /** Inbound calls Missed or Rejected; never an outbound NoAnswer. */
   missed: number
   blocked: number
+  /** Gave up in the PBX queue (S-55). Their rings are not counted again. */
+  abandoned: number
 }
 
 /** R-03: share is a percentage of the classified calls. */
@@ -110,6 +112,8 @@ export interface DashboardToday {
   missed: number
   unclassified: number
   agentsOnline: number
+  /** Gave up in the queue today, as of the last PBX check (S-55). */
+  abandoned: number
 }
 
 export interface DashboardPeriod {
@@ -160,13 +164,14 @@ export interface PeakHourRow {
   total: number
 }
 
-/** R-11: rate is missed ÷ incoming, as a percentage; null when nothing came in. */
+/** R-11: rate is (missed + rejected + abandoned) ÷ incoming, as a percentage; null when nothing came in. */
 export interface MissedRow {
   key: string
   label: string
   inbound: number
   missed: number
   rejected: number
+  abandoned: number
   total: number
   rate: number | null
 }
@@ -292,3 +297,45 @@ export const dataQuality = (f: ReportFilters) => api.get<DataQuality>(`${BASE}/d
 export const unknownNumbers = (f: ReportFilters) => api.get<UnknownNumberRow[]>(`${BASE}/unknown-numbers`, q(f))
 
 export const duplicateNames = () => api.get<DuplicateNameRow[]>(`${BASE}/duplicate-names`)
+
+// ---- R-20, the abandoned calls (S-55) ------------------------------------------------
+
+export type AbandonedGrouping = TimeGrouping | 'hour'
+
+/** R-20: rate is abandoned ÷ incoming, as a percentage; null when nothing came in. */
+export interface AbandonedRow {
+  key: string
+  label: string
+  inbound: number
+  abandoned: number
+  rate: number | null
+  averageWaitSec: number | null
+  maxWaitSec: number | null
+  /** Of the abandoned, how many numbers somebody rang afterwards. */
+  calledBack: number
+  averageMinutesToCallBack: number | null
+}
+
+export interface AbandonedCallRow {
+  id: string
+  /** Joined the queue. */
+  startedAt: string
+  /** Hung up. */
+  endedAt: string | null
+  waitSec: number | null
+  queue: string | null
+  number: string | null
+  contactId: string | null
+  customer: string | null
+  /** How often an agent's phone rang with the call and nobody took it. */
+  rings: number
+  /** The first call made to the number after the hang-up. */
+  calledBackAt: string | null
+  calledBackBy: string | null
+  minutesToCallBack: number | null
+}
+
+export const abandonedCalls = (f: ReportFilters, groupBy: AbandonedGrouping) =>
+  api.get<AbandonedRow[]>(`${BASE}/abandoned`, q(f, { groupBy }))
+
+export const abandonedList = (f: ReportFilters) => api.get<AbandonedCallRow[]>(`${BASE}/abandoned/list`, q(f))

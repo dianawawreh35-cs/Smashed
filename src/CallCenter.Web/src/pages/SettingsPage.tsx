@@ -4,17 +4,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { listSettings, settingProblems, updateSettings } from '../api/settings'
 import type { Setting } from '../api/settings'
+import AbandonedImportCard from '../components/AbandonedImportCard'
 import ChannelsCard from '../components/ChannelsCard'
 
 /**
- * Settings: the system values (S-47), and below them the channel list (S-41),
- * which is a setting in the same sense — changed rarely, by the supervisor,
- * read by every agent's app.
+ * Settings: the system values (S-47), the PBX login the abandoned-call import
+ * uses (S-55), and the channel list (S-41), which is a setting in the same
+ * sense — changed rarely, by the supervisor, read by every agent's app.
  */
 export default function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <SystemSettings />
+      <AbandonedImportCard />
       <ChannelsCard />
     </div>
   )

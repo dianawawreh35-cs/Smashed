@@ -117,7 +117,7 @@ docker compose version
 
 ## Step 5 — Application folder and settings
 
-**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, signing keys, the CDR pull account) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database, the recordings or the menu photographs.
+**What it does:** one place for everything. `docker-compose.yml` is the recipe listing the containers. `.env` holds all secrets and site-specific values (database password, signing keys, the POS token) so nothing sensitive is in the code. The `data/` folders live **outside** the containers, so you can update or rebuild containers without losing the database, the recordings or the menu photographs.
 
 **Work**
 ```bash
@@ -139,12 +139,6 @@ Fill in:
 POSTGRES_PASSWORD=<long random>
 JWT_SECRET=<long random, 64+ chars>
 SIP_SECRET_KEY=<long random, 32+ chars>
-CDR__HOST=192.168.1.10
-CDR__PORT=22
-CDR__USERNAME=cdrpull
-CDR__KEYPATH=/opt/callcenter/secrets/cdrpull
-CDR__REMOTEPATH=/var/log/asterisk/cdr-csv/Master.csv
-CDR__INTERVALSECONDS=300
 RECORDING_RETENTION_DAYS=90
 POS_LOOKUP_TOKEN=<the token the POS issued>
 TZ=Asia/Hebron
@@ -311,128 +305,46 @@ in this machine's shell history.
 
 ---
 
-## Step 8 — Connect the PBX (CDR import)
+## Step 8 — Connect the PBX (abandoned calls)
 
-**What it does:** Asterisk writes one line to a CSV file as each call ends. Your server fetches that file over SFTP every few minutes and turns the calls that never reached an agent into abandoned-call records and call-back tasks. Nothing is opened on the PBX — the connection is outbound from your server, the same direction as a phone registering.
+**What it does:** the PBX's web interface has a report, Call Center → Reports → Calls Detail, that lists every queue call and marks the ones the caller gave up on as **Abandoned**. Your server logs in to that web interface like a person would, downloads the report every minute, and saves the abandoned calls so they show in the reports and the call list. Nothing is installed or opened on the PBX — the connection is outbound from your server over HTTPS, the same direction as a phone registering.
 
-This is the only method: AMI and direct database access need an inbound port and are ruled out, and the call-back extension was removed (SRS 4.5).
+This is the only method: AMI and direct database access need an inbound port and are ruled out, and the call-back extension was removed (SRS 4.5). An earlier plan pulled Asterisk's CDR file over SFTP; it was replaced by this report on 26 Sep 2026 and never built, so there is no SFTP account or key to set up.
 
 **Prerequisite — the server's VPN connection**
 The PBX is only reachable over the VPN, so set this up first and confirm it:
 ```bash
-ping -c 3 10.8.0.1                 # the PBX on the VPN
-nc -vz 10.8.0.1 22                 # SSH/SFTP port reachable
+ping -c 3 10.8.0.1                                  # the PBX on the VPN
+curl -sk -o /dev/null -w '%{http_code}\n' https://10.8.0.1/index.php   # its web interface: 200
 ```
 Make the VPN start on boot, so a power cut does not leave the server silently cut off from the PBX.
 
-### 8.1 Check the PBX is writing the CDR file
+### 8.1 A PBX web user for the server
 
-On the Issabel box:
-```bash
-cat /etc/asterisk/cdr.conf | grep -Ev '^\s*(;|$)'
-ls -l /var/log/asterisk/cdr-csv/
-```
-You need `[csv]` enabled and, in it:
-```ini
-[csv]
-usegmtime=no
-loguniqueid=yes
-loguserfield=yes
-```
-**`loguniqueid=yes` is not optional.** It puts Asterisk's `uniqueid` in every row, which is the key the importer uses to avoid inserting the same call twice. Without it there is no stable key and duplicate protection is lost.
+In the Issabel web interface, as admin, create a user for the server — `callcenter-reports`, say — rather than lending it a person's login: if that person changes their password, the import stops.
 
-If you change `cdr.conf`:
-```bash
-asterisk -rx "module reload cdr_csv"
-asterisk -rx "cdr show status"
-```
+- **Language: English.** The report's column headings follow the user's language, and the server reads the English ones. A user set to another language gets a clear error on the settings screen, not an empty import.
+- **Access: Call Center reports.** Check by logging in as that user in a browser and opening Call Center → Reports → Calls Detail. If you can see the calls, so can the server.
 
-### 8.2 Create a restricted SFTP account on the PBX
+Store the username and password in your password manager.
 
-An account that can read the CDR directory and nothing else. On the Issabel box, as root:
-```bash
-useradd -r -m -d /home/cdrpull -s /sbin/nologin cdrpull
-mkdir -p /home/cdrpull/.ssh
-chmod 700 /home/cdrpull/.ssh
-usermod -a -G asterisk cdrpull          # read access to the CDR directory
-```
-Then in `/etc/ssh/sshd_config`, restrict it to SFTP only:
-```
-Match User cdrpull
-    ForceCommand internal-sftp
-    PasswordAuthentication no
-    AllowTcpForwarding no
-    X11Forwarding no
-```
-```bash
-systemctl restart sshd
-```
+### 8.2 Enter it in the app
 
-Read-only and key-only on purpose: this account exists to pull one file, and it should not be able to do anything else if the key ever leaks.
+Supervisor app → **Settings** → **Abandoned calls from the PBX**:
+- **PBX web address:** `https://10.8.0.1` — as you would open it in a browser.
+- **PBX username** and **PBX password:** the user from 8.1. The password is stored encrypted with `SIP_SECRET_KEY` (step 5) and never shown again; the screen only says one is saved.
+- **Check every:** 1 minute is the default.
 
-### 8.3 Generate the key on your server and install it on the PBX
+Save, then **Check now**. It should answer with the number of calls it downloaded and how many were abandoned. The first check reaches back 30 days.
 
-On **your server**:
-```bash
-ssh-keygen -t ed25519 -f /opt/callcenter/secrets/cdrpull -N '' -C 'callcenter cdr import'
-chmod 600 /opt/callcenter/secrets/cdrpull
-cat /opt/callcenter/secrets/cdrpull.pub
-```
-Copy that public key onto the **PBX**, into `/home/cdrpull/.ssh/authorized_keys`:
-```bash
-chown -R cdrpull:cdrpull /home/cdrpull/.ssh
-chmod 600 /home/cdrpull/.ssh/authorized_keys
-```
-The private key never leaves your server.
-
-### 8.4 Verify the connection
-
-From your server:
-```bash
-sftp -i /opt/callcenter/secrets/cdrpull cdrpull@10.8.0.1
-sftp> ls -l /var/log/asterisk/cdr-csv/
-sftp> bye
-```
-You should see `Master.csv` and its size. If it refuses, the usual causes are the key not installed, the group membership missing, or `sshd_config` not reloaded.
-
-### 8.5 Settings the server needs
-
-In `/opt/callcenter/.env`:
-```ini
-CDR__HOST=10.8.0.1
-CDR__PORT=22
-CDR__USERNAME=cdrpull
-CDR__KEYPATH=/opt/callcenter/secrets/cdrpull
-CDR__REMOTEPATH=/var/log/asterisk/cdr-csv/Master.csv
-CDR__INTERVALSECONDS=300
-```
-`docker compose up -d` after any change to `.env`.
-
-The import interval is also a supervisor setting (S-47) once the app is running; the `.env` value is the starting point.
-
-### 8.6 Before the importer is written — read real rows
-
-**Do this before any parsing work.** The rule for "this call was abandoned" cannot be guessed: `disposition = 'NO ANSWER'` is not sufficient, because an inbound route or IVR that answers before the queue makes Asterisk record `ANSWERED` even though no agent ever spoke.
-
-Make three calls to the restaurant number:
-1. one **answered by an agent**
-2. one **hung up while still ringing**
-3. one **left until the queue timeout**
-
-Then:
-```bash
-tail -n 20 /var/log/asterisk/cdr-csv/Master.csv
-```
-Write down what distinguishes the three — `lastapp`, `billsec`, `disposition`, and whether any column carries a usable **wait time**. The wait time decides whether report R-21 can show a service-level percentage or only counts.
-
-That observation is what the importer is written against.
+The PBX's HTTPS certificate is its own, self-signed; the server accepts it for this address only.
 
 **Verify once it is running**
-Supervisor app → Settings → PBX status: last import time and rows read.
+Settings shows the last check and, if it failed, why — a wrong password, an unreachable PBX, a user not set to English.
 ```bash
-docker compose logs api | grep -i cdr | tail
+docker compose logs api | grep -i "abandoned\|PBX" | tail
 ```
-Test: call the restaurant number and hang up while it is still ringing. It should appear in the dashboard as **Abandoned** within one import interval — not instantly.
+Test: call the restaurant number and hang up while it is still ringing. It should appear under Call reports → **Abandoned** within a minute — not instantly. The Abandoned tab's **Fetch from PBX** button downloads the chosen period at once.
 
 ---
 
@@ -499,7 +411,7 @@ Point a local API at it and confirm calls and contacts are there.
 
 **Work**
 - Give the supervisor a one-page sheet: server IP, web address, how to reboot (just power on — everything auto-starts), where backups go, your contact and support hours.
-- Store in your password manager: `.env` contents, admin password, the `cdrpull` SSH key pair (step 8), the VPN accounts for the server and each laptop, the router reservation.
+- Store in your password manager: `.env` contents, admin password, the PBX web user the server logs in as (step 8), the VPN accounts for the server and each laptop, the router reservation.
 - Commit `docker-compose.yml`, `.env.example`, `backup.sh` and this runbook to the repo (never the real `.env`).
 - Walk the supervisor through the dashboard for 1 hour; agents 1 hour.
 

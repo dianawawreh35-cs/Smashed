@@ -85,6 +85,7 @@ public static class TestSweeper
             CREATE TEMP TABLE sweep_comms AS
                 SELECT id FROM communications
                 WHERE sip_call_id LIKE '%@test' OR sip_call_id LIKE 'rec-%@pbx' OR sip_call_id LIKE 'never-reported-%@pbx'
+                   OR pbx_unique_id LIKE 'issabel:%|test-queue'
                    OR agent_id IN (SELECT id FROM sweep_users)
                    OR contact_id IN (SELECT id FROM sweep_contacts)
                    OR channel_id IN (SELECT id FROM channels WHERE NOT is_system AND name ~ ' [0-9a-f]{{8}}( Business)?$')

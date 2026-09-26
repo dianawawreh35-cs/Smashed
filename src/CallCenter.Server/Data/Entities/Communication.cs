@@ -7,12 +7,15 @@ namespace CallCenter.Server.Data.Entities;
 /// Calls and app entries share one table so every report is a single query
 /// (<see cref="Kind"/> and <see cref="ChannelId"/> separate them).
 ///
-/// Records arrive from three places and are reconciled: the Agent App reports
-/// what it handled, AMI reports everything the PBX did - including calls that
-/// never reached an agent (Abandoned, Overflowed, S-50) - and the CDR importer
-/// fills gaps afterwards. An AMI/CDR row and an Agent App row for the same call
-/// are joined on <see cref="PbxUniqueId"/> where available, otherwise on
-/// <see cref="RemoteNormalised"/> plus a time window.
+/// Records arrive from two places. The Agent App reports every ring it saw,
+/// answered or not (A-14). The PBX import (S-55) adds the calls that gave up in
+/// the queue - status Abandoned, no agent - from the PBX's own Calls Detail
+/// report, keyed by <see cref="PbxUniqueId"/>.
+///
+/// One abandoned call usually rang an agent several times first, and each ring
+/// the agent did not take is its own Missed, Rejected or Blocked row. Those
+/// rows point at the abandoned call through <see cref="AbandonedCallId"/>, so
+/// the reports count the customer's call once (S-55).
 /// </remarks>
 public class Communication
 {
@@ -69,8 +72,21 @@ public class Communication
     /// <summary>Call-ID from the Agent App INVITE.</summary>
     public string? SipCallId { get; set; }
 
-    /// <summary>Asterisk uniqueid from AMI or the CDR, used to join the two views of one call.</summary>
+    /// <summary>
+    /// The PBX's identity for a call it reported (S-55): for the Calls Detail
+    /// import, <c>issabel:</c> + hang-up time, number and queue. Unique, which is
+    /// what makes downloading the same day every minute harmless.
+    /// </summary>
     public string? PbxUniqueId { get; set; }
+
+    /// <summary>
+    /// On an Agent App ring that was not taken: the abandoned call it was a
+    /// ring of (S-55). The reports leave these rows out of the customer's
+    /// figures, since the abandoned call already counts that customer once;
+    /// the agent's own figures (R-15) still count every ring.
+    /// </summary>
+    public Guid? AbandonedCallId { get; set; }
+    public Communication? AbandonedCall { get; set; }
 
     /// <summary><see cref="Shared.CommunicationSources"/>: AgentApp, AMI, CDR or Manual.</summary>
     public string Source { get; set; } = null!;

@@ -11,7 +11,7 @@ const TODAY = {
   communications: 42, calls: 37, messages: 5,
   byType: [{ typeName: 'Order', labelAr: 'طلب', labelEn: 'Order', count: 20 }],
   byChannel: [{ key: 'ch-phone', label: 'Phone', count: 37 }, { key: 'ch-wa', label: 'WhatsApp', count: 5 }],
-  orders: 20, orderValue: 1234.5, complaints: 3, missed: 4, unclassified: 6, agentsOnline: 2,
+  orders: 20, orderValue: 1234.5, complaints: 3, missed: 4, unclassified: 6, agentsOnline: 2, abandoned: 5,
 }
 const PERIOD = {
   perDay: [{ key: '2026-09-24', label: '2026-09-24', count: 30 }, { key: '2026-09-25', label: '2026-09-25', count: 42 }],

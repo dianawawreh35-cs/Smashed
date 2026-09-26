@@ -96,6 +96,15 @@ try
     builder.Services.AddSingleton<CallCenter.Server.Features.Pos.PosLookupLedger>();
     builder.Services.AddScoped<CallCenter.Server.Features.Pos.PosCustomerSync>();
     builder.Services.AddHostedService<CallCenter.Server.Workers.PosLookupWorker>();
+
+    // S-55: the abandoned calls, from the PBX's Calls Detail report, checked
+    // every pbx.calls.interval_minutes. Off until the PBX's address and login
+    // are entered on the settings screen.
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.IPbxCallsDetailSource,
+        CallCenter.Server.Features.Pbx.IssabelCallsClient>();
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.AbandonedImportGate>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Pbx.AbandonedCallImport>();
+    builder.Services.AddHostedService<CallCenter.Server.Workers.AbandonedCallImportWorker>();
     builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();
     builder.Services.AddOptions<MenuImageOptions>()

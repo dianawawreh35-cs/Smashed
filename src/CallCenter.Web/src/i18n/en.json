@@ -53,7 +53,9 @@
       "unclassified": "Unclassified calls",
       "unclassifiedNote": "Answered calls with no type yet.",
       "agentsOnline": "Agents online",
-      "agentsOnlineNote": "Signed in to the Agent App. An agent who closed the app without signing out still counts."
+      "agentsOnlineNote": "Signed in to the Agent App. An agent who closed the app without signing out still counts.",
+      "abandoned": "Abandoned calls",
+      "abandonedNote": "Callers who gave up waiting in the queue, as of the last check of the PBX."
     },
     "byType": "Today by type",
     "byChannel": "Today by channel",
@@ -155,6 +157,28 @@
         "label": "Agent call log window (days)",
         "hint": "How far back an agent can see their own calls. A week by default. Nothing is deleted - the contact history and your reports still show everything."
       }
+    },
+    "pbx": {
+      "heading": "Abandoned calls from the PBX",
+      "intro": "The server logs in to the PBX's web interface and downloads its Calls Detail report, then saves the calls marked Abandoned. Use a PBX user of its own, set to English, that can open Call Center reports.",
+      "url": "PBX web address",
+      "urlHint": "As you would open it in a browser, e.g. https://10.8.0.1. Leave blank to turn the import off.",
+      "username": "PBX username",
+      "password": "PBX password",
+      "passwordSet": "A password is saved. Leave blank to keep it.",
+      "passwordUnset": "No password saved yet.",
+      "interval": "Check every (minutes)",
+      "intervalHint": "Between 1 and 60. Each check downloads from the day of the last successful one to today.",
+      "save": "Save PBX settings",
+      "saved": "PBX settings saved.",
+      "checkNow": "Check now",
+      "checking": "Checking…",
+      "off": "Not set up: the import is off.",
+      "never": "Set up, not checked yet. The first check reaches back 30 days.",
+      "lastOk": "Last checked {{when}}: {{added}} new abandoned calls.",
+      "lastFailed": "Last check {{when}} failed: {{error}}",
+      "lastSuccess": "Last successful check: {{when}}.",
+      "result": "{{from}} to {{to}}: {{calls}} calls, {{abandoned}} abandoned, {{added}} new."
     }
   },
   "contacts": {
@@ -638,7 +662,8 @@
       "customers": "Customers",
       "agents": "Agents",
       "problems": "Problems",
-      "quality": "Data quality"
+      "quality": "Data quality",
+      "abandoned": "Abandoned"
     },
     "columns": {
       "period": "Period",
@@ -695,12 +720,25 @@
       "firstCall": "First call",
       "name": "Name",
       "contacts": "Contacts",
-      "numbers": "Numbers"
+      "numbers": "Numbers",
+      "abandoned": "Abandoned",
+      "abandonedRate": "Abandoned rate",
+      "averageWait": "Average wait",
+      "maxWait": "Longest wait",
+      "wait": "Waited",
+      "calledBack": "Called back",
+      "calledBackAt": "Called back at",
+      "calledBackBy": "Called back by",
+      "minutesToCallBack": "Minutes to call back",
+      "averageMinutesToCallBack": "Average minutes to call back",
+      "rings": "Rings",
+      "queue": "Queue",
+      "hungUp": "Hung up"
     },
     "sections": {
       "summary": {
         "title": "Communications",
-        "hint": "Calls and application messages in each period. Answered and missed are incoming calls; missed counts missed and rejected, never an outgoing call nobody picked up. Internal calls are left out."
+        "hint": "Calls and application messages in each period. Answered, missed and abandoned are incoming calls; missed counts missed and rejected, never an outgoing call nobody picked up. Abandoned calls come from the PBX, and their rings are not counted again. Internal calls are left out."
       },
       "list": {
         "title": "Every call, with all its details",
@@ -773,15 +811,15 @@
       },
       "productivity": {
         "title": "Agent productivity",
-        "hint": "Per agent: calls handled (answered, in and out), average talk time over answered calls, orders and their value, answered calls left unclassified, and missed calls on their extension."
+        "hint": "Per agent: calls handled (answered, in and out), average talk time over answered calls, orders and their value, answered calls left unclassified, and missed calls on their extension - every ring they did not take, the rings of abandoned calls included."
       },
       "missed": {
         "title": "Missed calls",
-        "hint": "Incoming calls missed or rejected, and their share of all incoming calls. An outgoing call nobody picked up is not a missed call. Calls abandoned in the queue will join once the PBX's call records are imported."
+        "hint": "Incoming calls missed, rejected or abandoned in the queue, and their share of all incoming calls. The rings of an abandoned call count once, as the abandoned call. An outgoing call nobody picked up is not a missed call."
       },
       "missedList": {
         "title": "Every missed call",
-        "hint": "Newest first, with the note the agent left on it."
+        "hint": "Newest first, with the note the agent left on it. An abandoned call has no agent."
       },
       "quality": {
         "title": "Data quality",
@@ -794,6 +832,14 @@
       "duplicateNames": {
         "title": "Names shared by more than one contact",
         "hint": "Contacts with the same name, however it is spelt. A shared name is a question, not a mistake: common names are common. Merging two contacts is not built yet (A-63). Not limited to the period."
+      },
+      "abandoned": {
+        "title": "Abandoned calls",
+        "hint": "Callers who gave up waiting in the queue before anybody took the call, from the PBX's own report: how many, their share of incoming calls, how long they waited, and how many were called back. Grouped as you choose."
+      },
+      "abandonedList": {
+        "title": "Every abandoned call",
+        "hint": "Newest first. Waited is time in the queue; Rings is how often an agent's phone rang with the call. Called back is the first call anybody made to the number after the caller hung up."
       }
     },
     "fewer": "fewer",
@@ -811,6 +857,16 @@
       "duplicateNames": "Names shared by more than one contact"
     },
     "downloadImage": "Download image",
-    "imageFailed": "The picture could not be made."
+    "imageFailed": "The picture could not be made.",
+    "abandoned": {
+      "fetch": "Fetch from PBX",
+      "fetching": "Fetching…",
+      "fetchHint": "The PBX is checked automatically; this downloads the chosen period now.",
+      "fetched": "Downloaded {{from}} to {{to}}: {{abandoned}} abandoned, {{added}} new.",
+      "failed": "The PBX could not be read: {{error}}",
+      "lastChecked": "Last checked {{when}}.",
+      "notSetUp": "The PBX import is not set up. A supervisor can enter the PBX address and login in Settings.",
+      "notYet": "Not called back"
+    }
   }
 }

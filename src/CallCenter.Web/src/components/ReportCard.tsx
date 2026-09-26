@@ -73,12 +73,14 @@ export interface ReportChartSpec<T> {
 
 /**
  * The series colours, in a fixed order that never cycles: the brand blue
- * first, then the dataviz reference palette's dark-surface orange and aqua.
- * Validated together against the card surface (#171A21) with the dataviz
- * palette checker: every adjacent pair clears the colour-blindness floor
- * (worst ΔE 9.4) and 3:1 contrast. A fourth series would need re-validating.
+ * first, then the dataviz reference palette's dark-surface orange, aqua and
+ * yellow. Validated together against the card surface (#171A21) with the
+ * dataviz palette checker (26 Sep, with the yellow added for abandoned calls):
+ * every adjacent pair clears the colour-blindness target (worst ΔE 8.4,
+ * yellow against aqua) and 3:1 contrast. A fifth series would need
+ * re-validating.
  */
-export const SERIES_COLOURS = ['#4F8CFF', '#d95926', '#199e70'] as const
+export const SERIES_COLOURS = ['#4F8CFF', '#d95926', '#199e70', '#c98500'] as const
 
 export default function ReportCard<T>({
   title,

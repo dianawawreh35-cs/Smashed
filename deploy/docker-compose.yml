@@ -4,7 +4,7 @@
 #   docker compose up -d
 #
 # The API runs with network_mode: host so it uses the host's VPN route to the
-# PBX, for the CDR import (runbook step 8). It makes no SIP or audio connection:
+# PBX, for the abandoned-call import (runbook step 8). It makes no SIP or audio connection:
 # the softphone runs on each agent's laptop.
 
 services:

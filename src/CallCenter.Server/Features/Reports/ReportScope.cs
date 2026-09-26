@@ -18,6 +18,11 @@ namespace CallCenter.Server.Features.Reports;
 /// comparing the phone with the apps (R-01's calls vs app, R-12 to R-14, the
 /// dashboard's by-channel figures; Dia, 25 Sep).
 /// </param>
+/// <param name="WithRings">
+/// Also count the Agent App's untaken rings of an abandoned call (S-55). Off
+/// everywhere but the agents' own figures (R-15): the abandoned call already
+/// counts the customer once, and each ring would count them again.
+/// </param>
 public record ReportFilter(
     DateTimeOffset? From = null,
     DateTimeOffset? To = null,
@@ -25,7 +30,8 @@ public record ReportFilter(
     Guid? BranchId = null,
     Guid? ChannelId = null,
     Guid? TypeId = null,
-    string? Kind = CommunicationKinds.App);
+    string? Kind = CommunicationKinds.App,
+    bool WithRings = false);
 
 /// <summary>
 /// What every report agrees on, written once: which rows a filter means, which
@@ -48,6 +54,7 @@ public static class ReportScope
         IQueryable<Communication> q, ReportFilter f, IReadOnlyList<string>? internalNumbers = null)
     {
         if (f.Kind is { } kind) q = q.Where(c => c.Kind == kind);
+        if (!f.WithRings) q = q.Where(c => c.AbandonedCallId == null);
 
         // Instants, converted to UTC: PostgreSQL's timestamptz takes nothing
         // else from Npgsql, and a local offset here was the 20 September 500.

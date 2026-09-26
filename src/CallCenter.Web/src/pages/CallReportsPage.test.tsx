@@ -13,8 +13,8 @@ import i18n from '../i18n'
  */
 
 const SUMMARY = [
-  { bucket: '2026-09-24', communications: 14, calls: 12, messages: 2, inbound: 10, outbound: 2, answered: 7, missed: 2, blocked: 1 },
-  { bucket: '2026-09-25', communications: 9, calls: 8, messages: 1, inbound: 6, outbound: 2, answered: 5, missed: 1, blocked: 0 },
+  { bucket: '2026-09-24', communications: 14, calls: 12, messages: 2, inbound: 10, outbound: 2, answered: 7, missed: 2, blocked: 1, abandoned: 1 },
+  { bucket: '2026-09-25', communications: 9, calls: 8, messages: 1, inbound: 6, outbound: 2, answered: 5, missed: 1, blocked: 0, abandoned: 0 },
 ]
 const BY_TYPE = [
   { typeName: 'Order', labelAr: 'طلب', labelEn: 'Order', count: 6, share: 60 },
@@ -48,7 +48,7 @@ const CANCELLATIONS = [{ key: 'b1', label: 'Rafat', orders: 30, cancellations: 3
 const AGENTS = [{ agentId: 'a1', agent: 'Sara', handled: 40, inbound: 35, outbound: 6, averageDurationSec: 135,
   orders: 20, orderValue: 900, unclassified: 2, missed: 4 }]
 const QUALITY = { unclassified: 7, unknownCalls: 31, unknownNumbers: 25, duplicateNames: 1056 }
-const MISSED = [{ key: '2026-09-25', label: '2026-09-25', inbound: 40, missed: 3, rejected: 1, total: 4, rate: 10 }]
+const MISSED = [{ key: '2026-09-25', label: '2026-09-25', inbound: 40, missed: 3, rejected: 1, abandoned: 0, total: 4, rate: 10 }]
 
 function jsonResponse(body: unknown, status = 200) {
   return {
@@ -251,6 +251,56 @@ describe('call reports page', () => {
     const missed = card('Missed calls')
     expect(await within(missed).findByText('10%')).toBeInTheDocument()
     expect(within(missed).getByText(/An outgoing call nobody picked up is not a missed call/)).toBeInTheDocument()
+  })
+
+  it('shows the abandoned calls already fetched, and fetches the chosen period from the PBX on demand', async () => {
+    const ABANDONED = [{ key: '2026-09-24', label: '2026-09-24', inbound: 20, abandoned: 3, rate: 15, averageWaitSec: 75,
+      maxWaitSec: 115, calledBack: 1, averageMinutesToCallBack: 12 }]
+    const LIST = [
+      { id: 'x1', startedAt: '2026-09-24T13:47:09Z', endedAt: '2026-09-24T13:49:04Z', waitSec: 115, queue: '002',
+        number: '0569000002', contactId: null, customer: null, rings: 6, calledBackAt: null, calledBackBy: null, minutesToCallBack: null },
+      { id: 'x2', startedAt: '2026-09-24T12:00:00Z', endedAt: '2026-09-24T12:00:40Z', waitSec: 40, queue: '002',
+        number: '0569000003', contactId: 'c9', customer: 'Rami', rings: 2, calledBackAt: '2026-09-24T12:12:00Z',
+        calledBackBy: 'Sara', minutesToCallBack: 12 },
+    ]
+    const STATUS = { url: 'https://10.8.0.1', username: 'reports', passwordSet: true, intervalMinutes: 1, configured: true,
+      lastCheckedAt: '2026-09-24T14:00:00Z', lastSucceededAt: '2026-09-24T14:00:00Z', lastError: null, lastAdded: 0,
+      syncedThrough: '2026-09-24' }
+    const base = server()
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      const path = url.split('?')[0]
+      if (path === '/api/reports/calls/abandoned') return jsonResponse(ABANDONED)
+      if (path === '/api/reports/calls/abandoned/list') return jsonResponse(LIST)
+      if (path === '/api/pbx/abandoned-import') return jsonResponse(STATUS)
+      if (path === '/api/pbx/abandoned-import/fetch' && init?.method === 'POST') {
+        return jsonResponse({ ok: true, error: null, from: '2026-09-18', to: '2026-09-24', calls: 67, abandoned: 36, added: 2,
+          ringsLinked: 5, status: STATUS })
+      }
+      return base(url)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderPage('/call-reports?tab=abandoned')
+
+    const figures = card('Abandoned calls')
+    const day = (await within(figures).findByText('2026-09-24')).closest('tr')!
+    expect(within(day).getByText('15%')).toBeInTheDocument()
+    expect(within(day).getByText('1:15')).toBeInTheDocument()
+    expect(within(day).getByText('1:55')).toBeInTheDocument()
+
+    const list = card('Every abandoned call')
+    // No contact: the number stands in for the customer's name too.
+    const waiting = (await within(list).findAllByText('0569000002'))[0].closest('tr')!
+    expect(within(waiting).getByText('Not called back')).toBeInTheDocument()
+    expect(within(waiting).getByText('6')).toBeInTheDocument()
+    const rami = within(list).getByText('Rami').closest('tr')!
+    expect(within(rami).getByText('Sara')).toBeInTheDocument()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Fetch from PBX' }))
+    expect(await screen.findByText('Downloaded 2026-09-18 to 2026-09-24: 36 abandoned, 2 new.')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(([url, init]) => String(url).startsWith('/api/pbx/abandoned-import/fetch') && init?.method === 'POST')!
+    const sent = new URL(String(post[0]), 'http://x')
+    expect(sent.searchParams.get('from')).toBeTruthy()
+    expect(sent.searchParams.get('to')).toBeTruthy()
   })
 
   it('reads in Arabic', async () => {

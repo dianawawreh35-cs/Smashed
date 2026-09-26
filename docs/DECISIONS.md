@@ -5724,6 +5724,108 @@ Arabic included; 404 is "not a customer" and 401 throws; an extension or a
 foreign number is never sent. `ToNational` has 8 cases in the shared tests.
 372 server tests pass against `callcenter_test`, and 151 shared.
 
+## 2026-09-26 — Abandoned calls from the PBX's own report (S-55, R-11, R-20)
+
+Asked for by Dia: do it the way `issTest` does — log in to the PBX, download the
+whole call record, and take the calls marked abandoned — with the username and
+password on the settings screen, checked every minute. A separate report tab
+for the abandoned calls in the chosen period, with a button to fetch on demand.
+
+### Why not the SFTP pull of `Master.csv`
+
+The 19 Sep plan (S-55 as then written) needed an SFTP account and a key on the
+PBX, `loguniqueid=yes` in `cdr.conf`, and three test calls before anybody could
+write down what "abandoned" means in Asterisk's CDR. None of it was built. The
+Issabel Call Center module already has a report, **Calls Detail**, whose own
+Status column says *Success* or *Abandoned* and whose *Duration Wait* is the
+time in the queue. Its Export link is a plain GET after a form login
+(`input_user`, `input_pass`, `submit_login`, cookie `issabelSession`), which is
+exactly what `issTest`'s `IssabelExporter` does. So: no PBX-side setup, and
+the PBX decides what abandoned means, not a rule of ours.
+
+**Read against the real PBX before a line was written**, with Dia's login on
+192.168.0.27: 67 calls in the week, 36 abandoned, all incoming on queue 002. An
+abandoned row has no agent and no start time; End Time is the hang-up. The
+PBX's clock is the restaurant's: its answered call at 23:29:00 is the Agent
+App's ring at 23:28:55. Downloading the same 30 days twice gave the same 54
+abandoned rows.
+
+### Decisions
+
+- **Whole days, from the last successful check to today.** The report filters
+  by date only. Always "today" would lose a 23:59 call to a 00:00:30 check;
+  "since the last success" also catches up after an outage by itself. The first
+  check reaches back 30 days. A day downloaded again is harmless: each call is
+  keyed `issabel:` + hang-up time to the second + number + queue in
+  `pbx_unique_id`, whose unique index was already there. The report has no call
+  id; the closest two real calls from one number were 19 s apart.
+- **One minute by default** (Dia), 1–60 on the screen. The session cookie is
+  kept between checks and the login repeated only when the PBX wants it, so a
+  check is one request, not 1,440 logins a day.
+- **The rings count once.** The queue rings an agent again and again while a
+  caller waits, and the Agent App records every ring nobody took. On 22 Sep one
+  caller who waited 1:55 left six Missed and Rejected rows. Adding the PBX's row
+  on top would have counted that customer seven times. So a new column,
+  `communications.abandoned_call_id` (migration `LinkRingsToAbandonedCalls`),
+  points each untaken ring (Missed, Rejected, Blocked; same number; from 5 s
+  before joining the queue to 2 s after hanging up) at its abandoned call, and
+  the reports leave those rows out (`ReportFilter.WithRings`, off by default)
+  — except R-15, where every ring on an agent's phone is theirs. Rings are
+  joined on every check, since an offline laptop sends them late.
+- **A blocked caller is Blocked, not Abandoned.** When every ring was refused
+  as Blocked, the caller only waited until they gave up; the call is saved as
+  Blocked and never goes on the call-back list (one such call in the 30 days).
+- **The settings are their own card, not rows in the catalogue.** The password
+  is write-only (encrypted with the SIP-secret key, never sent back) and the
+  card also shows the last check and why it failed. `pbx.calls.*` rows are
+  outside `SettingsCatalog`, so the generic screen can neither show nor
+  overwrite them. No seed rows: blank means off, and the interval defaults.
+- **The PBX's self-signed certificate** is accepted for the configured address
+  only.
+- **The login check had to learn a second answer.** Without a session, the
+  export link answers 200 with
+  `{"error":"Your session has expired. …","statusResponse":"ERROR_SESSION"}`,
+  not the login page. The first check on the dev server took that for a report
+  in the wrong language; the client now treats it as "log in first". Found only
+  by running it: curl had always logged in first.
+
+### What changed where
+
+- **Server:** `Features/Pbx` (client, CSV reader, import, controller at
+  `api/pbx/abandoned-import`, `…/fetch`), `AbandonedCallImportWorker` (wakes
+  every 20 s, runs when due).
+- **Reports:** R-01 and the dashboard have an Abandoned figure; R-11 shows
+  missed, rejected and abandoned apart and together; **R-20** is built as a new
+  **Abandoned** tab — count, rate, average and longest wait, called back and
+  minutes to call back, per day, week, month or hour, and every call with its
+  rings and the first call anybody made to the number afterwards. Charts show
+  abandoned in a fourth palette colour, `#c98500`, validated with the dataviz
+  checker against the card (worst adjacent CVD ΔE 8.4).
+- **Docs:** SRS 4.5, S-47, S-55, R-11, R-20, R-21, client obligations and
+  support; runbook step 8 rewritten (a PBX web user, entered in Settings);
+  SCHEMA.
+
+### Seen running, 26 Sep 14:41
+
+On the dev server with the real PBX: logged in as Diaa, 107 calls downloaded
+for 30 days, 54 abandoned saved, 33 rings joined (16 Missed, 8 Rejected, 9
+Blocked), one call saved as Blocked. **Not yet seen in the browser**: the
+Abandoned tab, the settings card and the new chart line. The PBX login was
+written into the dev database's settings directly (encrypted the way the server
+does), not through the card, which nobody has used yet.
+
+### Tested
+
+`AbandonedCallImportTests`, 10: only incoming abandoned rows are read, with
+wait and hang-up; another language is refused with the reason; the login page
+and the session-expired JSON both mean "log in"; the export link is the PBX
+page's own; a day downloaded twice adds nothing; three rings inside the wait
+are joined and one outside is not, and R-11, R-01, R-15 and R-20 count the
+customer once; a call back after the hang-up is found and one before is not; a
+caller every laptop refused is Blocked; bad settings are refused whole; an agent
+cannot read the settings. Web: the Abandoned tab and its Fetch button. 382
+server tests, 151 shared and 118 web pass.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -5741,7 +5843,7 @@ and what comes after:
 | **Classification: the form and the supervisor's designer** | A-40, S-40 | nothing — A-14 landed |
 | Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
-| CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
+| Abandoned calls from the PBX's Calls Detail report | S-55, R-20 | **built 26 Sep and seen importing on the dev server** (26 Sep entry). Still to see: the Abandoned tab and the settings card, in both languages. Production needs a PBX user of its own (runbook 8.1), not Dia's |
 | Click-to-call from the log and from a contact | A-20 | dialling — **done**, needs its test call |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | Redial, call back from a missed call | A-22 | click-to-call |
@@ -5754,7 +5856,8 @@ and what comes after:
 | Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
 | Agents online counts only live apps: close the session when the app quits, or record when each session was last heard from | S-20 | Dia's decision, 26 Sep: an open session for now. 82 of 93 on the dev database were never closed |
-| R-20, R-21, abandoned calls in R-11, and R-11's time until called back | R-11, R-20, R-21 | the CDR import (S-55) |
+| Call-back tasks for abandoned calls | S-51 | nothing — the abandoned calls exist, and R-20 already shows who was rung back |
+| R-21, the queue service level | R-21 | saving the answered calls' wait too: the same PBX report has it |
 
 **A-17 works against the real PBX**, confirmed by test calls, and since A-14 the
 rejection is recorded too — a blocked call is reported with status Blocked, so it
@@ -5785,11 +5888,6 @@ settle first — a classification attaches to a call record, and a call made whi
 the server was down has no id yet, so the classification endpoint should accept
 the SIP Call-ID and extension as an alternative key. Both already ride in the
 offline buffer together.
-
-**The CDR importer (S-55) is unblocked too** — it writes the same
-`communications` rows — but still needs its own prerequisite first: three test
-calls, then read real rows of `Master.csv` and record what marks an abandoned
-call. That needs access to the Issabel box and does not depend on anything here.
 
 **Pin `SQLitePCLRaw.lib.e_sqlite3` before A-14 if the offline buffer is part of
 it.** The block-list cache deliberately avoided SQLite, so the advisory has not
@@ -5827,6 +5925,9 @@ merely unfinished. It was useful because it stayed short.
   `200 OK`, so its own leg ends correctly — the remaining leg is the dialplan's.
 - **Blocking at the PBX (S-46)** is the only way to stop a blocked caller
   entering the queue at all; the Agent App can only decline its own leg.
+- **A web user for the server (S-55)**, set to English, that can open Call
+  Center → Reports → Calls Detail. The abandoned-call import logs in as it every
+  minute; a person's own login stops working the day they change its password.
 
 ## Questions for the telephony provider
 
@@ -5858,10 +5959,6 @@ describe**:
 4. Can a **recording announcement** be added before ringing agents, if the
    client wants one?
 
-Not a question for anybody — an observation we make ourselves, before the
-importer is written: three test calls, then read the last rows of `Master.csv`
-and record what marks an abandoned call, and whether a usable wait time is
-there at all. See the 19 September CDR entry.
 
 ## Known gaps in what is built
 

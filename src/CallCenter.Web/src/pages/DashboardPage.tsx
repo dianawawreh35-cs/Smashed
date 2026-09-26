@@ -59,6 +59,7 @@ export default function DashboardPage() {
                 note={d ? t('dashboard.tiles.worth', { value: money(d.orderValue) }) : undefined} />
               <Tile label={t('dashboard.tiles.complaints')} value={d ? n(d.complaints) : undefined} />
               <Tile label={t('dashboard.tiles.missed')} value={d ? n(d.missed) : undefined} note={t('dashboard.tiles.missedNote')} />
+              <Tile label={t('dashboard.tiles.abandoned')} value={d ? n(d.abandoned) : undefined} note={t('dashboard.tiles.abandonedNote')} />
               <Tile label={t('dashboard.tiles.unclassified')} value={d ? n(d.unclassified) : undefined} note={t('dashboard.tiles.unclassifiedNote')} />
               <Tile label={t('dashboard.tiles.agentsOnline')} value={d ? n(d.agentsOnline) : undefined} note={t('dashboard.tiles.agentsOnlineNote')} />
             </div>

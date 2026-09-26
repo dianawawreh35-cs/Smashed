@@ -64,6 +64,15 @@ public class CommunicationConfiguration : IEntityTypeConfiguration<Communication
 
         builder.HasOne(x => x.Branch).WithMany(b => b.Communications)
             .HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+
+        // S-55: a ring points at the abandoned call it belonged to. Deleting
+        // that call (the demo-data removal, say) only undoes the link.
+        builder.HasOne(x => x.AbandonedCall).WithMany()
+            .HasForeignKey(x => x.AbandonedCallId).OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(x => x.AbandonedCallId)
+            .HasFilter("abandoned_call_id IS NOT NULL")
+            .HasDatabaseName("ix_comm_abandoned_call");
     }
 
     /// <summary>Renders a CHECK constraint body: <c>col IN ('a','b')</c>.</summary>

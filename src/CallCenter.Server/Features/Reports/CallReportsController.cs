@@ -102,6 +102,17 @@ public class CallReportsController(CallReportsService reports, ApplicationReport
     public async Task<ActionResult<IReadOnlyList<MissedCallRowDto>>> MissedList([FromQuery] ReportQuery query, CancellationToken ct) =>
         Ok(await reports.MissedListAsync(query.ToFilter(), ct));
 
+    /// <summary>R-20: abandoned calls per day, week, month or hour, their rate, wait and call-back (S-55).</summary>
+    [HttpGet("abandoned")]
+    public async Task<ActionResult<IReadOnlyList<AbandonedRowDto>>> Abandoned(
+        [FromQuery] ReportQuery query, [FromQuery] string? groupBy, CancellationToken ct) =>
+        Ok(await reports.AbandonedAsync(query.ToFilter(), groupBy, ct));
+
+    /// <summary>R-20: every abandoned call, with its wait and whether it was called back.</summary>
+    [HttpGet("abandoned/list")]
+    public async Task<ActionResult<IReadOnlyList<AbandonedCallRowDto>>> AbandonedList([FromQuery] ReportQuery query, CancellationToken ct) =>
+        Ok(await reports.AbandonedListAsync(query.ToFilter(), ct));
+
     /// <summary>R-12: orders per channel, phone and apps, with each one's share.</summary>
     [HttpGet("orders-by-channel")]
     public async Task<ActionResult<IReadOnlyList<ChannelOrdersRowDto>>> OrdersByChannel([FromQuery] ReportQuery query, CancellationToken ct) =>

@@ -18,16 +18,21 @@ namespace CallCenter.Shared.Contracts.Communications;
 /// <item><b>Unclassified</b>: an answered call with no classification (A-41).</item>
 /// <item><b>A customer</b>: a contact. A call from a number nobody saved is not
 /// a customer's.</item>
+/// <item><b>Abandoned</b>: an inbound call that gave up in the PBX queue
+/// before an agent took it, from the PBX's own report (S-55). No agent. The
+/// Agent App's untaken rings of that call are left out of every figure but
+/// R-15's, so the customer counts once.</item>
 /// <item><b>Internal calls</b> (S-48) are left out of every figure.</item>
 /// </list>
 /// </remarks>
 
 /// <summary>
 /// R-01: how many, in one period bucket. Communications = calls + messages.
-/// Inbound = answered + missed + blocked (and any call still ringing).
+/// Inbound = answered + missed + abandoned + blocked (and any call still ringing).
 /// </summary>
 /// <param name="Answered">Inbound calls answered.</param>
 /// <param name="Missed">Inbound calls Missed or Rejected.</param>
+/// <param name="Abandoned">Inbound calls that gave up in the queue (S-55).</param>
 public record CallSummaryRowDto(
     string Bucket,
     int Communications,
@@ -37,7 +42,8 @@ public record CallSummaryRowDto(
     int Outbound,
     int Answered,
     int Missed,
-    int Blocked);
+    int Blocked,
+    int Abandoned);
 
 /// <summary>R-03: one type's calls and its share of the classified calls, as a percentage to one decimal.</summary>
 public record TypeShareRowDto(string TypeName, string LabelAr, string LabelEn, int Count, decimal Share);
@@ -111,18 +117,21 @@ public record ComplaintsRowDto(
 /// <summary>R-10: inbound calls in one hour of the day, per weekday, Monday first.</summary>
 public record PeakHourRowDto(int Hour, IReadOnlyList<int> ByWeekday, int Total);
 
-/// <summary>R-11: missed calls under one heading, and as a share of inbound calls.</summary>
-/// <param name="Rate">Missed ÷ inbound, as a percentage to one decimal. Null when nothing came in.</param>
+/// <summary>R-11: missed and abandoned calls under one heading, and as a share of inbound calls.</summary>
+/// <param name="Abandoned">Calls that gave up in the queue (S-55). Never under an agent: nobody took them.</param>
+/// <param name="Total">Missed + rejected + abandoned.</param>
+/// <param name="Rate">Total ÷ inbound, as a percentage to one decimal. Null when nothing came in.</param>
 public record MissedRowDto(
     string Key,
     string Label,
     int Inbound,
     int Missed,
     int Rejected,
+    int Abandoned,
     int Total,
     decimal? Rate);
 
-/// <summary>One missed call, for R-11's list.</summary>
+/// <summary>One missed or abandoned call, for R-11's list. An abandoned call has no agent.</summary>
 public record MissedCallRowDto(
     Guid Id,
     DateTimeOffset StartedAt,
@@ -191,6 +200,7 @@ public record CountDto(string Key, string Label, int Count);
 /// <summary>S-20's figures for the restaurant's today.</summary>
 /// <param name="Communications">Calls and messages.</param>
 /// <param name="Missed">Inbound calls Missed or Rejected.</param>
+/// <param name="Abandoned">Inbound calls that gave up in the queue, as far as the last PBX check knows (S-55).</param>
 /// <param name="Unclassified">Answered calls with no classification.</param>
 /// <param name="AgentsOnline">
 /// Agents with a session not signed out (Dia, 25 Sep). Closing the app does not
@@ -207,7 +217,8 @@ public record DashboardTodayDto(
     int Complaints,
     int Missed,
     int Unclassified,
-    int AgentsOnline);
+    int AgentsOnline,
+    int Abandoned);
 
 /// <summary>S-20's four charts for the chosen period: calls and messages together.</summary>
 public record DashboardPeriodDto(
@@ -215,3 +226,41 @@ public record DashboardPeriodDto(
     IReadOnlyList<TypeCountDto> PerType,
     IReadOnlyList<CountDto> PerChannel,
     IReadOnlyList<CountDto> PerHour);
+
+/// <summary>
+/// R-20: abandoned calls under one heading — a day, week, month, or hour of
+/// the day — and as a share of inbound calls (S-55).
+/// </summary>
+/// <param name="Rate">Abandoned ÷ inbound, as a percentage to one decimal. Null when nothing came in.</param>
+/// <param name="AverageWaitSec">How long those callers waited before giving up, on average. Null with none.</param>
+/// <param name="CalledBack">Of those, how many numbers somebody here rang afterwards.</param>
+/// <param name="AverageMinutesToCallBack">From the hang-up to the call back, over those called back.</param>
+public record AbandonedRowDto(
+    string Key,
+    string Label,
+    int Inbound,
+    int Abandoned,
+    decimal? Rate,
+    int? AverageWaitSec,
+    int? MaxWaitSec,
+    int CalledBack,
+    int? AverageMinutesToCallBack);
+
+/// <summary>One abandoned call, for R-20's list (S-55).</summary>
+/// <param name="StartedAt">When the caller joined the queue.</param>
+/// <param name="EndedAt">When they hung up.</param>
+/// <param name="Rings">How many times the Agent Apps rang with this call and nobody took it.</param>
+/// <param name="CalledBackAt">The first call made to the number after the hang-up, by anybody. Null when nobody has rung back.</param>
+public record AbandonedCallRowDto(
+    Guid Id,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    int? WaitSec,
+    string? Queue,
+    string? Number,
+    Guid? ContactId,
+    string? Customer,
+    int Rings,
+    DateTimeOffset? CalledBackAt,
+    string? CalledBackBy,
+    int? MinutesToCallBack);

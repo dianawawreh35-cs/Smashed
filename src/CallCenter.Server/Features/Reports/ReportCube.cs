@@ -107,8 +107,8 @@ public sealed record ReportNames(
 ///
 /// <b>The filters are <see cref="ReportScope.Narrow"/>'s, written in SQL</b>:
 /// the same set, the same meaning — kind, the half-open period, agent, branch,
-/// channel, type, and S-48's internal numbers with a withheld number let
-/// through. Change one, change both; the acceptance test compares a list
+/// channel, type, S-48's internal numbers with a withheld number let through,
+/// and the rings of an abandoned call left out unless asked for (S-55). Change one, change both; the acceptance test compares a list
 /// (built by <c>Narrow</c>) with the figures (built here) over one known day.
 ///
 /// <b>The words</b> — missed, answered, an order — are not here. The cube
@@ -327,6 +327,7 @@ public class ReportCube(CallCenterDbContext db)
     {
         var where = new List<string> { "true" };
         if (f.Kind is { } kind) { where.Add("c.kind = @kind"); parameters.Add(new("kind", kind)); }
+        if (!f.WithRings) where.Add("c.abandoned_call_id IS NULL");
         if (f.AgentId is { } agent) { where.Add("c.agent_id = @agent"); parameters.Add(new("agent", agent)); }
         if (f.BranchId is { } branch) { where.Add("c.branch_id = @branch"); parameters.Add(new("branch", branch)); }
         if (f.ChannelId is { } channel) { where.Add("c.channel_id = @channel"); parameters.Add(new("channel", channel)); }

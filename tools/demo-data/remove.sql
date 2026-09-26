@@ -1,7 +1,7 @@
 -- Removes everything add.sql wrote, and nothing else. See README.md.
 --
---   Get-Content -Raw tools\demo-data\remove.sql |
---     docker exec -i callcenter-db-dev psql -U callcenter -d callcenter
+--   docker cp tools\demo-data\remove.sql callcenter-db-dev:/tmp/remove.sql
+--   docker exec callcenter-db-dev psql -U callcenter -d callcenter -f /tmp/remove.sql
 --
 -- What add.sql writes hangs off the five demo agents (logins demo-agent-1 to
 -- demo-agent-5): their calls and messages (with the classifications, notes and

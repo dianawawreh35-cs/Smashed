@@ -127,6 +127,14 @@ describe('call reports page', () => {
     expect(within(day).getByText('14')).toBeInTheDocument()
     const total = within(summary).getByText('Total').closest('tr')!
     expect(within(total).getByText('23')).toBeInTheDocument()
+    // A number's heading sits at the end of its column, over its numbers; the
+    // table's own rule puts headings at the start unless this wins (26 Sep).
+    expect(within(summary).getByRole('columnheader', { name: 'Calls' })).toHaveClass('!text-end')
+    // The cell follows the page's direction, so in Arabic it ends on the left
+    // with its heading; only the figure is held left-to-right.
+    const figure = within(day).getByText('14')
+    expect(figure.closest('td')).not.toHaveAttribute('dir')
+    expect(figure).toHaveAttribute('dir', 'ltr')
     // What "missed" means is on the card, where a supervisor would wonder.
     expect(within(summary).getByText(/never an outgoing call nobody picked up/)).toBeInTheDocument()
 

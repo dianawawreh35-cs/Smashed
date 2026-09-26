@@ -157,8 +157,12 @@ export default function ReportCard<T>({
               <table className="table">
                 <thead>
                   <tr>
+                    {/* A number's heading sits over its numbers, at the end of
+                        the column. `!` because `.table thead th` sets text-start
+                        and outranks a plain utility: without it every heading sat
+                        at the start while its numbers sat at the end. */}
                     {columns.map((c) => (
-                      <th key={c.key} className={c.numeric ? 'text-end' : undefined}>{c.label}</th>
+                      <th key={c.key} className={c.numeric ? '!text-end' : undefined}>{c.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -166,9 +170,14 @@ export default function ReportCard<T>({
                   {shown!.map((row, i) => (
                     <tr key={i}>
                       {columns.map((c) => (
-                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined} dir={c.numeric ? 'ltr' : undefined}
+                        // The cell ends where the page ends (the left in Arabic),
+                        // like its heading; only the figure itself is kept
+                        // left-to-right, so 1,587.74 reads the same in both.
+                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined}
                           style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax) : undefined}>
-                          {c.format ? c.format(row) : number(c.value(row))}
+                          {c.numeric
+                            ? <span dir="ltr">{c.format ? c.format(row) : number(c.value(row))}</span>
+                            : c.format ? c.format(row) : number(c.value(row))}
                         </td>
                       ))}
                     </tr>
@@ -176,11 +185,11 @@ export default function ReportCard<T>({
                   {totals && (
                     <tr className="font-semibold text-slate-100">
                       {columns.map((c, i) => (
-                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined} dir={c.numeric ? 'ltr' : undefined}>
+                        <td key={c.key} className={c.numeric ? 'tabular text-end' : undefined}>
                           {i === 0
                             ? t('applicationReports.total')
                             : c.total
-                              ? number(rows.reduce((sum, r) => sum + (Number(c.value(r)) || 0), 0))
+                              ? <span dir="ltr">{number(rows.reduce((sum, r) => sum + (Number(c.value(r)) || 0), 0))}</span>
                               : ''}
                         </td>
                       ))}

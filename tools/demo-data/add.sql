@@ -2,8 +2,11 @@
 -- messages on the development database, every row of it removable with
 -- remove.sql. See README.md.
 --
---   Get-Content -Raw tools\demo-data\add.sql |
---     docker exec -i callcenter-db-dev psql -U callcenter -d callcenter -v dev=yes
+--   docker cp tools\demo-data\add.sql callcenter-db-dev:/tmp/add.sql
+--   docker exec callcenter-db-dev psql -U callcenter -d callcenter -v dev=yes -f /tmp/add.sql
+--
+-- Copied in, not piped: Windows PowerShell re-encodes what it pipes to a
+-- program, and every Arabic name arrived as "Ø³Ø§Ø±Ø©" (26 Sep).
 --
 -- Optional: -v days=90 (how far back) -v per_day=200 (communications a day).
 --

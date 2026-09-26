@@ -22,7 +22,9 @@ $env:ConnectionStrings__Default = "Host=127.0.0.1;Port=5432;Database=callcenter_
 dotnet CallCenter.Server.dll seed --admin-user probe-supervisor --admin-password 'ProbePass!2026'
 
 # 2. A year of calls: about 180,000 rows, a minute to write.
-Get-Content -Raw <repo>\tools\report-probe\fill.sql | docker exec -i callcenter-db-dev psql -U callcenter -d callcenter_probe -v ON_ERROR_STOP=1
+#    Copied in, not piped: PowerShell re-encodes a pipe (tools/demo-data/README.md).
+docker cp <repo>\tools\report-probe\fill.sql callcenter-db-dev:/tmp/fill.sql
+docker exec callcenter-db-dev psql -U callcenter -d callcenter_probe -v ON_ERROR_STOP=1 -f /tmp/fill.sql
 
 # 3. A server on its own port against it, hidden, as DEVELOPING.md says.
 Start-Process dotnet -ArgumentList "CallCenter.Server.dll","--urls","http://127.0.0.1:5055" -WorkingDirectory $out -WindowStyle Hidden -RedirectStandardOutput "$out\probe.log"

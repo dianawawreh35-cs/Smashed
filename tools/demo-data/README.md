@@ -8,13 +8,20 @@ restaurant behind them. `add.sql` writes a stretch of realistic traffic;
 
 ```powershell
 # Add 90 days, about 200 communications a day (a couple of minutes).
-Get-Content -Raw tools\demo-data\add.sql | docker exec -i callcenter-db-dev psql -U callcenter -d callcenter -v dev=yes
+docker cp tools\demo-data\add.sql callcenter-db-dev:/tmp/add.sql
+docker exec callcenter-db-dev psql -U callcenter -d callcenter -v dev=yes -f /tmp/add.sql
 
-# Or choose: -v days=30 -v per_day=500
+# Or choose: put -v days=30 -v per_day=500 before -f
 
 # Take it all away again.
-Get-Content -Raw tools\demo-data\remove.sql | docker exec -i callcenter-db-dev psql -U callcenter -d callcenter
+docker cp tools\demo-data\remove.sql callcenter-db-dev:/tmp/remove.sql
+docker exec callcenter-db-dev psql -U callcenter -d callcenter -f /tmp/remove.sql
 ```
+
+**Copy the file in; don't pipe it.** `Get-Content file | docker exec -i …` in
+Windows PowerShell reads the UTF-8 file as Windows-1252 and re-encodes it on
+the way out: the first run stored every Arabic name as "Ø³Ø§Ø±Ø©" instead of
+"سارة" (26 Sep). `docker cp` gives psql the file's own bytes.
 
 `-v dev=yes` is required: without it `add.sql` refuses, so it cannot be run by
 accident. It also refuses when demo data is already there (remove it first)

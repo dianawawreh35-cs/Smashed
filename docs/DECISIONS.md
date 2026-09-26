@@ -5512,6 +5512,32 @@ page.
 **363 server tests (on `callcenter_test`), 143 shared and 117 web pass; the web
 build and lint pass. Not yet seen running**: checklist 1.9.
 
+## 2026-09-26 — Report headings sat apart from their numbers, and the demo names were garbled
+
+Dia's first screenshot of the reports (Application reports, *Per agent*)
+showed two faults.
+
+**Every number heading sat at the start of its column while its numbers sat
+at the end**, on every report card on both report pages since 25 Sep. The
+card gave number headings `text-end`, and `.table thead th` in `index.css`
+sets `text-start`, which is the more specific rule and won. Now `!text-end`.
+Arabic had a second fault on top: the number cells carried `dir="ltr"`, so
+their "end" was the right while the page's end is the left, and a heading
+fixed alone would have sat on the other side from its figures. The cell now
+follows the page's direction and only the figure inside it is held
+left-to-right, so "1,587.74" still reads as it should. The dashboard's two
+small tables had the same cell. A test pins both.
+
+**The demo agents' and demo customers' names read "Ø³Ø§Ø±Ø©"**, as did the
+complaint notes. The data, not the screen: the demo SQL had been piped in
+with `Get-Content file | docker exec -i psql`, and Windows PowerShell 5.1
+read the UTF-8 file as Windows-1252 and re-encoded it on the way out. The
+demo data was removed and added again by copying the file into the container
+(`docker cp`, then `psql -f`), which hands psql the file's own bytes; the
+names now read سارة (تجريبي) and so on. The READMEs of `tools/demo-data` and
+`tools/report-probe` give only that way now. Real data was never affected:
+the apps and the seed write through Npgsql, which sends UTF-8.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

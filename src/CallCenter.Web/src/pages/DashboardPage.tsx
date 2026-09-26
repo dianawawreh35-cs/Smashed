@@ -127,7 +127,7 @@ function Breakdown({ title, rows }: { title: string; rows: Count[] }) {
             {rows.map((r) => (
               <tr key={r.key}>
                 <td>{r.label}</td>
-                <td className="tabular text-end" dir="ltr">{r.count.toLocaleString(i18n.language)}</td>
+                <td className="tabular text-end"><span dir="ltr">{r.count.toLocaleString(i18n.language)}</span></td>
               </tr>
             ))}
           </tbody>

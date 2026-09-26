@@ -22,6 +22,14 @@ namespace CallCenter.AgentApp.Services.Calls;
 /// arriving while one is up is refused as busy, which is what the PBX expects
 /// and what lets it move the caller on to another agent.
 ///
+/// <b>The one exception is a call the agent places while another is on hold
+/// (A-24).</b> The held call is parked — its user agent, audio and recorder
+/// set aside untouched — and the new call gets a user agent of its own. When
+/// the new call ends, the held one comes back to the front, still on hold, for
+/// the agent to resume. Each <see cref="SIPUserAgent"/> answers only for its
+/// own dialogue, so the two share the transport without seeing each other's
+/// traffic. Only one call is ever parked.
+///
 /// Two things sit at the transport level rather than on the user agent, and
 /// both had to be learned the hard way:
 ///
@@ -60,7 +68,23 @@ public class CallService(
 {
     private readonly Lock _gate = new();
 
+    /// <summary>
+    /// The user agent that listens for incoming calls. It is the one every
+    /// ordinary call uses, in and out.
+    /// </summary>
+    private SIPUserAgent? _listener;
+
+    /// <summary>
+    /// The user agent of the call at the front: <see cref="_listener"/>, or a
+    /// user agent made for a call placed while another is on hold (A-24).
+    /// </summary>
     private SIPUserAgent? _agent;
+
+    /// <summary>
+    /// The call parked on hold while the agent makes another (A-24), or null.
+    /// </summary>
+    private HeldLine? _held;
+
     private SIPServerUserAgent? _pending;
     private VoIPMediaSession? _media;
 
@@ -150,47 +174,17 @@ public class CallService(
         lock (_gate)
         {
             _extensions = extensions;
-            _agent = new SIPUserAgent(transport.Transport, null);
-            _agent.OnIncomingCall += OnIncomingCall;
-            _agent.OnCallHungup += OnCallHungup;
-            _agent.ServerCallCancelled += (_, _) => Finish("the caller gave up");
 
-            // The far end can hold us too - a PBX does it during a transfer.
-            // Logged only: A-12 is about the agent's controls, and the pop-up
-            // has nothing to offer the agent about a hold they did not choose.
-            _agent.RemotePutOnHold += () => logger.LogInformation("Put on hold by the other side");
-            _agent.RemoteTookOffHold += () => logger.LogInformation("Taken off hold by the other side");
+            // Subscribed to the transport before OnTransportRequest below, so
+            // an INVITE reaches OnIncomingCall first. The busy check there and
+            // the one in OnTransportRequest rely on that order.
+            var listener = new SIPUserAgent(transport.Transport, null);
+            listener.OnIncomingCall += OnIncomingCall;
+            listener.ServerCallCancelled += (_, _) => Finish(listener, "the caller gave up");
+            WireCallEvents(listener);
 
-            // Outgoing calls (A-20). Ringing is worth a line because it is the
-            // proof the PBX accepted the number at all; the failure is kept so
-            // the outcome can say which kind of failure it was.
-            //
-            // It is also when the agent should hear ringing. The PBX sends no
-            // early media, so without a local tone the line is silent until
-            // the customer answers. A 183 that does carry audio (a body with
-            // it) is left alone: the network is already playing something.
-            _agent.ClientCallRinging += (_, response) =>
-            {
-                logger.LogInformation("The far end is ringing: {Status}", response?.Status);
-
-                if (string.IsNullOrEmpty(response?.Body))
-                {
-                    ringback.Start();
-                }
-            };
-
-            _agent.ClientCallFailed += (_, error, response) =>
-            {
-                ringback.Stop();
-
-                lock (_gate)
-                {
-                    _lastDialFailure = response?.Status;
-                }
-
-                logger.LogInformation(
-                    "The outgoing call did not connect: {Status} {Error}", response?.Status, error);
-            };
+            _listener = listener;
+            _agent = listener;
 
             transport.Transport.SIPTransportRequestReceived += OnTransportRequest;
         }
@@ -198,39 +192,164 @@ public class CallService(
         logger.LogInformation("Listening for calls");
     }
 
+    /// <summary>
+    /// What every user agent needs, whether it listens or only dials out
+    /// (A-24): the hang-up, the far end's hold, and the ringing and failure of
+    /// a call being placed.
+    /// </summary>
+    private void WireCallEvents(SIPUserAgent agent)
+    {
+        agent.OnCallHungup += _ => OnCallHungup(agent);
+
+        // The far end can hold us too - a PBX does it during a transfer.
+        // Logged only: A-12 is about the agent's controls, and the pop-up
+        // has nothing to offer the agent about a hold they did not choose.
+        agent.RemotePutOnHold += () => logger.LogInformation("Put on hold by the other side");
+        agent.RemoteTookOffHold += () => logger.LogInformation("Taken off hold by the other side");
+
+        // Outgoing calls (A-20). Ringing is worth a line because it is the
+        // proof the PBX accepted the number at all; the failure is kept so
+        // the outcome can say which kind of failure it was.
+        //
+        // It is also when the agent should hear ringing. The PBX sends no
+        // early media, so without a local tone the line is silent until
+        // the customer answers. A 183 that does carry audio (a body with
+        // it) is left alone: the network is already playing something.
+        agent.ClientCallRinging += (_, response) =>
+        {
+            logger.LogInformation("The far end is ringing: {Status}", response?.Status);
+
+            if (string.IsNullOrEmpty(response?.Body))
+            {
+                ringback.Start();
+            }
+        };
+
+        agent.ClientCallFailed += (_, error, response) =>
+        {
+            ringback.Stop();
+
+            lock (_gate)
+            {
+                _lastDialFailure = response?.Status;
+            }
+
+            logger.LogInformation(
+                "The outgoing call did not connect: {Status} {Error}", response?.Status, error);
+        };
+    }
+
+    /// <summary>
+    /// Lets go of a user agent made for a call placed while another was on
+    /// hold (A-24), once that call is over.
+    /// </summary>
+    /// <remarks>
+    /// Closed at once, so it answers nothing new; disposed — which is what
+    /// takes it off the transport — only after half a minute, because a closed
+    /// user agent still answers a retransmitted BYE and the PBX may send one.
+    /// </remarks>
+    private void Retire(SIPUserAgent agent)
+    {
+        try
+        {
+            agent.Close();
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "A finished call's user agent did not close cleanly");
+        }
+
+        _ = Task.Delay(TimeSpan.FromSeconds(32)).ContinueWith(_ =>
+        {
+            try
+            {
+                agent.Dispose();
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "A finished call's user agent did not dispose cleanly");
+            }
+        }, TaskScheduler.Default);
+    }
+
     /// <summary>Stops listening and ends anything in progress.</summary>
     public void Stop()
     {
-        SIPUserAgent? agent;
+        SIPUserAgent? listener;
 
         lock (_gate)
         {
-            agent = _agent;
-            _agent = null;
+            listener = _listener;
         }
 
-        if (agent is null)
+        if (listener is null)
         {
             return;
         }
 
         transport.Transport.SIPTransportRequestReceived -= OnTransportRequest;
-        agent.OnIncomingCall -= OnIncomingCall;
+        listener.OnIncomingCall -= OnIncomingCall;
 
-        try
+        // A connected call is hung up while everything is still in place, so
+        // it is finished and reported like any other hang-up. Twice, because
+        // finishing the call at the front brings a parked one forward (A-24).
+        for (var i = 0; i < 2; i++)
         {
-            agent.Hangup();
-            agent.Close();
+            SIPUserAgent? current;
+
+            lock (_gate)
+            {
+                current = _agent;
+            }
+
+            try
+            {
+                current?.Hangup();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "A call did not end cleanly while stopping");
+            }
         }
-        catch (Exception ex)
+
+        SIPUserAgent? front;
+        HeldLine? held;
+
+        lock (_gate)
         {
-            logger.LogWarning(ex, "A call did not end cleanly while stopping");
+            front = _agent;
+            held = _held;
+            _listener = null;
+            _agent = null;
+            _held = null;
+        }
+
+        // The call at the front, a call parked on hold behind it, and the
+        // listener, each once.
+        foreach (var agent in new[] { front, held?.Agent, listener }.OfType<SIPUserAgent>().Distinct())
+        {
+            try
+            {
+                agent.Hangup();
+                agent.Close();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "A call did not end cleanly while stopping");
+            }
         }
 
         ringback.Stop();
         ring.Stop();
         StopRecording();
         CloseMedia();
+
+        if (held is not null)
+        {
+            StopRecording(held.Recorder, held.Media, held.Audio);
+            CloseMedia(held.Media);
+        }
+
         Set(CallState.Idle);
     }
 
@@ -245,14 +364,20 @@ public class CallService(
     /// kept, because a number typed or displayed as <c>059-949-8581</c> is not
     /// something a switch will route.
     ///
-    /// <b>One call at a time (SRS 2.3).</b> The slot is claimed before anything
-    /// slow happens, so two clicks on a call button cannot both get through.
+    /// <b>One call at a time (SRS 2.3)</b>, except that a call on hold may be
+    /// parked to make another (A-24). The slot is claimed before anything slow
+    /// happens, so two clicks on a call button cannot both get through.
     ///
     /// The classification form needs the call's SIP Call-ID, and for an outgoing
     /// call that does not exist until the dialogue does — so it is read off the
     /// dialogue at the moment of answer, not before (A-21, A-40).
     /// </remarks>
-    public async Task DialAsync(string? number)
+    /// <param name="isInternal">
+    /// An internal call — another agent or a branch (A-23). Dialled without the
+    /// prefix, which is the PBX's way to an outside line and would send an
+    /// extension number out to the phone network.
+    /// </param>
+    public async Task DialAsync(string? number, bool isInternal = false)
     {
         var digits = PhoneNormalizer.DigitsOnly(number);
 
@@ -262,28 +387,48 @@ public class CallService(
             return;
         }
 
-        SIPUserAgent? agent;
+        SIPUserAgent agent;
         AgentExtensionsDto? extensions;
+        CallState? held = null;
 
         lock (_gate)
         {
-            agent = _agent;
             extensions = _extensions;
 
-            if (agent is null || extensions is null)
+            if (_listener is null || _agent is null || extensions is null)
             {
                 logger.LogWarning("Cannot dial: the phone is not ready");
                 return;
             }
 
-            if (_state.Status is not CallStatus.Idle)
+            if (!_state.AllowsDialling)
             {
-                // One extension, one call. The button is disabled for this, so
-                // reaching here means two clicks landed together.
+                // One extension, one call, unless that call is on hold. The
+                // button is disabled for this, so reaching here means two
+                // clicks landed together.
                 logger.LogInformation("Cannot dial {Number}: another call is in progress", digits);
                 return;
             }
 
+            if (_state.Status is CallStatus.Connected)
+            {
+                // A-24: the call on hold is parked exactly as it is — still on
+                // hold, still recording its hold — and the new call gets a user
+                // agent of its own, since the parked one still has its dialogue.
+                held = _state;
+                _held = new HeldLine(_agent, _media, _audio, _recorder, _callId, _state);
+                _agent = new SIPUserAgent(transport.Transport, null);
+                WireCallEvents(_agent);
+                _media = null;
+                _audio = null;
+                _recorder = null;
+                _callId = null;
+                _hangingUpLocally = false;
+
+                logger.LogInformation("The call on hold is parked while another call is placed");
+            }
+
+            agent = _agent;
             _lastDialFailure = null;
 
             // The slot is claimed here, inside the lock, rather than after the
@@ -291,15 +436,17 @@ public class CallService(
             // click to arrive.
             _state = new CallState(
                 CallStatus.Dialling, digits, null, null, DateTimeOffset.Now, null,
-                SipCallId: null, IsMuted: false, IsOnHold: false, IsOutbound: true);
+                SipCallId: null, IsMuted: false, IsOnHold: false, IsOutbound: true,
+                IsInternal: isInternal, IsSecondLine: held is not null, Held: held);
         }
 
         StateChanged?.Invoke(this, State);
 
-        var dialled = dialing.Value.Prefix + digits;
+        var dialled = (isInternal ? string.Empty : dialing.Value.Prefix) + digits;
         var destination = $"sip:{dialled}@{extensions.SipServer}";
 
-        logger.LogInformation("Dialling {Destination}", destination);
+        logger.LogInformation(
+            "Dialling {Destination} ({Kind} call)", destination, isInternal ? "internal" : "outside");
 
         try
         {
@@ -327,7 +474,7 @@ public class CallService(
                     failure = _lastDialFailure;
                 }
 
-                Finish(Explain(failure), OutcomeFor(failure));
+                Finish(agent, Explain(failure), OutcomeFor(failure));
                 return;
             }
 
@@ -359,7 +506,7 @@ public class CallService(
             // A missing microphone is the usual cause, and it must not take the
             // app down.
             logger.LogError(ex, "The call to {Number} could not be placed", digits);
-            Finish("the call could not be placed", CallOutcome.Failed);
+            Finish(agent, "the call could not be placed", CallOutcome.Failed);
         }
     }
 
@@ -456,7 +603,7 @@ public class CallService(
             if (!answered)
             {
                 logger.LogWarning("The call could not be answered");
-                Finish("the call could not be answered");
+                Finish(agent, "the call could not be answered");
                 return;
             }
 
@@ -481,7 +628,7 @@ public class CallService(
             // An audio device that has vanished is the usual cause, and it must
             // not take the app down mid-call.
             logger.LogError(ex, "Answering the call failed");
-            Finish("answering failed");
+            Finish(agent, "answering failed");
         }
     }
 
@@ -542,7 +689,7 @@ public class CallService(
             logger.LogWarning(ex, "Hanging up did not complete cleanly");
         }
 
-        Finish("hung up by the agent", CallOutcome.Answered);
+        Finish(agent, "hung up by the agent", CallOutcome.Answered);
     }
 
     /// <summary>
@@ -661,6 +808,10 @@ public class CallService(
         // asked for.
         SetMicrophone(paused: hold || state.IsMuted);
 
+        // And the speaker: Asterisk keeps sending the customer's voice through
+        // a hold, and A-12 says the agent does not hear them.
+        SetSpeakerSilenced(hold);
+
         // A-51: the recording notes where the hold is. The PBX plays its music
         // to the customer, not to us, so without this the stretch is just
         // silence on both sides.
@@ -668,6 +819,30 @@ public class CallService(
 
         logger.LogInformation("Call {Action}", hold ? "put on hold" : "taken off hold");
         Set(State with { IsOnHold = hold });
+    }
+
+    /// <summary>
+    /// Stops or restarts the customer's voice reaching the speaker, for a hold
+    /// (A-12). Only the call at the front is touched: a call parked on hold
+    /// (A-24) stays silenced until it comes back and is resumed.
+    /// </summary>
+    private void SetSpeakerSilenced(bool silenced)
+    {
+        VoIPMediaSession? media;
+
+        lock (_gate)
+        {
+            media = _media;
+        }
+
+        if (media?.Media?.AudioSink is HoldableAudioSink speaker)
+        {
+            speaker.IsSilenced = silenced;
+        }
+        else
+        {
+            logger.LogWarning("The speaker could not be {Action}", silenced ? "silenced" : "restored");
+        }
     }
 
     /// <summary>
@@ -743,9 +918,20 @@ public class CallService(
             return;
         }
 
-        if (string.Equals(request.Header.CallId, _callId, StringComparison.Ordinal))
+        string? frontCallId;
+        string? heldCallId;
+
+        lock (_gate)
         {
-            // Same dialogue - a re-INVITE, typically hold or a codec change.
+            frontCallId = _callId;
+            heldCallId = _held?.CallId;
+        }
+
+        if (string.Equals(request.Header.CallId, frontCallId, StringComparison.Ordinal)
+            || string.Equals(request.Header.CallId, heldCallId, StringComparison.Ordinal))
+        {
+            // Same dialogue - a re-INVITE, typically hold or a codec change,
+            // for the call at the front or the one parked behind it (A-24).
             return;
         }
 
@@ -831,6 +1017,16 @@ public class CallService(
     /// </summary>
     private void OnIncomingCall(SIPUserAgent agent, SIPRequest request)
     {
+        // The listener raises this for any INVITE while it has no dialogue of
+        // its own: while it is dialling or ringing, and while a call placed
+        // over a parked one (A-24) is up after the parked caller hung up. None
+        // of those is free to take a call. OnTransportRequest, which runs
+        // after this, turns it away as busy and reports it.
+        if (State.Status is not CallStatus.Idle)
+        {
+            return;
+        }
+
         var identity = CallerId.FromInvite(request);
         var caller = identity.Number;
         var queue = SipCustomHeaders.QueueFrom(request);
@@ -967,8 +1163,18 @@ public class CallService(
     /// The call ended. Raised for a BYE arriving <b>and</b> from inside our own
     /// <c>Hangup()</c>, so the flag decides which it was.
     /// </summary>
-    private void OnCallHungup(SIPDialogue? dialogue)
+    /// <remarks>
+    /// Keyed on the user agent it came from, because with a call parked (A-24)
+    /// there are two, and a customer who gives up while on hold ends the
+    /// parked call, not the one the agent is on.
+    /// </remarks>
+    private void OnCallHungup(SIPUserAgent agent)
     {
+        if (FinishHeld(agent, "the caller on hold hung up"))
+        {
+            return;
+        }
+
         lock (_gate)
         {
             if (_hangingUpLocally)
@@ -979,16 +1185,18 @@ public class CallService(
             }
         }
 
-        Finish("the caller hung up");
+        Finish(agent, "the caller hung up");
     }
 
     private void RejectWith(SIPResponseStatusCodesEnum status, string why)
     {
         SIPServerUserAgent? pending;
+        SIPUserAgent? agent;
 
         lock (_gate)
         {
             pending = _pending;
+            agent = _agent;
             _pending = null;
         }
 
@@ -1002,7 +1210,7 @@ public class CallService(
         }
 
         logger.LogInformation("Call ended: {Why}", why);
-        Finish(why, CallOutcome.RejectedByAgent);
+        Finish(agent, why, CallOutcome.RejectedByAgent);
     }
 
     /// <summary>
@@ -1089,6 +1297,15 @@ public class CallService(
             _recorder = null;
         }
 
+        return StopRecording(recorder, media, audio);
+    }
+
+    /// <summary>
+    /// Finishes one call's recording, whichever line it was on (A-24).
+    /// </summary>
+    private RecordedCall? StopRecording(
+        CallRecorder? recorder, VoIPMediaSession? media, WindowsAudioEndPoint? audio)
+    {
         if (recorder is null)
         {
             return null;
@@ -1179,10 +1396,13 @@ public class CallService(
     {
         var audio = new WindowsAudioEndPoint(new AudioEncoder());
 
+        // The speaker goes through a wrapper that can drop the customer's
+        // voice for a hold (A-12); see HoldableAudioSink for why the PBX's own
+        // hold is not enough.
         var media = new VoIPMediaSession(new MediaEndPoints
         {
             AudioSource = audio,
-            AudioSink = audio,
+            AudioSink = new HoldableAudioSink(audio),
         });
 
         // The PBX and the media may come from different addresses across the
@@ -1206,6 +1426,11 @@ public class CallService(
             _audio = null;
         }
 
+        CloseMedia(media);
+    }
+
+    private void CloseMedia(VoIPMediaSession? media)
+    {
         try
         {
             media?.Close("call ended");
@@ -1224,23 +1449,41 @@ public class CallService(
     /// answered, one that was only ringing was missed. Callers that know better
     /// — the agent pressing Reject — say so.
     /// </param>
-    private void Finish(string why, CallOutcome? outcome = null)
+    /// <param name="agent">
+    /// The user agent the call was on. With a call parked (A-24) the front one
+    /// changes when a call ends, so an event arriving late from a call already
+    /// finished must not finish whatever has come to the front since.
+    /// </param>
+    private void Finish(SIPUserAgent? agent, string why, CallOutcome? outcome = null)
     {
         CallState state;
+        CallState next;
         string? callId;
-
-        // Whatever ended the call — cancel, failure, a refusal — the ringing
-        // ends with it.
-        ringback.Stop();
-        ring.Stop();
+        CallRecorder? recorder;
+        VoIPMediaSession? media;
+        WindowsAudioEndPoint? audio;
+        SIPUserAgent? retired = null;
 
         lock (_gate)
         {
+            if (!ReferenceEquals(agent, _agent))
+            {
+                // A call that is already over, and whose line has gone.
+                return;
+            }
+
             state = _state;
             callId = _callId;
+            recorder = _recorder;
+            media = _media;
+            audio = _audio;
             _pending = null;
-            _callId = null;
             _hangingUpLocally = false;
+
+            if (agent is not null && !ReferenceEquals(agent, _listener))
+            {
+                retired = agent;
+            }
 
             // The call is marked finished HERE, inside the lock that read the
             // state, and not at the end of this method.
@@ -1253,14 +1496,47 @@ public class CallService(
             // flushes of the upload queue raced, and the server refused the
             // second copy with a duplicate key - visible as a 500 in the log on
             // 22 September, from a call that had otherwise gone fine.
-            _state = CallState.Idle;
+            //
+            // A call parked on hold (A-24) comes back to the front in the same
+            // step, still on hold: the agent resumes it when they are ready.
+            if (_held is { } held)
+            {
+                _agent = held.Agent;
+                _media = held.Media;
+                _audio = held.Audio;
+                _recorder = held.Recorder;
+                _callId = held.CallId;
+                _state = held.State;
+                _held = null;
+            }
+            else
+            {
+                _agent = _listener;
+                _media = null;
+                _audio = null;
+                _recorder = null;
+                _callId = null;
+                _state = CallState.Idle;
+            }
+
+            next = _state;
         }
+
+        // Whatever ended the call — cancel, failure, a refusal — the ringing
+        // ends with it.
+        ringback.Stop();
+        ring.Stop();
 
         // Before the media is closed: the tap hangs off the session, and
         // closing that first would take the last frames with it.
-        var recorded = StopRecording();
+        var recorded = StopRecording(recorder, media, audio);
 
-        CloseMedia();
+        CloseMedia(media);
+
+        if (retired is not null)
+        {
+            Retire(retired);
+        }
 
         if (state.Status is CallStatus.Idle)
         {
@@ -1268,7 +1544,14 @@ public class CallService(
             return;
         }
 
-        logger.LogInformation("Call finished: {Why}", why);
+        if (next.IsActive)
+        {
+            logger.LogInformation("Call finished: {Why}; the call on hold is back", why);
+        }
+        else
+        {
+            logger.LogInformation("Call finished: {Why}", why);
+        }
 
         Report(new FinishedCall(
             callId ?? Guid.NewGuid().ToString(),
@@ -1283,7 +1566,9 @@ public class CallService(
             state.StartedAt ?? DateTimeOffset.Now,
             state.ConnectedAt,
             DateTimeOffset.Now,
-            state.IsOutbound));
+            state.IsOutbound,
+            state.IsInternal,
+            state.IsSecondLine));
 
         // After the call has been reported, never before: a recording can only
         // be attached to a call the server has already been told about (A-31).
@@ -1293,7 +1578,70 @@ public class CallService(
         }
 
         // The state was set inside the lock above; this is only the event.
-        StateChanged?.Invoke(this, CallState.Idle);
+        StateChanged?.Invoke(this, next);
+    }
+
+    /// <summary>
+    /// Ends the call parked on hold (A-24), when the customer gives up waiting
+    /// while the agent is on another call. False if <paramref name="agent"/> is
+    /// not the parked call's.
+    /// </summary>
+    /// <remarks>
+    /// Reported as answered, which it was. The call at the front carries on
+    /// untouched; only the "on hold" line above it goes.
+    /// </remarks>
+    private bool FinishHeld(SIPUserAgent agent, string why)
+    {
+        HeldLine held;
+        CallState front;
+        bool retire;
+
+        lock (_gate)
+        {
+            if (_held is not { } parked || !ReferenceEquals(parked.Agent, agent))
+            {
+                return false;
+            }
+
+            held = parked;
+            retire = !ReferenceEquals(agent, _listener);
+            _held = null;
+            _state = _state with { Held = null };
+            front = _state;
+        }
+
+        var recorded = StopRecording(held.Recorder, held.Media, held.Audio);
+        CloseMedia(held.Media);
+
+        if (retire)
+        {
+            Retire(agent);
+        }
+
+        logger.LogInformation("Call finished: {Why}", why);
+
+        var state = held.State;
+
+        Report(new FinishedCall(
+            held.CallId ?? Guid.NewGuid().ToString(),
+            state.Number,
+            state.CallerName,
+            state.Queue,
+            CallOutcome.Answered,
+            state.StartedAt ?? DateTimeOffset.Now,
+            state.ConnectedAt,
+            DateTimeOffset.Now,
+            state.IsOutbound,
+            state.IsInternal,
+            state.IsSecondLine));
+
+        if (recorded is not null && held.CallId is not null)
+        {
+            Announce(new CallRecording(held.CallId, recorded));
+        }
+
+        StateChanged?.Invoke(this, front);
+        return true;
     }
 
     /// <summary>
@@ -1332,11 +1680,28 @@ public class CallService(
     {
         lock (_gate)
         {
-            _state = state;
+            // The parked call (A-24) is whatever is parked now, not whatever
+            // was parked when the caller read State: the customer on hold may
+            // have hung up in between.
+            _state = state.IsActive ? state with { Held = _held?.State } : state;
+            state = _state;
         }
 
         StateChanged?.Invoke(this, state);
     }
 
     public void Dispose() => Stop();
+
+    /// <summary>
+    /// A call set aside on hold while the agent places another (A-24):
+    /// everything that belongs to it, parked untouched until it comes back to
+    /// the front.
+    /// </summary>
+    private sealed record HeldLine(
+        SIPUserAgent Agent,
+        VoIPMediaSession? Media,
+        WindowsAudioEndPoint? Audio,
+        CallRecorder? Recorder,
+        string? CallId,
+        CallState State);
 }

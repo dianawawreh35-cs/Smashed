@@ -29,6 +29,30 @@
 
       <StackPanel Grid.Row="0">
 
+        <!-- A-24: a customer parked on hold while the agent makes another call.
+             First, above the call itself, in the warning colour: they are
+             waiting, and they come back to the front, still on hold, when this
+             call ends. The contact details further down are still theirs. -->
+        <Border BorderBrush="{StaticResource Warning}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CornerSmall}"
+                Padding="10,6"
+                Margin="0,0,0,12"
+                Visibility="{Binding HasHeldCall, Converter={StaticResource BoolToVisibility}}">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+            <TextBlock Text="{Binding Localizer[call.heldCall]}"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource Warning}"
+                       VerticalAlignment="Center" />
+            <TextBlock Text="{Binding HeldNumber}"
+                       FontFamily="{StaticResource MonoFont}"
+                       Foreground="{StaticResource Text}"
+                       FlowDirection="LeftToRight"
+                       Margin="8,0,0,0"
+                       VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+
         <!-- Ringing, or connected. The state first, because the agent reads this
              in the second before they decide. -->
         <TextBlock Text="{Binding StatusText}"
@@ -46,7 +70,7 @@
                 Margin="0,8,0,0"
                 HorizontalAlignment="Center"
                 Visibility="{Binding IsOutbound, Converter={StaticResource BoolToVisibility}}">
-          <TextBlock Text="{Binding Localizer[call.outgoing]}"
+          <TextBlock Text="{Binding DirectionBadge}"
                      FontSize="12"
                      FontWeight="SemiBold"
                      Foreground="{StaticResource Accent}" />

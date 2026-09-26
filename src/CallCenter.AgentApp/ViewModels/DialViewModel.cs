@@ -40,7 +40,11 @@ public partial class DialViewModel : ObservableObject
         _dispatcher = dispatcher;
         Localizer = localizer;
 
-        localizer.LanguageChanged += (_, _) => OnPropertyChanged(nameof(Hint));
+        localizer.LanguageChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(Hint));
+            OnPropertyChanged(nameof(ModeHint));
+        };
 
         // Both change whether a call can be placed: the phone going away, and a
         // call starting or ending.
@@ -56,8 +60,22 @@ public partial class DialViewModel : ObservableObject
     private string _number = string.Empty;
 
     /// <summary>
-    /// Why the Call button is dead, or nothing when it is not. A disabled button
-    /// with no explanation is the worst version of this.
+    /// The switch on the tab (A-23): on for a call out to a customer, through
+    /// the outside-line prefix; off for an internal call to another agent or a
+    /// branch, dialled as typed. On by default, since calling customers is
+    /// what the tab is mostly for, and kept as set until the app closes.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ModeHint))]
+    private bool _isOutsideCall = true;
+
+    /// <summary>What the switch's position means, under it, in words.</summary>
+    public string ModeHint => Localizer[IsOutsideCall ? "dial.outsideHint" : "dial.internalHint"];
+
+    /// <summary>
+    /// Why the Call button is dead, or what pressing it will do to the call on
+    /// hold (A-24). A disabled button with no explanation is the worst version
+    /// of this.
     /// </summary>
     public string Hint
     {
@@ -68,9 +86,18 @@ public partial class DialViewModel : ObservableObject
                 return Localizer["dial.phoneNotReady"];
             }
 
-            return _calls.State.Status is not CallStatus.Idle
-                ? Localizer["dial.callInProgress"]
-                : string.Empty;
+            var state = _calls.State;
+
+            if (state.AllowsDialling)
+            {
+                return state.IsActive ? Localizer["dial.heldWaits"] : string.Empty;
+            }
+
+            // A connected call that is not on hold is one Hold away from being
+            // able to dial; say so rather than just "busy".
+            return state is { Status: CallStatus.Connected, IsOnHold: false, Held: null }
+                ? Localizer["dial.holdFirst"]
+                : Localizer["dial.callInProgress"];
         }
     }
 
@@ -86,7 +113,7 @@ public partial class DialViewModel : ObservableObject
         }
 
         Number = PhoneNormalizer.DigitsOnly(number);
-        await _calls.DialAsync(number);
+        await _calls.DialAsync(number, isInternal: !IsOutsideCall);
     }
 
     [RelayCommand(CanExecute = nameof(CanDialTyped))]
@@ -119,7 +146,7 @@ public partial class DialViewModel : ObservableObject
 
     private bool CanDial(string? number) =>
         _sip.IsReady
-        && _calls.State.Status is CallStatus.Idle
+        && _calls.State.AllowsDialling
         && !string.IsNullOrEmpty(PhoneNormalizer.DigitsOnly(number));
 
     private void RefreshCanDial()

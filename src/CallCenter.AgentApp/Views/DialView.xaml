@@ -46,6 +46,23 @@
       <Border Style="{StaticResource Card}" Padding="24" HorizontalAlignment="Center">
         <StackPanel>
 
+          <!-- A-23: outside line or internal. On, the number goes out through
+               the PBX's outside-line prefix to a customer; off, it is dialled
+               as typed, for another agent or a branch. The line under it says
+               which, because a switch alone does not say what "off" means. -->
+          <CheckBox Content="{Binding Localizer[dial.outside]}"
+                    Style="{StaticResource Switch}"
+                    IsChecked="{Binding IsOutsideCall, Mode=TwoWay}"
+                    Focusable="False"
+                    Width="236"
+                    HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding ModeHint}"
+                     Style="{StaticResource Subtle}"
+                     FontSize="11"
+                     Width="236"
+                     Margin="0,4,0,14"
+                     TextWrapping="Wrap" />
+
           <!-- The number, exactly as wide as the keys below it (236: three keys
                of 72 and the two gaps between them), with the delete
                key sitting inside its right end. Typing still works: the pad is

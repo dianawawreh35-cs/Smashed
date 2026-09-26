@@ -181,7 +181,9 @@ public partial class CallViewModel : ObservableObject
     /// </summary>
     private void OnCallFinished(object? sender, FinishedCall call)
     {
-        if (!call.IsOutbound || call.Outcome is not CallOutcome.NoAnswer)
+        // Not for an internal call (A-23), nor one placed over a customer on
+        // hold (A-24): the pop-up is still that customer's.
+        if (!call.IsOutbound || call.Outcome is not CallOutcome.NoAnswer || !call.TakesForm)
         {
             return;
         }
@@ -210,7 +212,33 @@ public partial class CallViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(MuteLabel))]
     [NotifyPropertyChangedFor(nameof(IsOnHold))]
     [NotifyPropertyChangedFor(nameof(HoldLabel))]
+    [NotifyPropertyChangedFor(nameof(DirectionBadge))]
+    [NotifyPropertyChangedFor(nameof(HasHeldCall))]
+    [NotifyPropertyChangedFor(nameof(HeldNumber))]
     private CallState _state = CallState.Idle;
+
+    /// <summary>
+    /// The call the classification form was opened for, so a call coming back
+    /// from hold (A-24) does not have its half-filled form started again.
+    /// </summary>
+    private string? _formCallId;
+
+    /// <summary>
+    /// The badge on a call the agent placed: "Outgoing call", or "Internal
+    /// call" for one dialled with the switch off (A-21, A-23).
+    /// </summary>
+    public string DirectionBadge => Localizer[State.IsInternal ? "call.internal" : "call.outgoing"];
+
+    /// <summary>
+    /// A customer is waiting on hold behind the call on screen (A-24). The
+    /// pop-up says so above everything else: forgetting them is the one
+    /// mistake this feature makes possible.
+    /// </summary>
+    public bool HasHeldCall => State.Held is not null;
+
+    public string HeldNumber => State.Held?.Number is { Length: > 0 } number
+        ? number
+        : Localizer["call.numberWithheld"];
 
     public bool IsRinging => State.Status is CallStatus.Ringing;
 
@@ -367,9 +395,12 @@ public partial class CallViewModel : ObservableObject
 
                 // A-40: the agent takes the order while the customer is
                 // speaking, so the form is there from the answer rather than
-                // appearing once they have gone.
-                if (!wasConnected)
+                // appearing once they have gone. Not for an internal call or
+                // one placed over a held customer (A-23, A-24), and not again
+                // for the held customer when their call comes back.
+                if (!wasConnected && state.TakesForm && state.SipCallId != _formCallId)
                 {
+                    _formCallId = state.SipCallId;
                     Classification.Begin(state.SipCallId, Classification.Extension, state.IsOutbound);
                 }
             }
@@ -385,6 +416,11 @@ public partial class CallViewModel : ObservableObject
                 // something to hold the next caller up over.
                 Classification.Close();
                 CloseNotes();
+
+                if (state.Status is not CallStatus.Connected)
+                {
+                    _formCallId = null;
+                }
 
                 // Who it is (A-10). Started here, not awaited: the pop-up is on
                 // screen and the phone is ringing whatever the server does.
@@ -406,5 +442,7 @@ public partial class CallViewModel : ObservableObject
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(MuteLabel));
         OnPropertyChanged(nameof(HoldLabel));
+        OnPropertyChanged(nameof(DirectionBadge));
+        OnPropertyChanged(nameof(HeldNumber));
     }
 }

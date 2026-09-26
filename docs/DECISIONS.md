@@ -5,6 +5,78 @@ chosen and why, so a later reader does not have to re-derive it.
 
 ---
 
+## 2026-09-26 — Internal calls from the Dial tab, and a call while one is on hold (A-23, A-24)
+
+Asked for by Dia: the Dial tab is also used for internal calls, and an agent
+must be able to ring someone while a customer waits on hold.
+
+**A switch, "Outside line", on by default (A-23).** Off means internal: no dial
+prefix, an "Internal call" badge, no classification form and no note. The
+prefix (48 here) is how the PBX reaches an outside line, so sending it in front
+of an extension number would have failed the call. The switch keeps its
+position until the app closes and is not saved. Guessing internal calls from the
+number's length (`PhoneNormalizer.IsExtension`) was the alternative. It was not
+chosen because Dia asked for a switch, and a guess that is wrong costs a failed
+call with no clue why.
+
+**The switch does not tell the reports anything.** Internal calls are still
+recognised in the reports by the S-48 number list (SRS 2.3), so nothing changed
+on the server and no migration was needed. The cost: a branch number missing
+from the list still counts as a customer call in the reports.
+
+**A second call gets a second `SIPUserAgent`, and the held one is parked
+untouched (A-24).** Each SIPSorcery user agent handles only requests carrying
+its own dialogue's Call-ID. So the held call keeps its user agent, audio,
+recorder and hold state exactly as they were, while the new call runs on a user
+agent made for it and retired afterwards (closed at once, disposed 32 s later so
+it can still answer a retransmitted BYE). There is no new SIP mechanism: the
+hold is the same re-INVITE A-12 already sends. `CallState` carries the parked
+call as `Held`, so the pop-up gets both calls in one atomic state change, the
+same way it gets everything else.
+
+**When the new call ends, the held call comes back still on hold, and the agent
+presses Resume.** Resuming it automatically would put a customer back on the
+line mid-sentence, before the agent had finished with the other call. The held
+call is not resumable while the second call is up, and there is no swap button:
+that would need a hold and a resume in one step, and nobody asked for it.
+
+**The second call takes no form and no note.** The pop-up is the held
+customer's conversation, and their form is often half-filled. Opening an
+outbound form for the second call would have replaced it, so the form belongs to
+the held customer until they are done. `CallViewModel` also remembers which call
+its form was opened for, so a held call returning to the front does not start
+its form over.
+
+**Stale events are keyed on the user agent.** With two calls, "the call ended"
+must say which call. `Finish` now takes the user agent and ignores any user
+agent that is no longer at the front. A customer who hangs up while on hold is
+finished by `FinishHeld` and logged as answered. The call at the front is left
+alone.
+
+**Also fixed, because A-24 would have made it worse:** the listening user agent
+raises `OnIncomingCall` for any INVITE while it has no dialogue of its own,
+which includes while dialling out and while ringing. `OnIncomingCall` now
+ignores anything that arrives while a call is in progress. `OnTransportRequest`
+already refuses such calls as busy and reports them.
+
+**Hold now silences the customer on the laptop too (A-12).** Dia reported on
+26 Sep that during a hold the customer heard music, but the agent still heard
+the customer. The `a=sendonly` re-INVITE starts Asterisk's music, but Asterisk
+keeps sending the customer's audio. So the speaker now goes through
+`HoldableAudioSink`, which drops incoming frames while on hold. Pausing the
+Windows output was the alternative. It was not used because frames keep
+queueing behind a paused output, and Resume would have started by playing back
+what the customer said on hold. For the same reason the recorder now writes
+silence for the customer during a hold, as the hold mark already claimed.
+
+**Not verified against the PBX.** The build is clean, but no call has been held
+and a second one placed on the real Issabel. The unknown is the PBX, not the
+app: an extension with a call limit of 1 (`call-limit`/`busylevel` on chan_sip,
+or a PJSIP endpoint limit) would refuse the second INVITE. If that happens the
+fix is on the PBX, and the app logs it as Failed with the PBX's status code.
+
+---
+
 ## 2026-09-22 — Do not disturb and auto answer (A-18)
 
 Two check boxes in the agent's rail, beside sign-out and language.
@@ -5671,6 +5743,7 @@ and what comes after:
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
 | CDR import: abandoned calls from `Master.csv` over SFTP | S-55 | **A-14 first** — it writes `communications` rows |
 | Click-to-call from the log and from a contact | A-20 | dialling — **done**, needs its test call |
+| Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Merging two contacts | A-63 | nothing |
 | Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |

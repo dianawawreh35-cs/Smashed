@@ -76,6 +76,21 @@ public enum CallStatus
 /// where it is the difference between a customer who rang us and one we rang
 /// (A-21).
 /// </param>
+/// <param name="IsInternal">
+/// Placed with the Dial tab's switch set to internal: another agent or a branch
+/// (A-23). Dialled without the outside-line prefix, and never classified or
+/// given a note — there is no customer on it.
+/// </param>
+/// <param name="IsSecondLine">
+/// Placed while another call was parked on hold (A-24). It takes no form and no
+/// note of its own: the pop-up keeps the held customer's form, which is the
+/// conversation the agent is in the middle of.
+/// </param>
+/// <param name="Held">
+/// The call parked on hold behind this one (A-24), or null. Carried on the
+/// state rather than asked for separately, for the same reason as everything
+/// else here: one swap, never half a picture.
+/// </param>
 public record CallState(
     CallStatus Status,
     string? Number,
@@ -86,13 +101,31 @@ public record CallState(
     string? SipCallId = null,
     bool IsMuted = false,
     bool IsOnHold = false,
-    bool IsOutbound = false)
+    bool IsOutbound = false,
+    bool IsInternal = false,
+    bool IsSecondLine = false,
+    CallState? Held = null)
 {
     /// <summary>No call in progress.</summary>
     public static readonly CallState Idle = new(CallStatus.Idle, null, null, null, null, null);
 
     /// <summary>Whether the pop-up should be on screen.</summary>
     public bool IsActive => Status is not CallStatus.Idle;
+
+    /// <summary>
+    /// Whether a call can be placed now: no call at all, or a connected call on
+    /// hold with nothing already parked behind it (A-20, A-24).
+    /// </summary>
+    public bool AllowsDialling =>
+        Status is CallStatus.Idle
+        || (Status is CallStatus.Connected && IsOnHold && Held is null);
+
+    /// <summary>
+    /// Whether the call gets the classification form on answer and the note
+    /// when unanswered (A-40, A-41). Not an internal call (A-23), and not one
+    /// placed over a held customer, whose form stays on screen (A-24).
+    /// </summary>
+    public bool TakesForm => !IsInternal && !IsSecondLine;
 
     /// <summary>How long the agent has been talking, or null before the answer.</summary>
     public TimeSpan? Duration =>
@@ -140,6 +173,8 @@ public enum CallOutcome
 /// A call that is over, as reported to the server (A-14).
 /// </summary>
 /// <param name="IsOutbound">This agent placed the call (A-20, A-21).</param>
+/// <param name="IsInternal">An internal call from the Dial tab (A-23).</param>
+/// <param name="IsSecondLine">Placed while another call was on hold (A-24).</param>
 /// <remarks>
 /// Separate from <see cref="CallState"/>, which describes a call in progress and
 /// is what the pop-up binds to. A finished call is a different thing with
@@ -159,7 +194,16 @@ public record FinishedCall(
     DateTimeOffset StartedAt,
     DateTimeOffset? AnsweredAt,
     DateTimeOffset EndedAt,
-    bool IsOutbound = false);
+    bool IsOutbound = false,
+    bool IsInternal = false,
+    bool IsSecondLine = false)
+{
+    /// <summary>
+    /// Whether an unanswered call gets the note (A-41); see
+    /// <see cref="CallState.TakesForm"/>.
+    /// </summary>
+    public bool TakesForm => !IsInternal && !IsSecondLine;
+}
 
 /// <summary>
 /// A finished recording and the call it belongs to (A-31).

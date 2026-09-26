@@ -133,6 +133,18 @@ public sealed class CallRecorder : IDisposable
             return;
         }
 
+        // On hold the PBX keeps sending the customer's voice although the
+        // agent no longer hears it (A-12). The hold is marked as silence, so
+        // silence is what it records; what a customer says to nobody while
+        // waiting is not part of the call.
+        lock (_gate)
+        {
+            if (_holdStartFrame is not null)
+            {
+                return;
+            }
+        }
+
         Write(remote: true, Transcode(encoded, frame.AudioFormat));
     }
 

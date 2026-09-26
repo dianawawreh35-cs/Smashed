@@ -34,6 +34,33 @@ jobs:
   verify:
     name: Tests
     runs-on: ubuntu-latest
+
+    # The same database ci.yml gives its tests. Without it the server tests
+    # that need one were meant to skip, but the test host kept retrying a
+    # connection that could never succeed, and v0.2.0's run sat in "Server
+    # tests" for ten minutes before it was cancelled (26 Sep). A release now
+    # runs exactly the tests CI runs, against a real PostgreSQL.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: callcenter
+          POSTGRES_USER: callcenter
+          POSTGRES_PASSWORD: callcenter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U callcenter -d callcenter"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ConnectionStrings__Default: "Host=localhost;Port=5432;Database=callcenter;Username=callcenter;Password=callcenter"
+
+    # A test run that hangs fails the release in minutes, not after GitHub's six hours.
+    timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
 

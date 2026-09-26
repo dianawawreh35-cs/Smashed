@@ -181,10 +181,26 @@ and the supervisor web app. The desktop app is built and copied to the four
 laptops by hand (SRS §11, N-11).
 
 ```powershell
-dotnet publish src/CallCenter.AgentApp/CallCenter.AgentApp.csproj `
-  -c Release -r win-x64 --self-contained true `
-  -o publish/agent-app
+powershell -ExecutionPolicy Bypass -File tools\agent-app\publish.ps1
 ```
+
+That publishes into `publish\agent-app-<version>\` and zips it as
+`publish\SmashedAgentApp-<version>.zip`. The version comes from the latest git
+tag, so build it after tagging a release. `publish\` is git-ignored.
+
+**The server address is written in by the script.** The app has no screen for
+it. It reads `Server:BaseUrl` from the `appsettings.json` beside the program,
+and the repository's copy says `http://localhost:5000` for development. The
+script puts `http://192.168.1.100` into the published copy only. For another
+site, pass `-Server http://<address>`.
+
+**On each laptop:** unzip to `C:\SmashedAgentApp\`, not the Downloads folder,
+so it survives someone tidying up. Make a desktop shortcut to
+`CallCenter.AgentApp.exe`, then start it. To update, close the app, replace the
+folder's contents with the new zip's, and start it again. Its local data (the
+offline call queue, the block list, the logs) is under
+`%LOCALAPPDATA%\CallCenter` and is kept. This lasts until the installer and the
+server's download link exist (DECISIONS, open items).
 
 **Self-contained on purpose.** The app targets `net10.0-windows`, and
 `--self-contained true` bundles the runtime with it — about 185 MB and roughly

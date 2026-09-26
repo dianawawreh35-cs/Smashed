@@ -65,6 +65,10 @@ public static class SettingsCatalog
         // screen: the query is a range scan over (agent_id, started_at), and a
         // year-wide window on a busy extension is a slow page for everybody.
         new("agent.call_log_days", SettingKinds.Integer, null, IntegerBetween(1, 90)),
+
+        // A-67: how often the server asks the POS about recent unknown
+        // callers. Five minutes by default; up to a day. Blank means the default.
+        new(Pos.PosCustomerSync.IntervalMinutesKey, SettingKinds.Integer, null, IntegerBetween(1, 1440)),
     ];
 
     private static readonly Dictionary<string, Definition> ByKey =

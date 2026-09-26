@@ -15,6 +15,9 @@ public class PosLookupLedger
 {
     private readonly ConcurrentDictionary<string, DateTimeOffset> _askedAt = new();
 
+    /// <summary>When the last run began; null until the first one after startup.</summary>
+    public DateTimeOffset? LastRunAt { get; set; }
+
     public bool IsDue(string number, DateTimeOffset now, TimeSpan retryAfter) =>
         !_askedAt.TryGetValue(number, out var at) || now - at >= retryAfter;
 

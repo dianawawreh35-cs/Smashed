@@ -46,14 +46,55 @@ public class PosCustomerSync(
     IPosCustomerLookup pos,
     PosLookupLedger ledger,
     ContactCallLinker calls,
+    Settings.SettingsService settings,
     IOptions<PosLookupOptions> options,
     TimeProvider clock,
     ILogger<PosCustomerSync> logger)
 {
+    /// <summary>
+    /// How often a run happens, in minutes: the supervisor's setting (S-47),
+    /// read on every tick so a change needs no restart.
+    /// </summary>
+    public const string IntervalMinutesKey = "pos.lookup.interval_minutes";
+    public const int DefaultIntervalMinutes = 5;
+
     /// <summary>What one run did, for the log and for the tests.</summary>
     public readonly record struct Result(int Asked, int NotFound, int Created, int FilledIn, int CallsLinked, bool Failed);
 
     private enum Outcome { Created, FilledIn, Unchanged }
+
+    /// <summary>
+    /// Runs when <see cref="IntervalMinutesKey"/> has passed since the last
+    /// run began; otherwise does nothing and returns null. The worker asks
+    /// every half minute.
+    /// </summary>
+    /// <remarks>
+    /// A run that failed counts as a run, so a POS that is down is asked
+    /// once an interval, not every half minute.
+    /// </remarks>
+    public async Task<Result?> RunIfDueAsync(CancellationToken ct = default)
+    {
+        var minutes = await settings.GetIntAsync(IntervalMinutesKey, DefaultIntervalMinutes, ct);
+
+        // The settings screen allows 1 to 1440, but a row edited by hand to
+        // zero would otherwise ask the POS every half minute.
+        if (minutes < 1)
+        {
+            minutes = DefaultIntervalMinutes;
+        }
+
+        var now = clock.GetUtcNow();
+
+        // A few seconds' grace, so a tick landing a moment early does not
+        // skip a whole interval.
+        if (ledger.LastRunAt is { } last && now - last < TimeSpan.FromMinutes(minutes) - TimeSpan.FromSeconds(10))
+        {
+            return null;
+        }
+
+        ledger.LastRunAt = now;
+        return await RunOnceAsync(ct);
+    }
 
     public async Task<Result> RunOnceAsync(CancellationToken ct = default)
     {

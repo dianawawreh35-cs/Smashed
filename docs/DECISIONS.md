@@ -5647,8 +5647,9 @@ Found by asking it, before any code:
 
 ### How it works
 
-`PosLookupWorker` runs `PosCustomerSync` every 5 minutes, starting 1 minute
-after the server does. A run:
+`PosLookupWorker` runs `PosCustomerSync` every 5 minutes by default (the
+supervisor's setting, see the end of this entry), starting 1 minute after the
+server does. A run:
 
 1. Takes every number that called in the **last 2 days** and has **no
    contact**, or a contact with **no name or no address** (a bare number the
@@ -5685,14 +5686,14 @@ and is dropped.
 
 ### Configuration
 
-Section `PosLookup` in `appsettings.json`: `BaseUrl`, `Interval`, `Lookback`,
-`RetryAfter`, `MaxPerRun`, and `Token`, which is **blank in git**. Production
+Section `PosLookup` in `appsettings.json`: `BaseUrl`, `Lookback`,
+`RetryAfter`, `MaxPerRun`, and `Token`, which is **blank in git**. How often
+it runs is on the settings screen (below). Production
 sets `POS_LOOKUP_TOKEN` in `.env` (runbook step 5, `.env.example`,
 `docker-compose.yml`). This machine has it in `dotnet user-secrets`, which
 only Development reads. **No token, no requests:** the worker logs "off" once
 and stops, and that is what keeps the test host from asking the real POS about
-made-up numbers. These are file settings, not supervisor settings. There is
-nothing on the settings screen for this yet.
+made-up numbers. These are file settings, not supervisor settings.
 
 ### First run on the dev database
 
@@ -5723,6 +5724,27 @@ a POS that is down stops the run and leaves the number due; the client sends
 Arabic included; 404 is "not a customer" and 401 throws; an extension or a
 foreign number is never sent. `ToNational` has 8 cases in the shared tests.
 372 server tests pass against `callcenter_test`, and 151 shared.
+
+### How often is the supervisor's setting
+
+Dia, later on 26 Sep: "can we set the retrieval time in settings?" Yes:
+`pos.lookup.interval_minutes` on the settings screen (S-47), **1 to 1440
+minutes, five by default**, seeded for new installations and blank-means-five
+on a database seeded before it. It replaces the `PosLookup:Interval` file
+setting, so there is one place to change it, not two.
+
+The worker now wakes every 30 seconds and asks `RunIfDueAsync`, which reads
+the setting and runs only when that long has passed since the last run began,
+the way the abandoned-call import does. So a new value takes effect within
+half a minute, without a restart. A run that failed counts as a run, so a POS
+that is down is asked once an interval, not every half minute. A value of zero
+edited into the table by hand is treated as five. The time of the last run is
+kept in memory: after a restart the first run is a minute after startup,
+whatever the interval.
+
+`PosLookupTests` gains one: a run two minutes after the last waits for the
+five-minute default, and one six minutes after runs. The seed tests list the
+new key and its default.
 
 ## 2026-09-26 — Abandoned calls from the PBX's own report (S-55, R-11, R-20)
 

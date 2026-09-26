@@ -179,7 +179,23 @@ public class PosLookupTests(CallCenterApiFactory factory)
         handler.Request.Should().BeNull();
     }
 
-    private async Task<PosCustomerSync.Result> RunAsync(FakePos pos, PosLookupLedger? ledger = null)
+    [DatabaseFact]
+    public async Task A_run_waits_until_the_supervisor_s_interval_has_passed()
+    {
+        // pos.lookup.interval_minutes is unset in the test database: five minutes.
+        var ledger = new PosLookupLedger { LastRunAt = DateTimeOffset.UtcNow.AddMinutes(-2) };
+
+        (await RunAsync(new FakePos(), ledger, ifDue: true)).Should().BeNull("two minutes is not five");
+
+        ledger.LastRunAt = DateTimeOffset.UtcNow.AddMinutes(-6);
+        (await RunAsync(new FakePos(), ledger, ifDue: true)).Should().NotBeNull();
+        ledger.LastRunAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    private async Task<PosCustomerSync.Result> RunAsync(FakePos pos, PosLookupLedger? ledger = null) =>
+        (await RunAsync(pos, ledger, ifDue: false))!.Value;
+
+    private async Task<PosCustomerSync.Result?> RunAsync(FakePos pos, PosLookupLedger? ledger, bool ifDue)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var services = scope.ServiceProvider;
@@ -189,11 +205,12 @@ public class PosLookupTests(CallCenterApiFactory factory)
             pos,
             ledger ?? new PosLookupLedger(),
             services.GetRequiredService<ContactCallLinker>(),
+            services.GetRequiredService<Features.Settings.SettingsService>(),
             Options.Create(new PosLookupOptions { Token = "test", MaxPerRun = 10_000 }),
             TimeProvider.System,
             NullLogger<PosCustomerSync>.Instance);
 
-        var result = await sync.RunOnceAsync();
+        var result = ifDue ? await sync.RunIfDueAsync() : await sync.RunOnceAsync();
 
         // Contacts have no test pattern, so the sweep is told about the ones made here.
         foreach (var number in pos.Known)

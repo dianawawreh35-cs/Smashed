@@ -20,8 +20,8 @@ public class PosLookupOptions
     /// <summary>Bearer token the POS issued for this server.</summary>
     public string Token { get; set; } = "";
 
-    /// <summary>How often the job looks for callers nobody has on file.</summary>
-    public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(5);
+    // How often it runs is not here: it is the supervisor's setting
+    // pos.lookup.interval_minutes (S-47), so it can change without a restart.
 
     /// <summary>How far back a call still counts as recent.</summary>
     public TimeSpan Lookback { get; set; } = TimeSpan.FromDays(2);

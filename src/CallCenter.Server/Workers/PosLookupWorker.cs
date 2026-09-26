@@ -5,12 +5,17 @@ namespace CallCenter.Server.Workers;
 
 /// <summary>
 /// Runs the POS customer lookup (A-67) every
-/// <see cref="PosLookupOptions.Interval"/>.
+/// <c>pos.lookup.interval_minutes</c>, five by default.
 /// </summary>
 /// <remarks>
 /// <b>Does nothing without a token.</b> It says so once at startup and stops,
 /// so a server that was never given one, and the test host, never make a
 /// request.
+///
+/// <b>It wakes often and usually does nothing.</b> Every <see cref="Tick"/> it
+/// asks <see cref="PosCustomerSync.RunIfDueAsync"/>, which reads the setting
+/// and runs only once the interval has passed. So a new interval on the
+/// settings screen takes effect within half a minute, with no restart.
 ///
 /// <b>It cannot take the server down.</b> As with the retention job, every run
 /// is wrapped: a failure is logged and the timer carries on. The database is
@@ -27,6 +32,9 @@ public class PosLookupWorker(
     /// the first sign-ins, soon enough that a restart does not leave a gap.
     /// </summary>
     public static readonly TimeSpan StartupDelay = TimeSpan.FromMinutes(1);
+
+    /// <summary>How often it checks whether a run is due.</summary>
+    public static readonly TimeSpan Tick = TimeSpan.FromSeconds(30);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -45,7 +53,7 @@ public class PosLookupWorker(
             return;
         }
 
-        using var timer = new PeriodicTimer(options.Value.Interval);
+        using var timer = new PeriodicTimer(Tick);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -70,7 +78,7 @@ public class PosLookupWorker(
         try
         {
             await using var scope = scopes.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<PosCustomerSync>().RunOnceAsync(ct);
+            await scope.ServiceProvider.GetRequiredService<PosCustomerSync>().RunIfDueAsync(ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

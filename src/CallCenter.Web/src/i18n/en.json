@@ -156,6 +156,10 @@
       "agent.call_log_days": {
         "label": "Agent call log window (days)",
         "hint": "How far back an agent can see their own calls. A week by default. Nothing is deleted - the contact history and your reports still show everything."
+      },
+      "pos.lookup.interval_minutes": {
+        "label": "POS customer lookup, every (minutes)",
+        "hint": "How often the server asks the POS about recent callers who are not in the contacts, and adds the ones it knows. 5 by default, 1 to 1440. Takes effect within half a minute."
       }
     },
     "pbx": {

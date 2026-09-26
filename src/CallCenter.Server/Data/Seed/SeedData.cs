@@ -483,6 +483,9 @@ public static class SeedData
         // supervisor's reports are unaffected.
         ("agent.call_log_days", "7"),
 
+        // How often the POS is asked about recent unknown callers (A-67).
+        ("pos.lookup.interval_minutes", "5"),
+
         // Idle logout, so a shared laptop does not leave the previous shift signed in (A-05).
         ("agent.idle_logout_minutes", "240"),
 

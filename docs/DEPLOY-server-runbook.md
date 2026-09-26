@@ -282,8 +282,7 @@ Either way, wait for lines like `Migrations applied` and `Now listening on: http
 **Work**
 ```bash
 docker compose exec api dotnet CallCenter.Server.dll seed \
-  --admin-user supervisor --admin-password 'TempPass!2026' \
-  --branches "Branch 1,Branch 2,Branch 3,Branch 4"
+  --admin-user supervisor --admin-password 'TempPass!2026'
 ```
 It prints what it created:
 ```
@@ -299,8 +298,14 @@ It prints what it created:
 ```
 The contacts are the slow part - about ten seconds; everything else is instant.
 Safe to run twice - anything already there is left alone, and it refuses to
-create a second supervisor once the users table has rows. `--branches` is
-optional (it defaults to Branch 1-4) and is ignored if branches already exist.
+create a second supervisor once the users table has rows.
+
+**Leave `--branches` out.** Without it the seed creates the four real branches
+(رافات، بطن الهوى، ايكون، نابلس), and the 228 delivery areas are matched to
+them by those names. Other names would leave every delivery area out, with a
+warning for each. Earlier copies of this step passed `"Branch 1,…,Branch 4"`.
+Rename a branch later in the supervisor app if needed. The areas hold its id,
+so they follow it.
 `dotnet CallCenter.Server.dll seed --help` lists every option.
 
 **Change the password immediately after logging in** - it was typed on the

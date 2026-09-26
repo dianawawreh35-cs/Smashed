@@ -6,8 +6,7 @@ namespace CallCenter.Server.Data.Seed;
 /// The <c>seed</c> command from step 7 of the deployment runbook:
 /// <code>
 /// docker compose exec api dotnet CallCenter.Server.dll seed \
-///   --admin-user supervisor --admin-password 'TempPass!2026' \
-///   --branches "Branch 1,Branch 2,Branch 3,Branch 4"
+///   --admin-user supervisor --admin-password 'TempPass!2026'
 /// </code>
 /// Run once at installation. It applies migrations first, so it also works
 /// against a database that has only just been created.
@@ -113,8 +112,10 @@ public static class SeedCommand
           --admin-user <login>        create the first supervisor with this login
           --admin-password <pass>     their password (required with --admin-user)
           --admin-name <name>         display name (defaults to the login)
-          --branches "A,B,C,D"        branch names (defaults to Branch 1-4;
-                                      ignored if branches already exist)
+          --branches "A,B,C,D"        branch names (defaults to the four real
+                                      branches, which the delivery areas are
+                                      matched to by name - leave it out on a
+                                      real install; ignored if branches exist)
           -h, --help                  show this
 
         The first supervisor is only created when the users table is empty.

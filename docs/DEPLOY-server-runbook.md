@@ -84,7 +84,7 @@ Also reserve `192.168.1.100` in the router's DHCP settings so it never gives tha
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo timedatectl set-timezone Asia/Hebron
-sudo apt install -y ufw curl unzip nano
+sudo apt install -y ufw curl unzip nano rsync      # rsync: backup.sh copies to the backup disk (step 9)
 
 # Remote administration over Tailscale (see below) - add this BEFORE enabling
 # the firewall if you are connected that way, or ufw cuts off your own session

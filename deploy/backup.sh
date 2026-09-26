@@ -5,6 +5,8 @@
 #
 #   - gzipped pg_dump of the callcenter database  -> backups/db-<date>.sql.gz
 #   - recordings mirrored to the second disk      -> /mnt/backup/recordings/
+#   - menu photographs mirrored to the second disk -> /mnt/backup/menu-images/
+#   - needs rsync (runbook step 1)
 #   - a copy of the dump on the second disk       -> /mnt/backup/
 #   - both locations pruned after 30 days
 #
@@ -23,6 +25,7 @@ cd /opt/callcenter
 
 docker compose exec -T db pg_dump -U callcenter callcenter | gzip > backups/db-$D.sql.gz
 rsync -a --delete data/recordings/ /mnt/backup/recordings/
+rsync -a --delete data/menu-images/ /mnt/backup/menu-images/
 cp backups/db-$D.sql.gz /mnt/backup/
 find backups -name 'db-*.sql.gz' -mtime +30 -delete
 find /mnt/backup -name 'db-*.sql.gz' -mtime +30 -delete

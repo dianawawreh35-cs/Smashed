@@ -259,8 +259,10 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
             audio.Writer.TryComplete();
         };
 
+        var heard = new SoundTally();
         rtp.OnRtpPacketReceived += (_, media, packet) =>
         {
+            heard.Packet(packet.Header.PayloadType, packet.Payload);
             if (media == SDPMediaTypesEnum.audio && Pcm(packet.Header.PayloadType, packet.Payload) is { } pcm)
             {
                 audio.Writer.TryWrite(pcm);
@@ -287,7 +289,11 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
 
             ct.ThrowIfCancellationRequested();
             var silence = SendSilence(rtp, CancellationToken.None);
-            return new ListenCall(agent, rtp, transport, silence, audio, hungUp.Task, logger);
+
+            logger.LogInformation("PBX listen: answered; the PBX sends its audio to {Destination}, codec {Codec}",
+                rtp.AudioDestinationEndPoint, rtp.AudioStream?.GetSendingFormat().Name());
+
+            return new ListenCall(agent, rtp, transport, silence, audio, hungUp.Task, heard, logger);
         }
         catch
         {
@@ -334,6 +340,49 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
         }
     }
 
+    /// <summary>
+    /// What came in on a listen-in, for the log when it ends: without it, "no
+    /// sound" cannot be told apart between the PBX sending nothing and the
+    /// browser not playing it (26 Sep, the first listen-in on the server).
+    /// </summary>
+    private sealed class SoundTally
+    {
+        private readonly Lock _gate = new();
+        private readonly SortedSet<int> _payloadTypes = [];
+        private int _packets;
+        private int _loud;
+        private int _loudest;
+
+        public void Packet(int payloadType, byte[] payload)
+        {
+            var level = PromptListener.Level(payloadType, payload);
+            lock (_gate)
+            {
+                _packets++;
+                _payloadTypes.Add(payloadType);
+                if (level is { } l)
+                {
+                    _loudest = Math.Max(_loudest, l);
+                    if (l >= PromptListener.LoudLevel)
+                    {
+                        _loud++;
+                    }
+                }
+            }
+        }
+
+        public override string ToString()
+        {
+            lock (_gate)
+            {
+                return _packets == 0
+                    ? "no audio at all reached the server"
+                    : $"{_packets} packets ({_packets / 50} s) of payload type {string.Join(",", _payloadTypes)}, "
+                      + $"{_loud} of them sound, loudest level {_loudest} (speech is in the thousands, silence 0)";
+            }
+        }
+    }
+
     private sealed class ListenCall(
         SIPUserAgent agent,
         RTPSession rtp,
@@ -341,6 +390,7 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
         IDisposable silence,
         Channel<byte[]> audio,
         Task hungUp,
+        SoundTally heard,
         ILogger logger) : IPbxListenCall
     {
         private int _closed;
@@ -362,7 +412,7 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
 
             // Long enough for the BYE to leave before the port closes under it.
             await Task.Delay(200);
-            logger.LogInformation("PBX listen: hung up");
+            logger.LogInformation("PBX listen: hung up; heard {Heard}", heard);
         }
     }
 

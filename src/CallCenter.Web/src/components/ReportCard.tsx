@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import { chartToPng } from '../lib/chartImage'
 import { downloadBlob, downloadCsv, toCsv } from '../lib/csv'
+import { printOnly } from '../lib/print'
 import type { CsvCell } from '../lib/csv'
 
 /**
@@ -113,6 +114,7 @@ export default function ReportCard<T>({
   children?: React.ReactNode
 }) {
   const { t, i18n } = useTranslation()
+  const section = useRef<HTMLElement>(null)
 
   function onExport() {
     if (!rows) return
@@ -128,7 +130,7 @@ export default function ReportCard<T>({
     : 0
 
   return (
-    <section className="card" aria-label={title}>
+    <section ref={section} className="card report-card" aria-label={title}>
       <div className="card-header">
         <div>
           <h3 className="font-semibold text-slate-100">{title}</h3>
@@ -138,6 +140,11 @@ export default function ReportCard<T>({
           {children}
           <button type="button" className="btn-ghost btn-sm" onClick={onExport} disabled={!rows || rows.length === 0}>
             {t('applicationReports.export')}
+          </button>
+          {/* This report alone, with the page's printed heading (lib/print). */}
+          <button type="button" className="btn-ghost btn-sm" onClick={() => section.current && printOnly(section.current)}
+            disabled={!rows || rows.length === 0}>
+            {t('callReports.print')}
           </button>
         </div>
       </div>
@@ -174,7 +181,8 @@ export default function ReportCard<T>({
                       {columns.map((c) => (
                         // Centred under its heading; only the figure itself is
                         // held left-to-right, so 1,587.74 reads the same in both.
-                        <td key={c.key} className={c.numeric ? 'tabular text-center' : undefined}
+                        <td key={c.key}
+                          className={[c.numeric ? 'tabular text-center' : '', c.heat ? 'heat-cell' : ''].join(' ').trim() || undefined}
                           style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax) : undefined}>
                           {c.numeric
                             ? <span dir="ltr">{c.format ? c.format(row) : number(c.value(row))}</span>
@@ -205,7 +213,7 @@ export default function ReportCard<T>({
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-400" aria-hidden="true">
                 <span>{t('callReports.fewer')}</span>
                 {[0.25, 0.5, 0.75, 1].map((f) => (
-                  <span key={f} className="inline-block h-3 w-6 rounded-sm" style={heatStyle(f, 1)} />
+                  <span key={f} className="heat-cell inline-block h-3 w-6 rounded-sm" style={heatStyle(f, 1)} />
                 ))}
                 <span>{t('callReports.more')}</span>
               </div>

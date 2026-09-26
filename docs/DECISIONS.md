@@ -5826,6 +5826,53 @@ caller every laptop refused is Blocked; bad settings are refused whole; an agent
 cannot read the settings. Web: the Abandoned tab and its Fetch button. 382
 server tests, 151 shared and 118 web pass.
 
+## 2026-09-26 — Reports print, and save as PDF, with their charts (S-05, S-06)
+
+Dia asked why a report's CSV has no chart. A CSV is text in rows and columns;
+it cannot hold a picture, from this app or any other. Of the three ways to put
+the table and the chart in one file — print to PDF, an `.xlsx` with the chart
+as a picture, an `.xlsx` with a live Excel chart — Dia chose **printing**:
+nothing new on the server, no library, and "Save as PDF" is the browser's own.
+CSV stays for the numbers and *Download image* for a chart on its own.
+
+**Two ways to print**, as Dia asked for both:
+
+- **Print** on each report card: that report alone.
+- **Print page** at the top of the dashboard, Application reports and Call
+  reports: every report on the page, or on Call reports' open tab.
+
+**What reaches the paper** is decided by one print stylesheet (`index.css`,
+`@media print`): no sidebar, header, filter bar, tabs or buttons; white paper,
+dark text; the charts keep their series colours and the heat table its blue.
+A printed heading (`ReportPrintHeading`) says what the report covers — the
+page, the tab, the period and each filter chosen, by name — and when it was
+printed, because on paper the filter bar is gone and a figure that does not
+say what it counts is not worth printing. It is hidden on screen and kept out
+of the accessibility tree there, where the page's own heading says the same.
+
+**Printing one report** marks it and the page for the length of the print
+(`lib/print.ts`), so the stylesheet hides the other reports, and the marks are
+removed on `afterprint`. Nothing is rendered twice and nothing is fetched.
+
+**Charts on paper.** A chart is drawn at the width it was measured for on
+screen; on paper it takes the page's width and scales (recharts draws a
+`viewBox`), and its legend, placed in pixels on screen, flows under it. A
+report that does not fit what is left of a page moves whole to the next one; a
+table longer than a page runs on with its heading row repeated. Lists print
+their first 200 rows, as on screen, with the same note that the CSV has all.
+
+**Found on the way.** The sign-in test failed once the dashboard had the printed
+heading, because the test browser loads no stylesheet and saw two headings
+called "Dashboard". Keeping the printed heading out of the accessibility tree
+fixed it, and was right anyway.
+
+**Tested.** Web: 1 new — one report printed alone is the only one marked while
+the browser prints and nothing is marked after; the page prints with nothing
+marked; the printed heading names the page and tab and, once a branch is
+chosen, "Branch: Nablus". 119 web tests pass; the build and lint pass. The
+paper itself cannot be tested here: checklist 1.9, "Print one report" and
+"Print page".
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

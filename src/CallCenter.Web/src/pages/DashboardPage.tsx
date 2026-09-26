@@ -5,7 +5,8 @@ import type { Count } from '../api/callReports'
 import type { TypeCount } from '../api/applicationReports'
 import { ReportChart, SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportChartSpec } from '../components/ReportCard'
-import { ReportFilterBar } from '../components/ReportFilters'
+import { PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import { printPage } from '../lib/print'
 import { useReportFilters } from '../lib/reportFilters'
 
 /** Today's figures come back every minute, so the page left open on a screen stays current. */
@@ -41,9 +42,13 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="page-title">{t('dashboard.heading')}</h2>
-        <p className="page-subtitle">{t('dashboard.intro')}</p>
+      <ReportPrintHeading title={t('dashboard.heading')} draft={draft} periodOnly />
+      <div className="no-print flex items-start justify-between gap-4">
+        <div>
+          <h2 className="page-title">{t('dashboard.heading')}</h2>
+          <p className="page-subtitle">{t('dashboard.intro')}</p>
+        </div>
+        <PrintPageButton onPrint={printPage} />
       </div>
 
       <section className="space-y-3" aria-label={t('dashboard.today')}>

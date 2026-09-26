@@ -303,6 +303,43 @@ describe('call reports page', () => {
     expect(sent.searchParams.get('to')).toBeTruthy()
   })
 
+  it('prints one report alone, or the whole tab, under a heading saying what it covers', async () => {
+    const seen: { one?: string; printing?: string }[] = []
+    const print = vi.fn(() => {
+      // What the print stylesheet sees while the browser prints.
+      seen.push({ one: document.body.dataset.printOne, printing: card('Calls per type').dataset.printing })
+    })
+    vi.stubGlobal('print', print)
+    vi.stubGlobal('fetch', server())
+    renderPage()
+    await within(card('Calls per type')).findByText('Order')
+
+    // One report: it alone is marked for the length of the print, then nothing is.
+    fireEvent.click(within(card('Calls per type')).getByRole('button', { name: 'Print' }))
+    expect(print).toHaveBeenCalledTimes(1)
+    expect(seen[0]).toEqual({ one: 'true', printing: 'true' })
+    expect(card('Communications').dataset.printing).toBeUndefined()
+    window.dispatchEvent(new Event('afterprint'))
+    expect(document.body.dataset.printOne).toBeUndefined()
+    expect(card('Calls per type').dataset.printing).toBeUndefined()
+
+    // The whole tab: printed as it stands, nothing marked.
+    fireEvent.click(screen.getByRole('button', { name: 'Print page' }))
+    expect(print).toHaveBeenCalledTimes(2)
+    expect(seen[1]).toEqual({ one: undefined, printing: undefined })
+
+    // The printed heading names the page, the tab, the period and each filter chosen.
+    const block = screen.getByTestId('print-heading')
+    expect(block).toHaveClass('print-only')
+    // Out of the accessibility tree on screen, where the page's own heading says the same.
+    expect(block).toHaveAttribute('aria-hidden', 'true')
+    expect(block.querySelector('h1')!.textContent).toBe('Call reports — Overview')
+    expect(block.textContent).toContain('all agents, branches, channels and types')
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Nablus' })).toBeInTheDocument())
+    fireEvent.change(screen.getByLabelText('Branch'), { target: { value: 'b2' } })
+    await waitFor(() => expect(block.textContent).toContain('Branch: Nablus'))
+  })
+
   it('reads in Arabic', async () => {
     await i18n.changeLanguage('ar')
     vi.stubGlobal('fetch', server())

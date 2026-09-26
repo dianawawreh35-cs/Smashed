@@ -19,7 +19,8 @@ import type {
 } from '../api/applicationReports'
 import ReportCard, { SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportColumn } from '../components/ReportCard'
-import { Grouping, ReportFilterBar } from '../components/ReportFilters'
+import { Grouping, PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import { printPage } from '../lib/print'
 import { useReportFilters } from '../lib/reportFilters'
 
 const ORDERS_GROUPINGS: OrdersGrouping[] = ['channel', 'branch', 'agent', 'day']
@@ -117,9 +118,13 @@ export default function ApplicationReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="page-title">{t('applicationReports.heading')}</h2>
-        <p className="page-subtitle">{t('applicationReports.intro')}</p>
+      <ReportPrintHeading title={t('applicationReports.heading')} draft={draft} />
+      <div className="no-print flex items-start justify-between gap-4">
+        <div>
+          <h2 className="page-title">{t('applicationReports.heading')}</h2>
+          <p className="page-subtitle">{t('applicationReports.intro')}</p>
+        </div>
+        <PrintPageButton onPrint={printPage} />
       </div>
 
       <ReportFilterBar draft={draft} set={set} choosePreset={choosePreset} />

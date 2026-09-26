@@ -207,3 +207,106 @@
     content: '';
   }
 }
+
+/* --- Printing a report (26 Sep) -------------------------------------------
+   What the browser prints, to paper or to "Save as PDF" (lib/print.ts). The
+   screen is dark; paper is white, so everything prints dark on white except
+   what carries meaning in its colour: the charts' series and the heat
+   table's shading. Nothing to operate is printed — the sidebar, the header,
+   the filter bar, the tabs, the buttons — and the printed heading
+   (ReportPrintHeading) says instead what the report covers. */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  aside,
+  header,
+  form,
+  button,
+  [role='tablist'],
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Dark on white. The heat cells keep their shade: it is the reading. */
+  body *:not(.heat-cell) {
+    background-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  body * {
+    color: #111 !important;
+    border-color: #d4d4d8 !important;
+  }
+
+  .heat-cell {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* One report printed alone: the others step aside for the print. */
+  body[data-print-one] .report-card:not([data-printing]),
+  body[data-print-one] main section:not(.report-card):not(.report-card *) {
+    display: none !important;
+  }
+
+  /* A report that does not fit what is left of a page moves to the next one
+     whole, rather than a chart splitting across two; one longer than a page
+     runs on, with its table's heading row repeated. */
+  .report-card {
+    break-inside: avoid-page;
+    margin-bottom: 10mm;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+
+  /* The chart was measured for the screen; on paper it takes the page's
+     width, and recharts' viewBox scales it rather than cropping it. The
+     legend, placed in pixels on screen, flows under the chart instead. */
+  [data-testid='report-chart'],
+  .recharts-wrapper {
+    width: 100% !important;
+    height: auto !important;
+    break-inside: avoid;
+  }
+
+  .recharts-surface {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .recharts-legend-wrapper {
+    position: static !important;
+    width: auto !important;
+  }
+
+  .recharts-text,
+  .recharts-cartesian-axis-tick-value {
+    fill: #333 !important;
+  }
+
+  .recharts-tooltip-wrapper {
+    display: none !important;
+  }
+}

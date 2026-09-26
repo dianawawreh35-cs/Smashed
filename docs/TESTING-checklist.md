@@ -324,6 +324,19 @@ range both have plenty; without it, choose a range from mid-September.
       background. Open it: the bars or lines are there, and a chart with two
       series has its legend drawn under it. *If the picture is blank or has
       no text:* tell me which chart and which browser.
+- [ ] **Print one report.** On any card, **Print**: the browser's print
+      preview shows **only that report**, on white, under a heading with the
+      page, the tab, the period and any filters you chose (by name), and when
+      it was printed. No sidebar, buttons or filter bar. The chart fits the
+      page width with its legend under it; the table follows. Choose *Save as
+      PDF* and open the file. Close the preview: the page is exactly as it
+      was. *If the preview shows every report, or the page stays blank after
+      closing:* tell me which browser.
+- [ ] **Print page.** **Print page** at the top of Call reports prints
+      **every report on the open tab**, one after another; a report that
+      does not fit what is left of a page moves whole to the next. Peak
+      hours keeps its blue shading on paper. Try it on the dashboard and on
+      Application reports too. Both languages: Arabic prints right-to-left.
 - [ ] **Calls page: Export all N (CSV).** Filter to a few days, press it:
       a file downloads with **every** matching call, not the 50 on the page
       (the row count is N). Headings are in the language you're reading in.

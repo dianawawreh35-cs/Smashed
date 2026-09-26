@@ -867,6 +867,10 @@
       "lastChecked": "Last checked {{when}}.",
       "notSetUp": "The PBX import is not set up. A supervisor can enter the PBX address and login in Settings.",
       "notYet": "Not called back"
-    }
+    },
+    "print": "Print",
+    "printPage": "Print page",
+    "printAll": "all agents, branches, channels and types",
+    "printedAt": "Printed {{at}}"
   }
 }

@@ -119,3 +119,68 @@ export function Grouping<T extends string>({
     </label>
   )
 }
+
+/**
+ * What a printed report covers, at the top of the page (26 Sep): the page, the
+ * tab, the period and every filter chosen, by name, and when it was printed.
+ * Hidden on screen, where the filter bar says the same; on paper the bar is
+ * gone, and a report that does not say what it covers is a number without a
+ * question. The names come from the same lists the bar uses, already fetched.
+ */
+export function ReportPrintHeading({
+  title, section, draft, periodOnly = false,
+}: {
+  title: string
+  /** The tab, on a page that has them. */
+  section?: string
+  draft: ReportDraft
+  periodOnly?: boolean
+}) {
+  const { t, i18n } = useTranslation()
+  const arabic = i18n.language.startsWith('ar')
+  const agents = useQuery({ queryKey: ['users'], queryFn: listUsers, enabled: !periodOnly && !!draft.agentId })
+  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches, enabled: !periodOnly && !!draft.branchId })
+  const channels = useQuery({ queryKey: ['channels', 'all'], queryFn: () => listChannels(true), enabled: !periodOnly && !!draft.channelId })
+  const types = useQuery({ queryKey: ['classification', 'types'], queryFn: listClassificationTypes, enabled: !periodOnly && !!draft.typeId })
+
+  const day = (value: string) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString(i18n.language) : '…')
+  const period = draft.from === draft.to ? day(draft.from) : `${day(draft.from)} – ${day(draft.to)}`
+
+  const chosen: [string, string | undefined][] = periodOnly ? [] : [
+    [t('calls.columns.agent'), draft.agentId && agents.data?.find((u) => u.id === draft.agentId)?.displayName],
+    [t('calls.columns.branch'), draft.branchId && branches.data?.find((b) => b.id === draft.branchId)?.name],
+    [t('applicationReports.columns.channel'), draft.channelId && channels.data?.find((c) => c.id === draft.channelId)?.name],
+    [t('calls.columns.type'), draft.typeId && (() => {
+      const type = types.data?.find((ty) => ty.id === draft.typeId)
+      return type && (arabic ? type.labelAr : type.labelEn)
+    })()],
+  ]
+  const filters = chosen
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`)
+
+  // aria-hidden: on screen it is hidden and the page's own heading says the
+  // same, and a second heading of the same name confuses a screen reader.
+  return (
+    <div className="print-only mb-4 border-b pb-3" aria-hidden="true" data-testid="print-heading">
+      <h1 className="text-xl font-semibold">{section ? `${title} — ${section}` : title}</h1>
+      <p className="text-sm">
+        {t('applicationReports.period')}: <span dir="ltr">{period}</span>
+        {filters.length > 0 ? ` · ${filters.join(' · ')}` : ` · ${t('callReports.printAll')}`}
+      </p>
+      <p className="text-xs">
+        {t('callReports.printedAt', { at: new Date().toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }) })}
+      </p>
+    </div>
+  )
+}
+
+/** Prints the page as it stands: every report on the open tab, under the printed heading. */
+export function PrintPageButton({ onPrint }: { onPrint: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <button type="button" className="btn-ghost btn-sm shrink-0" onClick={onPrint}>
+      {t('callReports.printPage')}
+    </button>
+  )
+}

@@ -58,7 +58,8 @@ import type {
 } from '../api/callReports'
 import ReportCard, { SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportColumn } from '../components/ReportCard'
-import { Grouping, ReportFilterBar } from '../components/ReportFilters'
+import { Grouping, PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import { printPage } from '../lib/print'
 import { localDate, useReportFilters } from '../lib/reportFilters'
 
 /** The groups the reports are shown in (Dia, 25 Sep): one page, one filter bar, a tab each. */
@@ -93,9 +94,14 @@ export default function CallReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="page-title">{t('callReports.heading')}</h2>
-        <p className="page-subtitle">{t('callReports.intro')}</p>
+      <ReportPrintHeading title={t('callReports.heading')} section={t(`callReports.tabs.${tab}`)} draft={draft} />
+      <div className="no-print flex items-start justify-between gap-4">
+        <div>
+          <h2 className="page-title">{t('callReports.heading')}</h2>
+          <p className="page-subtitle">{t('callReports.intro')}</p>
+        </div>
+        {/* Every report on the open tab (lib/print). */}
+        <PrintPageButton onPrint={printPage} />
       </div>
 
       <ReportFilterBar draft={draft} set={set} choosePreset={choosePreset} includePhone />
@@ -223,7 +229,8 @@ function Overview({ filters }: { filters: ReportFilters }) {
         <Grouping label={t('applicationReports.groupBy')} value={by} options={['day', 'week', 'month']} onChange={setBy} />
       </ReportCard>
 
-      <section className="card card-body" aria-label={t('callReports.sections.list.title')}>
+      {/* A link to the Calls page, which means nothing on paper. */}
+      <section className="no-print card card-body" aria-label={t('callReports.sections.list.title')}>
         <h3 className="font-semibold text-slate-100">{t('callReports.sections.list.title')}</h3>
         <p className="text-sm text-slate-400">
           {t('callReports.sections.list.hint')}{' '}

@@ -47,7 +47,7 @@ public class SchemaTests
         "follow_up_tasks",
         "delivery_areas",
         "menu_categories", "menu_items",
-        "pbx_events_raw", "agent_sessions", "audit_log", "outbox_sync",
+        "pbx_events_raw", "pbx_blacklist", "agent_sessions", "audit_log", "outbox_sync",
     ];
 
     [Fact]

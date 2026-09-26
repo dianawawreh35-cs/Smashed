@@ -5,6 +5,138 @@ chosen and why, so a later reader does not have to re-derive it.
 
 ---
 
+## 2026-09-26 — The dashboard opens and closes the queue, by *280 (S-60)
+
+Asked for by Dia, right after the blacklist: "the same for opening and
+closing the queue". The code is `*280`, one code both ways. By hand it speaks
+and hangs up, with no keys to press.
+
+**`*280` is a toggle, and the server remembers the state.** The PBX says
+"open" or "closed", but the server cannot tell the two announcements apart,
+and dialling a toggle without knowing the state could close the queue when
+the supervisor meant to open it. Asked whether to read the real state from
+the PBX (its Call Flow Control page, through the web login the import
+already has) or to remember it, Dia chose remembering. It lives in three
+settings, `pbx.queue.is_open`, `changed_at` and `changed_by`, outside the
+catalogue.
+
+**What that costs, and what covers it.** `*280` dialled from a desk phone is
+not seen, and the dashboard then shows the opposite state. So the card always
+has a quiet "correct it without calling the PBX" link. Until someone has said
+which state the queue is in, that is the only thing it offers, and the server
+refuses to switch (`unknown_state`). Pressing Open on an open queue makes no
+call, so a double click or two supervisors cannot undo each other. One switch
+at a time (`busy`). A call that fails leaves the display unchanged and says
+why: an answered call that went wrong may still have switched the queue, and
+the supervisor is the one who can check.
+
+**Switched while the supervisor waits, not in the background.** Unlike the
+blacklist there is nothing to catch up on, and the supervisor wants to see
+the result. The call is a few seconds: answer, announcement, hang-up.
+
+**One dialer and one extension for every feature code.** `SipBlacklistDialer`
+became `SipFeatureDialer`, with `BlacklistAsync` (*30/*31, keys and
+confirmation) and `ToggleAsync` (dial, hear it out, hang up) sharing one call
+routine. The extension moved from `pbx.blacklist.*` to `pbx.features.*`
+(`PbxFeatureLine`), because it is no longer the blacklist's alone. The dev
+database's two rows were renamed by hand. Nothing was deployed with the old
+keys. It is still entered on the PBX blacklist card, whose hint now says the
+queue uses it too.
+
+**It opens by itself at 07:00.** Asked for by Dia the same evening.
+`queue.auto_open_time` is an ordinary catalogue setting (`HH:mm`, blank is
+off), seeded as `07:00`. `QueueAutoOpenWorker` asks every 30 seconds, and it
+has its own timer because a blacklist pass can dial for minutes. The opening
+is `SwitchAsync(open: true)` with no user, so it gets the same refusals: no
+call from an unknown state, no call if the queue is already open. It is
+logged with a null user and shown on the card as "opened automatically".
+
+Three rules keep it from fighting people:
+- **It stands aside for a person.** If the queue was switched or corrected
+  after 07:00 today, the day is theirs. So a supervisor who closes it at
+  07:05 is not overruled, whether or not the server was running at 07:00.
+- **It is never more than an hour late.** A server that was off until the
+  afternoon does not open a queue the restaurant may have kept closed. The
+  card says the opening was missed.
+- **Only a call that was never answered is retried.** An answered `*280`
+  that then went wrong (no sound, say) may already have opened the queue, and
+  a second one would close it again. So `PbxFeatureException` now carries
+  `Answered`. A refused or unanswered call is retried every five minutes
+  within the hour; an answered one stops the day's opening, and the card says
+  why.
+
+Closing automatically was not asked for, and is not built.
+
+**Not verified on the real PBX,** like the blacklist: the announcement's
+length, and that answering `*280` is what switches the queue.
+
+---
+
+## 2026-09-26 — Blocked numbers go on the PBX's own blacklist, by *30 and *31 (S-46)
+
+Asked for by Dia: block and unblock numbers from the supervisor web app using
+Issabel's feature codes. `*30`, wait for the prompt, the number and `#`, wait,
+`1` to confirm. `*31` removes a number the same way. Dia tried it by hand
+first: a key pressed while the PBX is still talking is lost.
+
+**The server dials, from an extension of its own.** A browser cannot place a
+call, so the web app could not do it. The supervisor's Agent App could, but
+only while the supervisor was signed in on a laptop. The server's call is an
+outbound INVITE with the extension's digest login, like an agent's outgoing
+call. Nothing registers and nothing listens, so SRS 4.5 (no port opened
+towards the PBX) still holds. The server already runs with host networking
+for SIP and RTP. The provider has to create the extension. For a first test,
+any agent's extension works, because placing a call does not disturb that
+agent's registration.
+
+**Same button as the Blocked flag, not a screen of its own.** Dia chose this.
+Blocking a contact (S-45) is the only way to block, and the PBX follows it.
+So there is one decision, one reason, and one audit trail. The only new
+screen is a settings card: the extension, its password, how many numbers the
+PBX has, how many are waiting, and what failed and why.
+
+**A comparison, not a queue of instructions.** Every 20 seconds
+`PbxBlacklistSync` works out which numbers ought to be on the PBX (every
+number of every blocked contact that is not deleted or merged away) and
+compares them with `pbx_blacklist`, the numbers the PBX has been told about.
+It dials the difference, one call at a time, additions first. Nothing in the
+flag code had to change, and edits that queued instructions would miss are
+caught anyway: a number added to a blocked contact, a merge, a deletion. A
+failed call is still different on the next pass and is tried again after
+five minutes. A new extension or password, or the Try again button, makes
+every failed number due at once.
+
+**Only what the server added is removed.** A number someone blacklisted by
+hand in Issabel has no row, so the server never touches it.
+
+**Listening, not fixed delays.** The read-back is as long as the number, so
+a fixed wait would be either too short or slow every time. `PromptListener`
+decodes each G.711 packet, takes its mean absolute sample, and calls a prompt
+finished after two seconds under the threshold following some sound. Two
+seconds is longer than the gaps inside the read-back. No sound at all within
+ten seconds means the audio is not reaching the server. That gets a message
+saying so, rather than a silent failure. The server sends silence for the
+whole call, because across the VPN the PBX may only learn where to send its
+audio from the audio it receives. Keys go as RFC 2833 events; a test checks
+the offer carries `telephone-event`.
+
+**The number keyed in is the local form, `0599123456`.** A phone pad has no
+`+`, and the PBX's Calls Detail report shows callers that way. **Not yet
+confirmed:** Agents see callers as `+970…`, and Asterisk's blacklist compares
+the caller id exactly. If a call from a blacklisted number still gets
+through, the trunk's caller id form decides what must be keyed in. Extensions
+and foreign numbers are not sent at all.
+
+**Not verified on the real PBX.** The code has been tested with a fake dialer
+and synthetic audio only. What still needs a real call: the prompt timing,
+whether `*31` also asks for `1` (assumed, since Dia said "the same way"), and
+the caller id form above.
+
+Stars in the Agent App's Dial tab were made to work locally, uncommitted, so
+`*30` could be tried by hand. That change is separate from this feature.
+
+---
+
 ## 2026-09-26 — Internal calls from the Dial tab, and a call while one is on hold (A-23, A-24)
 
 Asked for by Dia: the Dial tab is also used for internal calls, and an agent

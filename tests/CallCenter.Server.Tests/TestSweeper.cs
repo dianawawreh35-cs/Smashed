@@ -122,6 +122,9 @@ public static class TestSweeper
              WHERE f.version >= 100000
                AND NOT f.is_current
                AND NOT EXISTS (SELECT 1 FROM classifications c WHERE c.form_version = f.version);
+            DELETE FROM pbx_blacklist
+             WHERE number IN (SELECT '0' || substr(p.normalised, 4) FROM contact_phones p
+                              WHERE p.contact_id IN (SELECT id FROM sweep_contacts) AND p.normalised LIKE '970%');
             DELETE FROM contact_phones WHERE contact_id IN (SELECT id FROM sweep_contacts);
             DELETE FROM contacts c
              WHERE c.id IN (SELECT id FROM sweep_contacts)

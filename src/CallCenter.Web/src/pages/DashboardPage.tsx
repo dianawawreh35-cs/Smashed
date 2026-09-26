@@ -6,6 +6,7 @@ import type { TypeCount } from '../api/applicationReports'
 import { ReportChart, SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportChartSpec } from '../components/ReportCard'
 import { PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import QueueSwitchCard from '../components/QueueSwitchCard'
 import { printPage } from '../lib/print'
 import { useReportFilters } from '../lib/reportFilters'
 
@@ -13,8 +14,8 @@ import { useReportFilters } from '../lib/reportFilters'
 const TODAY_REFRESH_MS = 60_000
 
 /**
- * The supervisor's home page (S-20): today's figures, then four charts for a
- * chosen period — communications per day, per type, per channel, per hour.
+ * The supervisor's home page (S-20): the queue switch (S-60), today's
+ * figures, then four charts for a chosen period — communications per day, per type, per channel, per hour.
  *
  * Calls and messages together, because the dashboard is the whole picture;
  * missed and unclassified are calls' own words and say so. **Today** is the
@@ -49,6 +50,11 @@ export default function DashboardPage() {
           <p className="page-subtitle">{t('dashboard.intro')}</p>
         </div>
         <PrintPageButton onPrint={printPage} />
+      </div>
+
+      {/* S-60: open or close the call queue. Not printed with the figures. */}
+      <div className="no-print">
+        <QueueSwitchCard />
       </div>
 
       <section className="space-y-3" aria-label={t('dashboard.today')}>

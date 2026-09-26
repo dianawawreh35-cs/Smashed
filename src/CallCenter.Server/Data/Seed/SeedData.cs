@@ -505,6 +505,11 @@ public static class SeedData
         // whose other party is on this list is internal: still recorded, but
         // left out of the customer-facing reports. Comma separated.
         ("reports.internal_numbers", ""),
+
+        // The queue opens by itself at this time every day (S-60). Asked for by
+        // Dia on 26 Sep 2026. It does nothing until the server's PBX extension
+        // is set up and a supervisor has said whether the queue is open.
+        ("queue.auto_open_time", "07:00"),
     ];
 
     /// <summary>The role the first account is created with.</summary>

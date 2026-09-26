@@ -107,6 +107,7 @@ public class SeedDataTests
             "reports.internal_numbers",
             "agent.call_log_days",
             "pos.lookup.interval_minutes",
+            "queue.auto_open_time",
         ]);
     }
 
@@ -117,6 +118,7 @@ public class SeedDataTests
     [InlineData("sla.answer_seconds", "20")]         // R-21
     [InlineData("agent.call_log_days", "7")]         // A-50
     [InlineData("pos.lookup.interval_minutes", "5")] // A-67
+    [InlineData("queue.auto_open_time", "07:00")]    // S-60
     public void Setting_defaults_match_the_schema(string key, string expected)
     {
         SeedData.Settings.Single(s => s.Key == key).Value.Should().Be(expected);

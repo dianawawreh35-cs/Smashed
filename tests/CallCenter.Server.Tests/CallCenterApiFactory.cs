@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CallCenter.Server.Data;
 using CallCenter.Server.Features.Auth;
+using CallCenter.Server.Workers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -146,6 +147,12 @@ public class CallCenterApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
             {
                 services.RemoveAll<AccountTokenCheck>();
                 services.AddScoped<AccountTokenCheck, TokensForMadeUpAccounts>();
+
+                // The PBX blacklist job and the daily queue opening would place
+                // real calls the moment a test stores an extension. The tests
+                // run them themselves, with a dialer that only takes notes.
+                services.Remove(services.Single(d => d.ImplementationType == typeof(PbxBlacklistWorker)));
+                services.Remove(services.Single(d => d.ImplementationType == typeof(QueueAutoOpenWorker)));
             });
     }
 

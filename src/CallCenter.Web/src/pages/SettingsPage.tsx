@@ -6,10 +6,12 @@ import { listSettings, settingProblems, updateSettings } from '../api/settings'
 import type { Setting } from '../api/settings'
 import AbandonedImportCard from '../components/AbandonedImportCard'
 import ChannelsCard from '../components/ChannelsCard'
+import PbxBlacklistCard from '../components/PbxBlacklistCard'
 
 /**
  * Settings: the system values (S-47), the PBX login the abandoned-call import
- * uses (S-55), and the channel list (S-41), which is a setting in the same
+ * uses (S-55), the extension the PBX blacklist is dialled from (S-46), and the
+ * channel list (S-41), which is a setting in the same
  * sense — changed rarely, by the supervisor, read by every agent's app.
  */
 export default function SettingsPage() {
@@ -17,6 +19,7 @@ export default function SettingsPage() {
     <div className="max-w-3xl space-y-8">
       <SystemSettings />
       <AbandonedImportCard />
+      <PbxBlacklistCard />
       <ChannelsCard />
     </div>
   )

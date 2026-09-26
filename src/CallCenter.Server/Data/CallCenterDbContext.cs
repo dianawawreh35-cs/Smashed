@@ -50,6 +50,7 @@ public partial class CallCenterDbContext(DbContextOptions<CallCenterDbContext> o
 
     // Plumbing and audit
     public DbSet<PbxEventRaw> PbxEventsRaw => Set<PbxEventRaw>();
+    public DbSet<PbxBlacklistEntry> PbxBlacklist => Set<PbxBlacklistEntry>();
     public DbSet<AgentSession> AgentSessions => Set<AgentSession>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<OutboxSync> OutboxSync => Set<OutboxSync>();

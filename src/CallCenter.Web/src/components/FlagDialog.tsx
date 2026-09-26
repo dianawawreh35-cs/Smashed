@@ -119,6 +119,8 @@ export default function FlagDialog({
             </label>
           ))}
         </div>
+        {/* S-46: the PBX follows the flag by itself; say so, since nothing else on this screen will. */}
+        {choice === 'blocked' && <p className="field-hint">{t('flags.blockedPbxHint')}</p>}
       </fieldset>
 
       {/* Hidden when removing: there is nothing to give a reason for. */}

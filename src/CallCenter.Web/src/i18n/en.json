@@ -69,6 +69,30 @@
       "perHour": "Per hour of the day"
     }
   },
+  "queue": {
+    "heading": "Call queue",
+    "isOpen": "Open",
+    "isClosed": "Closed",
+    "unknown": "State not known",
+    "open": "Open the queue",
+    "close": "Close the queue",
+    "switching": "Calling the PBX…",
+    "changed": "Last changed {{when}} by {{who}}.",
+    "changedAutomatically": "Opened automatically {{when}}.",
+    "autoOpen": "Opens by itself every day at {{time}}. Change the time in Settings.",
+    "autoOpenOff": "No daily opening time is set. Set one in Settings.",
+    "notConfigured": "The server's PBX extension is not set up. Enter it on the PBX blacklist card in Settings.",
+    "whichNow": "Is the queue open or closed right now?",
+    "itIsOpen": "It is open",
+    "itIsClosed": "It is closed",
+    "correct": "The screen is wrong? Correct it without calling the PBX",
+    "errors": {
+      "not_configured": "The server's PBX extension is not set up. Enter it on the PBX blacklist card in Settings.",
+      "unknown_state": "Say whether the queue is open or closed right now first: the PBX code switches it either way.",
+      "busy": "Someone else is switching the queue right now. Try again in a moment.",
+      "pbx_failed": "The PBX call did not work: {{error}} Check the queue on the PBX and correct the screen if it changed."
+    }
+  },
   "common": {
     "notConnected": "Not connected",
     "connected": "Connected",
@@ -160,6 +184,10 @@
       "pos.lookup.interval_minutes": {
         "label": "POS customer lookup, every (minutes)",
         "hint": "How often the server asks the POS about recent callers who are not in the contacts, and adds the ones it knows. 5 by default, 1 to 1440. Takes effect within half a minute."
+      },
+      "queue.auto_open_time": {
+        "label": "Queue opens daily at",
+        "hint": "The server opens the call queue by itself at this time every day, 24-hour, e.g. 07:00. Blank turns it off. Skipped on a day someone has already switched the queue after this time, and never more than an hour late."
       }
     },
     "pbx": {
@@ -183,6 +211,21 @@
       "lastFailed": "Last check {{when}} failed: {{error}}",
       "lastSuccess": "Last successful check: {{when}}.",
       "result": "{{from}} to {{to}}: {{calls}} calls, {{abandoned}} abandoned, {{added}} new."
+    },
+    "blacklist": {
+      "heading": "PBX blacklist",
+      "intro": "When you block a contact, the server also puts their numbers on the PBX's own blacklist, so the call is refused before it reaches the queue. It dials *30 from an extension of its own, waits for each prompt to finish, keys in the number and # and then 1 to confirm; removing a block dials *31 the same way. Numbers added to the PBX by hand are never removed.",
+      "extension": "Server's extension",
+      "extensionHint": "An extension on the PBX for the server alone, from the PBX provider. Also used to open and close the queue from the dashboard. Leave blank to turn both off.",
+      "secret": "Extension password",
+      "save": "Save blacklist settings",
+      "saved": "Blacklist settings saved.",
+      "retry": "Try failed numbers again",
+      "off": "Not set up: blocked numbers are only refused by the Agent Apps. Needs the extension, its password and the PBX address in the system settings.",
+      "counts": "{{onPbx}} numbers on the PBX blacklist, {{waiting}} waiting.",
+      "lastSuccess": "Last change {{when}}.",
+      "failedAdd": "could not be added ({{when}}, {{attempts}} tries): {{error}}",
+      "failedRemove": "could not be removed ({{when}}, {{attempts}} tries): {{error}}"
     }
   },
   "contacts": {
@@ -237,6 +280,7 @@
     "flag": "Flag",
     "vip": "VIP",
     "blocked": "Blocked",
+    "blockedPbxHint": "Also added to the PBX's own blacklist within a minute or so, if that is set up in Settings.",
     "none": "Remove the flag",
     "reason": "Reason",
     "reasonHint": "Why. Shown on the list, and kept in the log after the flag is removed.",

@@ -69,6 +69,10 @@ public static class SettingsCatalog
         // A-67: how often the server asks the POS about recent unknown
         // callers. Five minutes by default; up to a day. Blank means the default.
         new(Pos.PosCustomerSync.IntervalMinutesKey, SettingKinds.Integer, null, IntegerBetween(1, 1440)),
+
+        // S-60: the queue opens by itself at this time every day, HH:mm, 24-hour.
+        // Blank turns it off.
+        new(Pbx.PbxQueueSwitch.AutoOpenTimeKey, SettingKinds.Text, null, ValidateTimeOfDay),
     ];
 
     private static readonly Dictionary<string, Definition> ByKey =
@@ -97,6 +101,14 @@ public static class SettingsCatalog
             ? null
             : $"must be numbers separated by commas; check {string.Join(", ", bad)}";
     }
+
+    /// <summary>A time of day as <c>HH:mm</c>, 24-hour, or blank.</summary>
+    private static string? ValidateTimeOfDay(string value) =>
+        string.IsNullOrWhiteSpace(value)
+        || TimeOnly.TryParseExact(value.Trim(), "HH:mm", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out _)
+            ? null
+            : "must be a time such as 07:00 (24-hour), or blank";
 
     /// <summary>
     /// For a <see cref="SettingKinds.Boolean"/> setting.

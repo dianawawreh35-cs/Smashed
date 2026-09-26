@@ -105,6 +105,21 @@ try
     builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.AbandonedImportGate>();
     builder.Services.AddScoped<CallCenter.Server.Features.Pbx.AbandonedCallImport>();
     builder.Services.AddHostedService<CallCenter.Server.Workers.AbandonedCallImportWorker>();
+
+    // S-46 and S-60: feature codes dialled from the server's own extension.
+    // The PBX's blacklist follows the Blocked flag (*30 / *31), and the
+    // supervisor opens and closes the queue (*280). Off until that extension is
+    // entered on the settings screen.
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.IPbxFeatureDialer,
+        CallCenter.Server.Features.Pbx.SipFeatureDialer>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Pbx.PbxFeatureLine>();
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.PbxBlacklistGate>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Pbx.PbxBlacklistSync>();
+    builder.Services.AddHostedService<CallCenter.Server.Workers.PbxBlacklistWorker>();
+    builder.Services.AddSingleton<CallCenter.Server.Features.Pbx.PbxQueueGate>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Pbx.PbxQueueSwitch>();
+    builder.Services.AddHostedService<CallCenter.Server.Workers.QueueAutoOpenWorker>();
+
     builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();
     builder.Services.AddOptions<MenuImageOptions>()

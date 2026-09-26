@@ -164,6 +164,16 @@ public class PbxListenService(
         return (new Started(session, call, agent.Extension, at), null, null);
     }
 
+    /// <summary>
+    /// Whether the call being listened to is over, as the PBX watch says (S-61).
+    /// Needed because <c>*222</c> does not hang up when that call does: the
+    /// PBX's spy stays on the line waiting for the extension's next call
+    /// (found on the server, 26 Sep). Free or offline is over; not known is
+    /// not, since the watch may simply be down.
+    /// </summary>
+    public bool CallIsOver(string extension) =>
+        watch.IsLive && watch.Get(extension).State is PhoneStates.Free or PhoneStates.Offline;
+
     /// <summary>Hangs up and records how long it lasted. Safe to call whatever ended it.</summary>
     public async Task EndAsync(Started started, string why)
     {

@@ -44,8 +44,13 @@ public class PbxAgentsController(PbxListenService listen, ListenSessions session
         }
 
         var why = "stopped";
-        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct, started!.Session.Stop.Token);
+        using var callOver = new CancellationTokenSource();
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct, started!.Session.Stop.Token, callOver.Token);
         limit.CancelAfter(PbxListenService.MaxListen);
+
+        // *222 stays on the line after the call it listens to has ended, so
+        // the end of the call is taken from the PBX watch instead.
+        _ = WatchForCallEndAsync(started.Extension, callOver, limit.Token);
 
         try
         {
@@ -89,14 +94,50 @@ public class PbxAgentsController(PbxListenService listen, ListenSessions session
         {
             why = ct.IsCancellationRequested ? "page_closed"
                 : started.Session.Stop.IsCancellationRequested ? "stopped"
+                : callOver.IsCancellationRequested ? "call_ended"
                 : "time_limit";
         }
         finally
         {
+            // Also stops the check for the end of the call.
+            await limit.CancelAsync();
             await listen.EndAsync(started, why);
         }
 
         return new EmptyResult();
+    }
+
+    /// <summary>How often the PBX watch is asked whether the call is over.</summary>
+    public static readonly TimeSpan CallEndCheck = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Ends the listen-in once the call has been over for two checks running,
+    /// so one stray report between a hold and a resume does not cut it off.
+    /// </summary>
+    private async Task WatchForCallEndAsync(string extension, CancellationTokenSource callOver, CancellationToken running)
+    {
+        var overFor = 0;
+        try
+        {
+            while (!running.IsCancellationRequested)
+            {
+                await Task.Delay(CallEndCheck, running);
+                overFor = listen.CallIsOver(extension) ? overFor + 1 : 0;
+                if (overFor >= 2)
+                {
+                    await callOver.CancelAsync();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Ended some other way.
+        }
+        catch (ObjectDisposedException)
+        {
+            // The listen-in finished and its token went with it.
+        }
     }
 
     /// <summary>Ends a listen-in this supervisor started. The browser also stops reading, which ends it too.</summary>

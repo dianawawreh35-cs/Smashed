@@ -173,6 +173,7 @@ before there is a machine to test against.
 | `v0.2.2` | 2026-09-26 | The Smashed logo as the supervisor app's browser-tab icon, and as the Agent App's icon (the Agent App is built separately, see below). |
 | `v0.3.0` | 2026-09-26 | The PBX's blacklist follows the Blocked flag (S-46) and the dashboard opens and closes the queue (S-60). Each agent's phone as the PBX sees it, offline, free, ringing or in a call, on the Users page and the dashboard (S-61), and listening in on a call with `*222` (S-62). Agents online counts only apps heard from lately; the dashboard counts a call passed between agents once. One migration (`agent_sessions.last_seen_at`). The Agent App is unchanged. |
 | `v0.3.1` | 2026-09-26 | Log lines only, to find why the first listen-in on the server was silent: where the PBX sends a listen-in's audio, and how much sound arrived. The PBX watch also says when it is off because the server's extension is not set up. |
+| `v0.3.2` | 2026-09-27 | A listen-in ends by itself when the call does. The PBX's `*222` stays on the line after the call it listens to, so the server now ends it once the PBX watch shows the agent free or offline. |
 
 ---
 

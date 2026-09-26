@@ -6237,13 +6237,25 @@ Asterisk 11, chan_sip), 26 Sep:**
 **Seen running on the dev server, 26 Sep 22:34:** subscribed as 2011, "2001 is
 now Free" within a second, the demo extensions refused with 404 as expected.
 
-**Not yet seen:** a state change through the server (only through the probe),
-ringing (`early`), and listening at all: `*222` has never been dialled from
-the server's extension, and no sound has yet gone from the PBX to a browser.
-**Nor from inside Docker** on the production server: there the PBX's NOTIFYs
-and the listen-in's sound have to find their way back in to the container. The
-one-minute renewal should keep that path open. `tools/presence-probe` can be
-run there first.
+**On the production server, 26–27 Sep** (v0.3.0 to v0.3.2):
+
+- The watch did nothing until the server's extension was entered in that
+  server's Settings: it had only ever been set on the dev database. v0.3.1
+  logs a line when that is the reason. Once set, all four agents (2001, 2008,
+  2009, 2010) were reported at once. The API runs with host networking, so
+  there is no Docker NAT between it and the PBX.
+- The first listen-in connected (`*2222001` answered, 49 s, Stop hung up) but
+  was silent. v0.3.1 logs what audio arrived; with it the sound was heard.
+  Why the first try was silent was not found: v0.3.1 changed only the log.
+- **`*222` does not hang up when the call it listens to ends.** The PBX's spy
+  stays on the line, waiting for the extension's next call, so the listen-in
+  ran on until the page was refreshed. v0.3.2 ends it from the watch: once the
+  agent's phone has read Free or Offline for two checks a second apart, the
+  server hangs up, and the bar says the call has ended (audit `why` =
+  `call_ended`). If the watch is down, only Stop, closing the page or the hour
+  ends it.
+
+**Not yet seen:** ringing (`early`) on the Users page.
 
 **Tested:** `PbxNotifyTests` (the bodies the PBX sent), `ExtensionWatchTests`
 (the states, the clock, going stale), `PbxAgentsTests` against

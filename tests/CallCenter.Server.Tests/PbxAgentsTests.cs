@@ -332,6 +332,48 @@ public class PbxAgentsTests(CallCenterApiFactory factory)
         }
     }
 
+    [DatabaseFact]
+    public async Task The_listen_in_ends_when_the_call_does_although_222_stays_on_the_line()
+    {
+        // As on the server, 26 Sep: the PBX's spy never hangs up by itself.
+        var listener = new PlayingListener(packets: 5, endAfter: false);
+        await using var host = HostWith(listener);
+        var (supervisor, login) = await SignInAsync(host, await data.CreateUserAsync(UserRoles.Supervisor));
+        var agent = await data.CreateUserAsync();
+        var watch = host.Services.GetRequiredService<ExtensionWatch>();
+
+        try
+        {
+            await SetLineAsync(supervisor);
+            watch.Heard();
+            watch.Presence(agent.Extension!, connected: true);
+            watch.Dialog(agent.Extension!, DialogState.InCall);
+
+            using var response = await supervisor.GetAsync(
+                $"/api/pbx/agents/{agent.Id}/listen", HttpCompletionOption.ResponseHeadersRead);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // The agent hangs up.
+            watch.Dialog(agent.Extension!, DialogState.Free);
+
+            var read = response.Content.ReadAsByteArrayAsync();
+            (await Task.WhenAny(read, Task.Delay(TimeSpan.FromSeconds(10)))).Should().BeSameAs(read,
+                "the server ends the listen-in within a few seconds of the call ending");
+
+            await WaitForAsync(() => listener.HungUp);
+            var why = await data.QueryAsync(db => db.AuditLog
+                .Where(a => a.UserId == login.User.Id && a.Entity == "listen" && a.Action == "stop")
+                .Select(a => a.After!.RootElement.GetProperty("why").GetString())
+                .SingleAsync());
+            why.Should().Be("call_ended");
+        }
+        finally
+        {
+            watch.Failing(ExtensionWatch.Problems.NotStarted);
+            await CleanUpAsync();
+        }
+    }
+
     // ---- helpers ----------------------------------------------------------------
 
     /// <summary>A host like the real-accounts one, listening through <paramref name="listener"/>.</summary>

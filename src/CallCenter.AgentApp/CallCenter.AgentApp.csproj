@@ -17,8 +17,9 @@
     <SelfContained>false</SelfContained>
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- <ApplicationIcon>Assets\app.ico</ApplicationIcon> -->
-    <!-- placeholder: drop app.ico into Assets\ and uncomment the line above -->
+    <!-- The Smashed logo, made by tools/icons/make_icons.py. This one is the
+         .exe's own icon: Explorer, the desktop shortcut, the installer. -->
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,6 +44,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CallCenter.Shared\CallCenter.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The same icon again for the windows' title bars and taskbar buttons.
+         A window left without one borrows the icon of the process, and in
+         development that process is dotnet.exe, so it showed .NET's. -->
+    <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
   <ItemGroup>

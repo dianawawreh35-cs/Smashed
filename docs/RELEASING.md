@@ -168,6 +168,9 @@ before there is a machine to test against.
 | Version | Date | Contents |
 | --- | --- | --- |
 | `v0.1.0` | 2026-09-14 | Scaffold — structure, config and placeholder code. No business features. Published to verify the pipeline. |
+| `v0.2.0` | 2026-09-26 | **Never published.** The release job had no database, the database-backed tests hung, and the run was cancelled. Use `v0.2.1`. |
+| `v0.2.1` | 2026-09-26 | The first version for the server: everything built to date, including calls, contacts, classification, the reports with printing, the POS contact lookup and the abandoned calls from the PBX. The release job now runs the tests against Postgres, as CI does. |
+| `v0.2.2` | 2026-09-26 | The Smashed logo as the supervisor app's browser-tab icon, and as the Agent App's icon (the Agent App is built separately, see below). |
 
 ---
 

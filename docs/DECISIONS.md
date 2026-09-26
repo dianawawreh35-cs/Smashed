@@ -5928,6 +5928,35 @@ Settled with Dia while installing the server:
   have stopped the install before pulling anything. The runbook now says
   `--no-backup`, for the first install only.
 
+## 2026-09-26 — The apps' icon is the Smashed logo
+
+Dia supplied the logo, a black circle with SMASHED in white across a yellow
+burger outline, and asked for it as the Agent App's icon and on the supervisor
+app's browser tab. It is at `tools/icons/smashed-logo.png`, and
+`tools/icons/make_icons.py` makes every icon from it. The outputs are
+committed, so nothing runs at build time. Rerun it if the logo changes.
+
+**Three pictures, chosen by size**, because the word is a smudge below 64 px:
+
+- **64 px and up:** the logo as it is. This is what the desktop shortcut and
+  Alt+Tab usually show.
+- **32 to 48 px:** the logo's own burger, with its halves closed up where the
+  word ran through them, on the black circle with a yellow rim.
+- **16 to 24 px:** the same burger drawn solid (bun, patty, bottom bun). The
+  first attempt thickened the outlines instead, and at those sizes the layers
+  ran together into a block that looked like a padlock.
+
+**Where it is used:** `Assets/app.ico` is the Agent App's `ApplicationIcon`, and
+it is also set as `Icon` on both windows (`MainWindow`, `CallPopupWindow`). A
+window with no icon of its own borrows the process's, and in development the
+process is `dotnet.exe`, which showed .NET's. The web app has `favicon.ico`
+(16/32/48) and `apple-touch-icon.png` (180) in `public/`, linked from
+`index.html`. The server serves them itself, so they work with no internet.
+
+Not changed: the web app's sidebar still shows the letter "S" on the brand
+blue, and the brand blue (#4F8CFF) is still the accent in both apps, which the
+client chose on 20 Sep. The logo's black and yellow are only in the icon.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

@@ -43,8 +43,10 @@ gzip -t "$PARTIAL"
 
 # pg_dump's last lines say it finished. A dump missing them was cut off, even
 # if the gzip around it is whole. grep -c, not -q, so it reads to the end and
-# the pipe is not broken under pipefail.
-zcat "$PARTIAL" | tail -n 5 | grep -c "PostgreSQL database dump complete" > /dev/null
+# the pipe is not broken under pipefail. The last 20 lines, not fewer: since
+# PostgreSQL 16.10 an "unrestrict" line follows the "complete" line, which on
+# the server on 27 Sep 2026 was already the 5th from the end.
+zcat "$PARTIAL" | tail -n 20 | grep -c "PostgreSQL database dump complete" > /dev/null
 
 mv "$PARTIAL" "$DUMP"
 

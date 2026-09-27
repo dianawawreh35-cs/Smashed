@@ -483,6 +483,23 @@ server (not `npm run dev`).
       *If it keeps saying the password is wrong however many times:* the
       server's limit is not in yet, or it answers something other than 429.
 
+**Changing your own password (needs today's server).** Signed in as a
+supervisor, on **Users**, press **Reset password** on your **own** row.
+
+- [ ] **Two boxes, not one.** Your own row shows **Your current password** /
+      **كلمة المرور الحالية** above **New password**, and the hint says you
+      will be signed out. **Save** stays greyed out until both are filled.
+      Another person's row shows only **New password**, as before.
+      **Screenshot your own row's form in both languages.**
+- [ ] **A wrong current password.** Type a wrong one and a new one, Save:
+      a red line says **Your current password is not correct.** /
+      **كلمة المرور الحالية غير صحيحة.**, and your password has not changed.
+- [ ] **The right one.** Save with your real current password: you are
+      signed out, and you sign in with the **new** password; the old one is
+      refused.
+      *If the save is refused with "type your current one as well" although
+      you did:* the web app and the server disagree about the field. Tell me.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.

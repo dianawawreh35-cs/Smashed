@@ -7075,6 +7075,21 @@ source maps are deleted from the server image (checked: none left in
    blacklist card, to confirm the server's extension (runbook 8.3) still
    works; `curl http://localhost:5000/health/ready` answers `Healthy`.
 
+## 2026-09-27 — The web app asks for your current password (S-42)
+
+The web half of part 2's rule, asked for by Dia the same day. On the Users
+screen, **Reset password** on the supervisor's own row now has a second box,
+*Your current password*, and Save waits for both. The hint says what follows:
+the server refuses tokens issued before a password change (N-05), so the
+supervisor is signed out and signs in with the new one. Anybody else's row is
+unchanged, one box. The two refusals, `current_password_required` and
+`current_password_wrong`, have messages in both languages.
+
+The page knows whose row is whose from the signed-in account (`useAuth`), so
+the tests' shared render helper (`test/http.tsx`) now renders signed in as a
+supervisor, as every real screen is. Three new tests on the Users page.
+Checklist 1.11 has the steps to see it.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -7104,7 +7119,6 @@ running**.
 | **Release the 27 Sep fixes and put them on the server** | review F-01 to F-14 and most M-items | a tag, then `update.sh` with the steps in the 27 Sep server entries: new `deploy/` files, one `docker compose up -d`, the backup cron line |
 | **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | the release above, for anything that needs the new server |
 | **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
-| The web app's Users screen asks for the **current password** when a supervisor changes their own: the server has required it since 27 Sep (`currentPassword`, answers `current_password_required` / `current_password_wrong`), so until then a supervisor cannot change their own password in the web app | N-05, S-42 | nothing: the web half only |
 | The report cards' own CSV export (`src/lib/csv.ts`) neutralises formula cells and writes numbers as `="0599…"`, as the server's call-search export has since 27 Sep | R-02, S-05 | nothing: the web half only |
 | **The web app's sign-out ends its token**, as the Agent App's has since 27 Sep (M-S01) | N-05 | a session row for web sign-ins, which changes what the dashboard's *agents online* counts. Then decide whether 12 hours is still right for the web token |
 | The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet |

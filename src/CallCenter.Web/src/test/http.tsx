@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthContext } from '../auth/context'
+import type { AuthState } from '../auth/context'
 
 /** Stand-ins for the server, for tests that stub `fetch`. */
 
@@ -31,12 +33,26 @@ export function routes(table: [string | RegExp, (url: string, init?: RequestInit
   }
 }
 
-/** Renders with a fresh query cache that does not retry, inside a router. */
+/**
+ * A supervisor signed in, as on every real screen. The Users page asks who it
+ * is, since changing your own password needs the current one (27 Sep 2026).
+ */
+export const SIGNED_IN: AuthState = {
+  user: { id: 'supervisor-1', login: 'supervisor', displayName: 'Supervisor', role: 'Supervisor' },
+  isLoading: false,
+  signIn: async () => {},
+  signOut: async () => {},
+  signedOutByServer: false,
+}
+
+/** Renders with a fresh query cache that does not retry, inside a router, signed in. */
 export function renderWithClient(ui: ReactNode, path = '/') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      <AuthContext.Provider value={SIGNED_IN}>
+        <MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>
+      </AuthContext.Provider>
     </QueryClientProvider>,
   )
   return { ...result, queryClient }

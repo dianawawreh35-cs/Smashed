@@ -143,14 +143,18 @@
       "cannot_disable_self": "You cannot disable your own account.",
       "invalid_request": "The change could not be applied. Check the fields.",
       "server_unreachable": "The server could not be reached.",
-      "server_error": "The server reported an error. Please try again."
+      "server_error": "The server reported an error. Please try again.",
+      "current_password_required": "To change your own password, type your current one as well.",
+      "current_password_wrong": "Your current password is not correct."
     },
     "extension": "Extension",
     "setExtension": "Set extension",
     "noExtension": "Not set",
     "secret": "SIP password",
     "extensionHint": "One extension per agent, used for every call. Internal calls are told apart by the internal numbers list in Settings.",
-    "failed": "The users could not be loaded."
+    "failed": "The users could not be loaded.",
+    "currentPassword": "Your current password",
+    "ownPasswordHint": "At least 8 characters. You will be signed out, and sign in again with the new password."
   },
   "phones": {
     "phone": "Phone",

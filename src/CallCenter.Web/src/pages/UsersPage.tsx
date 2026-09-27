@@ -14,6 +14,7 @@ import type { CreateUserRequest, User } from '../api/users'
 import type { AgentPhone } from '../api/pbxAgents'
 import { ListenBar, PhoneBadge } from '../components/AgentPhones'
 import LoadError from '../components/LoadError'
+import { useAuth } from '../auth/context'
 import { useAgentPhones, useListen } from '../lib/agentPhones'
 
 /**
@@ -27,6 +28,7 @@ import { useAgentPhones, useListen } from '../lib/agentPhones'
 export default function UsersPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { user: me } = useAuth()
   const [error, setError] = useState<string | null>(null)
 
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: listUsers })
@@ -98,6 +100,7 @@ export default function UsersPage() {
               {users?.map((user) => (
                 <UserRow
                   key={user.id}
+                  isSelf={me?.id === user.id}
                   user={user}
                   phone={user.role === 'Agent' ? phoneOf(user) : undefined}
                   listeningHere={listen.current?.agentId === user.id && listen.current.status !== 'failed' && listen.current.status !== 'ended'}
@@ -125,8 +128,11 @@ function UserRow({
   onToggle,
   onChanged,
   onError,
+  isSelf,
 }: {
   user: User
+  /** The signed-in supervisor's own row: changing the password needs the current one. */
+  isSelf: boolean
   phone: AgentPhone | undefined
   listeningHere: boolean
   onListen: (phone: AgentPhone) => void
@@ -219,7 +225,7 @@ function UserRow({
               {panel === 'extensions' ? (
                 <ExtensionForm user={user} onDone={close} onError={onError} />
               ) : (
-                <PasswordForm user={user} onDone={close} onError={onError} />
+                <PasswordForm user={user} isSelf={isSelf} onDone={close} onError={onError} />
               )}
             </div>
           </td>
@@ -337,20 +343,29 @@ function ExtensionForm({
   )
 }
 
+/**
+ * A new password. For the supervisor's own account the current one is asked
+ * for too (27 Sep 2026), so a browser left signed in cannot be used to lock its
+ * owner out. Changing it ends the supervisor's own sign-in, since the server
+ * refuses tokens issued before a password change (N-05), so the hint says so.
+ */
 function PasswordForm({
   user,
+  isSelf,
   onDone,
   onError,
 }: {
   user: User
+  isSelf: boolean
   onDone: () => void
   onError: (e: unknown) => void
 }) {
   const { t } = useTranslation()
   const [newPassword, setNewPassword] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
 
   const save = useMutation({
-    mutationFn: () => resetPassword(user.id, newPassword),
+    mutationFn: () => resetPassword(user.id, newPassword, isSelf ? currentPassword : undefined),
     onSuccess: onDone,
     onError,
   })
@@ -363,17 +378,27 @@ function PasswordForm({
       }}
       className="space-y-3"
     >
+      {isSelf && (
+        <div className="max-w-xs">
+          <Field
+            label={t('users.currentPassword')}
+            value={currentPassword}
+            onChange={setCurrentPassword}
+            type="password"
+          />
+        </div>
+      )}
       <div className="max-w-xs">
         <Field label={t('users.newPassword')} value={newPassword} onChange={setNewPassword} type="password" />
       </div>
       <button
         type="submit"
-        disabled={save.isPending || newPassword.length < 8}
+        disabled={save.isPending || newPassword.length < 8 || (isSelf && currentPassword.length === 0)}
         className="btn-primary"
       >
         {t('users.save')}
       </button>
-      <p className="field-hint">{t('users.passwordHint')}</p>
+      <p className="field-hint">{isSelf ? t('users.ownPasswordHint') : t('users.passwordHint')}</p>
     </form>
   )
 }

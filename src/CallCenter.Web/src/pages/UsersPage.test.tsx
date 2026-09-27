@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import UsersPage from './UsersPage'
 import { setToken } from '../auth/token'
+import { AuthContext } from '../auth/context'
+import type { AuthState } from '../auth/context'
 import i18n from '../i18n'
 
 /** Accounts and extensions (S-42), against a stubbed `fetch`. */
@@ -43,13 +45,26 @@ function withPhones(rest: (input: RequestInfo | URL, init?: RequestInit) => Prom
     String(input).endsWith('/api/pbx/agents') ? Promise.resolve(jsonResponse(phones)) : rest(input, init)
 }
 
+/** The supervisor signed in while the page is open. */
+const ME = { id: 's1', login: 'boss', displayName: 'Boss', role: 'Supervisor' }
+
+const SIGNED_IN: AuthState = {
+  user: ME,
+  isLoading: false,
+  signIn: async () => {},
+  signOut: async () => {},
+  signedOutByServer: false,
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <UsersPage />
-      </MemoryRouter>
+      <AuthContext.Provider value={SIGNED_IN}>
+        <MemoryRouter>
+          <UsersPage />
+        </MemoryRouter>
+      </AuthContext.Provider>
     </QueryClientProvider>,
   )
 }
@@ -250,6 +265,67 @@ describe('phones and listening in (S-61, S-62)', () => {
       expect(rest).toHaveBeenCalledWith('/api/pbx/agents/listen/L1', expect.objectContaining({ method: 'DELETE' })),
     )
     expect(screen.queryByText('Listening to Sara')).not.toBeInTheDocument()
+  })
+
+  it('asks for nothing but the new password on somebody else’s account', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([AGENT]))
+      .mockResolvedValueOnce(jsonResponse(null, 204))
+      .mockResolvedValue(jsonResponse([AGENT]))
+    vi.stubGlobal('fetch', withPhones(fetchMock))
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }))
+
+    expect(screen.queryByLabelText('Your current password')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'a new password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1))
+    const [url, init] = fetchMock.mock.calls[1]
+    expect(url).toBe('/api/users/a1/password')
+    expect(JSON.parse(init.body)).toEqual({ newPassword: 'a new password' })
+  })
+
+  it('asks for the current password on your own account, and sends it', async () => {
+    // The server refuses your own change without it (current_password_required).
+    const mine = { ...AGENT, id: ME.id, login: ME.login, displayName: ME.displayName, role: 'Supervisor' }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([mine]))
+      .mockResolvedValueOnce(jsonResponse(null, 204))
+      .mockResolvedValue(jsonResponse([mine]))
+    vi.stubGlobal('fetch', withPhones(fetchMock))
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }))
+
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'a new password' } })
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByText(/You will be signed out/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Your current password'), { target: { value: 'the old one' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1))
+    const [url, init] = fetchMock.mock.calls[1]
+    expect(url).toBe('/api/users/s1/password')
+    expect(JSON.parse(init.body)).toEqual({ newPassword: 'a new password', currentPassword: 'the old one' })
+  })
+
+  it('says so when your current password is wrong', async () => {
+    const mine = { ...AGENT, id: ME.id, login: ME.login, displayName: ME.displayName, role: 'Supervisor' }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([mine]))
+      .mockResolvedValueOnce(jsonResponse({ code: 'current_password_wrong' }, 403))
+    vi.stubGlobal('fetch', withPhones(fetchMock))
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }))
+    fireEvent.change(screen.getByLabelText('Your current password'), { target: { value: 'not it' } })
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'a new password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your current password is not correct.')
   })
 
   it('says why phone status is missing', async () => {

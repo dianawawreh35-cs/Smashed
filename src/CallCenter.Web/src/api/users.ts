@@ -41,8 +41,13 @@ export const updateUser = (id: string, displayName: string, isActive: boolean) =
 export const setExtension = (id: string, request: SetExtensionRequest) =>
   api.put<User>(`/users/${id}/extension`, request)
 
-export const resetPassword = (id: string, newPassword: string) =>
-  api.post<void>(`/users/${id}/password`, { newPassword })
+/**
+ * Sets a password (S-42). The supervisor's own needs the current one as well
+ * (27 Sep 2026): the server answers `current_password_required` without it and
+ * `current_password_wrong` when it is wrong. Anybody else's needs none.
+ */
+export const resetPassword = (id: string, newPassword: string, currentPassword?: string) =>
+  api.post<void>(`/users/${id}/password`, currentPassword === undefined ? { newPassword } : { newPassword, currentPassword })
 
 /**
  * The `code` from a refusal, for translation. Falls back to a generic key so

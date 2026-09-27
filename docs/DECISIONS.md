@@ -7298,6 +7298,46 @@ folder other than `C:\SmashedAgentApp` keeps it after installing, and two
 copies signed in as one agent is what lost calls on the evening of 27 Sep.
 The checklist says to look for one on each laptop the first time.
 
+## 2026-09-27 — The Logs page: the Agent Apps' logs in the web app, errors first (S-64)
+
+Asked by Dia the same evening as N-12: the laptops' logs on a page of their
+own, with errors caught and highlighted. This replaces the "no web page"
+of the N-12 entry above; the runbook's commands still work beside it.
+
+- **Supervisors only**, a page in the sidebar after Settings. The server's two
+  new reads (`GET /api/agent-logs`, `GET /api/agent-logs/{laptop}/{file}`) are
+  `SupervisorOnly`; sending stays `AgentOnly`. The rule moved from the
+  controller to each action, because a rule on both asks for both roles.
+- **Errors are the point of the page**, so they lead. Laptops whose latest day
+  has errors come first, with a red edge and a count, and warnings beside it
+  in amber. A line at the top says how many errors there were today, and on
+  how many laptops. In a day's log an error is red and open, its stack trace
+  shown; a warning is amber; anything else is folded to its first line (a
+  logged SQL command is five). **Next error** walks down the errors, and
+  round again.
+- **Entries, not lines** (`AgentLogReader`): an entry is a line starting with
+  the time and a bracketed level, the app's Serilog format, and every line
+  after it that does not, so an exception stays with the error it belongs to.
+  The filter (everything, warnings and errors, errors only) and the search
+  run on the server. At most the newest 2,000 matches per page; a normal day
+  is a few thousand entries, and the page says when it shows fewer than
+  matched.
+- **The counts are kept, not recounted.** The list counts errors and warnings
+  on every day of every laptop, each time it is asked. A file only grows, so
+  the server remembers how far it counted each one and counts only what
+  arrived since, and only up to the last whole line in case a piece is
+  being written as it reads.
+- **Up to date every 30 seconds**, as often as the laptops send, unless
+  "Keep up to date" is switched off.
+- **The log stays as the app wrote it**: English, file paths and stack
+  traces, so left to right in the Arabic page too. Times are the laptop's.
+
+Tests: the reader (entries, the lines under them, filters, search, counting
+in pieces), the store's list and read, the endpoints with both roles, and the
+page (order, counts, highlighting, folding, the filter, Next error, switching
+laptop, the empty and failed states). Not seen in a browser yet. Steps are in
+TESTING-checklist.md, Round 1.
+
 ## 2026-09-27 — A zip beside the installer, for when it will not run (S-63)
 
 Asked by Dia straight after S-63: an alternative zip install, in case the

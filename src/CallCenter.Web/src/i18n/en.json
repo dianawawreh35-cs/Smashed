@@ -21,6 +21,7 @@
     "applicationReports": "Application reports",
     "callReports": "Call reports",
     "agentApp": "Agent App",
+    "logs": "Logs",
     "label": "Sections"
   },
   "login": {
@@ -1045,5 +1046,43 @@
     "printPage": "Print page",
     "printAll": "all agents, branches, channels and types",
     "printedAt": "Printed {{at}}"
+  },
+  "logs": {
+    "heading": "Logs",
+    "intro": "What each Agent App laptop logged, as it sent it to the server. Errors in red, warnings in amber. Kept 30 days.",
+    "live": "Keep up to date",
+    "failed": "The logs did not load.",
+    "dayFailed": "This day's log did not load.",
+    "empty": "No laptop has sent its log yet.",
+    "emptyHint": "A laptop sends its log while an agent is signed in to the Agent App, every half a minute.",
+    "emptyDay": "Nothing was logged on this day.",
+    "noMatches": "Nothing on this day matches.",
+    "laptops": "Laptops",
+    "lastHeard": "Last sent {{when}}",
+    "noProblems": "No errors",
+    "errors_one": "1 error",
+    "errors_other": "{{count}} errors",
+    "warnings_one": "1 warning",
+    "warnings_other": "{{count}} warnings",
+    "errorsToday_one": "1 error today. Laptops affected: {{laptops}}.",
+    "errorsToday_other": "{{count}} errors today. Laptops affected: {{laptops}}.",
+    "day": "Day",
+    "dayOption": "{{date}} — errors: {{errors}}, warnings: {{warnings}}",
+    "show": "Show",
+    "levels": {
+      "all": "Everything",
+      "warnings": "Warnings and errors",
+      "errors": "Errors only"
+    },
+    "search": "Search the log",
+    "searchPlaceholder": "Search: a number, a word from an error…",
+    "nextError": "Next error",
+    "shown_one": "1 entry, newest first",
+    "shown_other": "{{count}} entries, newest first",
+    "shownOf_one": "The newest {{shown}} of 1 entry",
+    "shownOf_other": "The newest {{shown}} of {{count}} entries",
+    "unfold_one": "1 more line",
+    "unfold_other": "{{count}} more lines",
+    "fold": "Show less"
   }
 }

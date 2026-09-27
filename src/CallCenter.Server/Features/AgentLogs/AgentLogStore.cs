@@ -133,6 +133,101 @@ public class AgentLogStore(IOptions<AgentLogOptions> options, ILogger<AgentLogSt
         }
     }
 
+    /// <summary>
+    /// Errors and warnings per file, as far as it had been counted. A file only
+    /// grows, so a longer one is counted from where the count stopped, not
+    /// again from the start: the Logs page asks for every day of every laptop
+    /// each time it opens.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Length, int Errors, int Warnings)> _counts = new();
+
+    /// <summary>Every laptop that has sent a log, the most recently heard from first (the Logs page, N-12).</summary>
+    public IReadOnlyList<AgentLogLaptopDto> Laptops()
+    {
+        if (!Directory.Exists(_root))
+        {
+            return [];
+        }
+
+        var laptops = new List<AgentLogLaptopDto>();
+
+        foreach (var folder in new DirectoryInfo(_root).EnumerateDirectories().Where(d => AgentLogNames.IsLaptop(d.Name)))
+        {
+            var days = folder.EnumerateFiles()
+                .Where(f => AgentLogNames.IsFile(f.Name))
+                .OrderByDescending(f => f.Name, StringComparer.Ordinal)
+                .Select(f =>
+                {
+                    var (errors, warnings) = Counted(f);
+                    return new AgentLogDayDto(
+                        f.Name, DateOf(f.Name), f.Length, errors, warnings,
+                        new DateTimeOffset(f.LastWriteTimeUtc, TimeSpan.Zero));
+                })
+                .ToList();
+
+            if (days.Count > 0)
+            {
+                laptops.Add(new AgentLogLaptopDto(folder.Name, days.Max(d => d.LastWriteAt), days));
+            }
+        }
+
+        return laptops.OrderByDescending(l => l.LastWriteAt).ToList();
+    }
+
+    /// <summary>One day's file as text, or null when there is no such file.</summary>
+    public async Task<string?> ReadAsync(string laptop, string file, CancellationToken ct)
+    {
+        if (!AgentLogNames.IsLaptop(laptop) || !AgentLogNames.IsFile(file))
+        {
+            return null;
+        }
+
+        var path = System.IO.Path.Combine(Folder(laptop), file);
+
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        // Shared, so a laptop can go on appending while it is read.
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+
+        return await reader.ReadToEndAsync(ct);
+    }
+
+    private (int Errors, int Warnings) Counted(FileInfo file)
+    {
+        var known = _counts.GetValueOrDefault(file.FullName);
+
+        if (known.Length == file.Length)
+        {
+            return (known.Errors, known.Warnings);
+        }
+
+        // Shorter than counted: not the file that was counted (deleted and
+        // sent again). Start over.
+        var from = known.Length < file.Length ? known.Length : 0;
+        var (errors, warnings) = from == 0 ? (0, 0) : (known.Errors, known.Warnings);
+
+        using var stream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var length = stream.Length;
+        var bytes = new byte[length - from];
+        stream.Seek(from, SeekOrigin.Begin);
+        stream.ReadExactly(bytes);
+
+        // Up to the last whole line: a piece may be half written as this reads.
+        var whole = Array.LastIndexOf(bytes, (byte)'\n') + 1;
+        var (newErrors, newWarnings) = AgentLogReader.Count(bytes.AsSpan(0, whole));
+        var counted = (from + whole, errors + newErrors, warnings + newWarnings);
+
+        _counts[file.FullName] = counted;
+        return (counted.Item2, counted.Item3);
+    }
+
+    /// <summary><c>agent-20260927.log</c> to <c>2026-09-27</c>.</summary>
+    private static string DateOf(string file) => $"{file[6..10]}-{file[10..12]}-{file[12..14]}";
+
     /// <summary>Deletes every file not written for <see cref="AgentLogOptions.RetentionDays"/>, and emptied folders.</summary>
     /// <returns>How many files went.</returns>
     public int DeleteExpired(DateTime nowUtc)
@@ -152,6 +247,7 @@ public class AgentLogStore(IOptions<AgentLogOptions> options, ILogger<AgentLogSt
                 if (file.LastWriteTimeUtc < cutoff)
                 {
                     file.Delete();
+                    _counts.TryRemove(file.FullName, out _);
                     deleted++;
                 }
             }

@@ -49,6 +49,8 @@ export default function AppLayout() {
     { to: '/classification', label: t('nav.classification') },
     { to: '/users', label: t('nav.users') },
     { to: '/settings', label: t('nav.settings') },
+    // What each Agent App laptop logged, errors first (N-12).
+    { to: '/logs', label: t('nav.logs') },
     // Where a supervisor uploads a new version for the laptops (S-63).
     { to: '/agent-app', label: t('nav.agentApp') },
   ]

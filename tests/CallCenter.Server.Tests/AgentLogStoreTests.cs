@@ -108,6 +108,37 @@ public sealed class AgentLogStoreTests : IDisposable
         store.Lengths("LAPTOP-02").Keys.Should().Equal("agent-20260927.log");
     }
 
+    [Fact]
+    public async Task The_laptop_list_counts_each_day_and_keeps_up_as_it_grows()
+    {
+        var store = Store(maxFileBytes: 1024 * 1024);
+        const string error = "2026-09-27 09:02:00.000 +03:00 [ERR] Broken\n";
+        const string warning = "2026-09-27 09:03:00.000 +03:00 [WRN] Odd\n";
+
+        await store.AppendAsync(Laptop, "agent-20260926.log", 0, Bytes(warning), default);
+        await store.AppendAsync(Laptop, File, 0, Bytes(error), default);
+
+        var laptop = store.Laptops().Should().ContainSingle().Subject;
+        laptop.Laptop.Should().Be(Laptop);
+        laptop.Days.Select(d => (d.Date, d.Errors, d.Warnings))
+            .Should().Equal(("2026-09-27", 1, 0), ("2026-09-26", 0, 1));
+
+        // Counted again from where it stopped, not from the start.
+        await store.AppendAsync(Laptop, File, error.Length, Bytes(error + warning), default);
+        store.Laptops()[0].Days[0].Should().BeEquivalentTo(new { Errors = 2, Warnings = 1 });
+    }
+
+    [Fact]
+    public async Task A_day_reads_back_as_text_and_a_missing_one_as_nothing()
+    {
+        var store = Store();
+        await store.AppendAsync(Laptop, File, 0, Bytes("مرحبا\n"), default);
+
+        (await store.ReadAsync(Laptop, File, default)).Should().Be("مرحبا\n");
+        (await store.ReadAsync(Laptop, "agent-20260101.log", default)).Should().BeNull();
+        (await store.ReadAsync("..", File, default)).Should().BeNull();
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

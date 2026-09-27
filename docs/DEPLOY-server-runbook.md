@@ -567,7 +567,8 @@ Supervisor app → Settings → PBX status and Storage usage cover the same at a
 
 **An agent's laptop log** (N-12), without going to the laptop. Each laptop
 sends its log while an agent is signed in; the server keeps a file per laptop
-per day for 30 days:
+per day for 30 days. The easy way is the web app's **Logs** page (S-64),
+errors first. On the server itself:
 
 ```bash
 ls /opt/callcenter/data/logs/agents/                         # one folder per laptop (its Windows name)

@@ -58,6 +58,30 @@ public class AgentLogsEndpointTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
+    public async Task A_supervisor_reads_what_an_agent_sent_and_an_agent_cannot()
+    {
+        var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+        var laptop = Laptop();
+
+        await agent.PostAsync(
+            $"/api/agent-logs/{laptop}/{File}?offset=0",
+            Body("2026-09-27 09:02:00.000 +03:00 [ERR] Broken\n2026-09-27 09:03:00.000 +03:00 [INF] Fine\n"));
+
+        var laptops = await supervisor.GetFromJsonAsync<List<AgentLogLaptopDto>>("/api/agent-logs");
+        laptops!.Single(l => l.Laptop == laptop).Days.Single().Errors.Should().Be(1);
+
+        var page = await supervisor.GetFromJsonAsync<AgentLogPageDto>(
+            $"/api/agent-logs/{laptop}/{File}?levels={AgentLogLevels.Errors}");
+        page!.Entries.Should().ContainSingle().Which.Text.Should().Be("Broken");
+
+        (await agent.GetAsync("/api/agent-logs")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await agent.GetAsync($"/api/agent-logs/{laptop}/{File}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await supervisor.GetAsync($"/api/agent-logs/{laptop}/agent-20200101.log")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [DatabaseFact]
     public async Task A_supervisor_cannot_write_an_agents_log()
     {
         var (client, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));

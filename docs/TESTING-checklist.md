@@ -500,6 +500,36 @@ supervisor, on **Users**, press **Reset password** on your **own** row.
       *If the save is refused with "type your current one as well" although
       you did:* the web app and the server disagree about the field. Tell me.
 
+### 1.12 Logs: the Agent Apps' logs, errors first (S-64, N-12) — built 27 Sep, never run
+
+Needs an Agent App that has signed in at least once since N-12, so there is a
+log on the server (Round 2, "The log reaches the server").
+
+- [ ] **The page.** As a supervisor, **Logs** is in the sidebar after
+      Settings. It lists this laptop, with when it last sent and its
+      errors and warnings today, or a green "No errors". Sign in as an agent
+      instead: there is no Logs page, and `/logs` goes to the Agent App page.
+- [ ] **An error in red.** Make one: in the Agent App, stop the server and
+      save a contact, or anything that fails. Start the server, wait a minute
+      and refresh Logs. The laptop's count went up, it has a red edge, and the
+      red line at the top counts today's errors. In its log the error is on a
+      red background, open, with the lines under it; a warning (the phone not
+      registered, for one) is amber; the rest are grey and folded to one line,
+      with "N more lines" to open them. **Screenshot it.**
+- [ ] **Filter and search.** "Errors only" leaves only the red ones;
+      "Warnings and errors" adds the amber. Type a word from an error into the
+      search: only entries containing it, in whatever part of them.
+- [ ] **Next error.** With several errors on screen, press **Next error**:
+      the list moves to the first and rings it; again, the next; after the
+      last, back to the first.
+- [ ] **Another day.** The day box lists each day with its counts. Pick
+      yesterday's: that day's log.
+- [ ] **Keeps up.** Leave the page open with "Keep up to date" ticked, and use
+      the Agent App: new entries appear within a minute without refreshing.
+      Untick it: they stop until you tick it or reload.
+- [ ] **Arabic.** Switch the page to Arabic: the labels are Arabic and read
+      from the right, and the log text stays left to right, as written.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.

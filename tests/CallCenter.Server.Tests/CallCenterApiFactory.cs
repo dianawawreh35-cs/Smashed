@@ -143,6 +143,8 @@ public class CallCenterApiFactory : WebApplicationFactory<Program>, IAsyncLifeti
             // upload, deleted when the run ends. It was the test project's bin
             // folder, where 70 WAV files had piled up by 25 Sep.
             .UseSetting("Recordings:Path", RecordingsPath)
+            // N-12: under the recordings folder, so it goes with the run too.
+            .UseSetting("AgentLogs:Path", Path.Combine(RecordingsPath, "agent-logs"))
             // The suite signs in hundreds of times a minute from one address;
             // the limits themselves are tested in LoginLimitTests (F-12).
             .UseSetting("Auth:LoginLimits:PerAddressPerMinute", "1000000")

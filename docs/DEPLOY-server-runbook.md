@@ -564,3 +564,17 @@ df -h /opt/callcenter /mnt/backup     # disk space
 tail -5 /opt/callcenter/backups/backup.log
 ```
 Supervisor app → Settings → PBX status and Storage usage cover the same at a glance.
+
+**An agent's laptop log** (N-12), without going to the laptop. Each laptop
+sends its log while an agent is signed in; the server keeps a file per laptop
+per day for 30 days:
+
+```bash
+ls /opt/callcenter/data/logs/agents/                         # one folder per laptop (its Windows name)
+tail -100 /opt/callcenter/data/logs/agents/LAPTOP-NAME/agent-$(date +%Y%m%d).log
+grep -h "\[ERR\]\|\[WRN\]" /opt/callcenter/data/logs/agents/*/agent-$(date +%Y%m%d).log   # today's problems, every laptop
+```
+
+Up to half a minute behind the laptop. A laptop that has not signed in since
+the problem has not sent it yet: its own copy of the last 3 days is in
+`%LOCALAPPDATA%\CallCenter\logs`.

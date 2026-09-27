@@ -91,6 +91,13 @@ try
     // every run, so a change on the settings screen needs no restart.
     builder.Services.AddHostedService<CallCenter.Server.Workers.RecordingRetentionWorker>();
 
+    // N-12: the Agent Apps' logs, a file per laptop per day under
+    // AgentLogs:Path, kept AgentLogs:RetentionDays.
+    builder.Services.Configure<CallCenter.Server.Features.AgentLogs.AgentLogOptions>(
+        builder.Configuration.GetSection(CallCenter.Server.Features.AgentLogs.AgentLogOptions.SectionName));
+    builder.Services.AddSingleton<CallCenter.Server.Features.AgentLogs.AgentLogStore>();
+    builder.Services.AddHostedService<CallCenter.Server.Workers.AgentLogRetentionWorker>();
+
     // A-67: every few minutes, ask the restaurant POS about recent callers
     // nobody has on file, and make or fill in their contacts. Off until
     // PosLookup:Token is set (POS_LOOKUP_TOKEN in .env).

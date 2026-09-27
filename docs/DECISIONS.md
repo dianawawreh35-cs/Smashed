@@ -7156,6 +7156,62 @@ New requirement **A-84** in the SRS.
 Not seen running yet: the Agent App was open during the change. Steps are in
 TESTING-checklist.md, Round 2, under "Copying text".
 
+## 2026-09-27 — The Agent Apps send their logs to the server (N-12)
+
+Asked by Dia: a fault on a laptop could only be read on that laptop. New
+requirement **N-12**. Dia's choices, asked before building: keep a small
+copy on the laptop as well, keep the server's as files (no web page), and
+send everything the laptop logs, not just warnings.
+
+- **The log file is the queue.** The app writes `agent-<date>.log` as before,
+  now for **3 days** instead of 14 (`App.LocalLogDays`). `AgentLogShipper`
+  reads the part of each file the server does not have and sends it, every
+  30 seconds and at every sign-in, while an agent is signed in. Lines from
+  before sign-in, or from while the server or VPN was down, wait in the file.
+  No second buffer, nothing in memory to lose on a crash. The cost: a laptop
+  that cannot reach the server for more than 3 days loses the oldest days.
+- **A byte-for-byte copy on the server**, `AgentLogStore`, under
+  `AgentLogs:Path` (`logs/agents`, which in the container is the
+  `data/logs` mount the server's own log already uses, so the deployment is
+  unchanged): `data/logs/agents/<laptop>/agent-<date>.log`. Kept **30 days**
+  after the last write (`AgentLogs:RetentionDays`, a daily
+  `AgentLogRetentionWorker`); at most **50 MB** per file per day
+  (`AgentLogs:MaxFileBytes`), so an app stuck in a loop cannot fill the disk.
+- **Every piece says where it starts**, and the server appends only if its
+  copy ends exactly there; otherwise it answers 409 with where it does end.
+  So a piece whose answer was lost and is sent again is not written twice, and
+  a copy lost on the server is sent again from the start. Pieces end at the
+  last line break, so a line still being written waits for the next send.
+- **The feedback loop.** The app logs four lines for every HTTP request, so
+  sending the log would itself make more log to send, every half a minute, for
+  ever. The sender's client has no loggers (`RemoveAllLoggers`), and it logs
+  only when sending starts and stops failing. On the server, the same
+  requests are logged at Debug when they succeed (`RequestLogLevels`), or the
+  laptops' logs would be written a second time, as noise, into the server's.
+- **Named by laptop, not by agent** (`AgentLogNames`, shared): laptops are
+  shared between shifts and the file follows the machine. The machine name is
+  cleaned to letters, digits, `.`, `-` and `_`; the server refuses anything
+  else, and any file name that is not `agent-<8 digits>.log`, before building
+  a path. Agent accounts only: a supervisor gets 403.
+- **Not done:** the last lines before an agent signs out or closes the app
+  are sent at the next sign-in on that laptop, not at sign-out. A best-effort
+  send at sign-out would slow down a step that has a 5-second budget (M-A01).
+  No web page to read the logs: the runbook's "Quick health checks" has the
+  commands.
+
+Tests: the store (offsets, repeats, size limit, names, retention), the names,
+the sender against a fake server (whole lines, nothing before sign-in, server
+down and back, a lost answer, a restart), and the endpoint against the test
+database. Not seen running yet with a real laptop: the Agent App and the
+server were both open here during the change. Steps are in
+TESTING-checklist.md, Round 2, under "The log reaches the server".
+
+**To deploy:** a new server image (the endpoint) and the Agent App on every
+laptop. An old Agent App against the new server keeps its log on the laptop,
+as before; a new Agent App against an old server gets 404 and keeps trying,
+logging that once on the laptop, while the old server logs a line for each
+try. So the server goes first.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

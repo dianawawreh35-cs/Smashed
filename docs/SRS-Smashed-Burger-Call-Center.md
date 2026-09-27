@@ -359,6 +359,7 @@ The Calls Detail report's own Status column: *Success* or *Abandoned*. Read agai
 | N-09 | Language: Arabic (RTL) and English for both applications. | Must |
 | N-10 | Platforms: Agent App on Windows 10/11; Supervisor Web App on current Chrome/Edge; server on Linux (Ubuntu Server) or Windows on a mini PC with SSD. PBX: Issabel (Asterisk), hosted and operated by the telephony provider. | Must |
 | N-11 | Maintainability: single installer for the Agent App; updates deployed from the server; configuration without code changes. | Should |
+| N-12 | Diagnostics: each Agent App's log reaches the server, so a fault on a laptop can be read without going to it. **Added 27 Sep 2026 (Dia):** the laptop still writes its log to `%LOCALAPPDATA%\CallCenter\logs`, now kept **3 days** (was 14), and while an agent is signed in sends the server what it has not had yet, every 30 seconds. Lines written before sign-in or while the server is unreachable wait in that file and go with the next send; what is not sent within the 3 days is lost. The server keeps a byte-for-byte copy, one file per laptop per day, under `data/logs/agents/<laptop>/`, for **30 days** (`AgentLogs:RetentionDays`), at most 50 MB per file per day. Agents' accounts only. | Should |
 
 ---
 

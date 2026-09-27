@@ -670,6 +670,34 @@ Paste each one into Notepad to check what was copied.
       number and name and copy them. While the text is selected, the call's
       keys still work: Ctrl+Shift+H holds, Ctrl+Shift+E hangs up.
 
+### The log reaches the server (N-12) — built 27 Sep, never run
+
+The server's copy is in `logs\agents\` beside the server's own
+`callcenter-<date>.log`: on this machine
+`src\CallCenter.Server\bin\Debug\net10.0\logs\agents\` when the server is
+started from its bin folder; on the restaurant's server,
+`/opt/callcenter/data/logs/agents/`.
+
+- [ ] **It arrives.** Sign in to the Agent App and wait a minute. A folder
+      named after this laptop appears under `logs\agents`, with today's
+      `agent-<date>.log`. Open it beside
+      `%LOCALAPPDATA%\CallCenter\logs\agent-<date>.log`: the same lines, the
+      server's at most half a minute behind.
+- [ ] **Before sign-in goes too.** Close the app, start it, wait a minute on
+      the sign-in screen, then sign in. The "Agent App started" line from
+      before sign-in is in the server's copy within a minute.
+- [ ] **Nothing twice, nothing lost, after the server was down.** Signed in,
+      stop the server for two minutes and search Contacts meanwhile. Start it
+      again and wait a minute: the lines from the minutes it was down are in
+      the server's copy, each once. The laptop's log has one "The log could
+      not be sent" line for those minutes, not one every half a minute.
+- [ ] **No loop.** Leave the app signed in and idle for five minutes. The
+      laptop's log does not grow by "Start processing HTTP request … agent-logs"
+      lines every half a minute, and the server's own log
+      (`logs\callcenter-<date>.log`) has no line per send.
+- [ ] **The laptop keeps 3 days.** A few days later:
+      `%LOCALAPPDATA%\CallCenter\logs` has at most three `agent-*.log` files.
+
 ---
 
 ## Round 3 — the telephone

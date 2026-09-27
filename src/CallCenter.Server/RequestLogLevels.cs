@@ -25,6 +25,13 @@ public static class RequestLogLevels
         "/health",
     ];
 
+    /// <summary>
+    /// The Agent Apps' own logs arriving (N-12), a request per laptop every
+    /// half a minute, in both directions. A line for each would be the laptops'
+    /// logs written a second time, as noise, into the server's.
+    /// </summary>
+    private const string AgentLogs = "/" + CallCenter.Shared.Contracts.AgentLogs.AgentLogNames.Route;
+
     public static LogEventLevel For(HttpContext context, double elapsedMs, Exception? ex)
     {
         var status = context.Response.StatusCode;
@@ -41,6 +48,12 @@ public static class RequestLogLevels
         }
 
         var path = context.Request.Path;
+
+        if (path.StartsWithSegments(AgentLogs, StringComparison.OrdinalIgnoreCase))
+        {
+            return LogEventLevel.Debug;
+        }
+
         return HttpMethods.IsGet(context.Request.Method)
                && Polled.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase))
             ? LogEventLevel.Debug

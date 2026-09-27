@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
 using CallCenter.AgentApp.Data;
@@ -34,6 +35,13 @@ public partial class App : Application
 
     /// <summary>Log directory: <c>%LOCALAPPDATA%\CallCenter\logs</c>.</summary>
     public static string LogDirectory { get; } = Path.Combine(AppDataDirectory, "logs");
+
+    /// <summary>
+    /// Days of log the laptop keeps (N-12). The server has its own copy, so
+    /// this is only the part not sent yet, plus a little to read when the
+    /// server itself is what cannot be reached. It was 14 before 27 Sep.
+    /// </summary>
+    public const int LocalLogDays = 3;
 
     /// <summary>Service provider for views that cannot take constructor injection.</summary>
     public static IServiceProvider Services =>
@@ -107,7 +115,7 @@ public partial class App : Application
             .WriteTo.File(
                 Path.Combine(LogDirectory, "agent-.log"),
                 rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 14,
+                retainedFileCountLimit: LocalLogDays,
                 shared: true)
             .CreateLogger();
 
@@ -151,6 +159,9 @@ public partial class App : Application
         // A report or recording that failed is retried without waiting for the
         // next call (A-04, A-31).
         reporter.RetryEvery(TimeSpan.FromMinutes(1));
+
+        // N-12: the log goes to the server, from the file, whenever signed in.
+        _host.Services.GetRequiredService<AgentLogShipper>().RunEvery(TimeSpan.FromSeconds(30));
 
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;
@@ -292,6 +303,22 @@ public partial class App : Application
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + '/');
             client.Timeout = options.UploadTimeout;
         });
+
+        // N-12: the log's way to the server. No loggers on this client: the
+        // app logs four lines a request, and the sender's own requests would
+        // then make more log to send, every half a minute, for ever.
+        services.AddHttpClient(AgentLogShipper.HttpClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<ServerOptions>>().Value;
+
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + '/');
+            client.Timeout = options.Timeout;
+        }).RemoveAllLoggers();
+        services.AddSingleton(provider => new AgentLogShipper(
+            provider.GetRequiredService<IHttpClientFactory>(),
+            provider.GetRequiredService<AgentSession>(),
+            provider.GetRequiredService<ILogger<AgentLogShipper>>(),
+            LogDirectory));
 
         // One per process, not transient: the pop-up exists from startup and is
         // shown and hidden, rather than built while the phone is ringing (A-10).

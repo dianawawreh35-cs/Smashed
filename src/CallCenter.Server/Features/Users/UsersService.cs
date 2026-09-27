@@ -32,6 +32,12 @@ public class UsersService(
 
         /// <summary>A supervisor disabling their own account mid-session.</summary>
         CannotDisableSelf,
+
+        /// <summary>Changing one's own password without giving the current one.</summary>
+        CurrentPasswordRequired,
+
+        /// <summary>Changing one's own password, and the current one given is wrong.</summary>
+        CurrentPasswordWrong,
     }
 
     public async Task<IReadOnlyList<UserDto>> ListAsync(CancellationToken ct = default) =>
@@ -153,7 +159,11 @@ public class UsersService(
         return (ToDto(user), null);
     }
 
-    /// <summary>Sets a new password (S-42). The old one is not needed.</summary>
+    /// <summary>
+    /// Sets a new password (S-42). Another account's needs no old one; the
+    /// supervisor's own needs the current one (27 Sep review), so a browser
+    /// left signed in cannot be used to lock its owner out.
+    /// </summary>
     public async Task<Failure?> ResetPasswordAsync(
         Guid id, ResetPasswordRequest request, Guid actingUserId, CancellationToken ct = default)
     {
@@ -161,6 +171,20 @@ public class UsersService(
         if (user is null)
         {
             return Failure.NotFound;
+        }
+
+        if (id == actingUserId)
+        {
+            if (string.IsNullOrEmpty(request.CurrentPassword))
+            {
+                return Failure.CurrentPasswordRequired;
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            {
+                logger.LogWarning("{Login} tried to change their own password and gave the wrong current one", user.Login);
+                return Failure.CurrentPasswordWrong;
+            }
         }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);

@@ -62,6 +62,23 @@ public class MenuImageStore(IOptions<MenuImageOptions> options, ILogger<MenuImag
         contentType is not null && Extensions.ContainsKey(contentType);
 
     /// <summary>
+    /// What the bytes are, from their first few, or null when they are none of
+    /// PNG, JPEG or WebP (27 Sep review). The browser's Content-Type is what
+    /// the uploader says the file is; this is what it is, so an HTML page or a
+    /// script renamed to .png is never stored and served back as a picture.
+    /// </summary>
+    public static string? Sniff(ReadOnlySpan<byte> bytes)
+    {
+        ReadOnlySpan<byte> png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        ReadOnlySpan<byte> jpeg = [0xFF, 0xD8, 0xFF];
+
+        if (bytes.StartsWith(png)) return "image/png";
+        if (bytes.StartsWith(jpeg)) return "image/jpeg";
+        if (bytes.Length >= 12 && bytes[..4].SequenceEqual("RIFF"u8) && bytes[8..12].SequenceEqual("WEBP"u8)) return "image/webp";
+        return null;
+    }
+
+    /// <summary>
     /// Writes an item's picture, replacing whatever it had. Returns the file
     /// name to store on the row, or null when the bytes could not be written.
     /// </summary>

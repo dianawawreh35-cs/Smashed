@@ -28,8 +28,17 @@ public class CommunicationsService(
     Settings.SettingsService settings,
     CallEditWindow editWindow,
     RecordingStore recordings,
+    TimeProvider clock,
     ILogger<CommunicationsService> logger)
 {
+    /// <summary>
+    /// How far ahead of the server's clock a call may say it started (F-03).
+    /// A laptop's clock a minute or two fast is ordinary; a call from an hour
+    /// from now did not happen. There is no limit the other way: the offline
+    /// queue can hold a call for days.
+    /// </summary>
+    public static readonly TimeSpan FutureSlack = TimeSpan.FromMinutes(5);
+
     /// <summary>
     /// How far back an agent's call log reaches when the supervisor has not set
     /// it (A-50, setting <c>agent.call_log_days</c>).
@@ -60,6 +69,15 @@ public class CommunicationsService(
         EditWindowClosed,
 
         /// <summary>
+        /// The call was logged under an extension that is not the signed-in
+        /// agent's (F-03). The Agent App treats it as final and sets the item aside.
+        /// </summary>
+        ExtensionNotYours,
+
+        /// <summary>The call says it started more than <see cref="FutureSlack"/> from now.</summary>
+        StartedInFuture,
+
+        /// <summary>
         /// The call was recorded and the audio has gone: retention removed it
         /// (A-33), or the file is not on disk. Kept apart from
         /// <see cref="NotFound"/> on purpose, so a screen can say <i>expired</i>
@@ -79,6 +97,21 @@ public class CommunicationsService(
     /// <summary>
     /// Records one call, or updates it if the app has reported it before (A-14).
     /// </summary>
+    /// <remarks>
+    /// <b>The request is not trusted</b> (F-03 of the 27 Sep review). It used to
+    /// find the row by the request's own extension and overwrite everything on
+    /// it, the agent included, so one agent could rewrite another's calls or
+    /// replay yesterday's missed call as answered, and a shared laptop's offline
+    /// queue filed one agent's calls under whoever signed in next. Now:
+    /// <list type="bullet">
+    /// <item>the extension must be the signed-in agent's own;</item>
+    /// <item>an existing row keeps its agent, and belongs to that agent only;</item>
+    /// <item>once the A-42 edit window has closed, a resend is accepted only
+    /// when it says what was stored, which is what the offline queue sends;</item>
+    /// <item>a call may not start more than <see cref="FutureSlack"/> in the
+    /// future. Any time in the past is accepted (Dia, 27 Sep).</item>
+    /// </list>
+    /// </remarks>
     public async Task<(CommunicationDto? Communication, Failure? Failure)> LogCallAsync(
         LogCallRequest request, Guid agentId, CancellationToken ct = default)
     {
@@ -86,6 +119,27 @@ public class CommunicationsService(
             || !Directions.All.Contains(request.Direction))
         {
             return (null, Failure.UnknownValue);
+        }
+
+        if (request.StartedAt > clock.GetUtcNow() + FutureSlack)
+        {
+            logger.LogWarning(
+                "Call {SipCallId} from agent {AgentId} was refused: it says it started at {StartedAt}, in the future",
+                request.SipCallId, agentId, request.StartedAt);
+            return (null, Failure.StartedInFuture);
+        }
+
+        var ownExtension = await db.Users
+            .Where(u => u.Id == agentId)
+            .Select(u => u.Extension)
+            .FirstOrDefaultAsync(ct);
+
+        if (ownExtension is null || !string.Equals(ownExtension, request.Extension, StringComparison.Ordinal))
+        {
+            logger.LogWarning(
+                "Call {SipCallId} was refused: agent {AgentId} logged it under extension {Extension}, and theirs is {Own}",
+                request.SipCallId, agentId, request.Extension, ownExtension ?? "none");
+            return (null, Failure.ExtensionNotYours);
         }
 
         var channelId = await db.Channels
@@ -107,6 +161,34 @@ public class CommunicationsService(
             .FirstOrDefaultAsync(
                 c => c.SipCallId == request.SipCallId && c.Extension == request.Extension, ct);
 
+        if (existing is not null)
+        {
+            // Whoever logged it first is the agent, for good. With the extension
+            // check above, this is a call from an extension that has since been
+            // given to somebody else.
+            if (existing.AgentId != agentId)
+            {
+                logger.LogWarning(
+                    "Call {CallId} was not changed: agent {AgentId} resent it, and it is {Owner}'s",
+                    existing.Id, agentId, existing.AgentId);
+                return (null, Failure.NotYours);
+            }
+
+            if (await editWindow.CheckAsync(existing, agentId, actorIsSupervisor: false, ct) is CallEditWindow.Refusal.Closed)
+            {
+                if (Repeats(existing, request))
+                {
+                    // The offline queue resending what already arrived: nothing to do.
+                    return (await ToDtoAsync(existing, ct), null);
+                }
+
+                logger.LogWarning(
+                    "Call {CallId} was not changed: agent {AgentId} sent different values after the edit window closed",
+                    existing.Id, agentId);
+                return (null, Failure.EditWindowClosed);
+            }
+        }
+
         var call = existing ?? new Communication
         {
             Kind = CommunicationKinds.Call,
@@ -114,16 +196,16 @@ public class CommunicationsService(
             SipCallId = request.SipCallId,
             Extension = request.Extension,
             Source = CommunicationSources.AgentApp,
+
+            // Nobody handled a blocked call — it was refused before anything
+            // rang — but it is still this agent's laptop that saw it, so the
+            // agent is recorded. Abandoned calls, which no laptop sees, are the
+            // ones with a null agent (S-55). Set once, never by an update.
+            AgentId = agentId,
         };
 
         call.Direction = request.Direction;
         call.Status = request.Status;
-
-        // Nobody handled a blocked call — it was refused before anything rang —
-        // but it is still this agent's laptop that saw it, so the agent is
-        // recorded. Abandoned calls, which no laptop sees, are the ones with a
-        // null agent (S-55).
-        call.AgentId = agentId;
 
         call.RemoteNumberRaw = request.RemoteNumber;
         call.RemoteNormalised = string.IsNullOrEmpty(normalised) ? null : normalised;
@@ -181,6 +263,27 @@ public class CommunicationsService(
             call.Status, call.Extension, existing is null ? "new" : "updated");
 
         return (await ToDtoAsync(call, ct), null);
+    }
+
+    /// <summary>
+    /// Whether a resend says what is stored (F-03). Times are compared to the
+    /// microsecond, which is what PostgreSQL keeps of .NET's tenth-microsecond
+    /// ticks. The laptop id is left out: it says where the call was logged from,
+    /// not what happened.
+    /// </summary>
+    private static bool Repeats(Communication stored, LogCallRequest request)
+    {
+        static bool Same(DateTimeOffset? a, DateTimeOffset? b) =>
+            a is null ? b is null : b is not null && Math.Abs((a.Value - b.Value).Ticks) < 10;
+
+        return stored.Direction == request.Direction
+            && stored.Status == request.Status
+            && stored.RemoteNumberRaw == request.RemoteNumber
+            && stored.RemoteName == request.RemoteName
+            && stored.QueueName == request.Queue
+            && Same(stored.StartedAt, request.StartedAt)
+            && Same(stored.AnsweredAt, request.AnsweredAt)
+            && Same(stored.EndedAt, request.EndedAt);
     }
 
     /// <summary>
@@ -471,6 +574,25 @@ public class CommunicationsService(
     ///
     /// The caller owns the stream and must dispose it.
     /// </remarks>
+    /// <summary>
+    /// Writes down that somebody played or downloaded a call's recording
+    /// (N-06; 27 Sep review). A recording is the most private thing the system
+    /// keeps, and who listened to which call was nowhere.
+    /// </summary>
+    public async Task RecordListeningAsync(Guid communicationId, Guid userId, string action, CancellationToken ct = default)
+    {
+        db.AuditLog.Add(new AuditLogEntry
+        {
+            UserId = userId,
+            At = clock.GetUtcNow(),
+            Entity = "recordings",
+            EntityId = communicationId.ToString(),
+            Action = action,
+        });
+
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task<(RecordingFile? File, Failure? Failure)> OpenRecordingAsync(
         Guid communicationId, Guid actingUserId, bool isSupervisor, CancellationToken ct = default)
     {

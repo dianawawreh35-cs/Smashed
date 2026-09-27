@@ -139,6 +139,37 @@ public class RecordingPlaybackTests
     }
 
     /// <summary>
+    /// Who listened to which call is written down (N-06, 27 Sep review): once
+    /// per listening, not once per range a player asks for.
+    /// </summary>
+    [DatabaseFact]
+    public async Task Playing_and_downloading_are_audited_once_each_and_a_seek_is_not()
+    {
+        var agent = await _data.CreateUserAsync(UserRoles.Agent);
+        var call = await _recordings.CreateCallAsync(agent);
+        await _recordings.AttachRecordingAsync(call, seconds: 2);
+        var supervisor = await _data.CreateUserAsync(UserRoles.Supervisor);
+        var (agentClient, _) = await _data.SignInAsync(agent);
+        var (supervisorClient, _) = await _data.SignInAsync(supervisor);
+
+        (await agentClient.GetAsync($"/api/recordings/{call.Id}")).EnsureSuccessStatusCode();
+        var seek = new HttpRequestMessage(HttpMethod.Get, $"/api/recordings/{call.Id}");
+        seek.Headers.Range = new RangeHeaderValue(100, 199);
+        (await agentClient.SendAsync(seek)).EnsureSuccessStatusCode();
+        (await supervisorClient.GetAsync($"/api/recordings/{call.Id}/download")).EnsureSuccessStatusCode();
+
+        var rows = await _data.QueryAsync(db => Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            db.AuditLog.Where(a => a.Entity == "recordings" && a.EntityId == call.Id.ToString())
+                .Select(a => new { a.UserId, a.Action })));
+
+        rows.Should().BeEquivalentTo(new[]
+        {
+            new { UserId = (Guid?)agent.Id, Action = "play" },
+            new { UserId = (Guid?)supervisor.Id, Action = "download" },
+        });
+    }
+
+    /// <summary>
     /// A player seeks by asking for a range. The framework answers it because
     /// the file on disk is seekable — see the decision entry.
     /// </summary>

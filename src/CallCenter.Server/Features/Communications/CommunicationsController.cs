@@ -189,6 +189,12 @@ public class CommunicationsController(CommunicationsService communications) : Co
             CommunicationsService.Failure.EditWindowClosed =>
                 (StatusCodes.Status403Forbidden, "edit_window_closed",
                     "This call can no longer be changed. Ask a supervisor."),
+            CommunicationsService.Failure.ExtensionNotYours =>
+                (StatusCodes.Status403Forbidden, "extension_not_yours",
+                    "The call was logged under an extension that is not the signed-in agent's."),
+            CommunicationsService.Failure.StartedInFuture =>
+                (StatusCodes.Status400BadRequest, "started_in_future",
+                    "The call says it started in the future. Check the laptop's clock."),
             _ => (StatusCodes.Status400BadRequest, "invalid_request", "The call could not be logged."),
         };
 

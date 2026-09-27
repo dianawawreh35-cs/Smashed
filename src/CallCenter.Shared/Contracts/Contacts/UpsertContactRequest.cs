@@ -17,8 +17,8 @@ namespace CallCenter.Shared.Contracts.Contacts;
 public record UpsertContactRequest(
     [MaxLength(200)] string? Name,
     [MaxLength(500)] string? Address,
-    string? Notes,
-    string? DeliveryNotes,
+    [MaxLength(4000)] string? Notes,
+    [MaxLength(4000)] string? DeliveryNotes,
     [Required, MinLength(1)] IReadOnlyList<string> Phones);
 
 /// <summary>

@@ -6798,6 +6798,92 @@ loaded Node 22 run took eleven seconds inside one test.
 - The Agent App's buttons keep the old blue; if the app should match, that is
   its own change.
 
+## 2026-09-27 — The review's server fixes, part 2: the server stops trusting the client
+
+- **Logging a call (F-03, R-15, A-42).** `POST /api/communications/calls` now:
+  - refuses an extension that is not the signed-in agent's own, **403
+    `extension_not_yours`**. That is the code the Agent App (prompt 17) sets
+    aside for good. It is what stops a shared laptop's offline queue filing
+    agent A's calls as agent B's;
+  - never changes the agent on a row that exists. A resend of someone else's
+    call (the extension has since passed to another agent) is **403
+    `not_your_call`**;
+  - after the A-42 window has closed, accepts a resend only if it says what is
+    stored (times to the microsecond, which is what PostgreSQL keeps), and
+    answers **403 `edit_window_closed`** otherwise. An identical resend is a
+    200 that writes nothing;
+  - refuses a call starting more than five minutes in the future, **400
+    `started_in_future`**. Dia, 27 Sep: nothing is refused for being old, since
+    the offline queue can hold a call for days. The Agent App does not list
+    this code as permanent, so it retries, which is right for a laptop clock
+    that is a little fast: the call goes through once the server's clock
+    catches up.
+  Tests for each rule against the database. The three test helpers that
+  logged calls under a made-up "9000" now use the agent's own extension.
+- **Sign-in is rate-limited (F-12).** Dia, 27 Sep: 10 attempts a minute from
+  one address (four agents may share one) and 5 a minute at one login, case
+  ignored. Both answer **429** with the code `too_many_attempts`, as the other
+  sign-in refusals carry codes (the web session was told the same code). The
+  per-address limit is ASP.NET Core's rate-limiting middleware. The per-login
+  limit needs the login from the body, which that middleware runs too early to
+  read, so the controller asks a limiter from the same library. From the third
+  failure at one login in ten minutes, each failure is a warning in the log.
+  The limits are configuration (`Auth:LoginLimits`) only so the test host can
+  raise them.
+- **Placeholder keys are refused at start-up (F-13).** A JWT or SIP key
+  containing `change-me` anywhere, or equal to one of the development keys
+  outside Development, stops the server with a message naming the setting and
+  the `.env` line to fill in.
+- **A closed session ends its token (M-S01).** Logout, the idle logout (A-05)
+  and a password reset close the `agent_sessions` row, and the per-request
+  check now refuses a token whose session is closed. Measured on the dev
+  database: about 0.01 ms a request, in the same query as the account check.
+  **The web app's token is not affected:** supervisors have no session row,
+  so signing out of the web app still only forgets the token in the browser.
+  Making that end the token too needs a session for web sign-ins, and that
+  changes what the dashboard's "agents online" counts, so it is an Open item.
+  Question 5 of the prompt (is 12 hours still right for the web token?) is
+  left as it is, as asked.
+- **The PBX web address (M-S06, S-55).** Dia, 27 Sep: https only. Changing the
+  host (or clearing it) clears the stored password, which must be typed again,
+  so the PBX login is never posted to an address it was not typed for. An
+  http address saved before today is no longer used, and the settings card
+  says why.
+- **The call-search CSV (M-S02, R-02).** A cell starting with `=`, `+`, `-`,
+  `@`, a tab or a carriage return gets a leading apostrophe. Dia, 27 Sep, on
+  phone numbers: written as `="0599123456"`, which Excel shows exactly as
+  typed, as text, with no apostrophe (as plain text Excel dropped the 0, and
+  read `+970…` as a sum). A number column holding anything but digits,
+  spaces, `+`, `-` and brackets is treated like any other cell. **The report
+  cards' browser export (`src/lib/csv.ts`) does not do this yet.** It is the
+  web session's file, so it is an Open item.
+- **From the "worth doing" list:**
+  - a fallback authorization policy, so an endpoint that names no policy needs
+    a signed-in user; `AllowAnonymous` on sign-in, `/health`, `/health/ready`
+    and the SPA fallback. `ControllerPolicyTests` checks every controller
+    action names a policy, and that sign-in is the only anonymous one;
+  - security headers on every answer: `nosniff`, `X-Frame-Options: DENY`,
+    `Referrer-Policy: no-referrer`, and a CSP of `frame-ancestors 'none';
+    object-src 'none'; base-uri 'self'`. It deliberately says nothing about
+    scripts or styles, which are the web app's to decide;
+  - menu photographs are taken for what their first bytes say (PNG, JPEG,
+    WebP), not for the browser's Content-Type;
+  - the recording folder's guard compares against the folder with a trailing
+    separator, so `recordings-old/` no longer passes for `recordings/`;
+  - a supervisor changing their **own** password gives the current one
+    (`ResetPasswordRequest.CurrentPassword`, new and optional, in
+    `CallCenter.Shared`): **400 `current_password_required`** without it,
+    **403 `current_password_wrong`** when wrong. Dia, 27 Sep: build it now.
+    **The web app's Users screen has no box for it yet**, so until the web
+    session adds one, a supervisor cannot change their own password from the
+    web app. Other accounts' passwords are unaffected;
+  - contact notes and delivery notes are limited to 4,000 characters
+    (`UpsertContactRequest`, in `CallCenter.Shared`, agreed 27 Sep). Both
+    `CallCenter.Shared` changes still build with the Agent App as it is;
+  - every play of a recording from the start, and every download, is an
+    `audit_log` row (`recordings`, `play`/`download`). A player's later range
+    requests (seeking) are not, or one listening would be dozens of rows.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

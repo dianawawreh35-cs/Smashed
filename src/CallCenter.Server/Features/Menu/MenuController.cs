@@ -113,7 +113,10 @@ public class MenuController(MenuService menu) : ControllerBase
             using var buffer = new MemoryStream();
             await file.CopyToAsync(buffer, ct);
             bytes = buffer.ToArray();
-            contentType = file.ContentType;
+
+            // What the bytes are, not what the browser says they are. Anything
+            // else is refused as not a picture, as a wrong type always was.
+            contentType = MenuImageStore.Sniff(bytes) ?? "application/octet-stream";
         }
 
         var failure = await menu.SetImageAsync(id, bytes, contentType, User.GetRequiredUserId(), ct);

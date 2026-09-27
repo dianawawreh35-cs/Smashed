@@ -254,7 +254,7 @@ public class PosLookupTests(CallCenterApiFactory factory)
     private static async Task<CommunicationDto> LogAsync(HttpClient agent, string number, DateTimeOffset started)
     {
         var response = await agent.PostAsJsonAsync("/api/communications/calls", new LogCallRequest(
-            TestData.NewSipCallId(), "9000", Directions.In, CommunicationStatuses.Answered, number,
+            TestData.NewSipCallId(), TestData.ExtensionOf(agent), Directions.In, CommunicationStatuses.Answered, number,
             RemoteName: null, started, started.AddSeconds(3), started.AddMinutes(1), Queue: null, TestData.LaptopId));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());

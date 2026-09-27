@@ -32,6 +32,17 @@ namespace CallCenter.Server.Features.Auth;
 /// flag. The fingerprint is a hash of a hash: it reveals nothing about the
 /// password, and it changes whenever the stored hash does.
 /// </para>
+/// <para>
+/// <b>A closed session ends its token</b> (M-S01, 27 Sep review). An Agent App
+/// token names its <c>agent_sessions</c> row (<see cref="AppClaims.SessionId"/>);
+/// once that session is signed out — by the agent, by the idle logout (A-05),
+/// or by a password reset — the token is refused, where it used to work on for
+/// the rest of its 12 hours. The session is looked up in the same query as the
+/// account, an EXISTS on its primary key, in the same round trip. Measured on
+/// the development database on 27 Sep, 2,000 runs in one connection: 0.015 ms
+/// a request against 0.004 ms for the account alone, so about a hundredth of a
+/// millisecond. A token with no session, the web app's, is unaffected.
+/// </para>
 /// </remarks>
 public class AccountTokenCheck(CallCenterDbContext db, ILogger<AccountTokenCheck> logger)
 {
@@ -62,14 +73,24 @@ public class AccountTokenCheck(CallCenterDbContext db, ILogger<AccountTokenCheck
             return false;
         }
 
+        var sessionId = principal.GetSessionId();
+
         var account = await db.Users
             .AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => new { u.PasswordHash, u.Role, u.IsActive })
+            .Select(u => new
+            {
+                u.PasswordHash,
+                u.Role,
+                u.IsActive,
+                SessionOpen = sessionId == null
+                              || db.AgentSessions.Any(s => s.Id == sessionId && s.UserId == userId && s.LoggedOutAt == null),
+            })
             .FirstOrDefaultAsync(ct);
 
         return account is not null
                && account.IsActive
+               && account.SessionOpen
                && stamp == Stamp(account.PasswordHash, account.Role);
     }
 
@@ -86,10 +107,10 @@ public class AccountTokenCheck(CallCenterDbContext db, ILogger<AccountTokenCheck
             || !await IsCurrentAsync(context.Principal, context.HttpContext.RequestAborted))
         {
             logger.LogInformation(
-                "Refused a token for {UserId}: the account's password, role or status has changed since it was issued",
+                "Refused a token for {UserId}: its session is closed, or the account's password, role or status has changed since it was issued",
                 context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown");
 
-            context.Fail("The account has changed since this token was issued.");
+            context.Fail("The session is closed, or the account has changed since this token was issued.");
         }
     }
 }

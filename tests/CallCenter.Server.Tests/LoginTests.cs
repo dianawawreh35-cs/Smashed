@@ -178,6 +178,37 @@ public class LoginTests(CallCenterApiFactory factory)
         session.LogoutReason.Should().Be(LogoutReasons.Manual);
     }
 
+    [DatabaseTheory]
+    [InlineData(LogoutReasons.Manual)]
+    [InlineData(LogoutReasons.Idle)]
+    public async Task A_token_ends_with_its_session_however_the_session_was_closed(string reason)
+    {
+        // M-S01: it used to work for the rest of its 12 hours after logout, and
+        // after the idle logout (A-05) that is meant to protect an unattended laptop.
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (client, login) = await data.SignInAsync(agent);
+        (await client.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await client.PostAsJsonAsync("/api/auth/logout", new LogoutRequest(login.SessionId!.Value, reason)))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await client.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await client.GetAsync("/api/communications/mine")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [DatabaseFact]
+    public async Task Closing_one_session_leaves_the_account_s_other_sessions_working()
+    {
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (first, firstLogin) = await data.SignInAsync(agent);
+        var (second, _) = await data.SignInAsync(agent);
+
+        await first.PostAsJsonAsync("/api/auth/logout", new LogoutRequest(firstLogin.SessionId!.Value, LogoutReasons.Manual));
+
+        (await first.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await second.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [DatabaseFact]
     public async Task Reset_password_is_the_way_back_in_for_a_locked_out_disabled_account()
     {

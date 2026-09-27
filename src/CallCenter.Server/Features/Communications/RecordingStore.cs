@@ -69,6 +69,15 @@ public class RecordingStore(IOptions<RecordingOptions> options, ILogger<Recordin
 
     private readonly string _root = System.IO.Path.GetFullPath(options.Value.Path);
 
+    /// <summary>
+    /// The root with a separator on the end, for the prefix check in
+    /// <see cref="Resolve"/>. Without it, <c>/data/recordings-old/x.wav</c>
+    /// starts with <c>/data/recordings</c> and passed (27 Sep review).
+    /// </summary>
+    private string RootWithSeparator => System.IO.Path.EndsInDirectorySeparator(_root)
+        ? _root
+        : _root + System.IO.Path.DirectorySeparatorChar;
+
     /// <summary>The path a recording for this call would have, relative to the root.</summary>
     public static string PathFor(Guid communicationId, DateTimeOffset startedAt) =>
         $"{startedAt.UtcDateTime:yyyy/MM/dd}/{communicationId}.wav";
@@ -272,7 +281,7 @@ public class RecordingStore(IOptions<RecordingOptions> options, ILogger<Recordin
     {
         var full = System.IO.Path.GetFullPath(System.IO.Path.Combine(_root, relativePath));
 
-        if (!full.StartsWith(_root, StringComparison.Ordinal))
+        if (!full.StartsWith(RootWithSeparator, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"A recording path resolved outside the recordings folder: {relativePath}");

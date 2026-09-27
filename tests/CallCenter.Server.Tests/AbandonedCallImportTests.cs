@@ -286,7 +286,7 @@ public class AbandonedCallImportTests(CallCenterApiFactory factory)
         var started = At(at);
         var answered = status == CommunicationStatuses.Answered ? started.AddSeconds(3) : (DateTimeOffset?)null;
         var response = await agent.PostAsJsonAsync("/api/communications/calls", new LogCallRequest(
-            TestData.NewSipCallId(), "9000", direction, status, number,
+            TestData.NewSipCallId(), TestData.ExtensionOf(agent), direction, status, number,
             RemoteName: null, started, answered, started.AddSeconds(15), Queue: null, TestData.LaptopId));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());

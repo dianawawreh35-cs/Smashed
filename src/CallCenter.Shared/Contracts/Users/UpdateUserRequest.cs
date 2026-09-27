@@ -11,5 +11,11 @@ public record UpdateUserRequest(
     bool IsActive);
 
 /// <summary>Sets a new password for an account (S-42).</summary>
+/// <param name="CurrentPassword">
+/// Needed only when a supervisor changes their own password, and refused when
+/// wrong (27 Sep review): otherwise anyone at a browser left signed in could
+/// change it and lock them out. Another account's password needs none.
+/// </param>
 public record ResetPasswordRequest(
-    [Required, MinLength(8), MaxLength(256)] string NewPassword);
+    [Required, MinLength(8), MaxLength(256)] string NewPassword,
+    [MaxLength(256)] string? CurrentPassword = null);

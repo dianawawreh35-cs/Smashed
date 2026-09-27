@@ -60,10 +60,15 @@ public class CommunicationsEndpointTests(CallCenterApiFactory factory)
         var response = await ClientFor(UserRoles.Agent)
             .PostAsJsonAsync("/api/communications/calls", ValidCall());
 
-        // Past authorization it reaches the controller and then fails on the
-        // database these tests deliberately do without.
+        // Past authorization it reaches the controller. Without a database it
+        // fails there; with one, the made-up account has no extension of its
+        // own and the call is refused as not theirs (F-03) - by the controller,
+        // with a code, not by the policy.
         response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
-        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            (await response.Content.ReadAsStringAsync()).Should().Contain("extension_not_yours");
+        }
     }
 
     [Theory]

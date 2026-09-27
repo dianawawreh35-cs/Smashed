@@ -145,8 +145,26 @@ public class TestData(CallCenterApiFactory factory)
 
         var login = (await response.Content.ReadFromJsonAsync<LoginResponse>())!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        if (user.Extension is { } extension)
+        {
+            Extensions.AddOrUpdate(client, extension);
+        }
+
         return (client, login);
     }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<HttpClient, string> Extensions = new();
+
+    /// <summary>
+    /// The extension of the agent <paramref name="client"/> is signed in as. A
+    /// call logged under any other is refused (F-03), so a helper that only has
+    /// the client asks here.
+    /// </summary>
+    public static string ExtensionOf(HttpClient client) =>
+        Extensions.TryGetValue(client, out var extension)
+            ? extension
+            : throw new InvalidOperationException("That client is not signed in as an agent through TestData.");
 
     /// <summary>Runs <paramref name="query"/> against a fresh context, so it reads what was saved.</summary>
     public async Task<T> QueryAsync<T>(Func<CallCenterDbContext, Task<T>> query)

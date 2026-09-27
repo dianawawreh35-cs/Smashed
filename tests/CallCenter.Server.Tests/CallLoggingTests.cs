@@ -123,13 +123,110 @@ public class CallLoggingTests(CallCenterApiFactory factory)
         // Call-ID. Each laptop's report is its own row, or the second agent's
         // would overwrite the first's.
         await data.EnsurePhoneChannelAsync();
-        var (client, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var (one, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var (two, _) = await data.SignInAsync(await data.CreateUserAsync());
         var sipCallId = TestData.NewSipCallId();
 
-        var first = await LogAsync(client, Call(TestData.NewMobile(), sipCallId: sipCallId, extension: "9001"));
-        var second = await LogAsync(client, Call(TestData.NewMobile(), sipCallId: sipCallId, extension: "9002"));
+        var first = await LogAsync(one, Call(TestData.NewMobile(), sipCallId: sipCallId));
+        var second = await LogAsync(two, Call(TestData.NewMobile(), sipCallId: sipCallId));
 
         second.Id.Should().NotBe(first.Id);
+    }
+
+    // ---- F-03: the request is not trusted ------------------------------------------
+
+    [DatabaseFact]
+    public async Task A_call_under_an_extension_that_is_not_the_agent_s_is_refused()
+    {
+        // The shared laptop: agent A's queued calls replayed after agent B signs in.
+        await data.EnsurePhoneChannelAsync();
+        var (client, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var request = Call(TestData.NewMobile(), extension: "9001");
+
+        var response = await client.PostAsJsonAsync("/api/communications/calls", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await CodeAsync(response)).Should().Be("extension_not_yours", "the Agent App sets exactly this aside");
+        (await data.QueryAsync(db => db.Communications.AnyAsync(c => c.SipCallId == request.SipCallId)))
+            .Should().BeFalse();
+    }
+
+    [DatabaseFact]
+    public async Task A_call_keeps_its_agent_when_its_extension_has_passed_to_somebody_else()
+    {
+        await data.EnsurePhoneChannelAsync();
+        var first = await data.CreateUserAsync();
+        var (firstClient, _) = await data.SignInAsync(first);
+        var call = Call(TestData.NewMobile(), status: CommunicationStatuses.Missed);
+        var logged = await LogAsync(firstClient, call);
+
+        // The supervisor moves the extension to a new agent.
+        var second = await data.CreateUserAsync();
+        var (secondClient, _) = await data.SignInAsync(second);
+        var extension = first.Extension!;
+        await data.QueryAsync(async db =>
+        {
+            var users = await db.Users.Where(u => u.Id == first.Id || u.Id == second.Id).ToListAsync();
+            users.Single(u => u.Id == first.Id).Extension = $"8{Random.Shared.Next(1000, 9999)}";
+            users.Single(u => u.Id == second.Id).Extension = extension;
+            return await db.SaveChangesAsync();
+        });
+
+        var response = await secondClient.PostAsJsonAsync("/api/communications/calls",
+            call with { Extension = extension, Status = CommunicationStatuses.Answered, AnsweredAt = call.StartedAt.AddSeconds(5) });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await CodeAsync(response)).Should().Be("not_your_call");
+        var stored = await StoredAsync(logged.Id);
+        stored.AgentId.Should().Be(first.Id, "an existing call's agent is never changed");
+        stored.Status.Should().Be(CommunicationStatuses.Missed);
+    }
+
+    [DatabaseFact]
+    public async Task After_the_edit_window_a_resend_is_accepted_only_if_it_repeats_what_is_stored()
+    {
+        // A-42: the default window is the day of the call. The offline queue may
+        // deliver a call days late, and resend it after that; a replay that
+        // turns yesterday's missed call into a long answered one is refused.
+        await data.EnsurePhoneChannelAsync();
+        var (client, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var started = DateTimeOffset.UtcNow.AddDays(-3);
+        var call = Call(TestData.NewMobile(), status: CommunicationStatuses.Missed, started: started);
+
+        var first = await LogAsync(client, call);
+        var again = await LogAsync(client, call);
+        again.Id.Should().Be(first.Id, "the same call, resent, is accepted and changes nothing");
+
+        var rewrite = await client.PostAsJsonAsync("/api/communications/calls", call with
+        {
+            Extension = TestData.ExtensionOf(client),
+            Status = CommunicationStatuses.Answered,
+            AnsweredAt = started.AddSeconds(5),
+            EndedAt = started.AddMinutes(40),
+        });
+
+        rewrite.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await CodeAsync(rewrite)).Should().Be("edit_window_closed");
+        var stored = await StoredAsync(first.Id);
+        stored.Status.Should().Be(CommunicationStatuses.Missed);
+        stored.DurationSec.Should().BeNull();
+    }
+
+    [DatabaseFact]
+    public async Task A_call_from_the_future_is_refused_and_one_from_last_week_is_not()
+    {
+        // Dia, 27 Sep: a few minutes ahead is a laptop clock; the past has no
+        // limit, because the offline queue can hold a call for days.
+        await data.EnsurePhoneChannelAsync();
+        var (client, _) = await data.SignInAsync(await data.CreateUserAsync());
+
+        var ahead = await client.PostAsJsonAsync("/api/communications/calls",
+            Call(TestData.NewMobile(), started: DateTimeOffset.UtcNow.AddMinutes(20)) with { Extension = TestData.ExtensionOf(client) });
+        ahead.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await CodeAsync(ahead)).Should().Be("started_in_future");
+
+        await LogAsync(client, Call(TestData.NewMobile(), started: DateTimeOffset.UtcNow.AddMinutes(2)));
+        await LogAsync(client, Call(TestData.NewMobile(), started: DateTimeOffset.UtcNow.AddDays(-7)));
     }
 
     [DatabaseTheory]
@@ -175,7 +272,7 @@ public class CallLoggingTests(CallCenterApiFactory factory)
     private static LogCallRequest Call(
         string number,
         string? sipCallId = null,
-        string extension = "9000",
+        string extension = "",
         string status = CommunicationStatuses.Answered,
         DateTimeOffset? started = null,
         DateTimeOffset? answered = null,
@@ -196,11 +293,26 @@ public class CallLoggingTests(CallCenterApiFactory factory)
             TestData.LaptopId);
     }
 
+    /// <summary>
+    /// Posts the call, under the signed-in agent's own extension unless the
+    /// request names one (F-03 refuses any other).
+    /// </summary>
     private static async Task<CommunicationDto> LogAsync(HttpClient client, LogCallRequest request)
     {
+        if (request.Extension.Length == 0)
+        {
+            request = request with { Extension = TestData.ExtensionOf(client) };
+        }
+
         var response = await client.PostAsJsonAsync("/api/communications/calls", request);
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<CommunicationDto>())!;
+    }
+
+    private static async Task<string?> CodeAsync(HttpResponseMessage response)
+    {
+        using var problem = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return problem.RootElement.TryGetProperty("code", out var code) ? code.GetString() : null;
     }
 
     private Task<Communication> StoredAsync(Guid id) =>

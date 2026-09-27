@@ -139,7 +139,8 @@ public class CallReportsTests(CallCenterApiFactory factory)
         lines[0].Should().Be("Date,Time,Direction,Result,Agent,Customer,Number,Branch,Channel,Type,Order value,Duration (seconds),Notes,Recording");
         lines.Should().HaveCount(1 + 11);
         var numbers = lines.Skip(1).Select(l => l.Split(',')[6]).ToList();
-        numbers.Should().BeEquivalentTo(search.Rows.Select(r => r.RemoteNumberRaw));
+        // As ="0599…", quoted for CSV: Excel shows it as typed, leading 0 and all (M-S02).
+        numbers.Should().BeEquivalentTo(search.Rows.Select(r => $"\"=\"\"{r.RemoteNumberRaw}\"\"\""));
         lines.Should().Contain(l => l.Contains("\"cold burger, again\""), "a comma in a note is quoted");
         lines.Skip(1).Should().OnlyContain(l => l.StartsWith(d.DayKey));
 

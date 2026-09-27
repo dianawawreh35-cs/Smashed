@@ -106,7 +106,11 @@ public class AbandonedCallImport(
         var url = (request.Url ?? string.Empty).Trim();
         if (url.Length > 0)
         {
-            if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+            // https only (M-S06, Dia 27 Sep): the PBX login is posted to this
+            // address every check, and over http it crosses the network as it
+            // was typed. Issabel answers on https with its own certificate,
+            // which the client accepts for this one host.
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps)
             {
                 // The web interface's root; a pasted link to a page inside it
                 // would otherwise become part of every request.
@@ -114,7 +118,7 @@ public class AbandonedCallImport(
             }
             else
             {
-                problems["url"] = "must be the PBX's web address, such as https://10.8.0.1";
+                problems["url"] = "must be the PBX's web address starting with https://, such as https://10.8.0.1";
             }
         }
 
@@ -141,6 +145,15 @@ public class AbandonedCallImport(
         {
             values[Keys.Password] = protector.Protect(request.Password)!;
         }
+        else if (!SameHost(stored.GetValueOrDefault(Keys.Url), url)
+                 && !string.IsNullOrEmpty(stored.GetValueOrDefault(Keys.Password)))
+        {
+            // M-S06: a password is for the host it was typed for. Kept across a
+            // change of address, it was posted to whatever the new one was, so
+            // a mistyped or hostile address received the PBX login. It has to
+            // be entered again with the new address.
+            values[Keys.Password] = string.Empty;
+        }
 
         var changed = values
             .Where(v => stored.GetValueOrDefault(v.Key) != v.Value)
@@ -153,7 +166,8 @@ public class AbandonedCallImport(
         }
 
         // Never the password, in either direction: only that it changed.
-        string? Shown(string key, string? value) => key == Keys.Password ? (value is null ? null : "(set)") : value;
+        string? Shown(string key, string? value) =>
+            key == Keys.Password ? (string.IsNullOrEmpty(value) ? null : "(set)") : value;
 
         db.AuditLog.Add(new AuditLogEntry
         {
@@ -229,8 +243,10 @@ public class AbandonedCallImport(
             var stored = await LoadAsync(ct);
             if (Connection(stored) is not { } connection)
             {
-                return Result(false, "The PBX import is not set up: enter the PBX's address, username and password in Settings.",
-                    from, to, 0, 0, 0, 0, stored);
+                var why = stored.GetValueOrDefault(Keys.Url)?.StartsWith("http:", StringComparison.OrdinalIgnoreCase) == true
+                    ? "The PBX's address starts with http://: change it to https:// in Settings, and enter the password again (M-S06)."
+                    : "The PBX import is not set up: enter the PBX's address, username and password in Settings.";
+                return Result(false, why, from, to, 0, 0, 0, 0, stored);
             }
 
             var checkedAt = clock.GetUtcNow();
@@ -285,6 +301,30 @@ public class AbandonedCallImport(
                 await WriteAsync(state, null, ct);
 
                 return Result(false, ex.Message, from, to, 0, 0, 0, 0, await LoadAsync(ct));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                // M-S03 (27 Sep review): anything else used to write neither the
+                // time nor the error, so the settings card showed nothing and,
+                // with no last check recorded, the whole day's CSV was fetched
+                // again at every 20-second tick. Recorded like any failure, with
+                // the stack in the log since it is the server's own.
+                logger.LogError(ex, "PBX abandoned-call check failed unexpectedly");
+
+                var message = $"The check failed unexpectedly ({ex.GetType().Name}): {ex.Message}";
+                state[Keys.LastError] = message;
+                try
+                {
+                    await WriteAsync(state, null, CancellationToken.None);
+                }
+                catch (Exception writeFailed)
+                {
+                    // The database itself, most likely. Nothing more to be done here.
+                    logger.LogError(writeFailed, "The failed check could not be recorded either");
+                    return Result(false, message, from, to, 0, 0, 0, 0, stored);
+                }
+
+                return Result(false, message, from, to, 0, 0, 0, 0, await LoadAsync(CancellationToken.None));
             }
         }
         finally
@@ -464,13 +504,30 @@ public class AbandonedCallImport(
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>Whether two addresses are the same host and port, ignoring case. Blank is a host of its own.</summary>
+    private static bool SameHost(string? before, string after)
+    {
+        if (string.IsNullOrWhiteSpace(before) || after.Length == 0)
+        {
+            return string.IsNullOrWhiteSpace(before) && after.Length == 0;
+        }
+
+        return Uri.TryCreate(before, UriKind.Absolute, out var a)
+               && Uri.TryCreate(after, UriKind.Absolute, out var b)
+               && string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase)
+               && a.Port == b.Port;
+    }
+
     private PbxConnection? Connection(IReadOnlyDictionary<string, string> stored)
     {
         var url = stored.GetValueOrDefault(Keys.Url);
         var username = stored.GetValueOrDefault(Keys.Username);
         var password = protector.Unprotect(stored.GetValueOrDefault(Keys.Password));
 
+        // An http address saved before 27 Sep is not used: the login would
+        // cross the network in plain text (M-S06).
         return !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && uri.Scheme == Uri.UriSchemeHttps
             && !string.IsNullOrWhiteSpace(username) && !string.IsNullOrEmpty(password)
             ? new PbxConnection(uri, username, password)
             : null;

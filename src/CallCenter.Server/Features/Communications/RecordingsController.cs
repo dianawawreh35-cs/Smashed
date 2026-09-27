@@ -97,6 +97,15 @@ public class RecordingsController(
             return Problem(failure.Value);
         }
 
+        // Audited once per listening, not once per request: a player asks for
+        // each part it is about to play, and every seek is a request of its
+        // own. The first asks from the start, or has no range at all.
+        if (asDownload || IsFromTheStart(Request.Headers.Range.ToString()))
+        {
+            await communications.RecordListeningAsync(
+                communicationId, User.GetRequiredUserId(), asDownload ? "download" : "play", ct);
+        }
+
         // enableRangeProcessing: the player asks for the part it is about to
         // play rather than the whole call. The framework does the arithmetic
         // and the stream is disposed with the response either way.
@@ -106,6 +115,11 @@ public class RecordingsController(
             asDownload ? file.FileName : null,
             enableRangeProcessing: true);
     }
+
+    /// <summary>No range, or one that starts at the first byte.</summary>
+    internal static bool IsFromTheStart(string range) =>
+        string.IsNullOrWhiteSpace(range)
+        || range.Replace(" ", string.Empty).StartsWith("bytes=0-", StringComparison.OrdinalIgnoreCase);
 
     private ObjectResult Problem(CommunicationsService.Failure failure)
     {

@@ -18,6 +18,17 @@ namespace CallCenter.Server.Features.Communications;
 /// byte-order mark, CRLF, RFC 4180 quoting, numbers with a dot. The headings
 /// and the words for a result or a direction are the web app's own, in the
 /// language the supervisor is reading in; change one, change both.
+///
+/// <b>Nothing in a cell runs as a formula</b> (M-S02, 27 Sep review). Names come
+/// from the agents and from the POS, so a cell starting with <c>=</c>, <c>+</c>,
+/// <c>-</c>, <c>@</c>, a tab or a carriage return is written with a leading
+/// apostrophe, which Excel shows and does not run. <b>The number column is
+/// different on purpose</b> (Dia, 27 Sep): as plain text Excel turned
+/// <c>0599123456</c> into <c>599123456</c> and read <c>+970599123456</c> as a
+/// sum, and an apostrophe would show on every row. So a number made only of
+/// digits, spaces, <c>+</c>, <c>-</c> and brackets is written as
+/// <c>="0599123456"</c>, which Excel shows exactly as typed, as text; anything
+/// else in that column is treated like any other cell.
 /// </remarks>
 public static class CallExport
 {
@@ -79,7 +90,7 @@ public static class CallExport
                 words.GetValueOrDefault(r.Status, r.Status),
                 r.AgentDisplayName,
                 r.ContactName,
-                r.RemoteNumberRaw,
+                Number(r.RemoteNumberRaw),
                 r.BranchName,
                 r.ChannelName,
                 language == "ar" ? r.TypeLabelAr : r.TypeLabelEn,
@@ -91,7 +102,39 @@ public static class CallExport
         }
     }
 
-    private static string Line(IEnumerable<string?> cells) => string.Join(',', cells.Select(Field));
+    private static string Line(IEnumerable<string?> cells) => string.Join(',', cells.Select(c => Field(Safe(c))));
+
+    /// <summary>Marks a number as text for Excel.</summary>
+    private const string NumberPrefix = "=\"";
+
+    /// <summary>A cell Excel would run as a formula, with an apostrophe in front (M-S02).</summary>
+    public static string? Safe(string? value)
+    {
+        if (string.IsNullOrEmpty(value) || value.StartsWith(NumberPrefix, StringComparison.Ordinal) && IsNumberFormula(value))
+        {
+            return value;
+        }
+
+        return value[0] is '=' or '+' or '-' or '@' or '\t' or '\r' ? "'" + value : value;
+    }
+
+    /// <summary>A phone number as <c>="…"</c>, so Excel keeps its leading 0 and its +.</summary>
+    public static string? Number(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return raw;
+        }
+
+        var number = raw.Trim();
+        return number.All(c => char.IsAsciiDigit(c) || c is '+' or '-' or ' ' or '(' or ')')
+            ? $"{NumberPrefix}{number}\""
+            : number;
+    }
+
+    private static bool IsNumberFormula(string value) =>
+        value.Length > NumberPrefix.Length && value[^1] == '"'
+        && value[NumberPrefix.Length..^1].All(c => char.IsAsciiDigit(c) || c is '+' or '-' or ' ' or '(' or ')');
 
     /// <summary>Quoted when it holds a comma, a quote or a line break, with quotes doubled (RFC 4180).</summary>
     public static string Field(string? value)

@@ -93,6 +93,11 @@ public class UsersController(UsersService users) : ControllerBase
                     "This is the only active supervisor; disabling it would lock everyone out."),
             UsersService.Failure.CannotDisableSelf =>
                 (StatusCodes.Status409Conflict, "cannot_disable_self", "You cannot disable your own account."),
+            UsersService.Failure.CurrentPasswordRequired =>
+                (StatusCodes.Status400BadRequest, "current_password_required",
+                    "To change your own password, give your current one as well."),
+            UsersService.Failure.CurrentPasswordWrong =>
+                (StatusCodes.Status403Forbidden, "current_password_wrong", "Your current password is not correct."),
             _ => (StatusCodes.Status400BadRequest, "invalid_request", "The request could not be applied."),
         };
 

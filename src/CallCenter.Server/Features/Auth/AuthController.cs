@@ -1,6 +1,7 @@
 using CallCenter.Shared.Contracts.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CallCenter.Server.Features.Auth;
 
@@ -9,25 +10,41 @@ namespace CallCenter.Server.Features.Auth;
 /// </summary>
 [ApiController]
 [Route("api/auth")]
-public class AuthController(AuthService auth) : ControllerBase
+public class AuthController(AuthService auth, LoginThrottle throttle) : ControllerBase
 {
     /// <summary>
     /// Signs in and, for an agent, opens a session and returns the two SIP
     /// extensions to register with.
     /// </summary>
+    /// <remarks>
+    /// Limited per address and per login (F-12): too many attempts answer 429
+    /// with the code <c>too_many_attempts</c>, before any password is checked.
+    /// </remarks>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(LoginThrottle.Policy)]
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<LoginResponse>> Login(
         LoginRequest request, CancellationToken ct)
     {
+        var address = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+        if (!throttle.TryAcquire(request.Login, address))
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, LoginThrottle.Refusal());
+        }
+
         var (response, failure) = await auth.LoginAsync(request, ct);
 
         if (response is not null)
         {
+            throttle.Succeeded(request.Login);
             return Ok(response);
         }
+
+        throttle.Failed(request.Login, address);
 
         // A disabled account is told apart from a wrong password, because the
         // agent is standing at a laptop that will never work until a supervisor

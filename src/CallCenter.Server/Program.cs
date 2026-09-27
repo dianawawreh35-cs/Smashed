@@ -1,3 +1,4 @@
+using CallCenter.Server;
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Seed;
 using CallCenter.Server.Features.Auth;
@@ -58,6 +59,10 @@ try
         .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
         .ValidateDataAnnotations()
         .ValidateOnStart();
+
+    // F-13: the example keys from .env.example, and the development ones,
+    // are public. Refused before anything starts, naming the setting to fill.
+    DeploymentSecrets.Check(builder.Configuration, builder.Environment.IsDevelopment());
 
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<TokenService>();
@@ -144,6 +149,15 @@ try
 
     builder.Services.AddScoped<AccountTokenCheck>();
 
+    // F-12: sign-in attempts are limited per address and per login. The limits
+    // are configuration so the tests, which sign in hundreds of times a minute
+    // from one address, can raise them.
+    var loginLimits = builder.Configuration.GetSection(LoginLimitOptions.SectionName).Get<LoginLimitOptions>()
+                      ?? new LoginLimitOptions();
+    builder.Services.Configure<LoginLimitOptions>(builder.Configuration.GetSection(LoginLimitOptions.SectionName));
+    builder.Services.AddSingleton<LoginThrottle>();
+    builder.Services.AddRateLimiter(options => LoginThrottle.AddPolicy(options, loginLimits));
+
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
               ?? throw new InvalidOperationException(
                   "The 'Jwt' configuration section is missing. See docs/DEPLOY-server-runbook.md step 5.");
@@ -187,7 +201,14 @@ try
             };
         });
 
+    // The fallback: an endpoint that names no policy needs a signed-in user
+    // (27 Sep review), so a new controller cannot be anonymous by accident.
+    // Sign-in, /health and the SPA's own files say AllowAnonymous. Every
+    // controller action names its policy anyway (ControllerPolicyTests).
     builder.Services.AddAuthorizationBuilder()
+        .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build())
         .AddPolicy(AuthPolicies.SignedIn, policy => policy.RequireAuthenticatedUser())
         .AddPolicy(AuthPolicies.SupervisorOnly, policy => policy.RequireRole(UserRoles.Supervisor))
         .AddPolicy(AuthPolicies.AgentOnly, policy => policy.RequireRole(UserRoles.Agent));
@@ -223,7 +244,10 @@ try
         });
     });
 
-    builder.Services.AddHealthChecks();
+    // M-D04: /health is "the process is up"; /health/ready also asks the
+    // database, and is what update.sh waits for.
+    builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck>("database", tags: [DatabaseHealthCheck.Tag]);
 
     // CORS for the Vite dev server. In production the SPA is served from
     // wwwroot by this same host, so no cross-origin request happens.
@@ -259,7 +283,22 @@ try
     // runbook's "on first start the API applies database migrations" true.
     await DatabaseInitialiser.MigrateAsync(app.Services);
 
-    app.UseSerilogRequestLogging();
+    // M-D03: what refreshes itself on a timer is logged at Debug when it works.
+    app.UseSerilogRequestLogging(options => options.GetLevel = RequestLogLevels.For);
+
+    // Security headers on everything, the SPA's files included (27 Sep review).
+    // Nothing here limits scripts or styles, which the web app decides; it
+    // stops the pages being framed by another site, the browser guessing a
+    // file's type, and the address leaking to other sites.
+    app.Use((context, next) =>
+    {
+        var headers = context.Response.Headers;
+        headers.XContentTypeOptions = "nosniff";
+        headers.XFrameOptions = "DENY";
+        headers["Referrer-Policy"] = "no-referrer";
+        headers.ContentSecurityPolicy = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
+        return next();
+    });
 
     if (app.Environment.IsDevelopment())
     {
@@ -278,17 +317,25 @@ try
     app.UseStaticFiles();
 
     app.UseRouting();
+    app.UseRateLimiter();
     app.UseAuthentication();
     app.Use(SessionPresence.StampAsync);
     app.UseAuthorization();
 
-    app.MapHealthChecks("/health").AllowAnonymous();
+    app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => !check.Tags.Contains(DatabaseHealthCheck.Tag),
+    }).AllowAnonymous();
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = _ => true,
+    }).AllowAnonymous();
     app.MapControllers();
     app.MapHub<AgentHub>("/hubs/agent");
 
     // SPA fallback: any non-API, non-hub GET returns index.html so client-side
     // routing works on refresh. Harmless when wwwroot is empty (404).
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html").AllowAnonymous();
 
     Log.Information("Call Center API starting in {Environment}", app.Environment.EnvironmentName);
     await app.RunAsync();

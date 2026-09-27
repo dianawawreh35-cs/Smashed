@@ -7090,6 +7090,29 @@ the tests' shared render helper (`test/http.tsx`) now renders signed in as a
 supervisor, as every real screen is. Three new tests on the Users page.
 Checklist 1.11 has the steps to see it.
 
+## 2026-09-27 — v0.4.0's dashboard and report pages crashed on opening; v0.4.1
+
+Found on the server within minutes of deploying v0.4.0: the dashboard and both
+report pages showed *This could not be loaded*, while every other page worked
+and the server's log had no error. They are the three pages that load the
+chart library on first use.
+
+**Cause.** The web build's hand-made chunk groups (`vendor` and `charts`,
+added with M-S12's web half) put modules that import each other into chunks
+that import each other. In the production bundle the chart chunk then ran
+before a function it needed existed: `TypeError: t is not a function`, and in
+the supervisor's browser `re is not a function`. The page's safety net
+(`PageBoundary`) showed its general message. **The tests could not see it:**
+Vitest runs the source, not the bundle, and `npm run build` succeeds on a
+bundle that fails when a browser loads it.
+
+**Fix.** The groups are gone; the pages are still loaded on first use, which
+already keeps the chart library away from the login screen and the lists.
+The first page is 443 kB (483 kB with the groups). Checked by loading every
+chunk of the built bundle in headless Chrome: all eight load, and the app
+draws its sign-in page. The same check on the v0.4.0 bundle reproduces the
+crash.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -7145,6 +7168,7 @@ running**.
 | R-01 and R-04 count a passed-on call twice: should their totals and Missed column leave out untaken rings, as the dashboard now does? | R-01, R-04 | Dia's call. `WithoutUntaken` does it in one line each (26 Sep entry) |
 | POS pop-up prefill: when our lookup finds nobody, fill the new-customer form from the POS for the agent to confirm | — | nothing. The POS answers in about half a second, inside A-81's one second (26 Sep entry) |
 | POS lookup on the supervisor's screens: last run, how many found, whether the POS is reachable | — | Dia's call. Today it is only in the server log |
+| **A browser check of the built web app in CI**: load every chunk of `dist/` in headless Chrome and fail on an error. v0.4.0 shipped a bundle that built, passed 169 tests and crashed on three pages (27 Sep entry) | — | nothing; Chrome is on GitHub's Linux machines |
 | Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry) |
 
 **Blocking a caller works at both ends.** The Agent App declines a blocked

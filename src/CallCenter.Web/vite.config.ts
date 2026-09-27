@@ -27,29 +27,15 @@ export default defineConfig({
     // developer tools do not show the source. They are still in dist/, which
     // the Dockerfile copies whole into wwwroot (27 Sep, Open items).
     sourcemap: 'hidden',
-    rolldownOptions: {
-      output: {
-        codeSplitting: {
-          // The chart library in a chunk of its own name. The pages that draw
-          // charts are loaded on first use (App.tsx), so this is fetched with
-          // the dashboard or a report, never with the login screen or a list.
-          groups: [
-            // React, the router, the query cache and i18next: needed by every
-            // page, and they change far less often than the app's own code.
-            {
-              name: 'vendor',
-              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|@tanstack|i18next|react-i18next)[\\/]/,
-              includeDependenciesRecursively: false,
-            },
-            {
-              name: 'charts',
-              test: /[\\/]node_modules[\\/](recharts|recharts-scale|react-smooth|victory-vendor|d3-[^\\/]+)[\\/]/,
-              includeDependenciesRecursively: false,
-            },
-          ],
-        },
-      },
-    },
+    // No hand-made chunk groups. The pages that draw charts are loaded on
+    // first use (App.tsx), so the chart library already arrives with the
+    // dashboard or a report and never with the login screen or a list. The
+    // "vendor" and "charts" groups added on 27 Sep split modules that import
+    // each other into chunks that imported each other, and in the production
+    // build the dashboard and both report pages crashed on opening ("t is not
+    // a function", "re is not a function"); the tests, which run the source,
+    // could not see it. Found on the server the same day, and checked since
+    // by loading every page's chunk in a real browser.
   },
   test: {
     environment: 'jsdom',

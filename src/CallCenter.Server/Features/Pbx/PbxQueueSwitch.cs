@@ -239,14 +239,16 @@ public class PbxQueueSwitch(
                 // display keeps the old state, and the message tells the
                 // supervisor to check and correct it.
                 logger.LogWarning("Queue {Action} failed: {Reason}", open ? "open" : "close", ex.Message);
-                return (await FailAsync(Codes.PbxFailed, ex.Message, ct), !ex.Answered);
+                return (await FailAsync(Codes.PbxFailed, ex.Message, CancellationToken.None), !ex.Answered);
             }
 
-            await SaveAsync(open, actingUserId, open ? "open" : "close", ct);
+            // F-14: the PBX has switched, so what it now is gets written down
+            // whether or not the supervisor is still waiting for the answer.
+            await SaveAsync(open, actingUserId, open ? "open" : "close", CancellationToken.None);
             logger.LogInformation("Queue {Action} by {By}", open ? "opened" : "closed",
                 actingUserId?.ToString() ?? "the daily opening");
 
-            return (new QueueSwitchResultDto(true, null, null, await StatusAsync(ct)), false);
+            return (new QueueSwitchResultDto(true, null, null, await StatusAsync(CancellationToken.None)), false);
         }
         finally
         {

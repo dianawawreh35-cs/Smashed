@@ -261,7 +261,8 @@ public class ContactsService(CallCenterDbContext db, ContactCallLinker calls, IL
             {
                 contact = await Active()
                     .Include(c => c.Phones)
-                    .FirstOrDefaultAsync(c => c.Phones.Any(p => p.Last9 == last9), ct);
+                    .ByLast9(last9) // M-S11: the same contact every time
+                    .FirstOrDefaultAsync(ct);
             }
         }
 

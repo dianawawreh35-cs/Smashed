@@ -465,11 +465,15 @@ public class AbandonedCallImport(
             await db.SaveChangesAsync(ct);
         }
 
-        // Every call here with a Blocked ring is a blocked caller's (S-55).
+        // A call every ring of which was Blocked is a blocked caller's (S-55).
+        // Every ring, not any (M-S09, 27 Sep review): one stale Blocked ring
+        // from a laptop whose block list had not caught up turned a real
+        // abandoned call, which an agent should ring back, into a blocked one.
         var ids = calls.Where(c => c.Status == CommunicationStatuses.Abandoned).Select(c => c.Id).ToList();
         await db.Communications
             .Where(c => ids.Contains(c.Id)
-                && db.Communications.Any(r => r.AbandonedCallId == c.Id && r.Status == CommunicationStatuses.Blocked))
+                && db.Communications.Any(r => r.AbandonedCallId == c.Id)
+                && !db.Communications.Any(r => r.AbandonedCallId == c.Id && r.Status != CommunicationStatuses.Blocked))
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CommunicationStatuses.Blocked), ct);
 
         return linked;

@@ -281,14 +281,16 @@ public class PbxBlacklistSync(
             db.PbxBlacklist.Remove(row);
         }
 
-        await db.SaveChangesAsync(ct);
+        // F-14: once dialled, what the PBX now holds is written down even if the
+        // server is stopping, or the next run would dial the number again.
+        await db.SaveChangesAsync(CancellationToken.None);
 
         if (error is null)
         {
             await WriteAsync(new Dictionary<string, string>
             {
                 [Keys.LastSucceededAt] = clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture),
-            }, null, ct);
+            }, null, CancellationToken.None);
         }
     }
 

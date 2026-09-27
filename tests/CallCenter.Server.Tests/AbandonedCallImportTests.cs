@@ -230,6 +230,27 @@ public class AbandonedCallImportTests(CallCenterApiFactory factory)
         status.Should().Be(CommunicationStatuses.Blocked);
     }
 
+    [DatabaseFact]
+    public async Task One_blocked_ring_among_others_leaves_the_call_abandoned()
+    {
+        // M-S09: one laptop whose block list was stale refused a ring; another
+        // simply missed it. The caller was not blocked, and wants a call back.
+        await data.EnsurePhoneChannelAsync();
+        var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var day = RandomDay();
+        var number = TestData.NewMobile();
+        var hangUp = day.AddHours(9);
+
+        await RingAsync(agent, number, hangUp.AddSeconds(-80), CommunicationStatuses.Blocked);
+        await RingAsync(agent, number, hangUp.AddSeconds(-40), CommunicationStatuses.Missed);
+
+        await ApplyAsync(Parse(Abandoned(hangUp, 86, number)), day);
+
+        var status = await data.QueryAsync(db => db.Communications
+            .Where(c => c.RemoteNormalised == PhoneNormalizer.Normalize(number) && c.Source == CommunicationSources.Cdr).Select(c => c.Status).SingleAsync());
+        status.Should().Be(CommunicationStatuses.Abandoned);
+    }
+
     // ---- the settings -----------------------------------------------------------
 
     [DatabaseFact]

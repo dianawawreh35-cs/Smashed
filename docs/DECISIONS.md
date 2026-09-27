@@ -6884,6 +6884,48 @@ loaded Node 22 run took eleven seconds inside one test.
     `audit_log` row (`recordings`, `play`/`download`). A player's later range
     requests (seeking) are not, or one listening would be dozens of rows.
 
+## 2026-09-27 — The review's server fixes, part 3: failures that left no trace
+
+- **The queue switch cannot end up inverted (S-60, F-14).** The PBX feature
+  call now takes the caller's cancellation only before it dials. Once the PBX
+  has answered, the call runs to the end on its own time limit, and the new
+  state is saved regardless. Closing the tab mid-way used to stop it after the
+  PBX had toggled and before the server wrote that down. The blacklist codes
+  (`*30`/`*31`, S-46) share the same call and the same fix, and their result
+  is saved regardless too. **The listen-in (`*222`, S-62) was already right:**
+  if the supervisor's request goes after the PBX answers, the call is hung up
+  and nothing has been changed, so there is nothing to finish. New test: a
+  request cancelled while the PBX finishes still leaves the queue recorded as
+  open.
+- **Every failed PBX import check is recorded (S-55, M-S03).** An unexpected
+  error, not only a `PbxImportException`, now writes the time of the check and
+  the error, so the settings card says what happened and the next check waits
+  its interval instead of fetching the whole day every 20 seconds. The stack
+  goes to the log. (Committed with part 2, as it is in the same method as M-S06.)
+- **Publishing a form is one transaction (S-40, M-S05).** One advisory lock
+  queues a second publish behind the first. Clearing the old current form,
+  numbering the new one and adding it all happen in one transaction, so a
+  direction is never without a form and two publishes at once get two
+  versions. Tested with two supervisors publishing at once, three times over.
+- **Classification saves (A-40, A-43, M-S10).** Two first saves racing each
+  other become an insert and an edit, not a 500 (the same pattern as calls on
+  24 Sep). A save that changes nothing writes nothing and adds no history row.
+  It is compared as values, because the database hands 20.00 back for 20.
+- **Setting keys (S-47, M-S07).** One rule: a key is matched to the catalogue
+  ignoring case, and from then on it is the catalogue's spelling, for the
+  lookup, the write and the list alike. `PBX.HOST` used to find no row and
+  insert a second one, a 500. The Settings API has tests now (who may use it,
+  all or nothing, the audit, the case rule). There were none.
+- **An abandoned call is Blocked only if every ring was (S-55, M-S09).** The
+  comment said every ring and the code checked any, so one stale Blocked ring
+  took a real abandoned call off the call-back list.
+- **Matching a number by its last nine digits is deterministic (A-13,
+  M-S11).** The contact whose primary number matches comes first, then the
+  oldest, then the id. It is one query (`ContactMatching.ByLast9`), used by
+  the call log, the pop-up's lookup and the POS sync.
+- The CS8602 warning in `ContactCallLinker` is gone; the server builds with no
+  warnings.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

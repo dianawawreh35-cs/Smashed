@@ -1,5 +1,6 @@
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
+using CallCenter.Server.Features.Contacts;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Phone;
@@ -705,7 +706,7 @@ public class CommunicationsService(
         // collide with every other.
         return last9.Length == 9
             ? await active
-                .Where(c => c.Phones.Any(p => p.Last9 == last9))
+                .ByLast9(last9) // M-S11: the same contact every time
                 .Select(c => (Guid?)c.Id)
                 .FirstOrDefaultAsync(ct)
             : null;

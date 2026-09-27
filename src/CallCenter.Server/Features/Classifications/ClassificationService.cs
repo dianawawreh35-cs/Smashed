@@ -148,6 +148,9 @@ public class ClassificationService(
         : string.Equals(direction, Directions.None, StringComparison.OrdinalIgnoreCase) ? Directions.None
         : Directions.In;
 
+    /// <summary>The advisory lock that queues publishes one behind another (M-S05). Any number no one else uses.</summary>
+    private const long PublishLock = 40_400_001;
+
     /// <summary>
     /// Publishes a new version of the form (S-40).
     /// </summary>
@@ -189,33 +192,50 @@ public class ClassificationService(
             }
         }
 
-        // Versions are numbered across both directions: a classification
-        // points at a version, and one sequence means the number alone says
-        // which questions were asked.
-        var nextVersion = await db.FormDefinitions.MaxAsync(f => (int?)f.Version, ct) ?? 0;
-
-        // The old current is cleared first and saved separately: the partial
-        // unique index allows only one current row per direction, and setting
-        // the new one before clearing the old would collide.
-        await db.FormDefinitions
-            .Where(f => f.IsCurrent && f.Direction == direction)
-            .ExecuteUpdateAsync(set => set.SetProperty(f => f.IsCurrent, false), ct);
-
-        db.FormDefinitions.Add(new FormDefinition
+        // M-S05 (27 Sep review): one transaction, one publish at a time. It was
+        // two commits — "no current form" and then the new row — with the next
+        // version read unlocked, so two supervisors publishing at once could
+        // collide on the version and leave the direction with no form at all
+        // until someone published again. The advisory lock queues the second
+        // publish behind the first; the retrying strategy is the only way EF
+        // lets a transaction be opened by hand (see F-04).
+        var version = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            Version = nextVersion + 1,
-            Definition = definition,
-            Direction = direction,
-            IsCurrent = true,
-            CreatedBy = actingUserId,
-            CreatedAt = DateTimeOffset.UtcNow,
-        });
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({PublishLock})", ct);
 
-        await db.SaveChangesAsync(ct);
+            // Versions are numbered across both directions: a classification
+            // points at a version, and one sequence means the number alone says
+            // which questions were asked.
+            var next = (await db.FormDefinitions.MaxAsync(f => (int?)f.Version, ct) ?? 0) + 1;
+
+            // The old current is cleared first: the partial unique index allows
+            // only one current row per direction, and setting the new one before
+            // clearing the old would collide. Inside the transaction, nobody
+            // ever sees the direction without one.
+            await db.FormDefinitions
+                .Where(f => f.IsCurrent && f.Direction == direction)
+                .ExecuteUpdateAsync(set => set.SetProperty(f => f.IsCurrent, false), ct);
+
+            db.FormDefinitions.Add(new FormDefinition
+            {
+                Version = next,
+                Definition = definition,
+                Direction = direction,
+                IsCurrent = true,
+                CreatedBy = actingUserId,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return next;
+        });
 
         logger.LogInformation(
             "Classification form version {Version} ({Direction}) published by {UserId}",
-            nextVersion + 1, direction, actingUserId);
+            version, direction, actingUserId);
 
         return (await FormAsync(direction, ct), null);
     }
@@ -372,6 +392,9 @@ public class ClassificationService(
         }
 
         var before = communication.Classification is null ? null : Snapshot(communication.Classification);
+        var was = communication.Classification is { } stored
+            ? (stored.TypeId, stored.OrderValue, stored.Notes, stored.FollowUp, stored.Resolved, stored.CustomValues)
+            : default((Guid TypeId, decimal? OrderValue, string? Notes, bool FollowUp, bool? Resolved, JsonDocument CustomValues)?);
         var now = DateTimeOffset.UtcNow;
 
         var classification = communication.Classification;
@@ -387,11 +410,6 @@ public class ClassificationService(
             };
 
             db.Classifications.Add(classification);
-        }
-        else
-        {
-            classification.UpdatedBy = actingUserId;
-            classification.UpdatedAt = now;
         }
 
         classification.TypeId = type.Id;
@@ -427,9 +445,37 @@ public class ClassificationService(
 
         // The branch belongs to the call, not the classification: the reports
         // group calls by branch, and a call with no classification still has one.
-        if (request.BranchId is not null)
+        var branchChanged = request.BranchId is not null && request.BranchId != communication.BranchId;
+        if (branchChanged)
         {
             communication.BranchId = request.BranchId;
+        }
+
+        var after = Snapshot(classification);
+
+        // M-S10 (27 Sep review): the same save sent again — the Agent App's
+        // offline queue resends, a double press — changes nothing, so it writes
+        // nothing. Every resend used to add a history row (A-43) saying that
+        // nothing had changed. Compared as values, not as text: the database
+        // gives 20.00 back for an order value of 20, and a jsonb object comes
+        // back with its keys in its own order.
+        if (was is { } old && !branchChanged
+            && old.TypeId == classification.TypeId
+            && old.OrderValue == classification.OrderValue
+            && old.Notes == classification.Notes
+            && old.FollowUp == classification.FollowUp
+            && old.Resolved == classification.Resolved
+            && JsonElement.DeepEquals(old.CustomValues.RootElement, classification.CustomValues.RootElement))
+        {
+            db.ChangeTracker.Clear();
+            var (unchanged, _) = await GetAsync(communication.Id, actingUserId, actorIsSupervisor, ct);
+            return (unchanged, null);
+        }
+
+        if (before is not null)
+        {
+            classification.UpdatedBy = actingUserId;
+            classification.UpdatedAt = now;
         }
 
         communication.UpdatedAt = now;
@@ -440,10 +486,29 @@ public class ClassificationService(
             ChangedBy = actingUserId,
             ChangedAt = now,
             Before = before,
-            After = Snapshot(classification),
+            After = after,
         });
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (before is null
+            && db.Database.CurrentTransaction is null
+            && ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation } pg
+            && pg.ConstraintName == "pk_classifications")
+        {
+            // M-S10: the first classification of a call, sent twice at the same
+            // moment (the queue and a retry). Both found none and both inserted;
+            // the key let one through. The other's row is the classification,
+            // so this one becomes the edit it would have been a moment later,
+            // held to the same rules, instead of a 500.
+            logger.LogInformation(
+                "Call {CommunicationId} was classified twice at once; the second is applied as an edit", communicationId);
+
+            db.ChangeTracker.Clear();
+            return await SaveAsync(communicationId, request, actingUserId, actorIsSupervisor, ct);
+        }
 
         // Read back through the same door. Whoever got this far passed the edit
         // check, which is stricter than the read one, so it always answers.

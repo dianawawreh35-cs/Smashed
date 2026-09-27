@@ -67,7 +67,9 @@ public class SettingsService(CallCenterDbContext db, ILogger<SettingsService> lo
         var stored = await db.Settings
             .AsNoTracking()
             .Include(s => s.UpdatedByUser)
-            .ToDictionaryAsync(s => s.Key, s => s, StringComparer.OrdinalIgnoreCase, ct);
+            // Stored keys are the catalogue's spelling (M-S07), so exact. Ignoring
+            // case here would throw on a stray second row spelt differently.
+            .ToDictionaryAsync(s => s.Key, s => s, StringComparer.Ordinal, ct);
 
         return SettingsCatalog.All
             .Select(definition =>
@@ -94,6 +96,13 @@ public class SettingsService(CallCenterDbContext db, ILogger<SettingsService> lo
     {
         var problems = new Dictionary<string, string>();
 
+        // M-S07 (27 Sep review), one rule: a key is matched to the catalogue
+        // ignoring case, and from then on it is the catalogue's own spelling,
+        // for the lookup as well as the write. The lookup used to take the key
+        // as sent, which PostgreSQL compares exactly, so "PBX.HOST" found no
+        // row, a second "pbx.host" was inserted, and the answer was a 500.
+        var canonical = new Dictionary<string, string>(StringComparer.Ordinal);
+
         foreach (var (key, value) in values)
         {
             var definition = SettingsCatalog.Find(key);
@@ -103,7 +112,14 @@ public class SettingsService(CallCenterDbContext db, ILogger<SettingsService> lo
                 continue;
             }
 
-            var problem = definition.Validate(value?.Trim() ?? string.Empty);
+            var trimmed = value?.Trim() ?? string.Empty;
+            if (!canonical.TryAdd(definition.Key, trimmed))
+            {
+                problems[key] = $"is {definition.Key}, given twice";
+                continue;
+            }
+
+            var problem = definition.Validate(trimmed);
             if (problem is not null)
             {
                 problems[key] = problem;
@@ -115,19 +131,15 @@ public class SettingsService(CallCenterDbContext db, ILogger<SettingsService> lo
             return problems;
         }
 
+        var keys = canonical.Keys.ToList();
         var stored = await db.Settings
-            .Where(s => values.Keys.Contains(s.Key))
-            .ToDictionaryAsync(s => s.Key, StringComparer.OrdinalIgnoreCase, ct);
+            .Where(s => keys.Contains(s.Key))
+            .ToDictionaryAsync(s => s.Key, StringComparer.Ordinal, ct);
 
         var changed = new List<(string Key, string? Before, string After)>();
 
-        foreach (var (key, rawValue) in values)
+        foreach (var (canonicalKey, value) in canonical)
         {
-            // Catalogue lookup, so the stored key keeps its canonical spelling
-            // even if the caller sent a different case.
-            var canonicalKey = SettingsCatalog.Find(key)!.Key;
-            var value = rawValue?.Trim() ?? string.Empty;
-
             if (stored.TryGetValue(canonicalKey, out var row))
             {
                 if (row.Value == value)

@@ -54,9 +54,11 @@ public class ContactCallLinker(CallCenterDbContext db, ILogger<ContactCallLinker
             var tail = last9.Length == 9 ? last9 : null;
 
             linked += await db.Communications
+                // The null check is SQL's, in the same WHERE; the compiler cannot
+                // see across the two lambdas, hence the ! (CS8602, 27 Sep review).
                 .Where(c => c.ContactId == null && c.RemoteNormalised != null)
                 .Where(c => c.RemoteNormalised == number
-                            || (tail != null && c.RemoteNormalised.EndsWith(tail)))
+                            || (tail != null && c.RemoteNormalised!.EndsWith(tail)))
                 .ExecuteUpdateAsync(set => set.SetProperty(c => c.ContactId, contactId), ct);
         }
 

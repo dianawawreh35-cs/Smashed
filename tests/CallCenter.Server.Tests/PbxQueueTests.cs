@@ -87,6 +87,34 @@ public class PbxQueueTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
+    public async Task A_tab_closed_after_the_PBX_answered_still_leaves_the_new_state_written_down()
+    {
+        // F-14: the PBX has toggled the queue by the time the supervisor's
+        // request is cancelled. Unsaved, the next press would flip it the
+        // wrong way.
+        var (client, login) = await SupervisorAsync();
+        using var tab = new CancellationTokenSource();
+        var dialer = new DialerWhoseCallerLeaves(tab);
+
+        await ResetAsync(client);
+        try
+        {
+            await MarkAsync(client, open: false);
+
+            var result = await WithQueueAsync(dialer, TimeProvider.System, q => q.SwitchAsync(true, login.User.Id, tab.Token));
+
+            tab.IsCancellationRequested.Should().BeTrue("the request had gone by the time the PBX finished");
+            result.Ok.Should().BeTrue();
+            var status = await client.GetFromJsonAsync<QueueStatusDto>("/api/pbx/queue");
+            status!.IsOpen.Should().BeTrue("the PBX opened it, and the server says so");
+        }
+        finally
+        {
+            await CleanUpAsync();
+        }
+    }
+
+    [DatabaseFact]
     public async Task A_failed_call_leaves_the_state_as_it_was_and_says_why()
     {
         var (client, login) = await SupervisorAsync();
@@ -369,6 +397,19 @@ public class PbxQueueTests(CallCenterApiFactory factory)
         }
 
         public override DateTimeOffset GetUtcNow() => _now;
+    }
+
+    /// <summary>Answers, and the supervisor's request is cancelled while the PBX finishes.</summary>
+    private sealed class DialerWhoseCallerLeaves(CancellationTokenSource caller) : IPbxFeatureDialer
+    {
+        public Task BlacklistAsync(PbxExtension from, BlacklistAction action, string number, CancellationToken ct) =>
+            throw new InvalidOperationException("The queue switch never blacklists anything.");
+
+        public Task ToggleAsync(PbxExtension from, string code, CancellationToken ct)
+        {
+            caller.Cancel();
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NoteTakingDialer(string? failWith = null, bool answered = true) : IPbxFeatureDialer

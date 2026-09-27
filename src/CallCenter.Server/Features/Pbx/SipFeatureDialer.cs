@@ -153,11 +153,20 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
         CallAsync(from, code, string.Empty, call => call.PromptAsync("the announcement", hangUpEnds: true), ct);
 
     /// <summary>Dials <paramref name="code"/>, runs <paramref name="script"/> once answered, and hangs up.</summary>
+    /// <remarks>
+    /// <paramref name="ct"/> can stop the call only before it is dialled (F-14,
+    /// 27 Sep review). Once the PBX has answered, what the code does has
+    /// started there, so the call is finished on its own time limit: a
+    /// supervisor closing the tab mid-way used to cancel it after the PBX had
+    /// toggled the queue and before the server wrote that down, and the next
+    /// press flipped it the wrong way. The same holds for the blacklist codes.
+    /// </remarks>
     private async Task CallAsync(
         PbxExtension from, string code, string about, Func<FeatureCall, Task> script, CancellationToken ct)
     {
-        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        limit.CancelAfter(CallLimit);
+        ct.ThrowIfCancellationRequested();
+
+        using var limit = new CancellationTokenSource(CallLimit);
 
         var destination = $"sip:{code}@{from.Host}";
         var listener = new PromptListener(clock);
@@ -208,7 +217,7 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
 
             logger.LogInformation("PBX feature code: {Code} {About} done", code, about);
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (limit.IsCancellationRequested)
         {
             throw new PbxFeatureException($"The call to {code} took longer than {CallLimit.TotalMinutes:0} minutes and was ended.");
         }

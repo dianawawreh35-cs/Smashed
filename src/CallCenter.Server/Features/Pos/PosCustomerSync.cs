@@ -290,7 +290,7 @@ public class PosCustomerSync(
         var last9 = PhoneNormalizer.Last9(number);
         if (contact is null && last9.Length == 9)
         {
-            contact = await active.FirstOrDefaultAsync(c => c.Phones.Any(p => p.Last9 == last9), ct);
+            contact = await active.ByLast9(last9).FirstOrDefaultAsync(ct); // M-S11: the same contact every time
         }
 
         return contact;

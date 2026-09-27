@@ -65,12 +65,14 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
         _isOnCall = calls.State.Status != CallStatus.Idle;
         calls.StateChanged += OnCallStateChanged;
 
-        localizer.LanguageChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(Message));
-            OnPropertyChanged(nameof(PlayPauseLabel));
-            OnPropertyChanged(nameof(HoldsText));
-        };
+        localizer.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(Message));
+        OnPropertyChanged(nameof(PlayPauseLabel));
+        OnPropertyChanged(nameof(HoldsText));
     }
 
     /// <summary>Why there is nothing to play, when there is not.</summary>
@@ -354,6 +356,7 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
     public void Dispose()
     {
         _calls.StateChanged -= OnCallStateChanged;
+        Localizer.LanguageChanged -= OnLanguageChanged;
         Close();
     }
 

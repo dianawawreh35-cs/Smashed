@@ -6402,9 +6402,14 @@ logger now reads the `Serilog` section of `appsettings.json`, which it never
 did. So the `SIPSorcery: Warning` and `Microsoft: Warning` levels there now
 apply. The second one also quietens the host's own start-up lines.
 
-**M-A08.** The ring, the ringback and the key beeps use `WaveOutEvent`, which
-has its own playback thread, instead of `WaveOut` made on SIP threads and
-stopped from the UI.
+**M-A08 was wrong, and is not changed.** *Corrected later the same day:* this
+entry first said the tones had moved to `WaveOutEvent`. The build in Part 4
+then warned that `WaveOutEvent` is obsolete. In NAudio 3.0, which this app uses,
+`WaveOut` *is* the event-driven player with a playback thread of its own, and
+`WaveOutEvent` is only an old name for it. The window-callback player the review
+had in mind (the NAudio 1 and 2 `WaveOut`) is now `WaveOutWindow`, and nothing
+here uses it. So the tones were already on the safe player. The swap is undone,
+and the comments in `CadencedTonePlayer` say why.
 
 **Not tested automatically, and why.** The prompt asked for the state rules to
 be tested without a PBX if possible. They live inside `CallService` together
@@ -6558,6 +6563,48 @@ classification with it; `extension_not_yours` is tried once; a classification
 saved during the call goes after it; Try again sends a set-aside row; the name
 is cut; a classification the buffer cannot take is sent directly or reported
 failed.
+
+## 2026-09-27 — A-03 is removed; the call's keys; each sign-in cleans up after itself (F-11, M-A05, M-A06)
+
+Part 4 of prompt 17.
+
+**A-03, the audio device choice, is removed (Dia, 27 Sep): "don't add this and
+remove it from the document".** F-11 was right that it was a Must and not built.
+The answer is that it is not wanted. The SRS row is marked **Removed** with the
+reason and the ID retired, the way S-56 was, rather than deleted, so the number
+is never reused for something else. A-05 and A-18 no longer mention device
+choices. Runbook step 10 now says to make the headset the Windows default for
+input and output, because calls, the ring and recordings all use the Windows
+defaults. The three unused device fields are gone from `AgentSettingsStore`; a
+`settings.json` that still has them loads, and they are ignored.
+
+**M-A05, the keyboard (Dia's call, 27 Sep: in the app only, no global keys).**
+Ctrl+Shift with the English word's first letter: A Answer, R Reject, E End
+(hang up, or cancel a call being dialled), M Mute, H Hold. They are bound on
+the main window and on the pop-up, and shown in the pop-up's button tooltips.
+Ctrl+Shift so that nothing an agent types into a box can set one off, and a
+letter read by its key position, so the key is the same with the keyboard on
+Arabic. The service refuses each in a state it does not belong to (the Part 2
+guards on Reject and Hang up), and Answer does nothing unless a call is
+ringing. **The ringing pop-up no longer takes the keyboard.** It used to
+`Activate()`, and whatever the agent was typing (an order in the POS, a search)
+went into the pop-up or nowhere. Now it is shown without being activated,
+Topmost, and its taskbar button flashes until the agent turns to it. Clicking
+it once makes it an ordinary window again. It stays on top until then,
+including through a call answered by shortcut or auto answer. That is judged
+right: the agent needs the caller and the form in view.
+
+**M-A06, sign-out left everything behind.** The window now makes a DI scope
+for each screen it shows (the sign-in screen, the signed-in shell) and disposes
+the old one, and the old view, when it moves on. Every view model on those
+screens that listened to a singleton (the language, the phone, the
+preferences, the queue's set-aside count, the call state) now does it with a
+named handler, and takes it off in `Dispose`. So do the three views that set
+column headers on a language change, and the shell itself. The transient view
+models are resolved from the scope, which is what disposes them. One rule
+comes with it, written beside their registrations in `App.xaml.cs`: never
+resolve them from the root provider, where a transient `IDisposable` lives until
+the app exits.
 
 # Open items (live)
 

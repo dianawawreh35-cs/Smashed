@@ -35,7 +35,33 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(() => ShowNotice(key));
         localizer.LanguageChanged += (_, _) => ShowNotice(_noticeKey);
 
+        // M-A05: the call's keys work from here as well as from the pop-up.
+        CallShortcuts.Attach(this, services.GetRequiredService<CallViewModel>());
+
         ShowLogin();
+    }
+
+    /// <summary>
+    /// The scope the screen on show was built from (M-A06). Each sign-in and
+    /// each return to the sign-in screen gets a new one, and the old one is
+    /// disposed with everything it made, so the last shift's screens stop
+    /// listening to the language, the phone and the queue.
+    /// </summary>
+    private IServiceScope? _shell;
+
+    /// <summary>The view on show, disposed with its scope.</summary>
+    private IDisposable? _shellView;
+
+    /// <summary>Ends the screen on show, and starts a scope for the next.</summary>
+    private IServiceProvider NewShell()
+    {
+        _shellView?.Dispose();
+        _shellView = null;
+
+        _shell?.Dispose();
+        _shell = _services.CreateScope();
+
+        return _shell.ServiceProvider;
     }
 
     /// <summary>The notice on screen, as a label key, so it follows the language.</summary>
@@ -59,7 +85,9 @@ public partial class MainWindow : Window
     /// </param>
     private void ShowLogin(string? reason = null)
     {
-        var viewModel = _services.GetRequiredService<LoginViewModel>();
+        var services = NewShell();
+
+        var viewModel = services.GetRequiredService<LoginViewModel>();
         viewModel.SignedIn += (_, _) => ShowHome();
         viewModel.ErrorCode = reason;
 
@@ -68,9 +96,20 @@ public partial class MainWindow : Window
 
     private void ShowHome()
     {
-        var viewModel = _services.GetRequiredService<HomeViewModel>();
+        var services = NewShell();
+
+        var viewModel = services.GetRequiredService<HomeViewModel>();
         viewModel.SignedOut += (_, _) => ShowLogin();
 
-        ShellContent.Content = new HomeView(viewModel, _services);
+        var view = new HomeView(viewModel, services);
+        _shellView = view;
+        ShellContent.Content = view;
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _shellView?.Dispose();
+        _shell?.Dispose();
+        base.OnClosed(e);
     }
 }

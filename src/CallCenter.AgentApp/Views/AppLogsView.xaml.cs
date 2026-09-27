@@ -8,7 +8,7 @@ namespace CallCenter.AgentApp.Views;
 /// own beside Applications, as the Call log is for calls (Dia, 25 Sep). Shares
 /// Applications' view model, so what is recorded there is listed here at once.
 /// </summary>
-public partial class AppLogsView : UserControl
+public partial class AppLogsView : UserControl, IDisposable
 {
     /// <summary>
     /// The least the list keeps when a message is opened: the header and a few
@@ -36,7 +36,7 @@ public partial class AppLogsView : UserControl
         DataContext = viewModel;
 
         SetColumnHeaders();
-        viewModel.Localizer.LanguageChanged += (_, _) => SetColumnHeaders();
+        viewModel.Localizer.LanguageChanged += OnLanguageChanged;
 
         // Fetched when the tab is first shown, and whenever it is shown again,
         // so the list is current however long the agent spent in Applications.
@@ -55,6 +55,11 @@ public partial class AppLogsView : UserControl
         Root.Width = MinListWidth;
         Frame.SizeChanged += (_, _) => FitWidth();
     }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => SetColumnHeaders();
+
+    /// <summary>Off the language at sign-out (M-A06).</summary>
+    public void Dispose() => _viewModel.Localizer.LanguageChanged -= OnLanguageChanged;
 
     /// <summary>
     /// Gives the content the window's width, or the list's minimum when the

@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:CallCenter.AgentApp.ViewModels"
+        xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
         Title="{Binding StatusText}"
         Icon="/Assets/app.ico"
         FlowDirection="{Binding Localizer.FlowDirection}"
@@ -415,12 +416,14 @@
           <Button Content="{Binding Localizer[call.answer]}"
                   Style="{StaticResource PrimaryButton}"
                   MinWidth="120"
-                  Command="{Binding AnswerCommand}" />
+                  Command="{Binding AnswerCommand}"
+                  ToolTip="{x:Static local:CallShortcuts.Answer}" />
           <Button Content="{Binding Localizer[call.reject]}"
                   Style="{StaticResource DangerButton}"
                   MinWidth="120"
                   Margin="10,0,0,0"
-                  Command="{Binding RejectCommand}" />
+                  Command="{Binding RejectCommand}"
+                  ToolTip="{x:Static local:CallShortcuts.Reject}" />
         </StackPanel>
 
 
@@ -432,7 +435,8 @@
           <Button Content="{Binding Localizer[call.cancel]}"
                   Style="{StaticResource DangerButton}"
                   MinWidth="150"
-                  Command="{Binding HangUpCommand}" />
+                  Command="{Binding HangUpCommand}"
+                  ToolTip="{x:Static local:CallShortcuts.HangUp}" />
         </StackPanel>
 
         <!-- Connected: mute, hold, and one way out (A-12). Mute and Hold are
@@ -446,17 +450,20 @@
           <Button Content="{Binding MuteLabel}"
                   Style="{StaticResource GhostButton}"
                   MinWidth="100"
-                  Command="{Binding ToggleMuteCommand}" />
+                  Command="{Binding ToggleMuteCommand}"
+                  ToolTip="{x:Static local:CallShortcuts.Mute}" />
           <Button Content="{Binding HoldLabel}"
                   Style="{StaticResource GhostButton}"
                   MinWidth="100"
                   Margin="8,0,0,0"
-                  Command="{Binding ToggleHoldCommand}" />
+                  Command="{Binding ToggleHoldCommand}"
+                  ToolTip="{x:Static local:CallShortcuts.Hold}" />
           <Button Content="{Binding Localizer[call.hangUp]}"
                   Style="{StaticResource DangerButton}"
                   MinWidth="130"
                   Margin="8,0,0,0"
-                  Command="{Binding HangUpCommand}" />
+                  Command="{Binding HangUpCommand}"
+                  ToolTip="{x:Static local:CallShortcuts.HangUp}" />
         </StackPanel>
       </StackPanel>
     </Grid>

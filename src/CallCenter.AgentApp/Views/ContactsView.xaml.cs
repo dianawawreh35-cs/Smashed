@@ -7,7 +7,7 @@ using CallCenter.Shared.Contracts.Contacts;
 namespace CallCenter.AgentApp.Views;
 
 /// <summary>The shared contact list (A-61, A-63).</summary>
-public partial class ContactsView : UserControl
+public partial class ContactsView : UserControl, IDisposable
 {
     private readonly ContactsViewModel _viewModel;
 
@@ -19,8 +19,13 @@ public partial class ContactsView : UserControl
         DataContext = viewModel;
 
         SetColumnHeaders();
-        viewModel.Localizer.LanguageChanged += (_, _) => SetColumnHeaders();
+        viewModel.Localizer.LanguageChanged += OnLanguageChanged;
     }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => SetColumnHeaders();
+
+    /// <summary>Off the language at sign-out (M-A06).</summary>
+    public void Dispose() => _viewModel.Localizer.LanguageChanged -= OnLanguageChanged;
 
     /// <summary>
     /// A DataGrid column header is not part of the visual tree, so it cannot

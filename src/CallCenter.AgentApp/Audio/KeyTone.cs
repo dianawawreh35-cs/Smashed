@@ -19,9 +19,9 @@ namespace CallCenter.AgentApp.Audio;
 /// the beep follows within the output's buffer. A laptop with no output device
 /// stays silent and the key still works.
 ///
-/// The output is a <c>WaveOutEvent</c>, opened on a pool thread and closed from
-/// the UI; see <see cref="CadencedTonePlayer"/> for why that rules out
-/// <c>WaveOut</c> (M-A08).
+/// The output is opened on a pool thread and closed from the UI. In NAudio 3
+/// <c>WaveOut</c> is event-driven and safe for that; see
+/// <see cref="CadencedTonePlayer"/> (M-A08).
 /// </remarks>
 public sealed class KeyTone(ILogger<KeyTone> logger) : IDisposable
 {
@@ -40,7 +40,7 @@ public sealed class KeyTone(ILogger<KeyTone> logger) : IDisposable
 
     private readonly Lock _gate = new();
     private readonly Generator _generator = new();
-    private WaveOutEvent? _output;
+    private WaveOut? _output;
     private bool _failed;
 
     /// <summary>Plays the tone for one key. Unknown keys are silent. Never blocks the caller for long.</summary>
@@ -71,7 +71,7 @@ public sealed class KeyTone(ILogger<KeyTone> logger) : IDisposable
         {
             try
             {
-                var output = new WaveOutEvent();
+                var output = new WaveOut();
                 output.Init(_generator);
                 output.Play();
 
@@ -90,7 +90,7 @@ public sealed class KeyTone(ILogger<KeyTone> logger) : IDisposable
 
     public void Dispose()
     {
-        WaveOutEvent? output;
+        WaveOut? output;
 
         lock (_gate)
         {

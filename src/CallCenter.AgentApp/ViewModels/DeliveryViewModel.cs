@@ -48,8 +48,10 @@ public partial class DeliveryViewModel : ObservableObject, IDisposable
 
         Areas.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasResults));
 
-        localizer.LanguageChanged += (_, _) => OnPropertyChanged(nameof(StatusMessage));
+        localizer.LanguageChanged += OnLanguageChanged;
     }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(StatusMessage));
 
     public Localizer Localizer { get; }
 
@@ -136,6 +138,8 @@ public partial class DeliveryViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        // M-A06: off the language, with the shell's scope.
+        Localizer.LanguageChanged -= OnLanguageChanged;
         _typingTimer.Stop();
         _inFlight?.Cancel();
         _inFlight?.Dispose();

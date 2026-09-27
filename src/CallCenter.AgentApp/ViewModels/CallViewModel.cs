@@ -381,6 +381,12 @@ public partial class CallViewModel : ObservableObject
     [RelayCommand]
     private async Task AnswerAsync()
     {
+        // The shortcut (M-A05) can be pressed with nothing ringing.
+        if (!OffersAnswer)
+        {
+            return;
+        }
+
         IsAnswering = true;
 
         try

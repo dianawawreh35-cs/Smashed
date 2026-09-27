@@ -309,6 +309,10 @@ public partial class App : Application
         services.AddSingleton<CallViewModel>();
         services.AddSingleton<CallPopupWindow>();
 
+        // The screens below are transient and resolved from the scope the
+        // window makes for each sign-in and sign-out (M-A06), which disposes
+        // them when the screen goes. Never resolve them from the root: a
+        // transient IDisposable from the root is kept until the app exits.
         services.AddTransient<LoginViewModel>();
         services.AddTransient<HomeViewModel>();
         services.AddTransient<ContactsViewModel>();

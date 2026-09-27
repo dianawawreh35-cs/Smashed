@@ -15,7 +15,7 @@ namespace CallCenter.AgentApp.ViewModels;
 /// has just given their name. So the form is deliberately short: a name, a
 /// number, an address, and the delivery note that saves the driver a phone call.
 /// </remarks>
-public partial class ContactsViewModel : ObservableObject
+public partial class ContactsViewModel : ObservableObject, IDisposable
 {
     private readonly ApiClient _api;
 
@@ -29,12 +29,17 @@ public partial class ContactsViewModel : ObservableObject
 
         Results.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasResults));
 
-        localizer.LanguageChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(StatusMessage));
-            OnPropertyChanged(nameof(SameNameMessage));
-        };
+        localizer.LanguageChanged += OnLanguageChanged;
     }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(StatusMessage));
+        OnPropertyChanged(nameof(SameNameMessage));
+    }
+
+    /// <summary>Off the language at sign-out, with the shell's scope (M-A06).</summary>
+    public void Dispose() => Localizer.LanguageChanged -= OnLanguageChanged;
 
     public Localizer Localizer { get; }
 

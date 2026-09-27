@@ -15,12 +15,13 @@ namespace CallCenter.AgentApp.Audio;
 /// audio goes too, so it is heard in the same headset. Never throws out of
 /// <see cref="Start"/>: a laptop with no output device still gets the call.
 ///
-/// <b><c>WaveOutEvent</c>, not <c>WaveOut</c> (M-A08).</b> <c>WaveOut</c>
-/// delivers its buffers through window messages or callbacks on the thread
-/// that made it, and these tones are started on SIP threads and stopped from
-/// the UI: stopping a callback-driven <c>WaveOut</c> from another thread is a
-/// known NAudio deadlock on some drivers. <c>WaveOutEvent</c> has a playback
-/// thread of its own, so either thread may start or stop it.
+/// <b>Started on SIP threads and stopped from the UI, which is safe here.</b>
+/// The review of 27 Sep (M-A08) warned that NAudio's window-callback player
+/// deadlocks when used that way and asked for <c>WaveOutEvent</c>. That was
+/// true of NAudio 1 and 2. In NAudio 3, which this app uses, <c>WaveOut</c>
+/// <i>is</i> the event-driven player with a thread of its own (the old
+/// window-callback one is now <c>WaveOutWindow</c>), and <c>WaveOutEvent</c>
+/// is an obsolete alias for it. So nothing was changed.
 /// </remarks>
 /// <param name="frequencies">The sine waves mixed together, in Hz.</param>
 /// <param name="cadence">
@@ -36,7 +37,7 @@ public abstract class CadencedTonePlayer(
     double[] frequencies, double[] cadence, float volume, ILogger logger, double warbleHz = 0) : IDisposable
 {
     private readonly Lock _gate = new();
-    private WaveOutEvent? _output;
+    private WaveOut? _output;
 
     /// <summary>Starts the tone. Does nothing if it is already playing.</summary>
     public void Start()
@@ -50,7 +51,7 @@ public abstract class CadencedTonePlayer(
 
             try
             {
-                var output = new WaveOutEvent();
+                var output = new WaveOut();
                 output.Init(new Pattern(frequencies, cadence, volume, warbleHz));
                 output.Play();
                 _output = output;
@@ -65,7 +66,7 @@ public abstract class CadencedTonePlayer(
     /// <summary>Stops the tone. Safe to call when it is not playing.</summary>
     public void Stop()
     {
-        WaveOutEvent? output;
+        WaveOut? output;
 
         lock (_gate)
         {

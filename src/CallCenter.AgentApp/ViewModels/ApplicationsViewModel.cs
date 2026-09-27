@@ -116,24 +116,26 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
 
         Messages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasMessages));
 
-        localizer.LanguageChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(StatusMessage));
-            OnPropertyChanged(nameof(RecordMessage));
-            OnPropertyChanged(nameof(EditMessage));
-            OnPropertyChanged(nameof(FormUnavailable));
-            Rebuild();
-            OnPropertyChanged(nameof(Opened));
-
-            // The form's fields keep both languages and only need telling.
-            foreach (var field in Classification.Fields.Concat(OpenedClassification.Fields))
-            {
-                field.Retranslate();
-            }
-        };
+        localizer.LanguageChanged += OnLanguageChanged;
 
         ResetTime();
         FormLoaded = Classification.BeginForApplication();
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(StatusMessage));
+        OnPropertyChanged(nameof(RecordMessage));
+        OnPropertyChanged(nameof(EditMessage));
+        OnPropertyChanged(nameof(FormUnavailable));
+        Rebuild();
+        OnPropertyChanged(nameof(Opened));
+
+        // The form's fields keep both languages and only need telling.
+        foreach (var field in Classification.Fields.Concat(OpenedClassification.Fields))
+        {
+            field.Retranslate();
+        }
     }
 
     public Localizer Localizer { get; }
@@ -737,6 +739,8 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        // M-A06: off the language, with the shell's scope.
+        Localizer.LanguageChanged -= OnLanguageChanged;
         _lookupTimer.Stop();
         _searchTimer.Stop();
 

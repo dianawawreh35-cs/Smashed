@@ -6,8 +6,9 @@ namespace CallCenter.AgentApp.Services;
 
 /// <summary>
 /// The handful of choices that belong to the laptop rather than to the agent
-/// (A-03, A-05): audio devices, the UI language, the phone's own switches, and
-/// the username to pre-fill.
+/// (A-05): the UI language, the phone's own switches, and the username to
+/// pre-fill. There is no audio device choice: A-03 was removed on 27 Sep 2026,
+/// and calls use the Windows defaults.
 /// </summary>
 /// <remarks>
 /// Deliberately not a password store. Every agent has their own credentials, and
@@ -24,13 +25,6 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
 
         /// <summary>"ar" or "en" (A-80).</summary>
         public string Language { get; init; } = "ar";
-
-        /// <summary>Audio device ids, remembered per laptop (A-03).</summary>
-        public string? MicrophoneDeviceId { get; init; }
-
-        public string? SpeakerDeviceId { get; init; }
-
-        public string? RingDeviceId { get; init; }
 
         /// <summary>Turn calls away without ringing (A-18).</summary>
         public bool DoNotDisturb { get; init; }

@@ -35,6 +35,14 @@ public partial class CallPopupWindow : Window
         viewModel.CallEnded += (_, _) => Hide();
 
         SizeChanged += KeepCentreWhenResized;
+
+        // M-A05: the pop-up is shown without taking the keyboard, and stays
+        // above everything until the agent turns to it; after that it is an
+        // ordinary window again.
+        ShowActivated = false;
+        Activated += (_, _) => Topmost = false;
+
+        CallShortcuts.Attach(this, viewModel);
     }
 
     /// <summary>
@@ -82,8 +90,18 @@ public partial class CallPopupWindow : Window
     /// agent whose app is behind a browser must not miss a call because the
     /// only sign of it was a taskbar flash.
     /// </summary>
+    /// <remarks>
+    /// <b>In front, but not in focus (M-A05).</b> It used to <c>Activate()</c>,
+    /// which took the keyboard from whatever the agent was typing in: an order
+    /// in the POS, a search in the browser, a note in this app's own call log.
+    /// The keystrokes after the ring went into the pop-up, or nowhere. Now the
+    /// window is shown without being activated, <b>Topmost</b> so nothing
+    /// covers it, and its taskbar button flashes until the agent turns to it.
+    /// Clicking it, or a shortcut in the main window, is what answers.
+    /// </remarks>
     private void BringToFront()
     {
+        Topmost = true;
         Show();
 
         // A new caller starts at the top, not where the last one's form was
@@ -97,14 +115,7 @@ public partial class CallPopupWindow : Window
             WindowState = WindowState.Normal;
         }
 
-        // Topmost on and straight back off: Windows refuses Activate() from a
-        // process that does not have the foreground, which is exactly the case
-        // this has to work in. Leaving Topmost on would pin the pop-up over
-        // everything for the rest of the call, so it is turned off again once
-        // the window is up.
-        Topmost = true;
-        Activate();
-        Topmost = false;
+        TaskbarFlash.UntilActivated(this);
     }
 
     /// <summary>

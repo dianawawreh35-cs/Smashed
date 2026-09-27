@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace CallCenter.AgentApp.ViewModels;
 
 /// <summary>The sign-in screen (A-01). Username and password only — never SIP details.</summary>
-public partial class LoginViewModel : ObservableObject
+public partial class LoginViewModel : ObservableObject, IDisposable
 {
     private readonly SignInService _signIn;
 
@@ -19,8 +19,13 @@ public partial class LoginViewModel : ObservableObject
 
         // The failure is kept as a code, so the message follows the agent from
         // one language to the other while it is still on screen (A-80).
-        localizer.LanguageChanged += (_, _) => OnPropertyChanged(nameof(ErrorMessage));
+        localizer.LanguageChanged += OnLanguageChanged;
     }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(ErrorMessage));
+
+    /// <summary>Off the language once the sign-in screen goes (M-A06).</summary>
+    public void Dispose() => Localizer.LanguageChanged -= OnLanguageChanged;
 
     /// <summary>Bound by the view for its labels and the language toggle.</summary>
     public Localizer Localizer { get; }

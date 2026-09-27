@@ -13,7 +13,7 @@ namespace CallCenter.AgentApp.ViewModels;
 /// The signed-in shell: who is here, whether the phone works, how it should
 /// treat an arriving call (A-18), and the way out.
 /// </summary>
-public partial class HomeViewModel : ObservableObject
+public partial class HomeViewModel : ObservableObject, IDisposable
 {
     private readonly SignInService _signIn;
     private readonly AgentSession _session;
@@ -33,17 +33,32 @@ public partial class HomeViewModel : ObservableObject
         _preferences = preferences;
         Localizer = localizer;
 
-        localizer.LanguageChanged += (_, _) => RefreshPhone();
-        _sip.Changed += (_, _) => RefreshPhone();
+        localizer.LanguageChanged += OnPhoneChanged;
+        _sip.Changed += OnPhoneChanged;
 
         // The switches are also read from a SIP thread and could be set from
         // elsewhere later; the rail follows whatever the preferences say rather
         // than assuming it is the only thing that touches them.
-        _preferences.Changed += (_, _) =>
-        {
-            OnPropertyChanged(nameof(DoNotDisturb));
-            OnPropertyChanged(nameof(AutoAnswer));
-        };
+        _preferences.Changed += OnPreferencesChanged;
+    }
+
+    private void OnPhoneChanged(object? sender, EventArgs e) => RefreshPhone();
+
+    private void OnPreferencesChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(DoNotDisturb));
+        OnPropertyChanged(nameof(AutoAnswer));
+    }
+
+    /// <summary>
+    /// Off the singletons at sign-out, with the shell's scope (M-A06). Each
+    /// sign-in used to leave one more of these listening to the phone.
+    /// </summary>
+    public void Dispose()
+    {
+        Localizer.LanguageChanged -= OnPhoneChanged;
+        _sip.Changed -= OnPhoneChanged;
+        _preferences.Changed -= OnPreferencesChanged;
     }
 
     public Localizer Localizer { get; }

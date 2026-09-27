@@ -885,10 +885,12 @@ afterwards every time.
       starts without the red line. *If nothing appears:* the device kept
       running on the laptop's own speakers, which is not a failure. Check the
       log for "The microphone failed" or "The speaker failed".
-- [ ] **The ring and the key beeps still sound (M-A08).** They now play through
-      a different Windows audio path. Ring the extension, dial a few digits on
-      the Dial screen, and let an outgoing call ring out: all three tones as
-      before. Press Answer during the ring: it stops at once.
+- [ ] **The ring stops the instant you answer, every time.** Ring the extension
+      and press Answer; do it five times, and once with the shortcut. *M-A08
+      in the review asked for a different audio player; it turned out to be
+      the one already in use, so nothing changed. If the app ever freezes as a
+      ring stops:* send me the log, because that would prove the review right
+      after all.
 
 ### The 27 Sep review fixes: the upload queue (F-03, F-08, M-A03, M-A04) — needs the PBX and a second agent account
 
@@ -919,6 +921,31 @@ afterwards every time.
       and sign out. Start the server and sign in: the main screen comes
       straight away, and a call answered at once has its classification form.
       The backlog reaches the call log within a minute, behind you.
+
+### The 27 Sep review fixes: shortcuts, focus, and sign-out (M-A05, M-A06) — the first two need the PBX
+
+- [ ] **The ring does not take your typing (M-A05).** Start typing a sentence
+      in Notepad (or a search in the Contacts tab), and have someone ring
+      2001. The pop-up appears on top and the Agent App's taskbar button
+      flashes, but **your typing carries on in Notepad**: the letters do not
+      go into the pop-up. Click the pop-up and press Answer. *Before 27 Sep the
+      ring took the keyboard.*
+- [ ] **The shortcuts (M-A05).** With the pop-up or the main window in front:
+      **Ctrl+Shift+A** answers a ringing call, **Ctrl+Shift+R** rejects one,
+      **Ctrl+Shift+M** mutes and unmutes, **Ctrl+Shift+H** holds and resumes,
+      **Ctrl+Shift+E** hangs up (and cancels a call you are dialling). Hover
+      over each button in the pop-up: the tooltip shows its keys. Then check
+      the keys do **nothing** where they do not apply: Ctrl+Shift+R during a
+      connected call must not end it, and Ctrl+Shift+E while a call is only
+      ringing must not answer or end it. With **Notepad** in front, the keys do
+      nothing to the call: they are the app's only (Dia, 27 Sep). Try it with
+      the keyboard switched to Arabic too.
+- [ ] **Signing out and in again leaves nothing behind (M-A06).** Sign out and
+      in five times, then switch language once. Everything follows the
+      language as before, and the app is no slower. In Task Manager, the Agent
+      App's memory should not climb by a step at each sign-in. *Until 27 Sep
+      every sign-in left the last shift's screens listening, and they were
+      redrawn at every language change for the rest of the day.*
 
 ---
 

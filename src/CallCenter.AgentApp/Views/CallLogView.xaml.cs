@@ -4,7 +4,7 @@ using CallCenter.AgentApp.ViewModels;
 namespace CallCenter.AgentApp.Views;
 
 /// <summary>The agent's own calls (A-50, A-52).</summary>
-public partial class CallLogView : UserControl
+public partial class CallLogView : UserControl, IDisposable
 {
     /// <summary>
     /// The least the list keeps when a call is opened: the header and about four
@@ -25,7 +25,7 @@ public partial class CallLogView : UserControl
         DataContext = viewModel;
 
         SetColumnHeaders();
-        viewModel.Localizer.LanguageChanged += (_, _) => SetColumnHeaders();
+        viewModel.Localizer.LanguageChanged += OnLanguageChanged;
 
         // Loaded rather than in the constructor: the view is built when the
         // shell is, and fetching there would put an HTTP call on the path
@@ -51,6 +51,11 @@ public partial class CallLogView : UserControl
 
         Root.SizeChanged += (_, _) => FitOpenCall();
     }
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => SetColumnHeaders();
+
+    /// <summary>Off the language at sign-out (M-A06).</summary>
+    public void Dispose() => _viewModel.Localizer.LanguageChanged -= OnLanguageChanged;
 
     /// <summary>
     /// Caps the opened call's area at what is left once the list has its

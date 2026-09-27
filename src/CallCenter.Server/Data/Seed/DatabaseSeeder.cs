@@ -156,45 +156,80 @@ public class DatabaseSeeder(
     /// The menu, with its pictures (A-66).
     /// </summary>
     /// <remarks>
-    /// Skipped once any item exists, like everything else here: a supervisor who
-    /// has since changed a price must not have it put back on the next run.
+    /// Unlike the rest of this seeder, this is not skipped once a menu exists:
+    /// items added to <see cref="SeedData.MenuItems"/> after the first seed
+    /// reach a live server by running <c>seed</c> again. Only what is
+    /// <b>missing</b> is added — a category by folded name, an item by folded
+    /// name within its category — and nothing that exists is changed, so a
+    /// supervisor who has since changed a price does not have it put back. A
+    /// hidden item still exists and stays hidden. The one thing this cannot
+    /// tell apart is a seeded item or category a supervisor <i>renamed</i>: the
+    /// old name is missing, so it is added again, and they hide or delete it.
+    ///
+    /// A new category goes after the one that precedes it in
+    /// <see cref="SeedData.MenuCategories"/>, and the categories below it move
+    /// down one, keeping whatever order the supervisor gave them. A new item
+    /// goes at the end of its category.
     ///
     /// The pictures are embedded resources, so a fresh install needs the one DLL
     /// and no folder beside it. An item whose picture is missing from the
     /// assembly is still created — a menu without a photograph is usable, and
     /// failing the whole seed over one image would not be.
     /// </remarks>
-    private async Task<int> SeedMenuAsync(CancellationToken ct)
+    internal async Task<int> SeedMenuAsync(CancellationToken ct)
     {
-        if (await db.MenuItems.AnyAsync(ct))
+        await RestoreMenuImagesAsync(ct);
+
+        var existing = await db.MenuCategories
+            .Include(c => c.Items)
+            .ToListAsync(ct);
+
+        var categories = existing.ToDictionary(c => c.NameNormalised);
+        var previousOrder = -1;
+
+        foreach (var name in SeedData.MenuCategories)
         {
-            await RestoreMenuImagesAsync(ct);
-            return 0;
-        }
+            var normalised = NameNormalizer.Normalize(name);
 
-        var categories = new Dictionary<string, MenuCategory>();
-
-        for (var i = 0; i < SeedData.MenuCategories.Length; i++)
-        {
-            var name = SeedData.MenuCategories[i];
-
-            var category = new MenuCategory
+            if (!categories.TryGetValue(normalised, out var category))
             {
-                Name = name,
-                NameNormalised = NameNormalizer.Normalize(name),
-                SortOrder = i,
-            };
+                var order = previousOrder + 1;
 
-            categories[name] = category;
-            db.MenuCategories.Add(category);
+                foreach (var below in categories.Values.Where(c => c.SortOrder >= order))
+                {
+                    below.SortOrder++;
+                }
+
+                category = new MenuCategory
+                {
+                    Name = name,
+                    NameNormalised = normalised,
+                    SortOrder = order,
+                };
+
+                categories[normalised] = category;
+                db.MenuCategories.Add(category);
+            }
+
+            previousOrder = category.SortOrder;
         }
 
         var added = 0;
-        var position = new Dictionary<string, int>();
+
+        // Next free position in each category, after anything already in it.
+        var position = categories.Values.ToDictionary(
+            c => c.NameNormalised,
+            c => c.Items.Select(i => i.SortOrder).DefaultIfEmpty(-1).Max() + 1);
+
+        var present = categories.Values
+            .SelectMany(c => c.Items.Select(i => (c.NameNormalised, i.NameNormalised)))
+            .ToHashSet();
 
         foreach (var seed in SeedData.MenuItems)
         {
-            if (!categories.TryGetValue(seed.Category, out var category))
+            var categoryKey = NameNormalizer.Normalize(seed.Category);
+
+            if (!categories.TryGetValue(categoryKey, out var category))
             {
                 logger.LogWarning(
                     "Menu item {Name} names category {Category}, which is not seeded; skipped",
@@ -202,8 +237,12 @@ public class DatabaseSeeder(
                 continue;
             }
 
-            position.TryGetValue(seed.Category, out var order);
-            position[seed.Category] = order + 1;
+            if (!present.Add((categoryKey, NameNormalizer.Normalize(seed.Name))))
+            {
+                continue;
+            }
+
+            var order = position[categoryKey]++;
 
             var item = new MenuItem
             {

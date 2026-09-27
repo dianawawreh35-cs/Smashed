@@ -291,7 +291,7 @@ It prints what it created:
   form v1    created
   settings   6 created
   delivery   228 created
-  menu       44 created
+  menu       48 created
   contacts   15289 created
   supervisor supervisor created
 ```
@@ -550,6 +550,16 @@ Copy `update.sh` alongside the other files in step 5 (`chmod +x update.sh`).
 **When a release changes a file in `deploy/`, copy it to the server again**
 (the release notes in DECISIONS say so). `update.sh` replaces the image, not
 these files.
+
+**When a release adds menu items, run the seed once after the update:**
+```bash
+docker compose exec api dotnet CallCenter.Server.dll seed
+```
+It adds only the categories and items that are missing, with their pictures,
+and prints `menu  N created`. Nothing that exists is changed: a price the
+supervisor edited stays, and a hidden item stays hidden. The one exception is
+an item the supervisor **renamed**: its old name counts as missing, so the seed
+adds it again, and the supervisor hides or deletes that copy.
 The tag on the saved image **must** match the version you pass — the script
 refuses if `callcenter-api-v1.2.tar` does not contain `callcenter-api:v1.2`.
 

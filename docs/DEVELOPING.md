@@ -128,7 +128,9 @@ dotnet CallCenter.Server.dll seed
 The same command fills an empty database with the branches, the delivery price
 lists, the menu and the 15,289 customers carried over from the old ordering
 system - about ten seconds, almost all of it the contacts. It is idempotent, so
-running it against a database that already has them changes nothing.
+running it against a database that already has them changes nothing. The menu
+tops up, as the channels and settings do: after a row is added to
+`SeedData.MenuItems`, running `seed` again adds that item, and only that item.
 
 That customer book is embedded in the server assembly. It is regenerated from
 `docs/Contacts.xlsx` only when a newer export arrives:

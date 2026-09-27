@@ -7540,6 +7540,50 @@ closed first (Task Manager → Details → `CallCenter.AgentApp.exe`). A new app
 against the old server works, without guard 3; an old app against the new
 server is signed out when its agent signs in elsewhere, the old way.
 
+## 2026-09-27 (night) — The crispy burgers, and a menu seed that tops up (A-66)
+
+**In plain terms.** Dia added a page of the printed menu to
+`docs/smashed_menu.xlsx`: two new categories, برغر كلاسيك كرسبي (سنجل and دبل
+كرسبي برغر) and برغر دجاج كرسبي (ناشوز and بافلو كرسبي برغر), each with a
+sandwich and a meal price and a photograph. They are in the seed now, in the
+printed order after فلات برغر. That makes 14 categories and 48 items, with 43
+pictures.
+
+**The seed could not have delivered them.** It skipped the whole menu once
+any item existed, so the live server, seeded on install, would never have
+got them. Now the menu part adds whatever is **missing**: a category by folded
+name, an item by folded name within its category. It changes nothing that
+exists, so a supervisor's price stays. A hidden item still exists, so it
+stays hidden and is not added again (S-59 has hide, and no hard delete of a
+seeded item). A new category goes after the one before it in the seed, and
+the categories below move down one, keeping whatever order the supervisor
+gave them. A new item goes at the end of its category.
+
+**The one case it gets wrong** is a seeded item or category a supervisor
+renamed. Its old name counts as missing, so the seed adds it again, and the
+supervisor hides or deletes the copy. Tracking which seed rows were applied
+would close that gap. That would be a table kept for one rare case, so it was
+not built.
+
+**Transcribed from the spreadsheet by script,** not by hand, so the Arabic is
+exactly what Dia typed. The spreadsheet's other 39 pictures were compared byte
+for byte with `Data/Seed/MenuImages`, and all 39 matched. The four new ones are
+`item39.png` to `item42.png`. One thing is left as typed: the English contents
+of ناشوز كرسبي برغر mention nachos chips, and the Arabic, which is what is
+stored, does not.
+
+**Tested.** A new database test (`MenuSeedTests`) takes a seeded menu back to
+before the crispy burgers, reprices one item and hides another, seeds again,
+and checks that exactly the three missing items return, in the right places,
+with pictures, and that the price and the hidden item are untouched. A
+second run adds nothing. Another test checks that every seeded picture is
+embedded. Server suite, against PostgreSQL: 555 passed. Run for real on the
+dev database: `menu 4 created`, with 14 categories in printed order.
+
+**To deploy:** released as `v0.5.1`. After the server update, run
+`docker compose exec api dotnet CallCenter.Server.dll seed` once (runbook,
+*Updating later*). No migration, no deploy files, no Agent App change.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -7571,6 +7615,7 @@ running**.
 | Next | Requirement | Depends on |
 |---|---|---|
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |
+| **The crispy burgers on the live server**: after that update, run `seed` once and look for `menu 4 created`, then find ناشوز in the Agent App's menu | A-66 | the server on `v0.5.1`, which carries everything in `v0.5.0` too (27 Sep night entry) |
 | **Rename the three laptops** from `DESKTOP-RMSFSIV` to `AGENT-1`, `AGENT-2`, `AGENT-3` (Windows Settings → System → About → Rename this PC) | A-05, N-12 | Dia, at the laptops. The app tells them apart without it since 27 Sep evening, but the name is the part a person reads |
 | **The Users page: each agent's laptop, app version, and a "signed in twice" warning** | S-61, N-05 | nothing: the sessions have the laptop id and version. Worth doing next |
 | **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | nothing: v0.4.1 is on the server |

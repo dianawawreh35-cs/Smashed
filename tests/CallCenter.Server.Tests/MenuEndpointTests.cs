@@ -152,6 +152,20 @@ public class MenuEndpointTests(CallCenterApiFactory factory)
     }
 
     [Fact]
+    public void Every_seeded_picture_is_embedded()
+    {
+        // A picture missing from the assembly is skipped with a warning at seed
+        // time, and the item goes on the menu without its photograph.
+        var embedded = typeof(DatabaseSeeder).Assembly.GetManifestResourceNames().ToHashSet();
+
+        SeedData.MenuItems
+            .Where(i => i.Image is not null
+                && !embedded.Contains($"CallCenter.Server.Data.Seed.MenuImages.{i.Image}"))
+            .Select(i => i.Image)
+            .Should().BeEmpty();
+    }
+
+    [Fact]
     public void Only_add_ons_are_marked_as_surcharges()
     {
         // A surcharge is an amount added to another item. One marked wrongly

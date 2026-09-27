@@ -470,7 +470,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 
 - branches: رافات, بطن الهوى, ايكون, نابلس (renameable by the supervisor; the delivery areas hold a branch id, not a name)
 - delivery_areas: 228 rows from the branches' own price lists (A-65)
-- menu_categories / menu_items: 12 categories and 44 items with 39 pictures, from the printed menu (A-66)
+- menu_categories / menu_items: 14 categories and 48 items with 43 pictures, from the printed menu (A-66). The two crispy burger categories were added 2026-09-27; the seed adds any category or item that is missing and changes none that exist
 - contacts / contact_phones: 15,289 customers and 15,529 numbers, carried over from the old ordering system (A-61). The export is `docs/Contacts.xlsx`; `tools/contacts-import/convert.py` turns it into the gzipped CSV embedded in the server assembly. Numbers go through `PhoneNormalizer` at seed time, so caller matching (A-13) finds them. 69 of the 15,358 exported rows are dropped as duplicates - every number on them already belongs to a contact inserted earlier.
 - channels: Phone (system), WhatsApp, Facebook, Instagram, Wheels, Yummy, FoodOnTime, PalEat (the last three added 2026-09-25; the seed adds any name that is missing)
 - classification_types: Order, Cancellation, Complaint, Inquiry, WrongNumber, Other (Order/Complaint system)

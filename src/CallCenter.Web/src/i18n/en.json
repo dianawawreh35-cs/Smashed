@@ -70,8 +70,28 @@
         "bad_version": "The version must look like 0.4.1.",
         "not_a_program": "That file is not a Windows program. Choose the SmashedAgentApp-Setup file.",
         "too_large": "The file is larger than 400 MB.",
-        "failed": "The upload failed. Check the server is running, then try again."
-      }
+        "failed": "The upload failed. Check the server is running, then try again.",
+        "not_a_zip": "That file is not a zip. Choose the SmashedAgentApp-<version>.zip file.",
+        "version_mismatch": "The zip must be the same version as the installer. Choose both files from the same build.",
+        "no_installer": "Upload the installer first, or both together: the zip goes with it."
+      },
+      "zip": "Zip (.zip), optional",
+      "zipHint": "publish\\SmashedAgentApp-<version>.zip, from the same build. Agents are offered it for when the installer does not work.",
+      "zipFailed": "The installer was uploaded, but the zip was not."
+    },
+    "zip": {
+      "heading": "If the installer does not work",
+      "intro": "The same version as a zip, to put in place by hand.",
+      "details": "{{size}} MB",
+      "download": "Download the zip",
+      "steps": {
+        "close": "Close the Agent App.",
+        "unblock": "Right-click the zip you downloaded, choose Properties, tick Unblock at the bottom, and press OK.",
+        "empty": "Open C:\\SmashedAgentApp and delete everything in it. If the folder is not there, make it. The app keeps its settings and any calls waiting to upload somewhere else.",
+        "extract": "Right-click the zip, choose Extract All…, type C:\\SmashedAgentApp as the folder, and press Extract.",
+        "start": "Start CallCenter.AgentApp.exe in that folder, or the desktop shortcut that opens it, and sign in."
+      },
+      "once": "Only ever into C:\\SmashedAgentApp. A second copy of the app in another folder takes the agent’s calls."
     }
   },
   "dashboard": {

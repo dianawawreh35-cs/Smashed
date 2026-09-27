@@ -731,6 +731,17 @@ laptop. Build first: `tools\agent-app\publish.ps1`.
       one is in `C:\SmashedAgentApp`. Delete any other folder, and any
       desktop shortcut that points to it. *Two copies signed in as one
       agent take each other's calls (prompt 20).*
+- [ ] **The zip goes up with it.** As the supervisor, choose the installer
+      and, in the second box, `publish\SmashedAgentApp-<version>.zip`, and
+      **Upload**. The page now has *If the installer does not work* under
+      the steps, with the zip's size (about 80 MB). Put the installer in
+      the zip box instead: *not a zip*, and the installer is still offered.
+- [ ] **The zip by hand works.** On a laptop, as an agent: **Download the
+      zip** and follow the five steps on the page. After *Unblock*, the
+      app starts from `C:\SmashedAgentApp` with no blue Windows warning,
+      the offline queue and the block list are as they were, and signing
+      in works. *If Windows warns on every start, the zip was not
+      unblocked before extracting.*
 - [ ] **Arabic.** Switch the web app to Arabic: the page reads right to
       left, and the version number reads `0.4.1`, not reversed.
 - [ ] **Screenshots** of the page as an agent and as a supervisor, in

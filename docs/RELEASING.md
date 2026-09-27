@@ -226,9 +226,12 @@ script puts `http://192.168.1.100` into the published copy only. For another
 site, pass `-Server http://<address>`.
 
 **Put it on the server:** sign in to the web app as a supervisor, open
-**Agent App**, choose the `SmashedAgentApp-Setup-<version>.exe` file (the
-version fills itself in from the name) and **Upload**. It replaces the
-version before, and every agent is offered it at once.
+**Agent App**, choose the `SmashedAgentApp-Setup-<version>.exe` file and,
+in the second box, `SmashedAgentApp-<version>.zip` from the same build (the
+version fills itself in from the names), and **Upload**. They replace the
+version before, and every agent is offered them at once. The zip is the
+fallback for a laptop the installer will not run on; it is optional, but
+without it an agent has nothing to try when the installer fails.
 
 **On each laptop:** the agent signs in to the web app with their own account,
 sees only the Agent App page, downloads the installer and runs it. It installs
@@ -237,9 +240,11 @@ version's files, and makes the desktop shortcut. No administrator rights are
 needed. The app's own data (the offline call queue, the block list, the logs)
 is under `%LOCALAPPDATA%\CallCenter` and is kept.
 
-**Without the browser**, the zip still works: unzip it over
-`C:\SmashedAgentApp\` with the app closed. Never into a second folder: two
-copies signed in as one agent take each other's calls (prompt 20).
+**If the installer will not run**, the page offers the zip under it, with
+the steps: close the app, unblock the zip, empty `C:\SmashedAgentApp\`,
+extract into it, start it. **Without the browser**, the same zip carried
+over works the same way. Never into a second folder: two copies signed in
+as one agent take each other's calls (prompt 20).
 
 **Self-contained on purpose.** The app targets `net10.0-windows`, and
 `--self-contained true` bundles the runtime with it — about 185 MB and roughly

@@ -26,6 +26,9 @@ public sealed class AgentAppInstallerTests : IDisposable
     /// <summary>The first bytes of any Windows program, and a little more.</summary>
     private static readonly byte[] SomeProgram = [(byte)'M', (byte)'Z', 0x90, 0x00, 1, 2, 3, 4];
 
+    /// <summary>The first bytes of any zip, and a little more.</summary>
+    private static readonly byte[] SomeZip = [(byte)'P', (byte)'K', 3, 4, 20, 0, 5, 6, 7];
+
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "callcenter-tests", $"agent-app-{Guid.NewGuid():N}");
     private readonly WebApplicationFactory<Program> _host;
 
@@ -47,6 +50,8 @@ public sealed class AgentAppInstallerTests : IDisposable
     [InlineData("GET", "/api/agent-app")]
     [InlineData("GET", "/api/agent-app/installer")]
     [InlineData("PUT", "/api/agent-app/installer?version=0.4.1")]
+    [InlineData("GET", "/api/agent-app/zip")]
+    [InlineData("PUT", "/api/agent-app/zip?version=0.4.1")]
     public async Task Without_a_token_nothing_is_served(string method, string path)
     {
         var response = await _host.CreateClient().SendAsync(new HttpRequestMessage(new HttpMethod(method), path));
@@ -144,6 +149,88 @@ public sealed class AgentAppInstallerTests : IDisposable
         (await response.Content.ReadAsStringAsync()).Should().Contain("bad_version");
     }
 
+    [Fact]
+    public async Task The_zip_goes_beside_the_installer_and_an_agent_downloads_it()
+    {
+        var supervisor = ClientFor(UserRoles.Supervisor);
+        await Upload(supervisor, SomeProgram, "0.4.1");
+
+        var uploaded = await Upload(supervisor, SomeZip, "0.4.1", "zip");
+        uploaded.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var agent = ClientFor(UserRoles.Agent);
+        var current = await agent.GetFromJsonAsync<AgentAppInstallerDto>("/api/agent-app");
+        current!.ZipFileName.Should().Be("SmashedAgentApp-0.4.1.zip");
+        current.ZipSizeBytes.Should().Be(SomeZip.Length);
+        current.FileName.Should().Be("SmashedAgentApp-Setup-0.4.1.exe", "the installer is still offered");
+
+        var download = await agent.GetAsync("/api/agent-app/zip");
+        download.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await download.Content.ReadAsByteArrayAsync()).Should().Equal(SomeZip);
+        download.Content.Headers.ContentDisposition!.FileNameStar.Should().Be("SmashedAgentApp-0.4.1.zip");
+    }
+
+    [Fact]
+    public async Task Without_a_zip_there_is_none_to_download()
+    {
+        await Upload(ClientFor(UserRoles.Supervisor), SomeProgram, "0.4.1");
+
+        var agent = ClientFor(UserRoles.Agent);
+        var current = await agent.GetFromJsonAsync<AgentAppInstallerDto>("/api/agent-app");
+        var download = await agent.GetAsync("/api/agent-app/zip");
+
+        current!.ZipFileName.Should().BeNull();
+        download.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await download.Content.ReadAsStringAsync()).Should().Contain("no_zip");
+    }
+
+    [Fact]
+    public async Task A_zip_needs_an_installer_of_its_own_version()
+    {
+        var supervisor = ClientFor(UserRoles.Supervisor);
+
+        var first = await Upload(supervisor, SomeZip, "0.4.1", "zip");
+        first.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await first.Content.ReadAsStringAsync()).Should().Contain("no_installer");
+
+        await Upload(supervisor, SomeProgram, "0.4.1");
+        var older = await Upload(supervisor, SomeZip, "0.4.0", "zip");
+
+        older.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await older.Content.ReadAsStringAsync()).Should().Contain("version_mismatch");
+    }
+
+    [Fact]
+    public async Task A_new_installer_takes_the_old_zip_away()
+    {
+        // Otherwise the fallback beside 0.4.2 would be 0.4.1.
+        var supervisor = ClientFor(UserRoles.Supervisor);
+        await Upload(supervisor, SomeProgram, "0.4.1");
+        await Upload(supervisor, SomeZip, "0.4.1", "zip");
+
+        await Upload(supervisor, SomeProgram, "0.4.2");
+
+        var current = await supervisor.GetFromJsonAsync<AgentAppInstallerDto>("/api/agent-app");
+        current!.Version.Should().Be("0.4.2");
+        current.ZipFileName.Should().BeNull();
+        (await supervisor.GetAsync("/api/agent-app/zip")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task The_installer_is_refused_as_the_zip_and_an_agent_cannot_upload_one()
+    {
+        var supervisor = ClientFor(UserRoles.Supervisor);
+        await Upload(supervisor, SomeProgram, "0.4.1");
+
+        var wrongFile = await Upload(supervisor, SomeProgram, "0.4.1", "zip");
+        var agent = await Upload(ClientFor(UserRoles.Agent), SomeZip, "0.4.1", "zip");
+
+        wrongFile.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await wrongFile.Content.ReadAsStringAsync()).Should().Contain("not_a_zip");
+        agent.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        Directory.GetFiles(_folder).Should().HaveCount(2, "no zip, and no temporary file left behind");
+    }
+
     [Theory]
     [InlineData("0.4.1", true)]
     [InlineData("0.3.2.1", true)]
@@ -154,11 +241,12 @@ public sealed class AgentAppInstallerTests : IDisposable
     public void Version_numbers(string version, bool valid) =>
         AgentAppInstallerStore.IsVersion(version).Should().Be(valid);
 
-    private static Task<HttpResponseMessage> Upload(HttpClient client, byte[] bytes, string version)
+    private static Task<HttpResponseMessage> Upload(
+        HttpClient client, byte[] bytes, string version, string what = "installer")
     {
         var content = new ByteArrayContent(bytes);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        return client.PutAsync($"/api/agent-app/installer?version={Uri.EscapeDataString(version)}", content);
+        return client.PutAsync($"/api/agent-app/{what}?version={Uri.EscapeDataString(version)}", content);
     }
 
     private HttpClient ClientFor(string role)

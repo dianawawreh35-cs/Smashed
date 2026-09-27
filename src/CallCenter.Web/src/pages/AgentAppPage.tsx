@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   downloadAgentAppInstaller,
+  downloadAgentAppZip,
   fetchAgentAppInstaller,
   uploadAgentAppInstaller,
+  uploadAgentAppZip,
   uploadErrorCode,
   versionFromFileName,
 } from '../api/agentApp'
-import type { AgentAppInstaller, UploadErrorCode } from '../api/agentApp'
+import type { UploadErrorCode } from '../api/agentApp'
 import { UserRoles } from '../api/auth'
 import { useAuth } from '../auth/context'
 import LoadError from '../components/LoadError'
@@ -21,8 +23,9 @@ const QUERY_KEY = ['agent-app-installer']
 /**
  * The Agent App installer (N-11, S-63). An agent signs in to the web app and
  * this is the only page they see: the version on offer, a Download button, and
- * how to install it. A supervisor sees the same, and under it the form that
- * uploads a new version.
+ * how to install it; and, when the installer will not run on a laptop, the same
+ * version as a zip with the steps to put it in place by hand. A supervisor sees
+ * the same, and under it the form that uploads a new version.
  */
 export default function AgentAppPage() {
   const { t, i18n } = useTranslation()
@@ -30,6 +33,7 @@ export default function AgentAppPage() {
   const isSupervisor = user?.role === UserRoles.Supervisor
 
   const query = useQuery({ queryKey: QUERY_KEY, queryFn: fetchAgentAppInstaller })
+  const installer = query.data
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -43,16 +47,26 @@ export default function AgentAppPage() {
           <p className="text-slate-400">{t('app.loading')}</p>
         ) : query.isError ? (
           <LoadError message={t('agentApp.failed')} onRetry={() => void query.refetch()} busy={query.isFetching} />
-        ) : query.data === null ? (
+        ) : installer === null ? (
           <p role="status" className="notice-warning">
             {t(isSupervisor ? 'agentApp.noneSupervisor' : 'agentApp.noneAgent')}
           </p>
         ) : (
-          <Download installer={query.data} language={i18n.language} />
+          <DownloadCard
+            title={t('agentApp.version', { version: ltr(installer!.version) })}
+            details={t('agentApp.details', {
+              size: megabytes(installer!.sizeBytes, i18n.language),
+              date: new Date(installer!.uploadedAt).toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
+            })}
+            label={t('agentApp.download')}
+            fileName={installer!.fileName}
+            fetch={downloadAgentAppInstaller}
+            primary
+          />
         )}
       </section>
 
-      {query.data && (
+      {installer && (
         <section className="space-y-3" aria-label={t('agentApp.steps.heading')}>
           <h2 className="text-base font-semibold text-slate-100">{t('agentApp.steps.heading')}</h2>
           <ol className="list-decimal space-y-2 ps-5 text-sm text-slate-300">
@@ -64,12 +78,58 @@ export default function AgentAppPage() {
         </section>
       )}
 
+      {installer?.zipFileName && (
+        <section className="space-y-3" aria-label={t('agentApp.zip.heading')}>
+          <div>
+            <h2 className="text-base font-semibold text-slate-100">{t('agentApp.zip.heading')}</h2>
+            <p className="text-sm text-slate-400">{t('agentApp.zip.intro')}</p>
+          </div>
+
+          <DownloadCard
+            title={installer.zipFileName}
+            details={t('agentApp.zip.details', { size: megabytes(installer.zipSizeBytes ?? 0, i18n.language) })}
+            label={t('agentApp.zip.download')}
+            fileName={installer.zipFileName}
+            fetch={downloadAgentAppZip}
+          />
+
+          <ol className="list-decimal space-y-2 ps-5 text-sm text-slate-300">
+            <li>{t('agentApp.zip.steps.close')}</li>
+            <li>{t('agentApp.zip.steps.unblock')}</li>
+            <li>{t('agentApp.zip.steps.empty')}</li>
+            <li>{t('agentApp.zip.steps.extract')}</li>
+            <li>{t('agentApp.zip.steps.start')}</li>
+          </ol>
+
+          {/* Prompt 20: two copies signed in as one agent took each other's calls. */}
+          <p className="notice-warning">{t('agentApp.zip.once')}</p>
+        </section>
+      )}
+
       {isSupervisor && <Upload />}
     </div>
   )
 }
 
-function Download({ installer, language }: { installer: AgentAppInstaller; language: string }) {
+function megabytes(bytes: number, language: string): string {
+  return (bytes / 1024 / 1024).toLocaleString(language, { maximumFractionDigits: 0 })
+}
+
+function DownloadCard({
+  title,
+  details,
+  label,
+  fileName,
+  fetch,
+  primary = false,
+}: {
+  title: string
+  details: string
+  label: string
+  fileName: string
+  fetch: () => Promise<Blob>
+  primary?: boolean
+}) {
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -80,7 +140,7 @@ function Download({ installer, language }: { installer: AgentAppInstaller; langu
     setBusy(true)
     setFailed(false)
     try {
-      downloadBlob(installer.fileName, await downloadAgentAppInstaller())
+      downloadBlob(fileName, await fetch())
     } catch {
       setFailed(true)
     } finally {
@@ -88,21 +148,23 @@ function Download({ installer, language }: { installer: AgentAppInstaller; langu
     }
   }
 
-  const size = (installer.sizeBytes / 1024 / 1024).toLocaleString(language, { maximumFractionDigits: 0 })
-  const date = new Date(installer.uploadedAt).toLocaleString(language, { dateStyle: 'medium', timeStyle: 'short' })
-
   return (
     <div className="card card-body flex flex-wrap items-center justify-between gap-4">
       <div className="space-y-1">
-        <p className="text-lg font-semibold text-slate-100">
-          {t('agentApp.version', { version: ltr(installer.version) })}
+        <p className={primary ? 'text-lg font-semibold text-slate-100' : 'font-medium text-slate-100'} dir="auto">
+          {title}
         </p>
-        <p className="text-sm text-slate-400">{t('agentApp.details', { size, date })}</p>
+        <p className="text-sm text-slate-400">{details}</p>
       </div>
 
       <div className="space-y-2">
-        <button type="button" className="btn-primary" onClick={() => void onDownload()} disabled={busy}>
-          {busy ? t('agentApp.downloading') : t('agentApp.download')}
+        <button
+          type="button"
+          className={primary ? 'btn-primary' : 'btn-ghost'}
+          onClick={() => void onDownload()}
+          disabled={busy}
+        >
+          {busy ? t('agentApp.downloading') : label}
         </button>
         {failed && (
           <p role="alert" className="notice-error">
@@ -114,47 +176,75 @@ function Download({ installer, language }: { installer: AgentAppInstaller; langu
   )
 }
 
-/** S-63: a supervisor replaces what every laptop is offered. */
+/**
+ * S-63: a supervisor replaces what every laptop is offered. The installer and,
+ * optionally, the zip of the same build, sent one after the other. A zip on
+ * its own is added to the version already on offer, which the server checks.
+ */
 function Upload() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const fileInput = useRef<HTMLInputElement>(null)
+  const installerInput = useRef<HTMLInputElement>(null)
+  const zipInput = useRef<HTMLInputElement>(null)
 
-  const [file, setFile] = useState<File | null>(null)
+  const [installer, setInstaller] = useState<File | null>(null)
+  const [zip, setZip] = useState<File | null>(null)
   const [version, setVersion] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<UploadErrorCode | null>(null)
   const [done, setDone] = useState<string | null>(null)
+  // The installer went up and then the zip was refused: say which.
+  const [zipOnlyFailed, setZipOnlyFailed] = useState(false)
 
-  const upload = useMutation({
-    mutationFn: () => uploadAgentAppInstaller(file!, version.trim()),
-    onSuccess: (installer) => {
-      queryClient.setQueryData(QUERY_KEY, installer)
-      setDone(installer.version)
-      setFile(null)
-      setVersion('')
-      if (fileInput.current) fileInput.current.value = ''
-    },
-    onError: (failure) => setError(uploadErrorCode(failure)),
-  })
-
-  function onFile(chosen: File | null) {
-    setFile(chosen)
+  function onChoose(kind: 'installer' | 'zip', chosen: File | null) {
+    if (kind === 'installer') setInstaller(chosen)
+    else setZip(chosen)
     setError(null)
     setDone(null)
-    // publish.ps1 names the file after the version, so it is seldom typed.
-    if (chosen) setVersion(versionFromFileName(chosen.name))
+    setZipOnlyFailed(false)
+    // publish.ps1 names both files after the version, so it is seldom typed.
+    // The installer's name wins; the zip's only fills an empty box.
+    const found = chosen ? versionFromFileName(chosen.name) : ''
+    if (found && (kind === 'installer' || !version)) setVersion(found)
   }
 
-  function onSubmit(event: FormEvent) {
+  async function onSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!file) return
+    if (!installer && !zip) return
+
+    setBusy(true)
     setError(null)
     setDone(null)
-    upload.mutate()
+    setZipOnlyFailed(false)
+
+    const chosenVersion = version.trim()
+    let installerSaved = false
+
+    try {
+      if (installer) {
+        queryClient.setQueryData(QUERY_KEY, await uploadAgentAppInstaller(installer, chosenVersion))
+        installerSaved = true
+      }
+      if (zip) {
+        queryClient.setQueryData(QUERY_KEY, await uploadAgentAppZip(zip, chosenVersion))
+      }
+
+      setDone(chosenVersion)
+      setInstaller(null)
+      setZip(null)
+      setVersion('')
+      if (installerInput.current) installerInput.current.value = ''
+      if (zipInput.current) zipInput.current.value = ''
+    } catch (failure) {
+      setError(uploadErrorCode(failure))
+      setZipOnlyFailed(installerSaved)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4" aria-label={t('agentApp.upload.heading')}>
+    <form onSubmit={(e) => void onSubmit(e)} className="space-y-4" aria-label={t('agentApp.upload.heading')}>
       <div>
         <h2 className="page-title">{t('agentApp.upload.heading')}</h2>
         <p className="page-subtitle">{t('agentApp.upload.intro')}</p>
@@ -167,6 +257,7 @@ function Upload() {
       )}
       {error && (
         <p role="alert" className="notice-error">
+          {zipOnlyFailed && `${t('agentApp.upload.zipFailed')} `}
           {t(`agentApp.upload.errors.${error}`)}
         </p>
       )}
@@ -175,11 +266,24 @@ function Upload() {
         <label className="field">
           <span className="field-label">{t('agentApp.upload.file')}</span>
           <input
-            ref={fileInput}
+            ref={installerInput}
             type="file"
             accept=".exe"
-            disabled={upload.isPending}
-            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+            disabled={busy}
+            onChange={(e) => onChoose('installer', e.target.files?.[0] ?? null)}
+            className="input"
+          />
+        </label>
+
+        <label className="field">
+          <span className="field-label">{t('agentApp.upload.zip')}</span>
+          <span className="field-hint">{t('agentApp.upload.zipHint')}</span>
+          <input
+            ref={zipInput}
+            type="file"
+            accept=".zip"
+            disabled={busy}
+            onChange={(e) => onChoose('zip', e.target.files?.[0] ?? null)}
             className="input"
           />
         </label>
@@ -191,14 +295,14 @@ function Upload() {
             type="text"
             dir="ltr"
             value={version}
-            disabled={upload.isPending}
+            disabled={busy}
             onChange={(e) => setVersion(e.target.value)}
-            className={`input ${error === 'bad_version' ? 'input-invalid' : ''}`}
+            className={`input ${error === 'bad_version' || error === 'version_mismatch' ? 'input-invalid' : ''}`}
           />
         </label>
 
-        <button type="submit" className="btn-primary" disabled={!file || !version.trim() || upload.isPending}>
-          {upload.isPending ? t('agentApp.upload.uploading') : t('agentApp.upload.submit')}
+        <button type="submit" className="btn-primary" disabled={(!installer && !zip) || !version.trim() || busy}>
+          {busy ? t('agentApp.upload.uploading') : t('agentApp.upload.submit')}
         </button>
       </div>
     </form>

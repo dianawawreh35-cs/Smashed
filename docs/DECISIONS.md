@@ -7298,6 +7298,42 @@ folder other than `C:\SmashedAgentApp` keeps it after installing, and two
 copies signed in as one agent is what lost calls on the evening of 27 Sep.
 The checklist says to look for one on each laptop the first time.
 
+## 2026-09-27 — A zip beside the installer, for when it will not run (S-63)
+
+Asked by Dia straight after S-63: an alternative zip install, in case the
+installer does not work on a laptop. Built without asking further; the choices
+are small and are these.
+
+- **Uploaded with the installer, in the same form**: a second, optional file
+  box. Both go up with one click, the installer first. A zip on its own is
+  added to the version already on offer.
+- **Always the installer's version.** `PUT /api/agent-app/zip` is refused
+  with `version_mismatch` for any other version and `no_installer` before
+  there is one, and a new installer deletes the old zip before its
+  description is written. So an agent reaching for the fallback never gets an
+  older app than the installer beside it. It must start `PK\x03\x04`
+  (`not_a_zip`), so the installer put in the zip box is refused.
+- **Agents see it only when there is one**: a section *If the installer does
+  not work* under the install steps, with its own download
+  (`GET /api/agent-app/zip`, any signed-in account) and five steps: close the
+  app; *Unblock* the zip in its Properties, since a downloaded zip marks every
+  file taken out of it and the app would then get Windows' warning too; empty
+  `C:\SmashedAgentApp`, as the installer does, so no older file is left
+  behind; *Extract All* into that folder; start it. Then a warning that it
+  goes only there: a second copy took an agent's calls on 27 Sep (prompt 20).
+- **The upload says which file failed**: if the installer went up and the zip
+  was refused, the message says so, and the installer stays on offer.
+- Stored as `SmashedAgentApp.zip` beside the installer, named in
+  `current.json` (two new, optional fields), downloaded as
+  `SmashedAgentApp-<version>.zip`, the name `publish.ps1` gives it. No
+  migration and no new deploy file.
+
+Tests: the server (upload and download, none without an upload, the version
+rule both ways, a new installer removing the zip, the wrong file, an agent
+refused) and the page (the section only with a zip, both files in one go, the
+installer kept when the zip is refused). Not seen running yet: TESTING-checklist.md,
+Round 2, "Installing from the web app", the two zip steps.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

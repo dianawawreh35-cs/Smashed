@@ -275,7 +275,6 @@ public class SchemaTests
     [InlineData("contact_phones")]      // ON DELETE CASCADE from contacts
     [InlineData("recordings")]          // ON DELETE CASCADE from communications
     [InlineData("classifications")]     // ON DELETE CASCADE from communications
-    [InlineData("classification_history")]
     public void Dependent_rows_cascade_with_their_parent(string table)
     {
         var entity = Model.GetEntityTypes().Single(e => e.GetTableName() == table);
@@ -283,5 +282,17 @@ public class SchemaTests
         entity.GetForeignKeys().Select(f => f.DeleteBehavior)
             .Should().Contain(DeleteBehavior.Cascade,
                 $"the schema declares ON DELETE CASCADE for {table}");
+    }
+
+    [Fact]
+    public void The_classification_history_is_not_deleted_with_its_call()
+    {
+        // M-D05 (27 Sep 2026): the audit trail (A-43, N-06) is RESTRICT, so a
+        // deleted call cannot take the record of its changes along.
+        var entity = Model.GetEntityTypes().Single(e => e.GetTableName() == "classification_history");
+
+        entity.GetForeignKeys()
+            .Single(f => f.PrincipalEntityType.GetTableName() == "communications")
+            .DeleteBehavior.Should().Be(DeleteBehavior.Restrict);
     }
 }

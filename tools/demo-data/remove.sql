@@ -22,7 +22,10 @@ CREATE TEMP TABLE r_comms AS SELECT id FROM communications WHERE agent_id IN (SE
 UPDATE communications SET contact_id = NULL
 WHERE contact_id IN (SELECT id FROM r_contacts) AND id NOT IN (SELECT id FROM r_comms);
 
--- Classifications, their history and recordings cascade with the row.
+-- Classifications and recordings cascade with the row. Their change history
+-- does not, since 27 Sep 2026 (M-D05): it is the audit trail (N-06), and a
+-- call deleted by mistake must not take it along. So it goes first, here.
+DELETE FROM classification_history WHERE communication_id IN (SELECT id FROM r_comms);
 DELETE FROM follow_up_tasks
 WHERE communication_id IN (SELECT id FROM r_comms) OR closed_by_communication_id IN (SELECT id FROM r_comms)
    OR contact_id IN (SELECT id FROM r_contacts);

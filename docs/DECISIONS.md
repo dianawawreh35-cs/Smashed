@@ -6926,94 +6926,219 @@ loaded Node 22 run took eleven seconds inside one test.
 - The CS8602 warning in `ContactCallLinker` is gone; the server builds with no
   warnings.
 
+## 2026-09-27 — The review's server fixes, part 4: deployment and ops
+
+- **Logs rotate (M-D03).** Both containers log through Docker's `json-file`
+  driver at five files of 20 MB each, 200 MB per container at most. The API's
+  own daily files in `data/logs` were already capped at 30 days. The requests
+  that repeat on a timer (each laptop's block-list refresh, which is also its
+  presence; the dashboard's today; the phone badges; the blacklist card;
+  `/health`) are logged at Debug when they succeed, which production does not
+  write. A failure of any of them is still logged.
+- **`/health/ready` asks the database (M-D04).** It checks that the database
+  answers and that no migration is pending. `/health` stays "the process is
+  up", for the container's own health check, so a database restart does not
+  get the API marked unhealthy. `update.sh` waits for `/health/ready`.
+- **The classification history is `ON DELETE RESTRICT` (M-D05).** Migration
+  `ProtectClassificationHistory`; it only changes a foreign key. Nothing in
+  the application deletes a call, so nothing changes in use. The two scripts
+  that do delete calls, the test sweeper and `tools/demo-data/remove.sql`, now
+  delete the history first, on purpose.
+- **Rollback and migrations (M-D01).** `update.sh` notes the migrations the
+  database has had (`__EFMigrationsHistory`) before an update, and the name of
+  the dump `backup.sh` just made (`backups/last-update.env`). When the new
+  version never becomes ready, it rolls the image back **only if the
+  migrations are unchanged**. Otherwise it refuses, prints the dump to restore
+  and the steps, and leaves the system down rather than running the old
+  version against a database it may not read. `./update.sh --rollback` follows
+  the same rule, and is allowed again once the dump is restored, because the
+  restored database has the old migrations. The wait went from 90 s to 180 s,
+  so a long migration is not stopped half-way. `RELEASING.md` now says a
+  migration must only add, and removing takes two releases. Tried here against
+  stand-ins for docker and curl: a changed migration list refuses and prints
+  the dump, an unchanged one rolls back.
+- **Dependencies and CI (M-S12, server half).** Node 22 in the Dockerfile and
+  both workflows (the web app's tools ask for 22.12 or later). `npm ci` alone
+  in the Dockerfile. Every Microsoft 10.0.x package from 10.0.8 to 10.0.12,
+  together. `Microsoft.EntityFrameworkCore.Relational` is now named in the
+  server project, which ends the MSB3277 warning: Npgsql asks only for 10.0.4
+  or later, and the test project got 10.0.4 while the server was built against
+  10.0.8. CI has a 20-minute limit on the test job, and the stale .NET 8
+  installs and comments are gone. The release job also runs in Hebron time. **A dependency check in CI:**
+  `dotnet list package --vulnerable --include-transitive` over the whole
+  solution on the Windows job, failing on any finding (the command itself
+  always exits 0, so the step reads its output), and `npm audit --omit=dev
+  --audit-level=high` on the web job. Both are clean today. EF Core 10.0.12
+  asks for SQLitePCLRaw 2.1.12 itself, so the pin in `Directory.Packages.props`
+  and the Agent App's explicit reference to it are no longer needed. They are
+  left for whoever next touches the Agent App's project file.
+  - **This affects the Agent App's build** (the EF Core Sqlite version). It
+    builds, and its tests pass on the new version.
+- **`release.yml`:** the typed version reaches the script through `env:`,
+  quoted, and must look like `v1.2` or `v1.2-test`; `:latest` moves only for a
+  pushed tag, never for a test build from the Actions page.
+
+**Not done here, on purpose: they change the production server.**
+
+- **M-D02, a container that is not root.** What it takes: a `USER app` line in
+  the Dockerfile (the .NET 10 images ship a user `app`, uid 1654); the three
+  mounted folders `data/recordings`, `data/menu-images` and `data/logs` owned
+  by that uid on the server (`sudo chown -R 1654:1654 …`), once, before the
+  first start of such an image. The API also has to stop listening on
+  **port 80**, which needs root: either a `setcap` on `dotnet` in the image,
+  or the API on 5000 alone with the supervisor typing `:5000`, or a small
+  reverse proxy in front (which M-D06 would want anyway). **Host networking
+  stays:** the SIP calls, the PBX watch and the listen-in's audio need it (see
+  the compose file). Half a day, and one visit to the server; best done
+  together with M-D06.
+- **M-D06, TLS on the LAN.** Everything is plain HTTP: passwords at sign-in,
+  the tokens, and the SIP secret returned to the Agent App. Accepted while the
+  server is on the restaurant's LAN only, and the runbook now says so in
+  words (step 5), so the client accepts it knowingly. What it would take: a
+  certificate (from the client's own CA, or self-signed and installed on the
+  four laptops and the supervisor's PC); a reverse proxy (Caddy or nginx) in
+  the compose file on 443, sending on to the API on 5000; the Agent App's
+  `Server:BaseUrl` changed to `https://…` in `tools/agent-app/publish.ps1`,
+  and a new Agent App build on the laptops. About a day, with the laptops.
+
+## 2026-09-27 — The review's server fixes, part 5: the documents, and what the server needs
+
+**The documents that no longer described the system**, all of the review's list:
+
+- `README.md`: the status is the real one (in use, `v0.3.2`, what is built),
+  Node 22, and the folder map has every tool in `tools/`.
+- `SCHEMA.md` against the model snapshot: `users` has one `extension` and
+  `sip_secret`, not the old customer/internal pairs; `contacts.name_normalised`
+  and its index; only the settings keys that exist, plus the PBX features'
+  own internal keys; `form_definitions.direction` includes `None`; the menu's
+  columns have no defaults; `audit_log` and `pbx_events_raw` ids are identity
+  columns; `pbx_events_raw` and `outbox_sync` are written by nothing today. A
+  conventions paragraph says what the blocks leave out (foreign keys RESTRICT
+  unless marked, foreign-key indexes not listed).
+- The runbook: the example compose file is gone ("use
+  `deploy/docker-compose.yml` as it is"); step 3 no longer says the server
+  takes no part in calls; **a new step 8.3 sets up the server's own
+  extension**, and step 11 puts its password in the password manager; step 5
+  says the example keys are refused at start-up and, in so many words, that
+  everything is plain HTTP inside the LAN; step 9 describes the new
+  `backup.sh` and adds *restoring the live database*; step 10 has one
+  extension per agent; *Updating later* describes the ready check and the
+  migration rule.
+- `RECORDING_RETENTION_DAYS` is gone from `.env.example` and the runbook:
+  retention is the `recording.retention_days` setting, and nothing read it.
+- `RELEASING.md` says where the tests run (Linux, against PostgreSQL, in
+  Hebron time) and what else CI checks now.
+- *Where to pick up* is rewritten from the current state: it still listed
+  classification, done since 21 Sep, and the S-46 export, which the server's
+  own blacklist sync replaced on 26 Sep.
+
+Two small items that were on the Open items list, in files this task owns, are
+done too: the Agent App's tests run in CI (the Windows job), and the web app's
+source maps are deleted from the server image (checked: none left in
+`wwwroot`).
+
+**What the production server needs, for the release carrying parts 1 to 5**
+(in order; nothing here is done yet):
+
+1. **Check `.env` before updating.** The new version refuses to start if
+   `JWT_SECRET` or `SIP_SECRET_KEY` still contains `change-me`, or is a
+   development key (F-13). `grep -n change-me /opt/callcenter/.env` must
+   print nothing, or only the `POSTGRES_PASSWORD` line if that was never
+   changed (it is not checked, but should be). The `RECORDING_RETENTION_DAYS`
+   line can be deleted; nothing reads it.
+2. **Copy the new `deploy/` files** to `/opt/callcenter`: `docker-compose.yml`,
+   `backup.sh`, `update.sh`, and `.env.example` for reference. Then
+   `chmod +x backup.sh update.sh`.
+3. **The backup before the update.** `backup.sh` now stops, correctly, when it
+   cannot copy to `/mnt/backup`, and that disk still does not exist (Must fix
+   before handover). So until it does, make the dump by hand and update
+   without the script's backup, as for v0.3.0:
+   `docker compose exec -T db pg_dump -U callcenter callcenter | gzip > backups/db-before-<version>.sql.gz`,
+   check it is more than a few KB, then `./update.sh <version> --no-backup`.
+4. **The update** applies two migrations: `AddContactSource` (labels the
+   existing customers Seed, Agent or Pos) and `ProtectClassificationHistory`
+   (one foreign key). Both only add, so a rollback by image stays possible
+   in principle, but the new `update.sh` will refuse one anyway, because the
+   migration list changed. Restore the dump if it ever comes to that.
+5. **Log rotation** takes effect when the containers are recreated:
+   `docker compose up -d` once after the update, at a quiet moment. The
+   database restarts for a few seconds.
+6. **The Agent App on the laptops at the same time.** The server now refuses
+   a call logged under another agent's extension (`extension_not_yours`). The
+   new Agent App (prompt 17) sets such an item aside; the old one would retry
+   it for ever, and nothing behind it in that laptop's queue would reach the
+   server (review F-08).
+7. **The backup cron line is unchanged**
+   (`30 3 * * * /opt/callcenter/backup.sh >> /opt/callcenter/backups/backup.log 2>&1`),
+   and belongs in the crontab once the second disk is mounted.
+8. After it is running: the dashboard's phone badges, a queue switch and the
+   blacklist card, to confirm the server's extension (runbook 8.3) still
+   works; `curl http://localhost:5000/health/ready` answers `Healthy`.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
 is where history belongs.
 
-**Last reconciled: 2026-09-18 (flags).**
+**Last reconciled: 2026-09-27 (after the code review and its three fix
+prompts, 17 to 19, read against every dated entry since 18 September).**
 
 ## Where to pick up
 
-Contacts is the current thread. The flags (S-45) are done. What remains of it,
-and what comes after:
+**Where things stand.** The system runs on the restaurant's server as
+`v0.3.2` (RELEASING.md). Everything the Agent App does on a call is built and
+has met the real PBX: ringing, answer, hold, mute, the pop-up with the caller,
+blocking, outbound dialling, recording, and classification, which has been
+complete since 21 September (server, form, designer, the way back to a skipped
+call). So are the call log and the supervisor's call search with playback,
+contacts with their flags, delivery prices, the menu, messages from the other
+channels, the reports and the dashboard, the POS lookup, and the abandoned
+calls from the PBX. The server's own extension (26 Sep) is the fifth: it keeps
+the PBX's blacklist in step with the Blocked flag, opens and closes the queue,
+shows each agent's phone state and lets a supervisor listen in. The 27 Sep
+review's fixes are built in all three apps but **not yet released or seen
+running**.
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **The review's "fix first" list, F-01 to F-14** | A-03, A-11, R-15, R-16, R-17, S-20, S-58, N-07 | nothing — see [REVIEW-2026-09-27.md](REVIEW-2026-09-27.md). *Agent App, 27 Sep:* F-01, F-02, F-03 (the app's half), F-08 and F-09 built; F-11 dropped, A-03 removed. **Not yet seen running**: the 27 Sep sections of the checklist, Round 3 |
-| The supervisor web app's 27 Sep fixes **seen running**, in both languages | M-W01 to M-W10 | nothing: built 27 Sep, not yet seen. Checklist 1.11, with screenshots |
-| The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet. Left out of the 27 Sep web fixes by the prompt |
-| Leave the web app's source maps out of the server image | — | a Dockerfile change: since 27 Sep they are no longer linked (`sourcemap: 'hidden'`), but `dist/` is copied whole into `wwwroot`, so they are there by name |
+| **Release the 27 Sep fixes and put them on the server** | review F-01 to F-14 and most M-items | a tag, then `update.sh` with the steps in the 27 Sep server entries: new `deploy/` files, one `docker compose up -d`, the backup cron line |
+| **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | the release above, for anything that needs the new server |
+| **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
+| The web app's Users screen asks for the **current password** when a supervisor changes their own: the server has required it since 27 Sep (`currentPassword`, answers `current_password_required` / `current_password_wrong`), so until then a supervisor cannot change their own password in the web app | N-05, S-42 | nothing: the web half only |
+| The report cards' own CSV export (`src/lib/csv.ts`) neutralises formula cells and writes numbers as `="0599…"`, as the server's call-search export has since 27 Sep | R-02, S-05 | nothing: the web half only |
+| **The web app's sign-out ends its token**, as the Agent App's has since 27 Sep (M-S01) | N-05 | a session row for web sign-ins, which changes what the dashboard's *agents online* counts. Then decide whether 12 hours is still right for the web token |
+| The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet |
+| **A container that is not root** (M-D02) and **HTTPS on the LAN** (M-D06) | N-05 | changes the production server and, for HTTPS, a new Agent App build on the laptops. What each takes is in the 27 Sep part 4 entry. Until then the runbook says plainly that it is HTTP |
 | The review's Agent App items **left out of prompt 17**: a crash mid-call loses the call record and leaves raw audio in the scratch folder; the WAV is rebuilt on the UI thread at hang-up; user agents are closed but not disposed, and a 403 from a restarting PBX stops registration until the next sign-in, with no Retry; the pop-up centres on the primary monitor only; no token refresh, so the 12 h token ends a shift; `Server:HubPath` is configured and comments mention SignalR, but there is no SignalR client | A-02, A-10, A-31, N-05 | nothing |
-| Run the Agent App's tests in CI: one `dotnet test tests/CallCenter.AgentApp.Tests` step in the Windows job | — | nothing. Left out on 27 Sep only because the server session was editing `ci.yml` at the same time |
 | The upload queue's set-aside items: a way to clear one, or pass it to a supervisor. Today Try again is the only action, and a call refused as `extension_not_yours` is refused again | A-04 | Dia's call |
 | `CallService`'s state rules have no automated test (27 Sep entry, F-09) | A-12 | pulling the state machine out of `CallService` into something that can be built without SIPSorcery and a sound card |
-| **Classification: the form and the supervisor's designer** | A-40, S-40 | nothing — A-14 landed |
+| Drop the SQLitePCLRaw pin in `Directory.Packages.props` and the Agent App's explicit reference to it: EF Core 10.0.12 asks for 2.1.12 itself | — | the Agent App's project file, next time it is open |
 | Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
-| Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
-| Abandoned calls from the PBX's Calls Detail report | S-55, R-20 | **built 26 Sep and seen importing on the dev server** (26 Sep entry). Still to see: the Abandoned tab and the settings card, in both languages. Production needs a PBX user of its own (runbook 8.1), not Dia's |
-| Click-to-call from the log and from a contact | A-20 | dialling — **done**, needs its test call |
-| Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
-| Redial, call back from a missed call | A-22 | click-to-call |
-| Merging two contacts | A-63 | nothing |
-| Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's 15,358 customers is done)* | A-64 | nothing |
-| POS customer lookup: the regular check of recent callers | A-67 | **built 26 Sep and seen creating a contact on the dev server**. Still to see: that contact and its calls in the Contacts tab. The server needs `POS_LOOKUP_TOKEN` in `.env` when it is installed |
-| POS pop-up prefill: when our lookup finds nobody, fill the new-customer form from the POS for the agent to confirm | — | nothing. The POS answers in about half a second, inside A-81's one second (26 Sep entry) |
-| POS lookup on the supervisor's screens: last run, how many found, whether the POS is reachable | — | Dia's call. Today it is only in the server log |
-| Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry). |
-| Branch management: create, rename, disable | S-41 | nothing — a read-only `GET /api/branches` exists |
+| The supervisor's call search, playing and downloading a recording | S-02, S-03, S-04 | **built 24 Sep**; no entry here records a recording heard in the browser yet |
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
-| R-01 and R-04 count a passed-on call twice: should their totals and Missed column leave out untaken rings, as the dashboard now does? | R-01, R-04 | Dia's call. `WithoutUntaken` does it in one line each (26 Sep entry) |
+| Abandoned calls from the PBX's Calls Detail report | S-55, R-20 | **built 26 Sep and seen importing on the dev server**. Still to see: the Abandoned tab and the settings card, in both languages. Production needs a PBX user of its own (runbook 8.1), not Dia's |
+| POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**. Still to see: that contact and its calls in the Contacts tab. The server needs `POS_LOOKUP_TOKEN` in `.env` |
+| Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
+| The PBX's view of each phone: ringing (`early`) on the Users page | S-61 | built 26 Sep; offline, free and in a call seen, ringing not yet |
+| **Click-to-call** from the call log and from a contact (dialling from the Dial tab is built and works) | A-20 | nothing |
+| Redial, call back from a missed call | A-22 | click-to-call |
+| Blind transfer | A-15 | nothing. A *Should* |
+| Merging two contacts | A-63 | nothing |
+| Excel/CSV import *(the supervisor's own import; the one-off seed of the old system's customers is done)* | A-64 | nothing |
+| Branch management: create, rename, disable (channels, the other half of S-41, were built 25 Sep) | S-41 | nothing — a read-only `GET /api/branches` exists |
 | Call-back tasks for abandoned calls | S-51 | nothing — the abandoned calls exist, and R-20 already shows who was rung back |
 | R-21, the queue service level | R-21 | saving the answered calls' wait too: the same PBX report has it |
+| R-01 and R-04 count a passed-on call twice: should their totals and Missed column leave out untaken rings, as the dashboard now does? | R-01, R-04 | Dia's call. `WithoutUntaken` does it in one line each (26 Sep entry) |
+| POS pop-up prefill: when our lookup finds nobody, fill the new-customer form from the POS for the agent to confirm | — | nothing. The POS answers in about half a second, inside A-81's one second (26 Sep entry) |
+| POS lookup on the supervisor's screens: last run, how many found, whether the POS is reachable | — | Dia's call. Today it is only in the server log |
+| Measure the load probe once on the production server | — | the server being installed. The local collapse is gone and the pool is capped (24 Sep entry) |
 
-**A-17 works against the real PBX**, confirmed by test calls, and since A-14 the
-rejection is recorded too — a blocked call is reported with status Blocked, so it
-reaches the supervisor's reports as the requirement asks: the Calls page lists
-it, and R-01 counts it in its own column (26 Sep).
-
-One piece of A-17 stays open and cannot be closed in the Agent App:
-**declining is not hanging up.** The PBX decides what the caller hears next, so
-a queue may still hold them or pass them on. Only **S-46**, the blacklist the
-Issabel administrator loads, stops the call before it enters the queue. It is a
-*Should* in the SRS and worth more than that in practice.
-
-**A-14 landed on 19 September.** Every call the Agent App sees now reaches the
-server — answered, missed, rejected, blocked — with an on-disk queue behind it so
-nothing is lost when the server is down. That unblocks the reports (R-01 to
-R-21), the contact history (A-62), the agent's own call log (A-50), the
-classification (A-40) and the call-back tasks, none of which could start before
-it.
-
-**The calls are visible as of 20 September**: the agent's own call log in the
-Agent App (A-50) and the contact's history in the supervisor app (A-62). Neither
-has been seen running — both are unverified UI, like the pop-up.
-
-**Classification is the next substantial piece** (A-40, S-40), and the biggest
-remaining feature: a server side, the supervisor's form designer, and a form in
-the Agent App that renders fields it has never seen. One design question to
-settle first — a classification attaches to a call record, and a call made while
-the server was down has no id yet, so the classification endpoint should accept
-the SIP Call-ID and extension as an alternative key. Both already ride in the
-offline buffer together.
-
-**Pin `SQLitePCLRaw.lib.e_sqlite3` before A-14 if the offline buffer is part of
-it.** The block-list cache deliberately avoided SQLite, so the advisory has not
-been hit yet; a communications buffer that survives a network drop would hit it.
-
-Merging and import are independent of all of this and can be done whenever.
-
-The history panel (A-62) genuinely cannot start yet — it shows a contact's past
-calls, and communications do not exist until the call work lands.
-
-**Recording retention, playback and storage are server-side done** (A-33, S-04,
-S-43, 24 September). The nightly job expires audio and keeps the rows, a
-supervisor may play or download any recording and an agent may play their own,
-and `GET /api/recordings/storage` reports what the folder holds. **The agent's
-player is built** (A-50, A-51, 24 September): the call log marks recorded and
-expired calls and plays the agent's own, but nobody has heard one through it yet.
-The supervisor's player belongs to the call search (S-02, S-03), still unbuilt.
-Nobody has heard a recording through a browser.
+**Blocking a caller works at both ends.** The Agent App declines a blocked
+number's ring and records it as Blocked (A-17), and since 26 September the
+server puts the number on the PBX's own blacklist with `*30` and takes it off
+with `*31` (S-46), which stops the call before it enters the queue. The
+"export the blocked list for Issabel" that used to be on this list is not
+needed any more.
 
 ## Must fix before handover
 
@@ -7039,8 +7164,10 @@ merely unfinished. It was useful because it stayed short.
   caller, and without one they fall through to whatever is next and keep hearing
   a tone. Confirmed on 2026-09-20 that the Agent App sends `BYE` and is answered
   `200 OK`, so its own leg ends correctly — the remaining leg is the dialplan's.
-- **Blocking at the PBX (S-46)** is the only way to stop a blocked caller
-  entering the queue at all; the Agent App can only decline its own leg.
+- **The server's own extension (runbook step 8.3)** needs the feature codes
+  `*30`, `*31`, `*280` and `*222`, and leave to see the agents' extensions'
+  state. Blocking at the PBX (S-46) is done from it; it is the only way to
+  stop a blocked caller entering the queue at all.
 - **A web user for the server (S-55)**, set to English, that can open Call
   Center → Reports → Calls Detail. The abandoned-call import logs in as it every
   minute; a person's own login stops working the day they change its password.
@@ -7059,8 +7186,9 @@ describe**:
 
 1. Is incoming customer routing a **queue or a ring group**? Decides whether
    S-57 applies instead of S-55.
-2. Who administers Issabel's **Blacklist** screen, and how often will they load
-   the S-46 export?
+2. ~~Who administers Issabel's **Blacklist** screen, and how often will they load
+   the S-46 export?~~ **Answered 26 Sep:** nobody has to. The server keeps the
+   blacklist itself with `*30`/`*31`, from its own extension.
 3. What **VPN uptime and support hours** are agreed, and who is called when the
    tunnel drops?
 3b. ~~What does the dialplan expect an agent to dial?~~ **Answered 22 Sep by
@@ -7070,8 +7198,9 @@ describe**:
    The first outbound test was answered 183 Session Progress, given about eight
    seconds of early media, then **503 Service Unavailable**. That is an outbound
    route that did not complete. Listening to those eight seconds should say why,
-   because Asterisk usually announces it. **Outbound calling (A-20) cannot be
-   signed off until this is settled**, and nothing in the app can fix it.
+   because Asterisk usually announces it. **Settled in practice by 24 Sep:**
+   outbound calls were being made that evening (the entries of 24 Sep on the
+   outgoing form and the keypad).
 4. Can a **recording announcement** be added before ringing agents, if the
    client wants one?
 
@@ -7091,10 +7220,6 @@ describe**:
   command that works is
   `Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'"` and reading the
   command line.
-- **Step 10 of the server runbook still describes the old agent setup**: two
-  extensions per agent and a default branch. One extension per agent came in on
-  17 September, and `users.default_branch_id` has been dropped. Rewrite it
-  against the current Users screen before the next install.
 - **One of the three UI checks is still a throwaway script.** The label check
   became a real test on 22 September (`AgentAppLabelsTests`), after the fourth
   label to reach the screen as a raw key, and the `StaticResource` check on 27

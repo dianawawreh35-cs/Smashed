@@ -9,17 +9,22 @@ and rolls up into supervisor reports. It is built from three components — an
 **React supervisor web app** (Arabic-first dashboards and reports) served from
 the same host.
 
-> **Status: scaffold.** Every project builds, runs and is tested, but the
-> business features are not implemented yet — no entities, endpoints or
-> telephony. Those are added in the prompts under [docs/prompts/](docs/prompts/),
-> each referencing requirement IDs in the SRS and tables in the schema.
+> **Status (27 Sep 2026): in use on the restaurant's server, before handover.**
+> Released as `v0.3.2` ([docs/RELEASING.md](docs/RELEASING.md)). Built: the Agent
+> App's softphone with the caller pop-up, classification and the offline queue;
+> contacts, the call log and search; the call and message reports and the
+> dashboard; the POS customer lookup; the abandoned calls from the PBX; the PBX
+> blacklist, the queue switch, the agents' phone states and listening in. What
+> is left, and in what order, is under *Where to pick up* and *Open items* at
+> the end of [docs/DECISIONS.md](docs/DECISIONS.md). Each feature was built from
+> a prompt under [docs/prompts/](docs/prompts/), citing the SRS's requirement IDs.
 
 ## Prerequisites
 
 | Tool | Version | Notes |
 | --- | --- | --- |
 | .NET SDK | **10.0** | Pinned in [global.json](global.json) (`latestFeature` roll-forward) |
-| Node.js | **20+** | For the supervisor web app |
+| Node.js | **22.12+** | For the supervisor web app (`engines` in its `package.json`) |
 | Docker + Compose | v2 | PostgreSQL 16 in development, the full stack in production |
 | Windows 10 1809+ | — | Only to build/run the WPF agent app |
 
@@ -54,7 +59,7 @@ cp deploy/.env.example deploy/.env    # fill in every secret
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-The image builds the SPA with Node 20 and copies `dist/` into the server's
+The image builds the SPA with Node 22 and copies `dist/` into the server's
 `wwwroot`, so one container serves both the API and the web app. Full
 instructions are in [docs/DEPLOY-server-runbook.md](docs/DEPLOY-server-runbook.md).
 
@@ -62,12 +67,19 @@ instructions are in [docs/DEPLOY-server-runbook.md](docs/DEPLOY-server-runbook.m
 
 ```
 src/CallCenter.Shared/     phone normalisation, enums, DTO contracts (shared by server + agent app)
-src/CallCenter.Server/     ASP.NET Core API, SignalR hub, EF Core, background workers
+src/CallCenter.Server/     ASP.NET Core API, EF Core, the PBX features (SIP from the server's own extension), background workers
 src/CallCenter.AgentApp/   WPF softphone (SIPSorcery), SQLite offline buffer
 src/CallCenter.Web/        React 18 + Vite supervisor SPA (Arabic RTL default)
-tests/                     xUnit test projects
-tools/pbx-sim/             console app that will replay SIP events and CDR rows without a live PBX
-deploy/                    Docker Compose, .env.example, backup script
+tests/                     xUnit test projects: Shared, Server (against PostgreSQL), Agent App
+tools/agent-app/           publish.ps1: builds the Agent App for the laptops, pointed at the server
+tools/contacts-import/     convert.py: the old system's customer export into the seed file
+tools/demo-data/           add.sql / remove.sql: removable demo traffic for the dev database's reports
+tools/icons/               make_icons.py: the apps' icons from the Smashed logo
+tools/load-probe/          probe.py: many requests at once, for the concurrency work
+tools/presence-probe/      asks the PBX about extensions' states (S-61's first test)
+tools/report-probe/        a year of synthetic calls, and the time each report takes (N-02)
+tools/pbx-sim/             placeholder for a PBX simulator; not built
+deploy/                    Docker Compose, .env.example, backup.sh, update.sh
 docs/                      requirements, schema, runbook, decisions, prompt history
 ```
 

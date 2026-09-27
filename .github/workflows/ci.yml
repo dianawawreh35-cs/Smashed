@@ -27,13 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Both: the Agent App is net10.0-windows, everything else is net8.0.
+      # Everything is .NET 10 since 19 Sep 2026; the Agent App is
+      # net10.0-windows, which is why this job is on Windows.
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
+          dotnet-version: 10.0.x
 
       - name: Restore
         run: dotnet restore CallCenter.sln
@@ -41,9 +40,31 @@ jobs:
       - name: Build
         run: dotnet build CallCenter.sln --configuration Release --no-restore
 
+      # The Agent App's own tests need Windows, as the app does. They need no
+      # database, so they run here rather than on the Linux job.
+      - name: Agent App tests
+        run: dotnet test tests/CallCenter.AgentApp.Tests --configuration Release --no-build
+
+      # M-S12 (27 Sep review): nothing looked for known vulnerabilities. This
+      # is the whole solution, the Agent App included, which only builds here.
+      # `dotnet list package --vulnerable` exits 0 whatever it finds, so the
+      # step reads what it says.
+      - name: Vulnerable packages
+        shell: bash
+        run: |
+          dotnet list CallCenter.sln package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+          if grep -q "has the following vulnerable packages" vulnerable.txt; then
+            echo "::error::A NuGet package has a known vulnerability; see the list above."
+            exit 1
+          fi
+
   test:
     name: .NET test (Linux, with PostgreSQL)
     runs-on: ubuntu-latest
+
+    # A run that hangs fails in minutes, not after GitHub's six hours. A normal
+    # run is about two minutes of tests.
+    timeout-minutes: 20
 
     # The database, for the life of this job. Started before the steps run,
     # thrown away after, and reachable at localhost:5432.
@@ -113,15 +134,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      # 22: the web app's tools ask for 22.12 or later (engines in package.json).
+      - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: src/CallCenter.Web/package-lock.json
 
       - name: Install
         run: npm ci
+
+      # M-S12: a known high or critical vulnerability in what ships to the
+      # browser fails the build. Dev-only tools (Vite, Vitest) are left out:
+      # they never reach the restaurant.
+      - name: Audit
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint
         run: npm run lint

@@ -24,8 +24,13 @@ git push
 
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) then runs, on clean machines:
 
-- .NET build + all tests (Windows, because the WPF agent app needs it)
-- web build, lint and tests (Ubuntu)
+- .NET build of everything (Windows, because the WPF Agent App builds only
+  there), and a check that no NuGet package has a known vulnerability
+- the Shared and Server tests (Linux, because only Linux machines can have a
+  PostgreSQL attached; the tests run against it, in `TZ=Asia/Hebron` as the
+  server does, and give up after 20 minutes rather than six hours)
+- web install (`npm ci`), audit (no high or critical advisory in what ships),
+  lint, build and tests, on Node 22
 - Docker image build, discarded afterwards — this only proves the Dockerfile works
 
 Green means the repository builds from nothing but what is committed.
@@ -47,7 +52,8 @@ git push --tags
 
 1. runs the tests — **publishing depends on them**, so a failing version is never stored
 2. builds the image from the tagged commit
-3. pushes it to `ghcr.io/dianawawreh35-cs/callcenter-api:v1.2` (and `:latest`)
+3. pushes it to `ghcr.io/dianawawreh35-cs/callcenter-api:v1.2`, and moves
+   `:latest` to it (a pushed tag only; see below)
 4. prints the deploy commands in the run summary
 
 The image is private — it inherits this repository's visibility.
@@ -66,7 +72,9 @@ Tie these to the SRS phases: Phase 1 delivery is `v1.0.0`, Phase 2 is `v2.0.0`.
 
 The workflow also accepts a manual run with a version of your choosing
 (Actions → Release → Run workflow), for a test build that should not become a
-permanent version number.
+permanent version number. It must look like a version (`v1.2-test`), and a
+manual run **does not move `:latest`**, so a test build is never what a plain
+pull fetches (27 Sep 2026).
 
 ---
 
@@ -102,10 +110,24 @@ cd /opt/callcenter
 ./update.sh v1.2 --pull
 ```
 
-[`update.sh`](../deploy/update.sh) backs up first, keeps the running version as
-`:previous`, restarts, waits for `/health`, and rolls back automatically if the
-new version never becomes healthy. `./update.sh --rollback` goes back
-deliberately.
+[`update.sh`](../deploy/update.sh) backs up first and prints the dump's name,
+keeps the running version as `:previous`, restarts, and waits up to three
+minutes for `/health/ready`, which also asks the database. If the new version
+never becomes ready it rolls back automatically, **but only if the database
+is as it was before**. If the new version has already applied a migration, it
+stops. It says so, and prints the pre-update dump to restore first (runbook
+step 9). `./update.sh --rollback` goes back deliberately, under the same rule.
+
+### A migration must not remove what the previous release reads
+
+Rolling back swaps the image, never the database (M-D01, 27 Sep 2026). A
+migration that drops or renames a column the previous version still reads
+leaves nothing to roll back to except the dump, and restoring the dump loses
+whatever happened since the update. So a migration **only adds**: new
+tables, new columns (nullable or with a default), new indexes. Removing or
+renaming something takes two releases. The first stops reading it. The next,
+once the first has run in production, removes it. Say which kind a migration is
+in its DECISIONS entry.
 
 Full context in [DEPLOY-server-runbook.md](DEPLOY-server-runbook.md).
 

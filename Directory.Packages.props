@@ -4,31 +4,35 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
+  <!-- Every Microsoft 10.0.x package moves together, to the latest servicing
+       release (M-S12, 27 Sep 2026: 10.0.8 to 10.0.12). Moving one alone is how
+       two versions of Relational met in the test project (MSB3277). -->
   <ItemGroup Label="Entity Framework Core 10">
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
-    <!-- Pinned above what EF Core asks for. EF Core 10.0.8 still wants
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+    <!-- Pinned above what EF Core asked for. EF Core 10.0.8 still wanted
          SQLitePCLRaw 2.1.11, whose native library carries CVE-2025-6965 (high,
-         memory corruption); 2.1.12 is the first fixed release. Checked on the
-         .NET 10 upgrade: moving EF Core forward does NOT fix this, so the pin
-         stays. Referenced explicitly by the Agent App so this version wins over
-         the transitive one. Remove it only when EF Core asks for 2.1.12+. -->
+         memory corruption); 2.1.12 is the first fixed release. Referenced
+         explicitly by the Agent App so this version wins over the transitive
+         one. Since EF Core 10.0.12 (27 Sep 2026) EF Core asks for 2.1.12
+         itself, so the pin and the Agent App's reference are no longer needed
+         and can go the next time the Agent App's project file is touched. -->
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup Label="ASP.NET Core / hosting">
-    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.12" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
   </ItemGroup>
 
   <ItemGroup Label="Security">
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.1" />
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.1.2" />
   </ItemGroup>
 

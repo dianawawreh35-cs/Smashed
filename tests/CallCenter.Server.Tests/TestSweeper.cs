@@ -35,9 +35,10 @@ namespace CallCenter.Server.Tests;
 /// made straight through <c>QueryAsync</c>) stays, so tests should make
 /// contacts through <see cref="TestData"/>.
 ///
-/// The order is the foreign keys': communications first (classifications,
-/// history and recordings cascade from them), then what they point at, then
-/// what points at users, then the users.
+/// The order is the foreign keys': communications first (classifications and
+/// recordings cascade from them; their classification history does not, since
+/// M-D05, so it is deleted just before), then what they point at, then what
+/// points at users, then the users.
 /// </remarks>
 public static class TestSweeper
 {
@@ -92,9 +93,11 @@ public static class TestSweeper
                    OR branch_id IN (SELECT id FROM branches WHERE name ~ '^Test branch [0-9a-f]{{8}}$');
             """, ct);
 
-        // Communications and everything hanging off them.
+        // Communications and everything hanging off them. The classification
+        // history first: since 27 Sep (M-D05) it does not go with the call.
         await db.Database.ExecuteSqlRawAsync(
             """
+            DELETE FROM classification_history WHERE communication_id IN (SELECT id FROM sweep_comms);
             DELETE FROM follow_up_tasks
              WHERE communication_id IN (SELECT id FROM sweep_comms)
                 OR closed_by_communication_id IN (SELECT id FROM sweep_comms)

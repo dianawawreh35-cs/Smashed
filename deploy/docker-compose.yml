@@ -10,11 +10,22 @@
 # sound reach the API with no Docker NAT in the way. The agents' softphones
 # still run on their laptops.
 
+# M-D03 (27 Sep review): Docker keeps a container's console output for ever
+# unless told otherwise, and the server has one disk. Five files of 20 MB each,
+# per container, is 200 MB at most; the API's own log files in data/logs are
+# separate and roll daily (appsettings.json).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:16
     container_name: callcenter-db
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: callcenter
       POSTGRES_USER: callcenter
@@ -37,6 +48,7 @@ services:
     image: callcenter-api:latest
     container_name: callcenter-api
     restart: unless-stopped
+    logging: *logging
     # Host networking, so the container uses the host's VPN route to the
     # provider.
     network_mode: host

@@ -14,6 +14,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- Named, not left to Npgsql, which asks only for 10.0.4 or later: left
+         alone, the test project got 10.0.4 while the server was built against
+         the version Design brings (MSB3277, 27 Sep 2026). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- S-46: the server dials *30 and *31 itself, from its own extension. -->
     <PackageReference Include="SIPSorcery" />

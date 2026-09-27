@@ -2,14 +2,21 @@
 #   docker build -f src/CallCenter.Server/Dockerfile -t callcenter-api:latest .
 
 # ---------- stage 1: build the React SPA ----------
-FROM node:20-alpine AS web
+# Node 22: the web app's tools ask for 22.12 or later, and Node 20 has been
+# end-of-life since April 2026 (M-S12, 27 Sep 2026).
+FROM node:22-alpine AS web
 WORKDIR /web
 
-COPY src/CallCenter.Web/package.json src/CallCenter.Web/package-lock.json* ./
-RUN npm ci || npm install
+# npm ci alone: exactly the versions in the lockfile, the ones CI tested. The
+# old "|| npm install" fell back to whatever the registry had that day.
+COPY src/CallCenter.Web/package.json src/CallCenter.Web/package-lock.json ./
+RUN npm ci
 
 COPY src/CallCenter.Web/ ./
-RUN npm run build
+# The source maps stay out of the image: since 27 Sep they are no longer linked
+# from the scripts (sourcemap: 'hidden'), but copied into wwwroot they could
+# still be fetched by name, and they are the web app's source.
+RUN npm run build && find dist -name '*.map' -delete
 
 
 # ---------- stage 2: build and publish the API ----------

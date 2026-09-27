@@ -2,7 +2,14 @@
 
 PostgreSQL 16. UUID primary keys, all timestamps `timestamptz` (UTC), soft delete only where stated.
 Enumerations are `text` columns with CHECK constraints (simple for EF Core, readable in SQL, changeable without migrations of a type).
-This document is the source of truth for CC prompt 1; EF Core migrations must produce exactly this.
+It was written first, as the design the first prompt built from. Since then the EF Core migrations are the record, and this document is kept in step with them, a migration at a time.
+*Reconciled with the EF Core model snapshot on 27 Sep 2026 (review item, docs section).*
+
+Conventions the blocks below leave out, to stay readable:
+- Every foreign key is `ON DELETE RESTRICT` unless the block says otherwise (`CASCADE` or `SET NULL`).
+- EF Core also indexes every foreign-key column that no listed index already covers, named `ix_<table>_<column>` (for example `ix_contacts_created_by`). Those indexes are not listed.
+- A column marked `UNIQUE` is a unique index in the database, named `ix_<table>_<column>`, not a named constraint. `form_definitions.version` has a unique constraint as well (`ak_form_definitions_version`), because `classifications.form_version` references it.
+- CHECK constraints are named `ck_<table>_<column>`, for example `ck_communications_status`.
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid()
@@ -34,12 +41,9 @@ CREATE TABLE users (
   password_hash         text NOT NULL,                       -- BCrypt/Argon2
   display_name          text NOT NULL,
   role                  text NOT NULL CHECK (role IN ('Agent','Supervisor')),
-  -- The two extensions of SRS 2.3. Both make and receive calls; they differ by
-  -- who is on the other end, not by direction.
-  customer_extension    text,                                -- customers, e.g. '101'
-  customer_sip_secret   text,                                -- encrypted at rest (app-level key)
-  internal_extension    text,                                -- agents and branches, e.g. '201'
-  internal_sip_secret   text,                                -- encrypted at rest
+  -- One extension per agent (SRS 2.3, migration SingleExtensionPerAgent, 17 Sep 2026).
+  extension             text,                                -- the agent's PBX extension, e.g. '101'
+  sip_secret            text,                                -- its SIP password, encrypted at rest (app-level key)
   is_active             boolean NOT NULL DEFAULT true,
   created_at            timestamptz NOT NULL DEFAULT now(),
   last_login_at         timestamptz
@@ -47,15 +51,16 @@ CREATE TABLE users (
 
 CREATE TABLE settings (
   key         text PRIMARY KEY,           -- e.g. 'recording.retention_days', 'agent.idle_logout_minutes',
-  value       text NOT NULL,              --      'pbx.host', 'pbx.ami.user', 'callback.extension',
-  --                                         'sla.answer_seconds', 'reports.internal_numbers' (S-48)
+  value       text NOT NULL,              --      'pbx.host', 'sla.answer_seconds', 'reports.internal_numbers' (S-48);
+  --                                         the full list is in section 7
   updated_by  uuid REFERENCES users(id),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 ```
 
 Notes
-- Two extensions per agent live on the user row; the Agent App receives them after login. Secrets are never returned to the supervisor UI in clear.
+- One extension per agent lives on the user row; the Agent App receives it and its secret after login. The secret is never returned to the supervisor UI in clear.
+- There used to be two per agent, `customer_extension` and `internal_extension`, each with its secret. The migration `SingleExtensionPerAgent` (17 Sep 2026) dropped the internal pair and renamed the customer pair to `extension` and `sip_secret`. Internal calls are now told apart by the other party's number, against `reports.internal_numbers` (S-48).
 - `settings` is a key/value bag so the supervisor can change behaviour without a migration.
 
 ---
@@ -66,6 +71,7 @@ Notes
 CREATE TABLE contacts (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name             text,                       -- nullable: a bare number can be flagged before it has a name
+  name_normalised  text,                       -- NameNormalizer's folded form of name, for matching (A-63); NULL when no name
   address          text,
   notes            text,
   delivery_notes   text,                       -- gate code, landmark
@@ -96,11 +102,14 @@ CREATE TABLE contact_phones (
 CREATE UNIQUE INDEX ux_contact_phones_normalised ON contact_phones(normalised);
 CREATE INDEX ix_contact_phones_last9 ON contact_phones(last9);
 CREATE INDEX ix_contacts_name ON contacts USING gin (to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(address,'')));
+CREATE INDEX ix_contacts_name_normalised ON contacts(name_normalised);
 ```
 
 Notes
 - Matching a caller: normalise → exact match on `normalised`; if none, match on `last9` (handles 05x vs 9705x vs +9705x). Unique index on `normalised` gives duplicate detection for free.
 - Merge = move phones and communications to the target, set `merged_into_id` and `deleted_at` on the source. Never hard-delete.
+- `name_normalised` (migration `ContactNameNormalised`, 17 Sep 2026) is the name compared for the duplicate-name warning (A-63), because PostgreSQL does not treat `'أحمد'` and `'احمد'` as equal. It folds أ إ آ ٱ to ا, ى to ي, ة to ه, ؤ to و and ئ to ي, deletes the tashkeel and tatweel, lower-cases and levels the spacing. `CallCenter.Shared.Text.NameNormalizer` sets it on every save and is authoritative; the migration's SQL backfill only filled the rows that existed then. A nameless contact keeps it NULL, so it matches no other nameless contact.
+- `ix_contacts_name` is an expression index, so it exists only as raw SQL in its own migration (`AddContactsFullTextIndex`), not in the EF model.
 - `source` (migration `AddContactSource`, 27 Sep 2026): where the contact came from. `Seed` is the old system's customer book loaded by `seed`, `Agent` anything a person saved in either app, `Pos` a contact the POS lookup made (A-67). R-16 counts every contact as new in the period it was made except `Seed`. It used to be read from an empty `created_by`, which the POS lookup's contacts have too (F-10). The migration worked the existing rows out: a creator → `Agent`; no creator and made within ten minutes of the first creator-less contact (the seed runs once, in about ten seconds) → `Seed`; any other creator-less contact → `Pos`.
 
 ---
@@ -208,7 +217,8 @@ CREATE TABLE form_definitions (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   version     int NOT NULL UNIQUE,            -- one sequence across both directions
   definition  jsonb NOT NULL,                -- see JSON shape below
-  direction   varchar(10) NOT NULL DEFAULT 'In',  -- 'In' or 'Out': each has its own form (A-21, S-40)
+  direction   varchar(10) NOT NULL DEFAULT 'In',  -- 'In', 'Out' or 'None': In and Out each have their own form (A-21, S-40),
+  --                                                None is the messages' form (A-70). No CHECK: the application writes only these.
   is_current  boolean NOT NULL DEFAULT false,
   created_by  uuid REFERENCES users(id),
   created_at  timestamptz NOT NULL DEFAULT now()
@@ -236,7 +246,7 @@ CREATE INDEX ix_class_custom ON classifications USING gin (custom_values);
 
 CREATE TABLE classification_history (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  communication_id  uuid NOT NULL REFERENCES communications(id) ON DELETE CASCADE,
+  communication_id  uuid NOT NULL REFERENCES communications(id) ON DELETE RESTRICT, -- CASCADE until 27 Sep 2026 (M-D05)
   changed_by        uuid NOT NULL REFERENCES users(id),
   changed_at        timestamptz NOT NULL DEFAULT now(),
   before            jsonb,                   -- NULL on first classification
@@ -261,6 +271,9 @@ Form definition JSON shape (stored in `form_definitions.definition`):
 }
 ```
 Built-in kinds `type`, `branch`, `number`(order_value), `textarea`(notes), `checkbox`(follow_up) map to real columns; any other field goes to `custom_values`. Editing a form creates a new version and sets `is_current` for its direction; old classifications keep their `form_version` so history renders correctly. Inbound and outbound calls have separate forms (added 2026-09-24): `GET /api/classifications/form?direction=Out` returns the outbound one, and the Agent App draws whichever matches the call's direction. The type list is shared, and each form may narrow it: its `type` field can carry `"types": ["Order", "Complaint"]`, type **names** (like `showWhenType`), which the Agent App, the web editor and `ClassificationService.SaveAsync` all hold to (`type_not_offered`). No list means every type; an empty list or an unknown name is refused on publish (added 2026-09-25). The types are shared. Messages (A-70, `kind = 'App'`) have a third form under `direction = 'None'` (added 2026-09-25, migration `FormForApplications`): `GET /api/classifications/form?direction=None`. It starts as a copy of the inbound form and the supervisor edits it on its own tab. A classification is allowed on an Answered call or on an App row (which is always `Logged`); the check is `ClassificationService.CanBeClassified`.
+
+Notes
+- `classification_history.communication_id` is `ON DELETE RESTRICT` (migration `ProtectClassificationHistory`, 27 Sep 2026): the audit trail is not deleted with its call (M-D05). Nothing in the application deletes a call; a script that does must delete the history first, on purpose. `classifications` and `recordings` still cascade.
 
 ---
 
@@ -314,7 +327,7 @@ CREATE TABLE menu_categories (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name             varchar(200) NOT NULL,
   name_normalised  varchar(200) NOT NULL,
-  sort_order       int NOT NULL DEFAULT 0,       -- the order the printed menu reads
+  sort_order       int NOT NULL,                 -- the order the printed menu reads; no default, the application sets it
   is_active        boolean NOT NULL DEFAULT true
 );
 CREATE UNIQUE INDEX ux_menu_category_name ON menu_categories(name_normalised);
@@ -327,9 +340,9 @@ CREATE TABLE menu_items (
   description        text,                        -- contents, as the menu prints them
   price              numeric(10,2),               -- item alone, or the sandwich
   meal_price         numeric(10,2),               -- with fries and a drink
-  is_surcharge       boolean NOT NULL DEFAULT false,
+  is_surcharge       boolean NOT NULL,            -- no default, the application sets it
   image_file_name    varchar(200),                -- the photograph, under the menu-images folder
-  sort_order         int NOT NULL DEFAULT 0,
+  sort_order         int NOT NULL,                -- no default, the application sets it
   is_active          boolean NOT NULL DEFAULT true,
   created_by         uuid REFERENCES users(id),
   created_at         timestamptz NOT NULL DEFAULT now(),
@@ -398,15 +411,15 @@ CREATE INDEX ix_tasks_contact ON follow_up_tasks(contact_id);
 ## 6. Plumbing / audit
 
 ```sql
-CREATE TABLE pbx_events_raw (
-  id           bigserial PRIMARY KEY,
+CREATE TABLE pbx_events_raw (       -- nothing writes to this table at present (review of 27 Sep 2026)
+  id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   received_at  timestamptz NOT NULL DEFAULT now(),
   source       text NOT NULL CHECK (source IN ('AMI','CDR','SIP')),
   event_name   text,
   payload      jsonb NOT NULL
 );
 CREATE INDEX ix_pbx_events_received ON pbx_events_raw(received_at);
--- retention job deletes rows older than 30 days
+-- planned: a retention job deleting rows older than 30 days; none exists yet
 
 CREATE TABLE pbx_blacklist (        -- S-46: numbers the server has put on the PBX's own blacklist (*30), or is trying to add or remove
   number          varchar(32) PRIMARY KEY CHECK (number ~ '^[0-9]+$'),  -- as keyed into the PBX: local form, 0599123456
@@ -432,7 +445,7 @@ CREATE TABLE agent_sessions (
 CREATE INDEX ix_sessions_user ON agent_sessions(user_id, logged_in_at DESC);
 
 CREATE TABLE audit_log (
-  id           bigserial PRIMARY KEY,
+  id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   at           timestamptz NOT NULL DEFAULT now(),
   user_id      uuid REFERENCES users(id),
   entity       text NOT NULL,               -- 'contact','user','settings','form','flag','queue','listen'
@@ -443,7 +456,8 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX ix_audit_entity ON audit_log(entity, entity_id);
 
-CREATE TABLE outbox_sync (          -- server-side record of Agent App offline uploads, for idempotency
+CREATE TABLE outbox_sync (          -- server-side record of Agent App offline uploads, for idempotency;
+                                    -- nothing writes to it at present (review of 27 Sep 2026)
   client_op_id  uuid PRIMARY KEY,   -- generated on the laptop
   user_id       uuid NOT NULL REFERENCES users(id),
   applied_at    timestamptz NOT NULL DEFAULT now()
@@ -463,8 +477,14 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - form_definitions v1: the JSON above without the `reason` field (direction `In`)
 - form_definitions, outbound: `type`, `notes`, `follow_up` (direction `Out`), numbered after whatever exists. The migration `FormPerDirection` adds it to a database that predates it.
 - form_definitions, applications: a copy of v1 (direction `None`), for messages (A-70). The migration `FormForApplications` adds it to a database that predates it.
-- settings: `recording.retention_days=90`, `agent.idle_logout_minutes=240`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `cdr.interval_seconds=300`, `cdr.last_offset=0`, `agent.call_log_days=7`, `pos.lookup.interval_minutes=5`, `queue.auto_open_time=07:00`
-  - `cdr.last_offset` is the byte position in `Master.csv` the importer has read to (SRS S-55). It is state, not configuration, and is kept here so a restart resumes rather than re-reads. A file shorter than this value means the log rotated: reset to 0 and log it.
+- settings: `recording.retention_days=90`, `agent.call_log_days=7`, `pos.lookup.interval_minutes=5`, `agent.idle_logout_minutes=240`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `queue.auto_open_time=07:00` (`SeedData.Settings`). These nine are also the whole settings catalogue (`SettingsCatalog`, S-47): the only keys the supervisor may change, and any other key is refused.
+  - The server also keeps its own state in `settings`, outside the catalogue and not seeded; each row is written the first time the feature saves it:
+    - `pbx.calls.*` (the abandoned-call import, S-55): `url`, `username`, `password` (encrypted with the SIP-secret key), `interval_minutes`, `last_checked_at`, `last_succeeded_at`, `last_error`, `last_added`, `synced_through`.
+    - `pbx.features.*` (the server's own PBX extension, which places the `*30`/`*31` and `*280` feature-code calls): `extension`, `secret` (encrypted with the SIP-secret key).
+    - `pbx.queue.*` (the queue switch, S-60): `is_open`, `changed_at`, `changed_by` (a user id, or `auto`), `auto_done_on`, `auto_tried_at`, `auto_problem`, `auto_problem_on`.
+    - `pbx.blacklist.*` (the PBX blacklist sync, S-46): `last_succeeded_at`.
+  - There is no `cdr.*` setting: `cdr.interval_seconds` and `cdr.last_offset` (a `Master.csv` importer's state) were listed here but are neither seeded nor read by anything. The abandoned calls come from the PBX's Calls Detail report instead (`pbx.calls.*` above).
+  - `pbx.ip` was renamed to `pbx.host`; the migration `SingleExtensionPerAgent` deletes the left-over `pbx.ip` row.
   - `callback.extension` and `pbx.ami.enabled` were **removed on 2026-09-21**. Both belonged to approaches ruled out in SRS 4.5, and a setting the supervisor can edit that changes nothing is worse than a missing one.
 - users: one Supervisor created by the seed command
 
@@ -476,7 +496,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - Agents read all `contacts`, may create/edit name/address/notes, may not change `is_vip`/`is_blocked`.
 - Blocked check: Agent App caches `SELECT normalised FROM contact_phones JOIN contacts ... WHERE is_blocked`; refreshed on login and on push.
 - Recording retention job: for `recordings` where `uploaded_at < now() - retention`, delete file, set `deleted_at`.
-- `pbx_events_raw` older than 30 days deleted nightly.
+- `pbx_events_raw` older than 30 days deleted nightly (planned; nothing writes to the table and no job exists yet).
 
 ---
 

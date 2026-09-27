@@ -97,11 +97,17 @@ sudo ufw allow from 192.168.1.0/24 to any port 5000 proto tcp
 sudo ufw enable
 sudo ufw status
 ```
-Nothing else is opened. **The server takes no part in the phone calls.** The
-softphone runs on each agent's laptop, which registers with the PBX itself. Older
-copies of this runbook also opened `5060/udp` and `10000:10100/udp` for a
-call-back extension on the server. That feature was removed on 19 September 2026
-(S-56), so don't open those ports.
+Nothing else is opened. **The agents' calls do not go through the server.**
+The softphone runs on each agent's laptop, which registers with the PBX itself.
+**The server does talk to the PBX, from an extension of its own** (since v0.3.0,
+step 8.3). It dials the feature codes that keep the PBX's blacklist in step with
+the Blocked flag (`*30`/`*31`, S-46) and open or close the queue (`*280`, S-60).
+It asks the PBX what each agent's phone is doing (S-61), and it dials `*222` so
+a supervisor can listen in (S-62). All of that starts from the server, over the
+VPN, so **no port is opened for it**: the PBX's replies and the listen-in's
+sound come back on the conversations the server started. Older copies of this
+runbook opened `5060/udp` and `10000:10100/udp` for a call-back extension. That
+was removed on 19 September 2026 (S-56), so don't open those ports.
 
 Port 80 is what lets the supervisor open the dashboard by typing the server
 address on its own, with no port number after it. Nothing listens on 5001, so
@@ -147,8 +153,10 @@ sudo mkdir -p /opt/callcenter/data/postgres /opt/callcenter/data/recordings /opt
 sudo chown -R smashed:smashed /opt/callcenter
 cd /opt/callcenter
 ```
-From your laptop, copy the deployment files from your repo:
+From your laptop, copy the deployment files from the repository's `deploy/`
+folder, **as they are**:
 ```bash
+cd deploy
 scp docker-compose.yml .env.example backup.sh update.sh smashed@192.168.1.100:/opt/callcenter/
 ```
 Back on the server:
@@ -161,11 +169,18 @@ Fill in:
 POSTGRES_PASSWORD=<long random>
 JWT_SECRET=<long random, 64+ chars>
 SIP_SECRET_KEY=<long random, 32+ chars>
-RECORDING_RETENTION_DAYS=90
 POS_LOOKUP_TOKEN=<the token the POS issued>
 TZ=Asia/Hebron
 ```
-Generate random values with `openssl rand -base64 48`.
+Generate random values with `openssl rand -base64 48`. **Replace every
+`change-me` value.** Since 27 Sep 2026 the API refuses to start with the example
+values from `.env.example`, and says which line to fill in (F-13): they are in
+the repository for anyone to read.
+
+**How long recordings are kept is not in this file.** It is the
+`recording.retention_days` setting on the supervisor's Settings screen, 90 days
+by default (A-33, S-43). Older copies had `RECORDING_RETENTION_DAYS` here, and
+nothing ever read it.
 
 `POS_LOOKUP_TOKEN` is the bearer token for the POS's customer lookup. With it,
 every few minutes (the supervisor sets how often, five by default) the server asks the POS about recent callers nobody has on
@@ -179,45 +194,29 @@ supervisor app, and it's set in step 7. Older copies had `PBX_IP` or `PBX_HOST`
 here, and nothing ever read either of them.
 
 `JWT_SECRET` signs the tokens agents and supervisors hold; changing it signs
-everyone out. `SIP_SECRET_KEY` encrypts the agents' SIP secrets in the database,
-so a database dump does not hand over the extensions' passwords — keep both in
-the password manager. The API refuses to start if either is missing.
+everyone out. `SIP_SECRET_KEY` encrypts the agents' SIP secrets and the server's
+own extension's password in the database, so a database dump does not hand over
+the extensions' passwords — keep both in the password manager. The API refuses
+to start if either is missing, or still the example.
 
-Reference `docker-compose.yml` (adjust image name):
-```yaml
-services:
-  db:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: callcenter
-      POSTGRES_USER: callcenter
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      TZ: ${TZ}
-    volumes:
-      - ./data/postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U callcenter"]
-      interval: 10s
-      retries: 10
+**Use `docker-compose.yml` from the repository as it is.** There used to be an
+example of it here, and it had fallen behind: it lacked the signing keys, the
+POS token, port 80, the logs folder and the log rotation. The real one is
+commented line by line. In short: PostgreSQL listens on the server itself only
+(`127.0.0.1:5432`), and the API uses the host's network (`network_mode: host`),
+which is how it reaches the PBX over the server's VPN (step 8). The API answers
+on port 80 for the supervisor and 5000 for the health check. Each container's
+console log is capped at 200 MB.
 
-  api:
-    image: callcenter-api:latest
-    restart: unless-stopped
-    network_mode: host          # uses the host's VPN route to the PBX (step 8)
-    env_file: .env
-    environment:
-      ConnectionStrings__Default: Host=127.0.0.1;Database=callcenter;Username=callcenter;Password=${POSTGRES_PASSWORD}
-      Recordings__Path: /data/recordings
-      MenuImages__Path: /data/menu-images
-    volumes:
-      - ./data/recordings:/data/recordings
-      - ./data/menu-images:/data/menu-images
-    depends_on:
-      db:
-        condition: service_healthy
-```
-Because `api` uses host networking, Postgres must publish its port to the host — add `ports: ["127.0.0.1:5432:5432"]` to the `db` service so it's reachable only locally.
+**Everything is plain HTTP, and that is accepted knowingly.** Passwords at
+sign-in, the tokens the apps hold, and the SIP password the Agent App is given
+at sign-in all cross the restaurant's LAN unencrypted. Anyone on that LAN
+with the right tool could read them. That is accepted because the server
+is reachable from the LAN only (step 3) and the LAN is the restaurant's own.
+Turning on HTTPS (M-D06) needs a certificate on the server and trusted by the
+four laptops and the supervisor's PC, and a new Agent App build. It is listed in
+DECISIONS' Open items. **Tell the client this at handover** (step 11), so it is
+their decision too.
 
 ---
 
@@ -260,8 +259,8 @@ read -s T && echo "$T" | docker login ghcr.io -u dianawawreh35-cs --password-std
 chmod +x update.sh backup.sh
 ./update.sh v1.0 --pull --no-backup
 ```
-That pulls the image, starts it, waits for `/health`, and rolls back if it does
-not come up. `postgres:16` is fetched from Docker Hub automatically.
+That pulls the image, starts it, waits for `/health/ready` (the database
+included), and rolls back if it does not come up. `postgres:16` is fetched from Docker Hub automatically.
 `--no-backup` is for this first install only. The script backs up before every
 update, and with no database yet (and no backup disk until step 9) that backup
 would fail and stop the install. Leave it off every later update.
@@ -379,6 +378,35 @@ docker compose logs api | grep -i "abandoned\|PBX" | tail
 ```
 Test: call the restaurant number and hang up while it is still ringing. It should appear under Call reports → **Abandoned** within a minute — not instantly. The Abandoned tab's **Fetch from PBX** button downloads the chosen period at once.
 
+### 8.3 The server's own extension (S-46, S-60, S-61, S-62)
+
+**What it does:** the server calls the PBX from an extension of its own. It
+dials `*30`/`*31` to add a number to the PBX's blacklist or take it off,
+following the Blocked flag. It dials `*280` to open or close the queue from the
+dashboard, and opens it by itself each morning at the time in Settings. It asks
+the PBX what each agent's phone is doing, for the badges on the dashboard and
+the Users page. And it dials `*222` so a supervisor can listen in on a call.
+Without the extension none of these work, and the settings cards say so; calls
+themselves are not affected.
+
+**Work**
+1. Ask the telephony provider for **one more extension, for the server**. It is
+   not an agent's and nobody answers it. It needs the feature codes `*30`,
+   `*31`, `*280` and `*222` allowed, and permission to see the agents'
+   extensions' state (a *subscribe* / busy-lamp permission). On the dev PBX it
+   is `2011`. Note the number and its SIP password.
+2. Supervisor app → **Settings** → **PBX blacklist** card: enter the extension
+   and its password, and save. The password is stored encrypted with
+   `SIP_SECRET_KEY` and never shown again. Put it in the password manager
+   (step 11).
+3. On the **dashboard**, the **Queue** card: say once whether the queue is open
+   or closed right now, so the first press of Open or Close goes the right way.
+   The daily opening time is `queue.auto_open_time` on the Settings screen
+   (`HH:mm`, blank for never), if the client wants one.
+4. **Check:** the dashboard's phone badges show the agents who are signed in
+   as online. Block a test number on a contact; within a minute the blacklist
+   card shows it on the PBX. Unblock it again.
+
 ---
 
 ## Step 9 — Backups
@@ -394,20 +422,17 @@ sudo blkid /dev/sdb1                   # copy the UUID
 echo 'UUID=<uuid>  /mnt/backup  ext4  defaults,nofail  0 2' | sudo tee -a /etc/fstab
 sudo mount -a
 ```
-`backup.sh` (in `/opt/callcenter`, make executable with `chmod +x backup.sh`):
-```bash
-#!/bin/bash
-set -e
-D=$(date +%F)
-cd /opt/callcenter
-docker compose exec -T db pg_dump -U callcenter callcenter | gzip > backups/db-$D.sql.gz
-rsync -a --delete data/recordings/ /mnt/backup/recordings/
-rsync -a --delete data/menu-images/ /mnt/backup/menu-images/
-cp backups/db-$D.sql.gz /mnt/backup/
-find backups -name 'db-*.sql.gz' -mtime +30 -delete
-find /mnt/backup -name 'db-*.sql.gz' -mtime +30 -delete
-echo "$D backup OK"
-```
+`backup.sh` is the one in the repository's `deploy/` folder, copied in step 5
+(make it executable with `chmod +x backup.sh`). It dumps the database to
+`backups/db-<date>-<time>.sql.gz`, mirrors the recordings and the menu
+photographs to `/mnt/backup`, copies the dump there too, and removes dumps older
+than 30 days in both places. **It checks the dump before keeping it** (since
+27 Sep 2026, F-07): it is written under a temporary name, tested with
+`gzip -t`, checked for pg_dump's closing line, and only then given its name. If
+anything fails, it prints `backup FAILED`, exits with an error, and the dumps
+already there are left alone. The time in the name means the dump `update.sh`
+makes before an update never replaces the night's.
+
 Schedule nightly at 03:30:
 ```bash
 crontab -e
@@ -418,10 +443,25 @@ Run it once by hand and check `backups/backup.log`.
 **Restore test (on your own PC with Docker):**
 ```bash
 docker run -d --name restoretest -e POSTGRES_PASSWORD=x -p 5433:5432 postgres:16
-gunzip -c db-<date>.sql.gz | docker exec -i restoretest psql -U postgres -c "CREATE DATABASE callcenter" && \
-gunzip -c db-<date>.sql.gz | docker exec -i restoretest psql -U postgres -d callcenter
+docker exec restoretest psql -U postgres -c "CREATE DATABASE callcenter"
+gunzip -c db-<date>-<time>.sql.gz | docker exec -i restoretest psql -U postgres -d callcenter -v ON_ERROR_STOP=1
 ```
 Point a local API at it and confirm calls and contacts are there.
+
+**Restoring the live database** — after an update that went wrong once its
+migrations had run (`update.sh` stops and prints the dump to use), or after
+damage. It replaces everything in the database with the dump, so anything done
+since the dump is lost; recordings and menu photographs are files and are not
+touched.
+```bash
+cd /opt/callcenter
+docker compose stop api
+docker compose exec -T db psql -U callcenter -d postgres -c "DROP DATABASE callcenter"
+docker compose exec -T db psql -U callcenter -d postgres -c "CREATE DATABASE callcenter"
+gunzip -c backups/db-<date>-<time>.sql.gz | docker compose exec -T db psql -U callcenter -d callcenter -v ON_ERROR_STOP=1
+./update.sh --rollback        # after a failed update: the previous version, now allowed
+# or, after damage with the current version: docker compose up -d api
+```
 
 ---
 
@@ -430,7 +470,7 @@ Point a local API at it and confirm calls and contacts are there.
 **What it does:** creating agents in the supervisor app stores each one's two extensions and SIP passwords centrally, so agents never type SIP details. Installing the Agent App from the server's download link means every laptop gets the same version and future updates come from the same place. The Windows Firewall prompt matters: deny it and you get registered-but-silent calls.
 
 **Work**
-1. Supervisor app → Users → add 5 agents: name, login, customer extension + SIP password, internal extension + SIP password, default branch. (Customer = the one the queue rings and that calls customers; internal = agents and branches. SRS 2.3.)
+1. Supervisor app → Users → add the agents: name and login, then each one's **extension and its SIP password**. One extension per agent since 17 September 2026: the one the queue rings and that calls customers and branches alike (SRS 2.3); earlier copies of this step asked for two and a default branch. The server's own extension (step 8.3) is not an agent's and is not added here.
 2. On each of the 4 laptops: plug in the headset and make it the **Windows default** for both output and input (Settings → System → Sound). The Agent App has no device choice of its own (A-03 was removed on 27 Sep 2026): calls, the ring and recordings all use the Windows defaults. Then install the Agent App and log in as an agent. **The app has no screen for the server address.** It reads `Server:BaseUrl` from the `appsettings.json` beside the program, which must be `http://192.168.1.100`. The file in the repo says `http://localhost:5000`, for development, so set it in the build that goes to the laptops. The download link `http://192.168.1.100/downloads/AgentApp-Setup.exe` and the installer are not built yet (DECISIONS, open items). Until they are, copy the published folder as `RELEASING.md` describes.
 3. Windows Firewall prompt → **Allow** on private networks. If missed: Windows Security → Firewall → Allow an app → tick the Agent App.
 4. Test on each laptop: internal call between two agents (pop-up, audio both ways, recording plays back, classification form opens), then a real call from a mobile through the trunk.
@@ -444,8 +484,9 @@ Point a local API at it and confirm calls and contacts are there.
 
 **Work**
 - Give the supervisor a one-page sheet: server IP, web address, how to reboot (just power on — everything auto-starts), where backups go, your contact and support hours.
-- Store in your password manager: `.env` contents, admin password, the PBX web user the server logs in as (step 8), the VPN accounts for the server and each laptop, the router reservation.
-- Commit `docker-compose.yml`, `.env.example`, `backup.sh` and this runbook to the repo (never the real `.env`).
+- Store in your password manager: `.env` contents, admin password, the PBX web user the server logs in as (step 8), **the server's own extension and its SIP password (step 8.3)**, the VPN accounts for the server and each laptop, the router reservation.
+- Tell the client, in so many words, that the system runs on plain HTTP inside their LAN (step 5), and what HTTPS would take.
+- Commit `docker-compose.yml`, `.env.example`, `backup.sh`, `update.sh` and this runbook to the repo (never the real `.env`).
 - Walk the supervisor through the dashboard for 1 hour; agents 1 hour.
 
 ---
@@ -455,7 +496,8 @@ Point a local API at it and confirm calls and contacts are there.
 **What it does:** swaps the API container for the new version in seconds. Database, recordings and menu photographs are untouched; migrations bring the schema up to date; agent apps update themselves at next launch. Phones never stop because they don't depend on the server.
 
 Use `update.sh` rather than doing this by hand — it backs up first, verifies the
-new version answers `/health`, and rolls back automatically if it does not.
+new version answers `/health/ready`, and rolls back automatically if it does not
+and the database has not been changed.
 
 The image comes from CI — `git tag v1.2 && git push --tags` publishes it (see
 [RELEASING.md](RELEASING.md)). You never build a release by hand.
@@ -482,18 +524,32 @@ cd /opt/callcenter
 ./update.sh v1.2 --pull
 ```
 
-It runs `backup.sh`, tags the running image `callcenter-api:previous`, loads the
-new one, restarts the API, and waits up to 90 seconds for `/health`. If the new
-version never becomes healthy it prints the last 40 log lines, retags
-`:previous` back to `:latest`, restarts, and confirms the old version is serving
-again — so a bad build costs seconds, not an evening.
+It runs `backup.sh` and prints the dump's name, tags the running image
+`callcenter-api:previous`, loads the new one, restarts the API, and waits up to
+three minutes for `/health/ready`. If the new version never becomes ready it
+prints the last 40 log lines and then:
+
+- **if the database is as it was before**, it retags `:previous` back to
+  `:latest`, restarts, and confirms the old version is serving again — so a bad
+  build costs seconds, not an evening;
+- **if the new version has already applied a migration**, it does **not** roll
+  back (M-D01, 27 Sep 2026). The old version may not work with the changed
+  database. It says so, prints the pre-update dump, and leaves the new version
+  in place. Restore the dump as in step 9 (*Restoring the live database*), then
+  run `./update.sh --rollback`, which is allowed again once the database matches.
 
 To go back deliberately after a successful but unwanted update:
 ```bash
 ./update.sh --rollback
 ```
+The same rule applies: if that update changed the database, it refuses and
+prints the dump to restore first. What the last update started from is kept in
+`backups/last-update.env`.
 
 Copy `update.sh` alongside the other files in step 5 (`chmod +x update.sh`).
+**When a release changes a file in `deploy/`, copy it to the server again**
+(the release notes in DECISIONS say so). `update.sh` replaces the image, not
+these files.
 The tag on the saved image **must** match the version you pass — the script
 refuses if `callcenter-api-v1.2.tar` does not contain `callcenter-api:v1.2`.
 

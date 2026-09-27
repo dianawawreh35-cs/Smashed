@@ -24,6 +24,14 @@ public partial class MainWindow : Window
 
         DataContext = this;
 
+        // Never bigger than the screen it opens on (review, 27 Sep). A
+        // 1366 x 768 laptop at 125 % scaling has about 1093 x 574 to offer
+        // above the taskbar: the old minimum width, 1120, did not fit at all,
+        // and the opening height ran off the bottom. The minimum is now 1024.
+        var area = SystemParameters.WorkArea;
+        Width = Math.Max(MinWidth, Math.Min(Width, area.Width));
+        Height = Math.Max(MinHeight, Math.Min(Height, area.Height));
+
         // The server can end the sign-in from its side (N-05). Back to the
         // sign-in screen, saying why, rather than a main screen that fails at
         // every turn.

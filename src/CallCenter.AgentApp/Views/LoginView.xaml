@@ -50,13 +50,13 @@
              place, so the agent always looks in the same spot. -->
         <Border Margin="0,18,0,0"
                 Padding="12,10"
-                Background="#2A1416"
+                Background="{StaticResource DangerDim}"
                 BorderBrush="{StaticResource Danger}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource CornerSmall}"
                 Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
           <TextBlock Text="{Binding ErrorMessage}"
-                     Foreground="#FF9B95"
+                     Foreground="{StaticResource DangerText}"
                      TextWrapping="Wrap" />
         </Border>
 

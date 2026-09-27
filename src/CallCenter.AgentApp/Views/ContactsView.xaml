@@ -99,7 +99,7 @@
                                         RelativeSource={RelativeSource AncestorType=DataGrid}}">
                     <Border Padding="7,2"
                             CornerRadius="{StaticResource CornerSmall}"
-                            Background="#3A2E12"
+                            Background="{StaticResource WarningChip}"
                             Visibility="{Binding IsVip, Converter={StaticResource BoolToVisibility}}">
                       <TextBlock Text="{Binding DataContext.Localizer[contacts.vip],
                                         RelativeSource={RelativeSource AncestorType=DataGrid}}"
@@ -109,7 +109,7 @@
                     <Border Padding="7,2"
                             Margin="4,0,0,0"
                             CornerRadius="{StaticResource CornerSmall}"
-                            Background="#3B1618"
+                            Background="{StaticResource DangerChip}"
                             Visibility="{Binding IsBlocked, Converter={StaticResource BoolToVisibility}}">
                       <TextBlock Text="{Binding DataContext.Localizer[contacts.blocked],
                                         RelativeSource={RelativeSource AncestorType=DataGrid}}"
@@ -157,13 +157,13 @@
         <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
         <Border Margin="0,10,0,0"
                 Padding="10,8"
-                Background="#2A2412"
+                Background="{StaticResource WarningDim}"
                 BorderBrush="{StaticResource Warning}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource CornerSmall}"
                 Visibility="{Binding SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
           <StackPanel>
-            <TextBlock Text="{Binding SameNameMessage}" FontSize="11" Foreground="#E8C56B" />
+            <TextBlock Text="{Binding SameNameMessage}" FontSize="11" Foreground="{StaticResource WarningText}" />
             <ItemsControl ItemsSource="{Binding SameName}" Margin="0,6,0,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
@@ -185,8 +185,11 @@
         </Border>
 
         <TextBlock Text="{Binding Localizer[contacts.phone]}" Style="{StaticResource FieldLabel}" />
+        <!-- Left to right in Arabic too, so "+970" is typed and read the right
+             way round (review, 27 Sep). -->
         <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}"
-                 FontFamily="{StaticResource MonoFont}" />
+                 FontFamily="{StaticResource MonoFont}"
+                 FlowDirection="LeftToRight" />
 
         <TextBlock Text="{Binding Localizer[contacts.address]}" Style="{StaticResource FieldLabel}" />
         <TextBox Text="{Binding Address}" />

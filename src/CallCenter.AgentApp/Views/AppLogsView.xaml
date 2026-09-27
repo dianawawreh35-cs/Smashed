@@ -15,6 +15,12 @@
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <!-- A phone number reads left to right in Arabic too (review, 27 Sep). -->
+    <Style x:Key="NumberCell" TargetType="TextBlock" BasedOn="{StaticResource TrimmedCell}">
+      <Setter Property="FlowDirection" Value="LeftToRight" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
     <!-- The customer: dimmed when nobody is on file, so the names stand out. -->
     <Style x:Key="WhoCell" TargetType="TextBlock" BasedOn="{StaticResource TrimmedCell}">
       <Style.Triggers>
@@ -159,7 +165,7 @@
                                   ElementStyle="{StaticResource WhoCell}" />
               <DataGridTextColumn x:Name="NumberColumn" Width="156" Binding="{Binding Number}"
                                   FontFamily="{StaticResource MonoFont}"
-                                  ElementStyle="{StaticResource TrimmedCell}" />
+                                  ElementStyle="{StaticResource NumberCell}" />
 
               <!-- Classified or not (A-41 rule, reused): a chip either way, so
                    a glance shows the work left. -->
@@ -169,7 +175,7 @@
                     <StackPanel Orientation="Horizontal">
                       <Border Padding="7,2"
                               CornerRadius="{StaticResource CornerSmall}"
-                              Background="#2A2412"
+                              Background="{StaticResource WarningDim}"
                               VerticalAlignment="Center"
                               Visibility="{Binding IsUnclassified, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding DataContext.Localizer[callLog.unclassified],
@@ -179,7 +185,7 @@
                       </Border>
                       <Border Padding="7,2"
                               CornerRadius="{StaticResource CornerSmall}"
-                              Background="#14261B"
+                              Background="{StaticResource SuccessDim}"
                               VerticalAlignment="Center"
                               Visibility="{Binding IsClassified, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding DataContext.Localizer[applications.classified],

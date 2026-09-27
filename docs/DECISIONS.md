@@ -6606,6 +6606,40 @@ comes with it, written beside their registrations in `App.xaml.cs`: never
 resolve them from the root provider, where a transient `IDisposable` lives until
 the app exits.
 
+## 2026-09-27 — The Agent App's look: tooltips, colours, numbers, 1366 × 768, menu pictures (review "worth doing")
+
+Part 5 of prompt 17, from the review's "worth doing" list. All checked against
+the code first; all were as described.
+
+- **Tooltips and context menus** have implicit styles in `Theme.xaml` now: dark
+  boxes with the theme's text, border and corner, and a plain dark menu item
+  for the Cut / Copy / Paste menu every TextBox makes for itself. They showed
+  WPF's light default before. The menu style covers only plain items, which is
+  all the app has: a submenu would need more.
+- **The hard-coded colours** in the pop-up, Contacts, Login, App logs,
+  Applications and the call log are theme brushes, with the **same colours**:
+  `WarningDim`, `WarningText`, `OnWarning`, `WarningChip`, `DangerChip`,
+  `DangerDim`, `DangerText`, `SuccessDim`, `BadgeBg`. The rail's status dot takes
+  `Success`, `Warning` and `Danger` by name instead of building colours in code.
+- **Left to right**: the Contacts phone box, and the Number columns of the call
+  log and App logs, through a `NumberCell` style that sits at the start of the
+  cell as the text beside it does.
+- **1366 × 768 at 125 %** is about 1093 × 574 usable. `MinWidth` 1120 did not fit
+  at all, and the opening height of 740 ran off the bottom. The minimum is now
+  **1024** (it also fits 1280-wide screens at 125 %), and the window is clamped
+  to the work area when it opens. At that width the call log's filter row
+  (search, two dates, the tick box, Clear filters) is wider than the space, so
+  it is a wrap panel now and moves onto a second line. It probably clipped
+  Clear filters even at 1120. Whether anything else clips in Arabic can only be
+  seen on screen: it is a checklist step, with screenshots.
+- **`MenuImageCache`** remembered a failed picture for the life of the app. A
+  failure now stands for a minute, and the next search after that asks again.
+
+**Also:** `ThemeResourcesTests` checks that every `{StaticResource}` any XAML file
+names is defined, plus the keys the code looks up by name. It was the second of
+the three throwaway UI checks the *Known gaps* list below asked for. It finds
+the source from its own file path, so it runs from any build folder.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -6620,7 +6654,11 @@ and what comes after:
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **The review's "fix first" list, F-01 to F-14** | A-03, A-11, R-15, R-16, R-17, S-20, S-58, N-07 | nothing — see [REVIEW-2026-09-27.md](REVIEW-2026-09-27.md) |
+| **The review's "fix first" list, F-01 to F-14** | A-03, A-11, R-15, R-16, R-17, S-20, S-58, N-07 | nothing — see [REVIEW-2026-09-27.md](REVIEW-2026-09-27.md). *Agent App, 27 Sep:* F-01, F-02, F-03 (the app's half), F-08 and F-09 built; F-11 dropped, A-03 removed. **Not yet seen running**: the 27 Sep sections of the checklist, Round 3 |
+| The review's Agent App items **left out of prompt 17**: a crash mid-call loses the call record and leaves raw audio in the scratch folder; the WAV is rebuilt on the UI thread at hang-up; user agents are closed but not disposed, and a 403 from a restarting PBX stops registration until the next sign-in, with no Retry; the pop-up centres on the primary monitor only; no token refresh, so the 12 h token ends a shift; `Server:HubPath` is configured and comments mention SignalR, but there is no SignalR client | A-02, A-10, A-31, N-05 | nothing |
+| Run the Agent App's tests in CI: one `dotnet test tests/CallCenter.AgentApp.Tests` step in the Windows job | — | nothing. Left out on 27 Sep only because the server session was editing `ci.yml` at the same time |
+| The upload queue's set-aside items: a way to clear one, or pass it to a supervisor. Today Try again is the only action, and a call refused as `extension_not_yours` is refused again | A-04 | Dia's call |
+| `CallService`'s state rules have no automated test (27 Sep entry, F-09) | A-12 | pulling the state machine out of `CallService` into something that can be built without SIPSorcery and a sound card |
 | **Classification: the form and the supervisor's designer** | A-40, S-40 | nothing — A-14 landed |
 | Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |
@@ -6768,14 +6806,14 @@ describe**:
   extensions per agent and a default branch. One extension per agent came in on
   17 September, and `users.default_branch_id` has been dropped. Rewrite it
   against the current Users screen before the next install.
-- **Two of the three UI checks are still throwaway scripts.** The label check
+- **One of the three UI checks is still a throwaway script.** The label check
   became a real test on 22 September (`AgentAppLabelsTests`), after the fourth
-  label to reach the screen as a raw key. The other two are not reproducible by
-  anyone else yet: that every `StaticResource` a view names is defined, and that
-  every control a view uses has a style in the theme. **The last of those is what
-  would have caught the white contacts list** — a `ListView` left with no style
-  falls back to WPF's default white, and nothing in the build complains. Both
-  belong beside the label test.
+  label to reach the screen as a raw key, and the `StaticResource` check on 27
+  September (`ThemeResourcesTests`). The one left: that every control a view
+  uses has a style in the theme. **That is what would have caught the white
+  contacts list**, and the light tooltips found on 27 Sep: a control left with
+  no style falls back to WPF's default white, and nothing in the build
+  complains. It belongs beside the other two.
 
 ## What running the apps has caught that the checks did not
 

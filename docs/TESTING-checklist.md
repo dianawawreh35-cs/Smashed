@@ -947,6 +947,42 @@ afterwards every time.
       every sign-in left the last shift's screens listening, and they were
       redrawn at every language change for the rest of the day.*
 
+### The 27 Sep review fixes: how it looks (tooltips, colours, numbers, 1366 × 768, menu pictures) — no phone needed
+
+- [ ] **A tooltip in the dark theme.** Hover over **Do not disturb** in the rail:
+      the hint appears as a dark grey box with light text and a thin border,
+      not a pale yellow or white Windows box. The same over a long customer
+      name in the call log. **Screenshot one.**
+- [ ] **A right-click menu in the dark theme.** Right-click in the Contacts
+      search box: Cut / Copy / Paste appear dark, with the item under the
+      pointer tinted blue and the unavailable ones dimmed. *If it is white:*
+      tell me, with a screenshot.
+- [ ] **Nothing changed colour.** The VIP and Blocked chips in Contacts, the
+      "Classified" chip in App logs, the pop-up's queue badge, the same-name
+      warning, and the red box under the sign-in button (type a wrong password)
+      look exactly as they did. Only where the colours are written down
+      changed.
+- [ ] **Numbers read left to right in Arabic.** Switch to Arabic. In Contacts,
+      open a contact and type `+970 59` into the phone box: the `+` stays on
+      the left. In the Call log and App logs, the Number column shows
+      `0599…` the right way round, and a `+970…` number with its `+` first.
+- [ ] **The window at 1366 × 768 (the agents' laptops).** On this machine, set
+      the display to 1366 × 768 and Scale to 125 % (Settings → System →
+      Display), or use a laptop that has it. Open the app: the whole window is
+      on screen, title bar to bottom edge. Make it as narrow as it will go:
+      it stops at a width that still fits the screen. In the Call log, tick
+      "Needs classifying" so "Clear filters" appears: if the row is too wide,
+      the end of it moves onto a second line instead of being cut off. Go
+      through every rail section **in Arabic and in English** at that size and
+      look for any text cut at an edge. **Screenshot the Call log and
+      Contacts at 1366 × 768, in both languages.** Put the display back
+      afterwards.
+- [ ] **A menu picture that failed comes back.** Hard to cause on purpose: the
+      menu itself needs the server. If you ever see **تعذّر تحميل الصورة /
+      Picture failed to load** (the VPN blinking, a server restart), search
+      the menu again a minute later: the picture should appear without
+      restarting the app. *Before 27 Sep it stayed broken until a restart.*
+
 ---
 
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)

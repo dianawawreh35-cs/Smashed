@@ -4,7 +4,7 @@
         Title="{Binding Localizer[app.title]}"
         Icon="/Assets/app.ico"
         Height="740" Width="1180"
-        MinHeight="560" MinWidth="1120"
+        MinHeight="560" MinWidth="1024"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
         Background="{StaticResource Bg}"

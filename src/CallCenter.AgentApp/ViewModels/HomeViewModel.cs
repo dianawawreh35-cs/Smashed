@@ -88,7 +88,11 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     /// The dot beside it. Green only when calls can actually arrive; red when
     /// the PBX refused, because that needs a supervisor rather than patience.
     /// </summary>
-    public Brush StatusBrush => new SolidColorBrush(StatusColour);
+    /// <remarks>
+    /// The theme's own brushes, by name, rather than colours written out here
+    /// (review, 27 Sep): a change to the palette now reaches the dot too.
+    /// </remarks>
+    public Brush StatusBrush => (Brush)System.Windows.Application.Current.FindResource(StatusColour);
 
     private string StatusKey
     {
@@ -109,20 +113,21 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         }
     }
 
-    private Color StatusColour
+    /// <summary>The theme brush for the dot, by its key in Theme.xaml.</summary>
+    private string StatusColour
     {
         get
         {
             if (!_session.HasPhone)
             {
-                return Color.FromRgb(0xD2, 0x99, 0x22);
+                return "Warning";
             }
 
             return _sip.State?.Status switch
             {
-                RegistrationStatus.Registered => Color.FromRgb(0x3F, 0xB9, 0x50),
-                RegistrationStatus.Failed => Color.FromRgb(0xF8, 0x51, 0x49),
-                _ => Color.FromRgb(0xD2, 0x99, 0x22),
+                RegistrationStatus.Registered => "Success",
+                RegistrationStatus.Failed => "Danger",
+                _ => "Warning",
             };
         }
     }

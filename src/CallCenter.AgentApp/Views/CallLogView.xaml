@@ -169,7 +169,10 @@
             Command="{Binding RefreshCommand}"
             IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
 
-    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,18,0,0">
+    <!-- A wrap panel, so a narrow window (1366 x 768 at 125 %) moves the tick
+         box and Clear filters onto a second line instead of cutting them off
+         at the edge (review, 27 Sep). -->
+    <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,18,0,0">
       <TextBox Width="280"
                Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}"
                ToolTip="{Binding Localizer[callLog.searchHint]}" />
@@ -207,7 +210,7 @@
                  VerticalAlignment="Center"
                  Margin="14,0,0,0"
                  Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
-    </StackPanel>
+    </WrapPanel>
 
     <Border Grid.Row="2" Grid.ColumnSpan="2"
             Margin="0,18,0,0"
@@ -297,6 +300,14 @@
               <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
               <Setter Property="VerticalAlignment" Value="Center" />
             </Style>
+
+            <!-- A phone number reads left to right in Arabic too, or "+970 59"
+                 comes out reversed (review, 27 Sep). At the start of the cell,
+                 as the text beside it is. -->
+            <Style x:Key="NumberCell" TargetType="TextBlock" BasedOn="{StaticResource TrimmedCell}">
+              <Setter Property="FlowDirection" Value="LeftToRight" />
+              <Setter Property="HorizontalAlignment" Value="Left" />
+            </Style>
           </DataGrid.Resources>
 
           <!-- Column widths (A-52). Every column but Customer is bounded: a
@@ -340,7 +351,7 @@
                                 ElementStyle="{StaticResource TrimmedCell}" />
             <DataGridTextColumn x:Name="NumberColumn" Width="Auto" MaxWidth="140" Binding="{Binding Number}"
                                 FontFamily="{StaticResource MonoFont}"
-                                ElementStyle="{StaticResource TrimmedCell}" />
+                                ElementStyle="{StaticResource NumberCell}" />
             <DataGridTextColumn x:Name="QueueColumn" Width="Auto" MaxWidth="120" Binding="{Binding Queue}"
                                 ElementStyle="{StaticResource TrimmedCell}" />
             <DataGridTextColumn x:Name="DurationColumn" Width="Auto" MaxWidth="90" Binding="{Binding Duration}"
@@ -386,7 +397,7 @@
                   <Grid>
                     <Border Padding="7,2"
                             CornerRadius="{StaticResource CornerSmall}"
-                            Background="#2A2412"
+                            Background="{StaticResource WarningDim}"
                             Visibility="{Binding IsUnclassified, Converter={StaticResource BoolToVisibility}}">
                       <TextBlock Text="{Binding DataContext.Localizer[callLog.unclassified],
                                         RelativeSource={RelativeSource AncestorType=DataGrid}}"

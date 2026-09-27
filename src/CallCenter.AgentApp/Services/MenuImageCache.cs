@@ -35,9 +35,19 @@ namespace CallCenter.AgentApp.Services;
 /// 39 times a search. It is remembered as <see langword="null"/>, which the row
 /// shows as "could not be loaded" rather than as an item with no photograph —
 /// telling those two apart is what would have made this visible on day one.
+///
+/// <b>For a minute, not for ever</b> (review, 27 Sep). A failure used to stand
+/// until the app was restarted, so one dropped request while the VPN blinked
+/// left that picture broken for the rest of the day. Now the next search after
+/// <see cref="RetryFailuresAfter"/> asks again.
 /// </remarks>
 public class MenuImageCache(ApiClient api, ILogger<MenuImageCache> logger)
 {
+    /// <summary>How long a failed picture is left alone before it is asked for again.</summary>
+    public static readonly TimeSpan RetryFailuresAfter = TimeSpan.FromMinutes(1);
+
+    /// <summary>When each picture last failed, for the ones that have.</summary>
+    private readonly Dictionary<Guid, DateTimeOffset> _failedAt = [];
     /// <summary>
     /// How many pictures may be in flight together.
     /// </summary>
@@ -63,14 +73,25 @@ public class MenuImageCache(ApiClient api, ILogger<MenuImageCache> logger)
     {
         lock (_images)
         {
-            if (_images.TryGetValue(id, out var existing))
+            if (_images.TryGetValue(id, out var existing)
+                && !(_failedAt.TryGetValue(id, out var failed) && DateTimeOffset.Now - failed > RetryFailuresAfter))
             {
                 return existing;
             }
 
+            _failedAt.Remove(id);
+
             var fetch = FetchAsync(id);
             _images[id] = fetch;
             return fetch;
+        }
+    }
+
+    private void NoteFailure(Guid id)
+    {
+        lock (_images)
+        {
+            _failedAt[id] = DateTimeOffset.Now;
         }
     }
 
@@ -88,6 +109,7 @@ public class MenuImageCache(ApiClient api, ILogger<MenuImageCache> logger)
                 // leave no trace anywhere, which is why 39 failures a search
                 // went unnoticed.
                 logger.LogWarning("The picture for menu item {ItemId} could not be fetched", id);
+                NoteFailure(id);
                 return null;
             }
 
@@ -108,6 +130,7 @@ public class MenuImageCache(ApiClient api, ILogger<MenuImageCache> logger)
         catch (Exception ex)
         {
             logger.LogWarning(ex, "The picture for menu item {ItemId} could not be decoded", id);
+            NoteFailure(id);
             return null;
         }
         finally

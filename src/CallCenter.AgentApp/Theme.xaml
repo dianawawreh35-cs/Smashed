@@ -61,6 +61,15 @@
   <!-- Text on a solid Warning background: the VIP badge, a count badge. -->
   <SolidColorBrush x:Key="OnWarning" Color="#1A1200" />
 
+  <!-- The chips and boxes that used to carry these colours inline (review,
+       27 Sep): same colours, now named once here. -->
+  <SolidColorBrush x:Key="WarningChip" Color="#3A2E12" />   <!-- VIP chip in the contacts list -->
+  <SolidColorBrush x:Key="DangerChip" Color="#3B1618" />    <!-- Blocked chip -->
+  <SolidColorBrush x:Key="DangerDim" Color="#2A1416" />     <!-- an error box: the sign-in refusal -->
+  <SolidColorBrush x:Key="DangerText" Color="#FF9B95" />    <!-- text in an error box -->
+  <SolidColorBrush x:Key="SuccessDim" Color="#14261B" />    <!-- "Classified" chip -->
+  <SolidColorBrush x:Key="BadgeBg" Color="#1F2A37" />       <!-- the pop-up's queue and direction badges -->
+
   <CornerRadius x:Key="CornerSmall">6</CornerRadius>
   <CornerRadius x:Key="CornerLarge">10</CornerRadius>
 
@@ -1121,6 +1130,112 @@
         </Setter>
       </Trigger>
     </Style.Triggers>
+  </Style>
+
+  <!-- ===== Tooltips and context menus ===============================
+       Keyless, so they apply everywhere, including the Cut / Copy / Paste
+       menu every TextBox makes for itself. Without them both showed WPF's
+       light default over the dark app: the same kind of bug as the white
+       contacts list (review, 27 Sep). -->
+  <Style TargetType="ToolTip">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="HasDropShadow" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToolTip">
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="{StaticResource CornerSmall}"
+                  Padding="8,5"
+                  MaxWidth="420">
+            <ContentPresenter>
+              <ContentPresenter.Resources>
+                <!-- A long hint wraps instead of running off the screen. -->
+                <Style TargetType="TextBlock">
+                  <Setter Property="TextWrapping" Value="Wrap" />
+                </Style>
+              </ContentPresenter.Resources>
+            </ContentPresenter>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="ContextMenu">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSoft}" />
+    <Setter Property="HasDropShadow" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ContextMenu">
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="{StaticResource CornerSmall}"
+                  Padding="4">
+            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Only the plain items the app's menus have: no submenus, no icons. -->
+  <Style TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="MenuItem">
+          <Border x:Name="Chrome"
+                  Background="Transparent"
+                  CornerRadius="4"
+                  Padding="10,5"
+                  MinWidth="140">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <ContentPresenter ContentSource="Header"
+                                RecognizesAccessKey="True"
+                                VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1"
+                         Text="{TemplateBinding InputGestureText}"
+                         Foreground="{StaticResource TextMuted}"
+                         Margin="24,0,0,0"
+                         VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Chrome" Property="Background" Value="{StaticResource AccentDim}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Foreground" Value="{StaticResource TextFaint}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Separator">
+          <Border Height="1" Margin="6,4" Background="{StaticResource BorderSoft}" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
 </ResourceDictionary>

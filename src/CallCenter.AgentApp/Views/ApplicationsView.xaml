@@ -91,7 +91,7 @@
                   Margin="0,6,0,0"
                   HorizontalAlignment="Left"
                   Visibility="{Binding Customer.IsVip, Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="{Binding Localizer[caller.vip]}" FontSize="11" FontWeight="Bold" Foreground="#1A1200" />
+            <TextBlock Text="{Binding Localizer[caller.vip]}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource OnWarning}" />
           </Border>
           <TextBlock Text="{Binding Customer.StatusText}"
                      Style="{StaticResource Subtle}"
@@ -118,13 +118,13 @@
             <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
             <Border Margin="0,8,0,0"
                     Padding="10,8"
-                    Background="#2A2412"
+                    Background="{StaticResource WarningDim}"
                     BorderBrush="{StaticResource Warning}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource CornerSmall}"
                     Visibility="{Binding Customer.SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
               <StackPanel>
-                <TextBlock Text="{Binding Customer.SameNameMessage}" FontSize="11" Foreground="#E8C56B" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Customer.SameNameMessage}" FontSize="11" Foreground="{StaticResource WarningText}" TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{Binding Customer.SameName}" Margin="0,6,0,0">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>

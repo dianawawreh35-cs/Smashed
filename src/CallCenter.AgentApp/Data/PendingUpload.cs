@@ -13,12 +13,18 @@ namespace CallCenter.AgentApp.Data;
 /// classification arrives for a call the server has never heard of. One table
 /// with one sequence keeps them in the order they happened, whatever they are.
 ///
-/// The second is that this shape never has to change. Adding notes, or app
+/// The second is that this shape rarely has to change. Adding notes, or app
 /// orders, or anything else later is a new <see cref="Kind"/> and no schema
 /// change at all — which is what makes it safe to create this database with
 /// <c>EnsureCreated</c> rather than carrying migration tooling onto every
 /// agent's laptop. A buffer that needed a migration would have to choose
 /// between losing an offline shift's work and shipping a migration runner.
+///
+/// <b>It did change once, on 27 Sep (F-03, F-08)</b>: <see cref="UserId"/> and
+/// <see cref="SetAsideAt"/>. Two nullable columns added in place by
+/// <see cref="AgentBufferDbContext.UpgradeAsync"/>, which a laptop with rows
+/// waiting keeps. Any later change should follow the same rule: added,
+/// nullable, never renamed or dropped.
 /// </remarks>
 public class PendingUpload
 {
@@ -52,6 +58,30 @@ public class PendingUpload
 
     /// <summary>Why the last attempt failed, for the log and for support.</summary>
     public string? LastError { get; set; }
+
+    /// <summary>
+    /// Who was signed in when this was queued (F-03). Replayed only as them.
+    /// </summary>
+    /// <remarks>
+    /// The buffer belongs to the laptop, and laptops are shared between
+    /// shifts. Until 27 Sep a row was replayed as whoever signed in next, so an
+    /// evening's calls queued while the server was down became the next
+    /// morning's agent's. Null only on rows from before this column existed:
+    /// those are sent once as the next agent to sign in, and the log says so
+    /// (Dia's call, 27 Sep).
+    /// </remarks>
+    public Guid? UserId { get; set; }
+
+    /// <summary>
+    /// When this was moved aside as hopeless (F-08), or null while it is still
+    /// being tried. <see cref="LastError"/> says why.
+    /// </summary>
+    /// <remarks>
+    /// A column rather than a second table: the row keeps its place in the
+    /// sequence, so if the agent asks for it to be tried again it still goes
+    /// after its call.
+    /// </remarks>
+    public DateTimeOffset? SetAsideAt { get; set; }
 }
 
 /// <summary>The kinds of thing the buffer holds (A-04).</summary>

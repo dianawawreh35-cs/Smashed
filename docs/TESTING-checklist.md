@@ -890,6 +890,36 @@ afterwards every time.
       the Dial screen, and let an outgoing call ring out: all three tones as
       before. Press Answer during the ring: it stops at once.
 
+### The 27 Sep review fixes: the upload queue (F-03, F-08, M-A03, M-A04) — needs the PBX and a second agent account
+
+- [ ] **Save is instant with the server stopped (M-A04).** Take a call as
+      `dia20`, stop the server, classify the call and press Save. "Saved"
+      appears at once, not after ten seconds. Start the server again: within a
+      minute the call and its classification are in the web app.
+- [ ] **One laptop, two agents (F-03).** Stop the server. Take a call as
+      `dia20` and hang up. Sign out (it works with the server down). Start the
+      server and sign in on the same laptop as a **second agent**. Wait a
+      minute: `dia20`'s call must **not** appear in the second agent's call log,
+      nor under them in the web app. Sign out, sign in as `dia20`: within a
+      minute the call is in `dia20`'s call log. *If it turns up under the
+      second agent:* the fix did not take; check the `bin` date.
+- [ ] **Something the server refuses is set aside, and the rest still go
+      (F-08).** This needs the server session's change (prompt 18) that refuses
+      a call logged under someone else's extension. Stop the server, take a
+      call as `dia20`, sign out. Start the server and, in the web app, give
+      `dia20` a different extension. Sign in as `dia20` and take one more call.
+      The new call reaches the call log as usual, and above the list an amber
+      box says **"Could not be sent to the server (1)"**. The Call log button
+      in the rail has an amber **1**. **Show** lists the call: its time,
+      "Call", the number read left to right, and "Logged under another agent's
+      extension". Put `dia20`'s extension back, press **Try again**: the box and
+      the badge go, and the old call appears in the log. **Screenshot the box,
+      open, in both languages.**
+- [ ] **Sign-in with a backlog.** Stop the server, take three or four calls,
+      and sign out. Start the server and sign in: the main screen comes
+      straight away, and a call answered at once has its classification form.
+      The backlog reaches the call log within a minute, behind you.
+
 ---
 
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)

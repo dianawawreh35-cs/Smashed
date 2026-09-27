@@ -283,6 +283,16 @@ public partial class App : Application
             client.Timeout = options.Timeout;
         });
 
+        // F-08: the same server, for recording uploads only, with a timeout a
+        // long call's file can fit in.
+        services.AddHttpClient(ApiClient.UploadClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<ServerOptions>>().Value;
+
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + '/');
+            client.Timeout = options.UploadTimeout;
+        });
+
         // One per process, not transient: the pop-up exists from startup and is
         // shown and hidden, rather than built while the phone is ringing (A-10).
         // One definition, shared. Fetched at sign-in.

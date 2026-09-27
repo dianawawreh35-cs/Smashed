@@ -47,6 +47,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The queue's tests point its old-file import away from the real file. -->
+    <InternalsVisibleTo Include="CallCenter.AgentApp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The same icon again for the windows' title bars and taskbar buttons.
          A window left without one borrows the icon of the process, and in
          development that process is dotnet.exe, so it showed .NET's. -->

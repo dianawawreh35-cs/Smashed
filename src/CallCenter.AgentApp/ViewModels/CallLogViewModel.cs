@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Threading;
 using CallCenter.AgentApp.Services;
+using CallCenter.AgentApp.Services.Calls;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
@@ -34,6 +35,7 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
     private static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(400);
 
     private readonly ApiClient _api;
+    private readonly CallLogReporter _reporter;
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _typingTimer;
 
@@ -42,16 +44,25 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
 
     public CallLogViewModel(
         ApiClient api,
+        CallLogReporter reporter,
         ClassificationFormViewModel classification,
         RecordingPlayerViewModel player,
         Localizer localizer,
         Dispatcher dispatcher)
     {
         _api = api;
+        _reporter = reporter;
         _dispatcher = dispatcher;
         Classification = classification;
         Player = player;
         Localizer = localizer;
+
+        // F-08: what the queue gave up on, shown here, where the agent looks
+        // for their calls. Named handlers, so Dispose can take them off the
+        // singletons again (M-A06).
+        _reporter.SetAsideChanged += OnSetAsideChanged;
+        localizer.LanguageChanged += OnLanguageChanged;
+        _ = LoadSetAsideAsync();
 
         // A saved classification clears the chip on the row it belongs to, so
         // the list is refetched rather than guessed at.
@@ -76,21 +87,95 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
         };
 
         Calls.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasCalls));
+    }
 
-        localizer.LanguageChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(StatusMessage));
-            OnPropertyChanged(nameof(NotesHeading));
-            Rebuild();
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(StatusMessage));
+        OnPropertyChanged(nameof(NotesHeading));
+        Rebuild();
 
-            // The open call's details are worded from the row, which reads the
-            // language as it is asked, so telling the screen to ask again is
-            // enough.
-            OnPropertyChanged(nameof(Opened));
-        };
+        // The open call's details are worded from the row, which reads the
+        // language as it is asked, so telling the screen to ask again is
+        // enough.
+        OnPropertyChanged(nameof(Opened));
+
+        OnPropertyChanged(nameof(SetAsideTitle));
+        RebuildSetAside();
     }
 
     public Localizer Localizer { get; }
+
+    // ---- what could not be sent (F-08) -----------------------------------
+
+    /// <summary>The agent's items the queue set aside, oldest first.</summary>
+    public ObservableCollection<SetAsideRow> SetAside { get; } = [];
+
+    private IReadOnlyList<SetAsideItem> _setAside = [];
+
+    public bool HasSetAside => SetAside.Count > 0;
+
+    /// <summary>"Could not be sent to the server (3)".</summary>
+    public string SetAsideTitle => $"{Localizer["callLog.unsent.title"]} ({SetAside.Count})";
+
+    /// <summary>Whether the list under the heading is open. Closed until asked for.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SetAsideToggleLabel))]
+    private bool _isSetAsideOpen;
+
+    public string SetAsideToggleLabel => Localizer[IsSetAsideOpen ? "callLog.unsent.hide" : "callLog.unsent.show"];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RetrySetAsideCommand))]
+    private bool _isRetrying;
+
+    [RelayCommand]
+    private void ToggleSetAside() => IsSetAsideOpen = !IsSetAsideOpen;
+
+    /// <summary>
+    /// Puts everything set aside back on the queue: for once a supervisor has
+    /// dealt with why the server refused it.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRetrySetAside))]
+    private async Task RetrySetAsideAsync()
+    {
+        IsRetrying = true;
+
+        try
+        {
+            await _reporter.RetrySetAsideAsync();
+            await LoadSetAsideAsync();
+        }
+        finally
+        {
+            IsRetrying = false;
+        }
+    }
+
+    private bool CanRetrySetAside() => !IsRetrying;
+
+    private void OnSetAsideChanged(object? sender, EventArgs e) =>
+        _dispatcher.BeginInvoke(() => _ = LoadSetAsideAsync());
+
+    private async Task LoadSetAsideAsync()
+    {
+        _setAside = await _reporter.SetAsideItemsAsync();
+        RebuildSetAside();
+    }
+
+    private void RebuildSetAside()
+    {
+        SetAside.Clear();
+
+        foreach (var item in _setAside)
+        {
+            SetAside.Add(new SetAsideRow(item, Localizer));
+        }
+
+        OnPropertyChanged(nameof(HasSetAside));
+        OnPropertyChanged(nameof(SetAsideTitle));
+        OnPropertyChanged(nameof(SetAsideToggleLabel));
+    }
 
     public ObservableCollection<CallRow> Calls { get; } = [];
 
@@ -345,6 +430,11 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        // M-A06: off the singletons, so a signed-out call log is not kept
+        // alive, and redrawn, by them for the rest of the day.
+        _reporter.SetAsideChanged -= OnSetAsideChanged;
+        Localizer.LanguageChanged -= OnLanguageChanged;
+
         _typingTimer.Stop();
         Player.Dispose();
 
@@ -454,6 +544,27 @@ public partial class CallLogViewModel : ObservableObject, IDisposable
             Calls.Add(new CallRow(call, Localizer));
         }
     }
+}
+
+/// <summary>One item the queue set aside (F-08), worded for the call log.</summary>
+public class SetAsideRow(SetAsideItem item, Localizer localizer)
+{
+    /// <summary>Call, classification, note or recording.</summary>
+    public string Kind => localizer[$"callLog.unsent.kind.{item.Kind}"];
+
+    public string When => item.QueuedAt.ToLocalTime().ToString("dd/MM HH:mm");
+
+    public string Number => item.Number ?? string.Empty;
+
+    /// <summary>Why, in the agent's words rather than the server's code.</summary>
+    public string Reason => localizer[item.Reason switch
+    {
+        "extension_not_yours" or "not_your_call" => "callLog.unsent.reason.notYours",
+        "gave_up" => "callLog.unsent.reason.gaveUp",
+        "call_set_aside" or "call_never_arrived" => "callLog.unsent.reason.noCall",
+        "unreadable" => "callLog.unsent.reason.unreadable",
+        _ => "callLog.unsent.reason.refused",
+    }];
 }
 
 /// <summary>

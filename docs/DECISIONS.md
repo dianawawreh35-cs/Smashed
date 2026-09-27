@@ -6468,6 +6468,97 @@ against the code first; all six were as the review described.
 **Not changed:** `SaveClassificationRequest.Resolved` keeps its shape and its
 place in `CallCenter.Shared`; only the server's handling of it changed.
 
+## 2026-09-27 — The upload queue: nothing lost, nothing filed under the wrong agent (F-03, F-08, M-A03, M-A04)
+
+Part 3 of prompt 17. All four items were as the review described. The line
+numbers had moved a little (the queue and reporter live in `Services/Calls/`).
+
+**One correction to the prompt.** It asked for the buffer's migration to follow
+"how it has been migrated before". It never had been: it was made with
+`EnsureCreated`, whose remarks said the shape "should never need to change".
+This is the first change, so it sets the pattern: `AgentBufferDbContext
+.UpgradeAsync` reads `pragma_table_info` at start-up and adds any missing column
+with `ALTER TABLE … ADD COLUMN`, nullable. Every row survives, so a laptop that
+was offline when it was updated loses nothing. There is still no migration
+runner on the laptops. `SCHEMA.md` now has the buffer's table, as section 10.
+
+**F-03, the Agent App half.** Each row carries `UserId`, and a pass sends only
+the signed-in agent's rows; another agent's wait for them. Rows from before the
+column have no owner and are given to the next agent to sign in, once, with a
+warning in the log saying how many and as whom (Dia's call, 27 Sep, the
+recommended option). What the server does with a call under an extension that
+is not the sender's is the server session's half (prompt 18). Here,
+`extension_not_yours` is treated as permanent, as agreed.
+
+**F-08, one item no longer stops the queue.** A row has four ways to fail, and
+each is handled on its own:
+
+| What happened | What the pass does | Counts against the row |
+|---|---|---|
+| Server unreachable, or 401 | stops: everything after would fail the same way | no |
+| A refusal the server is certain about (`bad_request`, `extension_not_yours`, the old discard list) | sets it aside at once | — |
+| A server error, or an upload that ran out of time | skips it, and what belongs to its call, and carries on | only if something *after* it went through in the same pass |
+| `call_not_found` for a classification, note or recording | waits: the normal case during a call | after a day with its call not in the queue, set aside |
+
+Five counted failures set a row aside. The "only if something after it went
+through" rule is what stops a sick server wearing out a whole evening's calls:
+a failure is only held against a row when the server has just shown it works.
+Three server errors in a row end the pass for the same reason. **Set aside**
+means `SetAsideAt` is filled in; the row stays in the file, in its place, so
+Try again sends it after its call as before. Whatever belongs to a call that is
+set aside is set aside with it. Before, the old discard list deleted rows
+outright; now they are kept.
+
+- **Recording uploads have their own client and a 30-minute timeout**
+  (`Server:UploadTimeout`), and go last in each pass, so the calls and forms
+  queued behind a big file do not wait for it. A timeout on the upload is
+  `upload_timed_out`, the "skip and carry on" kind, not "server unreachable".
+- **A 400 with no `code` is `bad_request`**, and permanent. The sign-in screen
+  maps any code it has no label for to "server error", so neither this nor a
+  code a newer server adds (the login rate limit, F-12) can reach the agent as
+  a raw key.
+- **The caller's number, name and queue are cut to `LogCallRequest`'s limits**
+  before queueing (40, 200, 100). The Call-ID and extension are the call's key
+  and are left whole.
+- A row that cannot be read is set aside too, instead of being skipped and
+  logged on every pass for ever.
+
+**Where the agent sees it (Dia, 27 Sep).** In the call log, above the list: an
+amber box, "Could not be sent to the server (3)", with Show and Try again. The
+Call log button in the rail has the same count as a badge. The prompt said "the
+app log view", but in this app App logs is the WhatsApp and Facebook messages
+list; these are all calls or belong to calls.
+
+**M-A03.** Every enqueue returns whether it worked. When it did not, the item
+is sent directly, once. A classification or note that is neither queued nor
+sent keeps what was typed, and the form says it could not be saved. It no longer
+says Saved. A call or recording that is neither says so in the bar across the
+main window (`callLog.notKept`), so the agent can tell a supervisor the reports
+are one short.
+
+**M-A04.** Save returns once the item is queued, and the flush runs behind it.
+Sign-in loads the classification catalogue first and then starts the flush in
+the background, instead of holding the agent at the sign-in screen while an
+evening's backlog went.
+
+**After an idle logout (M-S01, server side), checked by reading the code, not
+run.** The first request that gets 401 raises `TokenRefused`. `SignedOutByServer`
+signs out (at once, or when the call in progress ends), and the window goes back
+to the sign-in screen saying why. Nothing retries the dead token in a loop: the
+queue's pass stops at a 401 without counting it, the minute timer's passes do
+nothing once signed out, and the block list refreshes every two minutes and
+keeps its cache on any failure.
+
+**Tests.** `UploadQueueTests`, eleven, against a real SQLite file in a temp
+folder and a stubbed server. They cover: rows go only as their owner; unowned
+rows go once; a first-version file is upgraded with its row kept; a failing
+call is set aside after five counted failures while the rest go; a server that
+is down wears nothing out; a 400 with no code is permanent and takes its
+classification with it; `extension_not_yours` is tried once; a classification
+saved during the call goes after it; Try again sends a set-aside row; the name
+is cut; a classification the buffer cannot take is sent directly or reported
+failed.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

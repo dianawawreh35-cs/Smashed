@@ -474,8 +474,16 @@ public partial class ClassificationFormViewModel(
             else
             {
                 // A call in progress: queued behind the call, which the server
-                // has not been told about yet.
-                await reporter.ClassifyAsync(request);
+                // has not been told about yet. M-A03: "Saved" only if it really
+                // is, in the buffer or on the server. Until 27 Sep a failed
+                // write to the buffer was logged and the form said Saved anyway.
+                var outcome = await reporter.ClassifyAsync(request);
+
+                if (outcome is CallLogReporter.SaveOutcome.Failed)
+                {
+                    Message = Localizer["classification.saveFailed"];
+                    return;
+                }
             }
 
             IsSaved = true;

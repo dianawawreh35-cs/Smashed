@@ -140,6 +140,10 @@ public partial class CallViewModel : ObservableObject
     [ObservableProperty]
     private string _notesText = string.Empty;
 
+    /// <summary>Why the note could not be kept (M-A03). Empty otherwise.</summary>
+    [ObservableProperty]
+    private string _notesMessage = string.Empty;
+
     public bool IsNotesOpen => NotesFor is not null;
 
     /// <summary>
@@ -152,8 +156,16 @@ public partial class CallViewModel : ObservableObject
         if (NotesFor is { } call && Classification.Extension is { } extension
             && !string.IsNullOrWhiteSpace(NotesText))
         {
-            await _reporter.SaveNotesAsync(
+            var outcome = await _reporter.SaveNotesAsync(
                 new SaveCallNotesByCallRequest(call.SipCallId, extension, NotesText.Trim()));
+
+            if (outcome is CallLogReporter.SaveOutcome.Failed && ReferenceEquals(NotesFor, call))
+            {
+                // M-A03: the pop-up stays, with the note, rather than closing
+                // on something that went nowhere.
+                NotesMessage = Localizer["classification.saveFailed"];
+                return;
+            }
         }
 
         FinishNotes();
@@ -178,6 +190,7 @@ public partial class CallViewModel : ObservableObject
     {
         NotesFor = null;
         NotesText = string.Empty;
+        NotesMessage = string.Empty;
     }
 
     /// <summary>

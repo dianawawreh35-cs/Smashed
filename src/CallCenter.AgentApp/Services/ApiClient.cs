@@ -18,10 +18,28 @@ namespace CallCenter.AgentApp.Services;
 /// Calls to the server. Every method reports failure as a value rather than an
 /// exception, because the app has to keep working when the server is down (A-04).
 /// </summary>
-public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient> logger)
+/// <param name="clients">
+/// For the recording upload's own client, with its long timeout (F-08). Null
+/// in the tests, where every request goes through <paramref name="http"/>.
+/// </param>
+public class ApiClient(
+    HttpClient http, AgentSession session, ILogger<ApiClient> logger, IHttpClientFactory? clients = null)
 {
     /// <summary>The name this client is registered under in DI.</summary>
     public const string HttpClientName = "server";
+
+    /// <summary>The client for recording uploads: the same server, a long timeout (F-08).</summary>
+    public const string UploadClientName = "server-uploads";
+
+    /// <summary>
+    /// A 400 that carried no <c>code</c>: model validation, typically (F-08).
+    /// Until 27 Sep it came back as <c>server_error</c>, and the queue retried
+    /// a request the server would refuse for ever.
+    /// </summary>
+    public const string BadRequest = "bad_request";
+
+    /// <summary>A recording upload that ran out of time (F-08).</summary>
+    public const string UploadTimedOut = "upload_timed_out";
 
     public enum ApiStatus
     {
@@ -145,6 +163,8 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
         }
 
         return await SendAsync<object>(
+            clients?.CreateClient(UploadClientName) ?? http,
+            UploadTimedOut,
             () =>
             {
                 var content = new MultipartFormDataContent
@@ -634,8 +654,19 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
         }
     }
 
+    private Task<Result<T>> SendAsync<T>(
+        Func<HttpRequestMessage> build, bool authenticated, CancellationToken ct) =>
+        SendAsync<T>(http, timeoutCode: null, build, authenticated, ct);
+
+    /// <param name="client">The client to send with: the usual one, or the upload one.</param>
+    /// <param name="timeoutCode">
+    /// What running out of time means, or null for "unreachable". For an upload
+    /// it is not the server being down (F-08): the file may just be too big for
+    /// the network, and the queue should move on to the next item.
+    /// </param>
     private async Task<Result<T>> SendAsync<T>(
-        Func<HttpRequestMessage> build, bool authenticated, CancellationToken ct)
+        HttpClient client, string? timeoutCode, Func<HttpRequestMessage> build, bool authenticated,
+        CancellationToken ct)
     {
         using var request = build();
 
@@ -646,7 +677,7 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
 
         try
         {
-            using var response = await http.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
@@ -674,7 +705,10 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
 
                 return Result<T>.Failed(
                     ApiStatus.ServerError,
-                    await ReadErrorCodeAsync(response, LoginErrorCodes.ServerError, ct));
+                    await ReadErrorCodeAsync(
+                        response,
+                        response.StatusCode == HttpStatusCode.BadRequest ? BadRequest : LoginErrorCodes.ServerError,
+                        ct));
             }
 
             // Endpoints such as logout answer 204 with no body.
@@ -688,6 +722,16 @@ public class ApiClient(HttpClient http, AgentSession session, ILogger<ApiClient>
             return value is null
                 ? Result<T>.Failed(ApiStatus.ServerError, LoginErrorCodes.ServerError)
                 : Result<T>.Ok(value);
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested
+                                               && ex.InnerException is TimeoutException
+                                               && timeoutCode is not null)
+        {
+            logger.LogWarning(
+                "{Method} {Path} ran out of time after {Timeout}",
+                request.Method, request.RequestUri, client.Timeout);
+
+            return Result<T>.Failed(ApiStatus.ServerError, timeoutCode);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {

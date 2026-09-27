@@ -45,7 +45,7 @@ public class SignInService(
 
         if (!result.IsOk || result.Value is null)
         {
-            return SignInResult.Failed(result.ErrorCode ?? LoginErrorCodes.ServerError);
+            return SignInResult.Failed(Known(result.ErrorCode));
         }
 
         // The API authenticates anyone; this app is for agents. A supervisor
@@ -84,15 +84,19 @@ public class SignInService(
             sip.Start(extensions);
         }
 
-        // Anything the last shift could not send. A laptop that was offline all
-        // evening catches up the moment somebody signs in on it (A-04, A-14).
-        await callLog.FlushAsync(ct);
-
         // The classification form, so the fields are in hand before the first
         // call rather than being fetched while an agent waits with a customer on
         // the line. This is also how a supervisor's change to the form reaches
         // agents without anything being reinstalled (S-40).
+        //
+        // Before the queue, not after (M-A04): a laptop with an evening's calls
+        // waiting kept the agent at the sign-in screen, with no form, until
+        // every one of them had gone.
         await classification.LoadAsync(ct);
+
+        // Anything this agent's last shift could not send (A-04, A-14), in the
+        // background: the agent is in, and the queue catches up behind them.
+        callLog.FlushInBackground();
 
         if (!session.HasPhone)
         {
@@ -132,4 +136,18 @@ public class SignInService(
 
     /// <summary>The username to pre-fill in the login box.</summary>
     public string? LastLogin => settings.Current.LastLogin;
+
+    /// <summary>
+    /// The sign-in screen shows <c>login.errors.{code}</c>, so a code with no
+    /// label there would reach the agent as a raw key (N-09). One the app does
+    /// not know, such as <c>bad_request</c> or anything a newer server adds,
+    /// is shown as a server error.
+    /// </summary>
+    private static string Known(string? code) => code switch
+    {
+        LoginErrorCodes.InvalidCredentials or LoginErrorCodes.AccountDisabled or LoginErrorCodes.EmptyFields
+            or LoginErrorCodes.ServerUnreachable or LoginErrorCodes.NotAnAgent or LoginErrorCodes.SignedOut
+            => code,
+        _ => LoginErrorCodes.ServerError,
+    };
 }

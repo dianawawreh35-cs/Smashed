@@ -113,6 +113,27 @@
     "notesSave": "Save note",
     "notesCancel": "Close",
     "notesSaved": "Note saved",
+    "notKept": "Something from your last call could not be saved on this laptop or sent to the server. Tell your supervisor: it may be missing from the reports.",
+    "unsent": {
+      "title": "Could not be sent to the server",
+      "hint": "The server refused these, so they are kept on this laptop and no longer tried. Tell your supervisor. Once the problem is fixed, press Try again.",
+      "retry": "Try again",
+      "show": "Show",
+      "hide": "Hide",
+      "kind": {
+        "Call": "Call",
+        "Classification": "Classification",
+        "Notes": "Note",
+        "Recording": "Recording"
+      },
+      "reason": {
+        "notYours": "Logged under another agent's extension",
+        "refused": "Refused by the server",
+        "gaveUp": "The server kept failing on it",
+        "noCall": "Its call never reached the server",
+        "unreadable": "Damaged on this laptop"
+      }
+    },
     "incoming": "Incoming",
     "outgoing": "Outgoing",
     "closeCall": "Close",

@@ -54,6 +54,13 @@
   <SolidColorBrush x:Key="Warning" Color="#D29922" />
   <SolidColorBrush x:Key="Danger" Color="#F85149" />
 
+  <!-- A box that needs the agent's attention without being an error: the
+       warning's colour, dark, as a background, with WarningText on it. -->
+  <SolidColorBrush x:Key="WarningDim" Color="#2A2412" />
+  <SolidColorBrush x:Key="WarningText" Color="#E8C56B" />
+  <!-- Text on a solid Warning background: the VIP badge, a count badge. -->
+  <SolidColorBrush x:Key="OnWarning" Color="#1A1200" />
+
   <CornerRadius x:Key="CornerSmall">6</CornerRadius>
   <CornerRadius x:Key="CornerLarge">10</CornerRadius>
 

@@ -95,6 +95,71 @@
     <StackPanel Grid.Row="0" Grid.Column="0">
       <TextBlock Text="{Binding Localizer[nav.callLog]}" Style="{StaticResource Heading}" />
       <TextBlock Text="{Binding Localizer[callLog.intro]}" Style="{StaticResource Subtle}" />
+
+      <!-- F-08: what the upload queue gave up on. Only there when something
+           is; the rail button carries the same count as a badge. Closed to one
+           line until asked, so it never pushes the list down for long. -->
+      <Border Margin="0,12,0,0"
+              Padding="12,10"
+              Background="{StaticResource WarningDim}"
+              BorderBrush="{StaticResource Warning}"
+              BorderThickness="1"
+              CornerRadius="{StaticResource CornerSmall}"
+              Visibility="{Binding HasSetAside, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel>
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button Content="{Binding SetAsideToggleLabel}"
+                      Style="{StaticResource GhostButton}"
+                      Command="{Binding ToggleSetAsideCommand}" />
+              <Button Content="{Binding Localizer[callLog.unsent.retry]}"
+                      Style="{StaticResource SmallButton}"
+                      Margin="8,0,0,0"
+                      Command="{Binding RetrySetAsideCommand}" />
+            </StackPanel>
+            <TextBlock Text="{Binding SetAsideTitle}"
+                       Foreground="{StaticResource Warning}"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap" />
+          </DockPanel>
+
+          <StackPanel Visibility="{Binding IsSetAsideOpen, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding Localizer[callLog.unsent.hint]}"
+                       Style="{StaticResource Subtle}"
+                       Margin="0,6,0,8"
+                       TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding SetAside}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,2">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="90" />
+                      <ColumnDefinition Width="110" />
+                      <ColumnDefinition Width="130" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding When}" Foreground="{StaticResource Text}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Kind}" Foreground="{StaticResource Text}" />
+                    <!-- A number reads left to right in Arabic too. -->
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Number}"
+                               FontFamily="{StaticResource MonoFont}"
+                               Foreground="{StaticResource Text}"
+                               FlowDirection="LeftToRight"
+                               HorizontalAlignment="Left" />
+                    <TextBlock Grid.Column="3"
+                               Text="{Binding Reason}"
+                               Style="{StaticResource Subtle}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Reason}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </Border>
     </StackPanel>
 
     <Button Grid.Row="0" Grid.Column="1"

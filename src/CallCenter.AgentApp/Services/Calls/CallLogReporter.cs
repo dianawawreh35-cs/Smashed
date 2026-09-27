@@ -19,13 +19,51 @@ namespace CallCenter.AgentApp.Services.Calls;
 /// Queue first, then send. A call is on disk before the request is attempted, so
 /// the server being down, the VPN dropping or the laptop losing power costs
 /// nothing. The queue is flushed on the next successful report and at sign-in.
+///
+/// <b>One bad item no longer stops the queue (F-08).</b> What the server refuses
+/// for good, or keeps failing on while the items after it go through, is set
+/// aside, and the queue carries on. The call log shows the agent how many.
 /// </remarks>
 public class CallLogReporter(
     ApiClient api,
     AgentSession session,
     CallLogQueue queue,
+    AgentNotices notices,
     ILogger<CallLogReporter> logger)
 {
+    /// <summary>
+    /// How many failures an item may have, each with something after it going
+    /// through in the same pass, before it is set aside (F-08).
+    /// </summary>
+    public const int MaxAttempts = 5;
+
+    /// <summary>
+    /// After this many server errors in a row a pass stops: that is the server
+    /// in trouble, not the items, and every item it touched would otherwise be
+    /// marked down for it.
+    /// </summary>
+    private const int ServerErrorsToStop = 3;
+
+    /// <summary>
+    /// How long a classification, note or recording waits for a call that is
+    /// not in the queue before it is set aside. Long, because the normal case
+    /// is a form saved during a call that has not ended yet.
+    /// </summary>
+    private static readonly TimeSpan WaitForCall = TimeSpan.FromDays(1);
+
+    /// <summary>What happened to something the agent saved (M-A03).</summary>
+    public enum SaveOutcome
+    {
+        /// <summary>In the buffer; it goes when its turn comes.</summary>
+        Queued,
+
+        /// <summary>The buffer could not take it, and the server did.</summary>
+        Sent,
+
+        /// <summary>Neither. The agent must be told, and what they typed kept.</summary>
+        Failed,
+    }
+
     /// <summary>
     /// Subscribes to a call service, so every call it finishes is reported.
     /// </summary>
@@ -50,8 +88,7 @@ public class CallLogReporter(
 
             // Fire and forget on purpose: this runs on a SIP thread as the call
             // tears down, and blocking it to wait for an HTTP round trip would
-            // delay the next call. The queue is written synchronously inside,
-            // before anything is awaited, so nothing is lost if the app closes.
+            // delay the next call.
             _ = ReportAsync(Describe(call, extension));
         };
 
@@ -84,18 +121,53 @@ public class CallLogReporter(
     /// <summary>Queues a recording and tries to send it. Never throws.</summary>
     public async Task QueueRecordingAsync(PendingRecording recording, CancellationToken ct = default)
     {
-        await queue.EnqueueAsync(recording, ct);
-        await FlushAsync(ct);
+        if (await queue.EnqueueAsync(recording, ct))
+        {
+            await FlushAsync(ct);
+            return;
+        }
+
+        // M-A03: the buffer could not take it, so once, directly. The file
+        // stays on the laptop either way until the server has it (A-31).
+        var sent = await api.UploadRecordingAsync(recording.SipCallId, recording.Extension, recording.LocalPath, ct);
+
+        if (sent.IsOk)
+        {
+            DeleteLocal(recording.LocalPath);
+            return;
+        }
+
+        logger.LogError(
+            "A recording could not be queued or sent ({Code}); it stays at {Path}",
+            sent.ErrorCode, recording.LocalPath);
+        notices.Post("callLog.notKept");
     }
 
     /// <summary>
     /// Records a finished call. Never throws: a reporting problem must not reach
-    /// the agent, who has done nothing wrong and cannot act on it.
+    /// the agent as a crash, and the one they can act on is said in the bar.
     /// </summary>
     public async Task ReportAsync(LogCallRequest call, CancellationToken ct = default)
     {
-        await queue.EnqueueAsync(call, ct);
-        await FlushAsync(ct);
+        if (await queue.EnqueueAsync(call, ct))
+        {
+            await FlushAsync(ct);
+            return;
+        }
+
+        // M-A03: a call the buffer would not take used to be logged and then
+        // forgotten. Now it is sent directly, once; if that fails too, the call
+        // is gone, and the agent is told so a supervisor can know the reports
+        // are one short.
+        var sent = await api.LogCallAsync(call, ct);
+
+        if (!sent.IsOk)
+        {
+            logger.LogError(
+                "A call could not be queued or sent ({Code}): {SipCallId}, {Number}",
+                sent.ErrorCode, call.SipCallId, call.RemoteNumber);
+            notices.Post("callLog.notKept");
+        }
     }
 
     /// <summary>
@@ -106,31 +178,74 @@ public class CallLogReporter(
     /// form opens when the call is answered and the call is not reported until
     /// it ends, so a classification saved while the agent is still talking would
     /// arrive for a call the server has never heard of. The shared queue puts it
-    /// behind its call; the flush below sends it when its turn comes.
+    /// behind its call; the flush sends it when its turn comes.
     ///
-    /// Saving during the call is therefore normal and safe: the agent presses
-    /// save, the form closes, and the ordering is somebody else's problem.
+    /// <b>Returns once it is queued (M-A04)</b>, with the flush behind it. Save
+    /// used to wait for the whole queue to go, which with the server down was
+    /// ten seconds and more of an agent staring at a greyed button.
     /// </remarks>
-    public async Task ClassifyAsync(
+    public async Task<SaveOutcome> ClassifyAsync(
         SaveClassificationByCallRequest classification, CancellationToken ct = default)
     {
-        await queue.EnqueueAsync(classification, ct);
-        await FlushAsync(ct);
+        if (await queue.EnqueueAsync(classification, ct))
+        {
+            FlushInBackground();
+            return SaveOutcome.Queued;
+        }
+
+        var sent = await api.ClassifyByCallAsync(classification, ct);
+
+        if (sent.IsOk)
+        {
+            return SaveOutcome.Sent;
+        }
+
+        // During the call this is certain to fail - the server has no call to
+        // attach it to yet - which is why it is only the fall-back.
+        logger.LogError("A classification could not be queued or sent ({Code})", sent.ErrorCode);
+        return SaveOutcome.Failed;
     }
 
     /// <summary>
     /// Records the note on a call that has just ended (A-41) — an outbound call
-    /// the customer did not pick up.
+    /// the customer did not pick up. Returns once it is queued, as a
+    /// classification does.
     /// </summary>
-    /// <remarks>
-    /// Queued behind its call, like a classification, so it cannot arrive for a
-    /// call the server has not heard of yet.
-    /// </remarks>
-    public async Task SaveNotesAsync(SaveCallNotesByCallRequest notes, CancellationToken ct = default)
+    public async Task<SaveOutcome> SaveNotesAsync(SaveCallNotesByCallRequest notes, CancellationToken ct = default)
     {
-        await queue.EnqueueAsync(notes, ct);
-        await FlushAsync(ct);
+        if (await queue.EnqueueAsync(notes, ct))
+        {
+            FlushInBackground();
+            return SaveOutcome.Queued;
+        }
+
+        var sent = await api.SaveCallNotesByCallAsync(notes, ct);
+
+        if (sent.IsOk)
+        {
+            return SaveOutcome.Sent;
+        }
+
+        logger.LogError("A call note could not be queued or sent ({Code})", sent.ErrorCode);
+        return SaveOutcome.Failed;
     }
+
+    /// <summary>
+    /// A flush nobody waits for (M-A04). Never throws; a failure is logged and
+    /// the next call, the next minute or the next sign-in tries again.
+    /// </summary>
+    public void FlushInBackground() =>
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await FlushAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Sending the queued items failed");
+            }
+        });
 
     /// <summary>
     /// One pass over the queue at a time.
@@ -197,123 +312,219 @@ public class CallLogReporter(
             }
         });
 
+    // ---- what has been set aside (F-08) -----------------------------------
+
+    /// <summary>
+    /// How many of the signed-in agent's items have been set aside. The call
+    /// log's rail button shows it as a badge.
+    /// </summary>
+    public int SetAsideCount { get; private set; }
+
+    /// <summary>Raised when <see cref="SetAsideCount"/> changes, on any thread.</summary>
+    public event EventHandler? SetAsideChanged;
+
+    /// <summary>The signed-in agent's set-aside items, for the call log's panel.</summary>
+    public Task<IReadOnlyList<SetAsideItem>> SetAsideItemsAsync(CancellationToken ct = default) =>
+        session.User is { } user
+            ? queue.SetAsideItemsAsync(user.Id, ct)
+            : Task.FromResult<IReadOnlyList<SetAsideItem>>([]);
+
+    /// <summary>
+    /// Puts the agent's set-aside items back on the queue and sends them now.
+    /// For when the server's refusal has been dealt with.
+    /// </summary>
+    public async Task RetrySetAsideAsync(CancellationToken ct = default)
+    {
+        if (session.User is not { } user)
+        {
+            return;
+        }
+
+        var count = await queue.RetrySetAsideAsync(user.Id, ct);
+        logger.LogInformation("{Count} set-aside item(s) put back on the queue by the agent", count);
+
+        await FlushAsync(ct);
+    }
+
+    private async Task RefreshSetAsideAsync(CancellationToken ct)
+    {
+        var count = session.User is { } user ? (await queue.SetAsideItemsAsync(user.Id, ct)).Count : 0;
+
+        if (count == SetAsideCount)
+        {
+            return;
+        }
+
+        SetAsideCount = count;
+        SetAsideChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ---- the pass ----------------------------------------------------------
+
+    /// <summary>
+    /// Refusals the server is certain about. Retried, they fail the same way
+    /// for ever, so they are set aside at once.
+    /// </summary>
+    /// <remarks>
+    /// <c>extension_not_yours</c> is the server refusing a call logged under an
+    /// extension that is not the signed-in agent's (F-03, server side, prompt
+    /// 18). <c>bad_request</c> is a 400 that carried no code (F-08).
+    /// </remarks>
+    private static bool IsPermanent(string? code) => code is
+        "unknown_value" or "invalid_request" or "unknown_type" or "unknown_branch" or "not_your_call"
+        or "not_answered" or "notes_not_taken" or "edit_window_closed"
+        or "extension_not_yours" or ApiClient.BadRequest;
+
     private async Task FlushPassAsync(CancellationToken ct)
     {
-        if (!session.IsSignedIn)
+        if (!session.IsSignedIn || session.User is not { } user)
         {
             // Nothing can be sent without a token. The queue keeps until the
             // next sign-in, which is exactly what it is for.
             return;
         }
 
-        var pending = await queue.PendingItemsAsync(ct);
+        // F-03: rows from before the owner was recorded are this agent's now,
+        // once (Dia's call, 27 Sep). Nothing is unowned after this.
+        var claimed = await queue.ClaimUnownedAsync(user.Id, ct);
+
+        if (claimed > 0)
+        {
+            logger.LogWarning(
+                "{Count} queued item(s) had no owner, from before 27 Sep; they are sent now as {Login} (F-03)",
+                claimed, user.Login);
+        }
+
+        var pending = await queue.PendingItemsAsync(user.Id, ct);
+
         if (pending.Count == 0)
         {
+            await RefreshSetAsideAsync(ct);
             return;
         }
 
+        // Recordings last (F-08). A long one can take minutes to upload, and
+        // the calls and forms behind it should not wait for it. Still after
+        // their own call, which is in the first half.
+        var ordered = pending.Where(i => i.Recording is null)
+            .Concat(pending.Where(i => i.Recording is not null))
+            .ToList();
+
+        var callsQueued = pending.Where(i => i.Call is not null).Select(i => i.Reference).ToHashSet();
+
         var done = new List<long>();
+        var setAside = new List<(long Id, string Reason)>();
+        var callsSetAside = new List<string>();
+        var failed = new List<(CallLogQueue.PendingItem Item, string? Code, int Index)>();
+
+        // Calls that did not go through in this pass. What belongs to them
+        // waits behind them rather than being sent to be refused.
+        var held = new HashSet<string>();
+
+        var lastSuccess = -1;
+        var serverErrorsInARow = 0;
 
         // Set when a classification was skipped because its call had not been
         // sent yet. If a call did go out in this pass, one more pass clears it
         // rather than leaving it until the next call ends.
         var deferred = false;
 
-        foreach (var item in pending)
+        for (var index = 0; index < ordered.Count; index++)
         {
-            var (id, call, classification, notes, recording) =
-                (item.Id, item.Call, item.Classification, item.Notes, item.Recording);
+            var item = ordered[index];
 
-            // One loop over every kind, in one sequence.
-            bool ok;
-            string? errorCode;
-
-            if (call is not null)
+            if (item.Call is null && item.Reference is { } waitsFor && held.Contains(waitsFor))
             {
-                var sent = await api.LogCallAsync(call, ct);
-                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
-            }
-            else if (classification is not null)
-            {
-                var sent = await api.ClassifyByCallAsync(classification, ct);
-                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
-            }
-            else if (notes is not null)
-            {
-                var sent = await api.SaveCallNotesByCallAsync(notes, ct);
-                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
-            }
-            else
-            {
-                var sent = await api.UploadRecordingAsync(
-                    recording!.SipCallId, recording.Extension, recording.LocalPath, ct);
-
-                (ok, errorCode) = (sent.IsOk, sent.ErrorCode);
-
-                // A-31: the laptop's copy goes only once the server has it. A
-                // file whose upload succeeded but whose confirmation was lost
-                // reports "recording_missing" on the retry, which is also done.
-                if (ok || errorCode is "recording_missing")
-                {
-                    DeleteLocal(recording.LocalPath);
-                    ok = true;
-                }
-            }
-
-            if (ok)
-            {
-                done.Add(id);
                 continue;
             }
 
-            // A classification for a call the server does not have yet.
+            var (ok, status, errorCode) = await SendAsync(item, ct);
+
+            if (ok)
+            {
+                done.Add(item.Id);
+                lastSuccess = index;
+                serverErrorsInARow = 0;
+                continue;
+            }
+
+            // A classification, note or recording for a call the server does
+            // not have yet.
             //
             // This is the normal case, not the exception, and the queue order is
             // the opposite of what it looks like: the agent saves the form while
             // still talking, so the classification is queued *before* the call,
             // which is not reported until hang-up. Its id is therefore lower
-            // than its call's.
-            //
-            // Skipped and left in place, never break. Stopping here would leave
-            // the classification blocking the very call it is waiting for, and
-            // the queue would deadlock - which is exactly what it did: two calls
-            // and two classifications sat unsent behind each other.
-            if (call is null && errorCode is "call_not_found")
+            // than its call's. Skipped and left in place, never a reason to stop.
+            if (item.Call is null && errorCode is "call_not_found")
             {
+                // Unless the call is not in the queue at all and has had a day
+                // to arrive: then it is never coming, and this would wait for
+                // it for ever.
+                if (!callsQueued.Contains(item.Reference) && DateTimeOffset.Now - item.CreatedAt > WaitForCall)
+                {
+                    setAside.Add((item.Id, "call_never_arrived"));
+                    continue;
+                }
+
                 logger.LogDebug(
                     "A classification, note or recording is waiting for its call to be reported ({Reference})",
-                    classification?.SipCallId ?? notes?.SipCallId ?? recording?.SipCallId);
+                    item.Reference);
 
                 deferred = true;
                 continue;
             }
 
-            // A refusal the server is certain about will never succeed, however
-            // often it is retried, and a queue that retries it forever blocks
-            // every call behind it. Drop it, loudly.
-            if (errorCode is "unknown_value" or "invalid_request"
-                or "unknown_type" or "unknown_branch" or "not_your_call"
-                or "not_answered" or "notes_not_taken" or "edit_window_closed")
+            if (IsPermanent(errorCode))
             {
                 logger.LogError(
-                    "The server refused queued item {Id} ({Code}); it is discarded rather than retried forever",
-                    id, errorCode);
+                    "The server refused queued item {Id} ({Code}); it is set aside rather than retried for ever",
+                    item.Id, errorCode);
 
-                done.Add(id);
+                setAside.Add((item.Id, errorCode!));
+
+                if (item.Call is not null && item.Reference is { } reference)
+                {
+                    held.Add(reference);
+                    callsSetAside.Add(reference);
+                }
+
                 continue;
             }
 
-            // Anything else - unreachable, a 500, an expired token - is worth
-            // retrying. Stop here rather than working through the rest: they
-            // will fail the same way, and the order is worth keeping, because a
-            // classification must never reach the server before its call.
-            await queue.RecordFailureAsync(id, errorCode, ct);
+            if (status is ApiClient.ApiStatus.Unreachable or ApiClient.ApiStatus.Unauthorized)
+            {
+                // The server, not the item. Everything after would fail the
+                // same way, so the pass stops, and the attempt does not count
+                // against the item: an evening with the server down must not
+                // wear the evening's calls out. A 401 is the sign-in ending
+                // (N-05), which SignedOutByServer is already dealing with.
+                await queue.RecordFailureAsync(item.Id, errorCode, counts: false, ct);
 
-            logger.LogInformation(
-                "{Count} item(s) still waiting to reach the server ({Reason})",
-                pending.Count - done.Count, errorCode ?? "unreachable");
+                logger.LogInformation(
+                    "{Count} item(s) still waiting to reach the server ({Reason})",
+                    ordered.Count - done.Count, errorCode ?? "unreachable");
 
-            break;
+                break;
+            }
+
+            // A server error, or an upload that ran out of time (F-08). Perhaps
+            // this item, perhaps the server: skipped for now with whatever
+            // belongs to it, and the pass carries on to the next.
+            failed.Add((item, errorCode, index));
+
+            if (item.Call is not null && item.Reference is { } failedCall)
+            {
+                held.Add(failedCall);
+            }
+
+            if (++serverErrorsInARow >= ServerErrorsToStop)
+            {
+                logger.LogWarning(
+                    "The server failed {Count} items in a row ({Reason}); the rest wait for the next pass",
+                    serverErrorsInARow, errorCode);
+                break;
+            }
         }
 
         if (done.Count > 0)
@@ -321,6 +532,43 @@ public class CallLogReporter(
             await queue.AcknowledgeAsync(done, ct);
             logger.LogInformation("{Count} item(s) reported to the server", done.Count);
         }
+
+        // A failure counts against the item only if something after it went
+        // through in the same pass: that is the server working, and refusing
+        // this one. Failures after the last success say nothing either way.
+        foreach (var (item, code, index) in failed)
+        {
+            var counts = index < lastSuccess;
+            await queue.RecordFailureAsync(item.Id, code, counts, ct);
+
+            if (counts && item.Attempts + 1 >= MaxAttempts)
+            {
+                logger.LogError(
+                    "Queued item {Id} failed {Attempts} times while others went through ({Code}); it is set aside",
+                    item.Id, item.Attempts + 1, code);
+
+                setAside.Add((item.Id, "gave_up"));
+
+                if (item.Call is not null && item.Reference is { } reference)
+                {
+                    callsSetAside.Add(reference);
+                }
+            }
+        }
+
+        if (setAside.Count > 0)
+        {
+            await queue.SetAsideAsync(setAside, ct);
+
+            // What was waiting on a set-aside call can never go either.
+            var followers = await queue.SetAsideFollowersAsync(user.Id, callsSetAside, ct);
+
+            logger.LogError(
+                "{Count} item(s) set aside, and {Followers} waiting on them; the call log shows them to the agent",
+                setAside.Count, followers);
+        }
+
+        await RefreshSetAsideAsync(ct);
 
         // A classification was skipped, and a call went out in the same pass -
         // very likely the call it was waiting for. One more pass sends it now
@@ -342,6 +590,44 @@ public class CallLogReporter(
                 _retrying = false;
             }
         }
+    }
+
+    /// <summary>Sends one queued item, whichever kind it is.</summary>
+    private async Task<(bool Ok, ApiClient.ApiStatus Status, string? Code)> SendAsync(
+        CallLogQueue.PendingItem item, CancellationToken ct)
+    {
+        if (item.Call is { } call)
+        {
+            var sent = await api.LogCallAsync(call, ct);
+            return (sent.IsOk, sent.Status, sent.ErrorCode);
+        }
+
+        if (item.Classification is { } classification)
+        {
+            var sent = await api.ClassifyByCallAsync(classification, ct);
+            return (sent.IsOk, sent.Status, sent.ErrorCode);
+        }
+
+        if (item.Notes is { } notes)
+        {
+            var sent = await api.SaveCallNotesByCallAsync(notes, ct);
+            return (sent.IsOk, sent.Status, sent.ErrorCode);
+        }
+
+        var recording = item.Recording!;
+        var uploaded = await api.UploadRecordingAsync(
+            recording.SipCallId, recording.Extension, recording.LocalPath, ct);
+
+        // A-31: the laptop's copy goes only once the server has it. A file
+        // whose upload succeeded but whose confirmation was lost reports
+        // "recording_missing" on the retry, which is also done.
+        if (uploaded.IsOk || uploaded.ErrorCode is "recording_missing")
+        {
+            DeleteLocal(recording.LocalPath);
+            return (true, ApiClient.ApiStatus.Ok, null);
+        }
+
+        return (false, uploaded.Status, uploaded.ErrorCode);
     }
 
     /// <summary>
@@ -378,6 +664,13 @@ public class CallLogReporter(
     /// Turns a finished call into the report the server stores. The status is
     /// worked out here, from what actually happened.
     /// </summary>
+    /// <remarks>
+    /// The number, the name and the queue are cut to what
+    /// <see cref="LogCallRequest"/> accepts (F-08). They come from the PBX, and
+    /// a name over 200 characters was refused 400 with no code, which the queue
+    /// retried for ever. The Call-ID and the extension are left whole: they are
+    /// the call's key, and a shortened one would be a different call.
+    /// </remarks>
     public static LogCallRequest Describe(FinishedCall call, string extension) => new(
         SipCallId: call.SipCallId,
         Extension: extension,
@@ -398,11 +691,15 @@ public class CallLogReporter(
             CallOutcome.Failed => CommunicationStatuses.Failed,
             _ => CommunicationStatuses.Missed,
         },
-        RemoteNumber: call.Number,
-        RemoteName: call.CallerName,
+        RemoteNumber: Cut(call.Number, 40),
+        RemoteName: Cut(call.CallerName, 200),
         StartedAt: call.StartedAt,
         AnsweredAt: call.AnsweredAt,
         EndedAt: call.EndedAt,
-        Queue: call.Queue,
-        LaptopId: LaptopInfo.LaptopId);
+        Queue: Cut(call.Queue, 100),
+        LaptopId: Cut(LaptopInfo.LaptopId, 100));
+
+    /// <summary>At most <paramref name="max"/> characters; the same limits as the request's.</summary>
+    private static string? Cut(string? value, int max) =>
+        value is { Length: var length } && length > max ? value[..max] : value;
 }

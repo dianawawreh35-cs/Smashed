@@ -498,3 +498,29 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 | R‑20/21 abandoned, SLA | communications(status, wait_sec) |
 
 Every report resolves to these tables — nothing missing.
+
+---
+
+## 10. The Agent App's offline buffer (SQLite, on each laptop)
+
+Not part of the server's database: `%LOCALAPPDATA%\CallCenter\agent-buffer.db` on
+every agent laptop, holding what has not reached the server yet (A-04). Created
+with `EnsureCreated`, and changed only by adding nullable columns in place
+(`AgentBufferDbContext.UpgradeAsync`), so a laptop with rows waiting keeps them
+through an update. See `src/CallCenter.AgentApp/Data/README.md`.
+
+```sql
+CREATE TABLE pending_uploads (
+  "Id"          INTEGER PRIMARY KEY AUTOINCREMENT,  -- the replay order
+  "Kind"        TEXT NOT NULL,     -- Call | Classification | Notes | Recording
+  "Payload"     TEXT NOT NULL,     -- the request body as JSON; a recording's is its file path
+  "Reference"   TEXT,              -- SipCallId|Extension: the call it belongs to
+  "CreatedAt"   TEXT NOT NULL,
+  "Attempts"    INTEGER NOT NULL,  -- failures that count towards setting it aside
+  "LastError"   TEXT,              -- the server's code, or why it was set aside
+  "UserId"      TEXT,              -- added 27 Sep (F-03): who queued it; replayed only as them
+  "SetAsideAt"  TEXT               -- added 27 Sep (F-08): given up on; null while still tried
+);
+CREATE INDEX ix_pending_order     ON pending_uploads ("Id");
+CREATE INDEX ix_pending_reference ON pending_uploads ("Reference");
+```

@@ -395,6 +395,13 @@
                       Margin="10,0,0,0"
                       Command="{Binding SkipNotesCommand}" />
             </StackPanel>
+
+            <!-- M-A03: the note was neither queued nor sent; it is still here. -->
+            <TextBlock Text="{Binding NotesMessage}"
+                       Foreground="{StaticResource Warning}"
+                       FontSize="11"
+                       Margin="0,6,0,0"
+                       TextWrapping="Wrap" />
           </StackPanel>
         </StackPanel>
       </ScrollViewer>

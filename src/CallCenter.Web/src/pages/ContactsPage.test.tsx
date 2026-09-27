@@ -145,7 +145,7 @@ describe('contacts page', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Ahmad' } })
     fireEvent.change(screen.getByLabelText('Phone number 1'), { target: { value: '0599222333' } })
 
-    expect(await screen.findByText(/already 1 contact with this name/i)).toBeInTheDocument()
+    expect(await screen.findByText(/already a contact with this name/i)).toBeInTheDocument()
 
     // The existing contact is shown with enough to recognise them by.
     expect(screen.getByText(/0599123456/)).toBeInTheDocument()
@@ -376,5 +376,45 @@ describe('contacts page', () => {
 
     expect(await screen.findByText('Nothing matched that search.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /flag it anyway/i })).not.toBeInTheDocument()
+  })
+
+  it('holds every phone number left to right, for Arabic (M-W01)', async () => {
+    // In a right-to-left page +970 59 912 3456 otherwise shows its groups reversed.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse([{ ...AHMAD, phones: ['+970 59 912 3456', '022987654'] }]),
+    ))
+
+    renderPage()
+
+    expect(await screen.findByText('+970 59 912 3456')).toHaveAttribute('dir', 'ltr')
+    expect(screen.getByText('022987654')).toHaveAttribute('dir', 'ltr')
+  })
+
+  it('isolates the number inside a translated sentence', async () => {
+    // "Nobody has {{number}}": the number is wrapped in left-to-right isolate
+    // marks, since it has no element of its own to carry dir="ltr".
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse([])))
+
+    renderPage()
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '+970 599 000 111' } })
+
+    const offer = await screen.findByRole('button', { name: /flag it anyway/i })
+    expect(offer.textContent).toContain('⁦+970 599 000 111⁩')
+  })
+
+  it('waits for the typing to stop before it searches (M-W09)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    const box = screen.getByLabelText('Search')
+    fireEvent.change(box, { target: { value: '0' } })
+    fireEvent.change(box, { target: { value: '05' } })
+    fireEvent.change(box, { target: { value: '059' } })
+
+    const asked = () => fetchMock.mock.calls.map(([url]) => new URL(String(url), 'http://x').searchParams.get('q'))
+    await waitFor(() => expect(asked()).toContain('059'))
+    expect(asked()).not.toContain('0')
+    expect(asked()).not.toContain('05')
   })
 })

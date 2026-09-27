@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   addPhoneToContact,
@@ -14,13 +14,13 @@ import {
 import type { Contact, ContactFilter, ContactSummary, DuplicateNumber } from '../api/contacts'
 import { communicationsForContact } from '../api/communications'
 import { errorCodeOf } from '../api/users'
+import { looksLikeNumber, ltr, searchDir } from '../lib/bidi'
 import { noSelectOnDoubleClick } from '../lib/rows'
+import { useDebounced } from '../lib/useDebounced'
 import ContactHistory from '../components/ContactHistory'
 import FlagDialog from '../components/FlagDialog'
 import type { FlagTarget } from '../components/FlagDialog'
-
-/** Whether what was typed is a bare phone number, so it can be flagged unseen (S-45). */
-const looksLikeNumber = (query: string) => /^[\d\s+()-]{3,}$/.test(query.trim())
+import LoadError from '../components/LoadError'
 
 /**
  * The shared contact list (A-60 to A-63).
@@ -42,6 +42,10 @@ const looksLikeNumber = (query: string) => /^[\d\s+()-]{3,}$/.test(query.trim())
  * double-clicking a row near the bottom made the page jump to the top a moment
  * later. Reported as glitchy on 24 Sep. Only a new contact, and flagging a
  * number nobody has, open above the list: there is no row for them to sit under.
+ *
+ * **The search waits for the typing to stop** (M-W09, 250 ms), and the last
+ * results stay on screen, dimmed, until the next ones arrive. It used to send
+ * a request per key and flash "Loading…" between each.
  */
 export default function ContactsPage() {
   const { t } = useTranslation()
@@ -50,10 +54,13 @@ export default function ContactsPage() {
   const [adding, setAdding] = useState(false)
   const [flagging, setFlagging] = useState<FlagTarget | null>(null)
 
-  const { data: results, isLoading } = useQuery({
-    queryKey: ['contacts', query, filter],
-    queryFn: () => searchContacts(query, filter),
+  const searched = useDebounced(query)
+  const search = useQuery({
+    queryKey: ['contacts', searched, filter],
+    queryFn: () => searchContacts(searched, filter),
+    placeholderData: keepPreviousData,
   })
+  const results = search.data
 
   const filters: ContactFilter[] = ['all', 'vip', 'blocked']
 
@@ -61,7 +68,7 @@ export default function ContactsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">{t('contacts.heading')}</h2>
+          <h1 className="page-title">{t('contacts.heading')}</h1>
           <p className="page-subtitle">{t('contacts.intro')}</p>
         </div>
         <button type="button" onClick={() => setAdding(true)} className="btn-primary">
@@ -76,6 +83,8 @@ export default function ContactsPage() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('contacts.searchPlaceholder')}
           aria-label={t('contacts.search')}
+          // A number is typed left to right in Arabic too (M-W01).
+          dir={searchDir(query)}
           className="input max-w-md"
         />
 
@@ -101,27 +110,35 @@ export default function ContactsPage() {
       {/* Only a bare number, offered from the empty result below: it has no row. */}
       {flagging && <FlagDialog target={flagging} onClose={() => setFlagging(null)} />}
 
-      {isLoading ? (
+      {/* An empty list and a failed search must not look the same (M-W03):
+          a failure says so, and never offers to flag a number "nobody has",
+          because nobody knows. */}
+      {search.isError ? (
+        <LoadError message={t('contacts.searchFailed')} onRetry={() => void search.refetch()} busy={search.isFetching} />
+      ) : search.isPending ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : results && results.length > 0 ? (
-        <ContactTable contacts={results} />
+        // Dimmed, not replaced, while the next search is on its way.
+        <div className={search.isPlaceholderData ? 'opacity-60 transition' : 'transition'} aria-busy={search.isPlaceholderData}>
+          <ContactTable contacts={results} />
+        </div>
       ) : (
-        /* An empty list and a failed search must not look the same. */
         <div className="card card-body flex flex-col items-center gap-3 text-center">
           <p className="text-slate-300">
-            {query ? t('contacts.noMatches') : t('contacts.empty')}
+            {searched ? t('contacts.noMatches') : t('contacts.empty')}
           </p>
 
           {/* A number nobody has on file is exactly the nuisance caller S-45
               expects to be blockable, so offer it here rather than making the
-              supervisor invent a contact for them first. */}
-          {looksLikeNumber(query) && (
+              supervisor invent a contact for them first. The number that was
+              searched for, which is the one this answer is about. */}
+          {looksLikeNumber(searched) && !search.isPlaceholderData && (
             <button
               type="button"
-              onClick={() => setFlagging({ kind: 'number', number: query.trim() })}
+              onClick={() => setFlagging({ kind: 'number', number: searched.trim() })}
               className="btn-ghost btn-sm"
             >
-              {t('contacts.flagThisNumber', { number: query.trim() })}
+              {t('contacts.flagThisNumber', { number: ltr(searched.trim()) })}
             </button>
           )}
         </div>
@@ -193,7 +210,9 @@ function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
                   </span>
                 )}
               </td>
-              <td className="tabular text-slate-400">{contact.phones.join(' · ')}</td>
+              <td className="tabular text-slate-400">
+                <PhoneList phones={contact.phones} />
+              </td>
               <td className="text-slate-400">{contact.address}</td>
               {/* The double-click stops here: a quick double press of Edit
                   would otherwise open the contact and shut it again. */}
@@ -221,7 +240,7 @@ function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
                 they have scrolled past. */}
             {open && (
               <tr>
-                <td colSpan={4} className="bg-ink-950/60 p-3">
+                <td colSpan={4} className="row-panel">
                   {/* w-0 min-w-full: as wide as the table and never wider, so
                       opening a row cannot make every column jump. */}
                   <div className="w-0 min-w-full">
@@ -246,6 +265,23 @@ function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
 }
 
 /**
+ * A contact's numbers, each held left to right (M-W01): in Arabic a number
+ * such as +970 59 912 3456 otherwise shows with its groups reversed.
+ */
+function PhoneList({ phones }: { phones: string[] }) {
+  return (
+    <>
+      {phones.map((phone, i) => (
+        <span key={i}>
+          {i > 0 && ' · '}
+          <span dir="ltr">{phone}</span>
+        </span>
+      ))}
+    </>
+  )
+}
+
+/**
  * Fades in where it opens, and nothing else. **The page does not scroll.** It
  * used to scroll to show the whole panel when it opened near the bottom of the
  * window, and that movement was the part that still felt wrong (24 Sep).
@@ -264,7 +300,9 @@ function OpenContact({ id, onClose }: { id: string; onClose: () => void }) {
   const { t } = useTranslation()
   const contact = useQuery({ queryKey: ['contacts', 'one', id], queryFn: () => getContact(id) })
 
-  if (contact.isError) return <p className="notice-error">{t('contacts.errors.server_error')}</p>
+  if (contact.isError) {
+    return <LoadError onRetry={() => void contact.refetch()} busy={contact.isFetching} />
+  }
   if (!contact.data) {
     // Still, not pulsing: only seen when the contact was not already fetched
     // on hover, and a flashing block is itself a flicker.
@@ -292,14 +330,17 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
   const [duplicate, setDuplicate] = useState<DuplicateNumber | null>(null)
 
   // Contacts that already carry this name (A-63). Looked up as the name is
-  // typed, so the agent is told before saving rather than afterwards. Never
-  // blocks the save - common names are common, and two customers may genuinely
-  // share one.
-  const { data: sameName } = useQuery({
-    queryKey: ['contacts', 'by-name', name, contact?.id],
-    queryFn: () => findContactsByName(name.trim(), contact?.id),
-    enabled: name.trim().length > 0,
+  // typed, once the typing stops (M-W09), so the agent is told before saving
+  // rather than afterwards. Never blocks the save - common names are common,
+  // and two customers may genuinely share one.
+  const typedName = useDebounced(name.trim())
+  const sameNameQuery = useQuery({
+    queryKey: ['contacts', 'by-name', typedName, contact?.id],
+    queryFn: () => findContactsByName(typedName, contact?.id),
+    enabled: typedName.length > 0,
+    placeholderData: keepPreviousData,
   })
+  const sameName = typedName.length > 0 ? sameNameQuery.data : undefined
 
   const firstNumber = phones.map((p) => p.trim()).find(Boolean) ?? ''
 
@@ -360,7 +401,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
             <p className="mt-1">
               {t('contacts.duplicateHolder', {
                 name: duplicate.existingContactName ?? t('contacts.noName'),
-                number: duplicate.number,
+                number: ltr(duplicate.number),
               })}
             </p>
           )}
@@ -372,6 +413,11 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
         <Field label={t('contacts.address')} value={address} onChange={setAddress} />
       </div>
 
+      {/* Said, but quietly: the check is a help, and the save does not need it. */}
+      {sameNameQuery.isError && typedName.length > 0 && (
+        <p className="text-xs text-amber-300">{t('contacts.sameNameFailed')}</p>
+      )}
+
       {/* A matching name is a prompt to look, not an obstacle (A-63). */}
       {sameName && sameName.length > 0 && (
         <div className="notice-warning">
@@ -380,7 +426,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
             {sameName.map((match) => (
               <li key={match.id} className="flex flex-wrap items-center gap-2">
                 <span className="text-slate-300">
-                  {match.name} · {match.phones.join(' · ')}
+                  {match.name} · <PhoneList phones={match.phones} />
                   {match.address ? ` · ${match.address}` : ''}
                 </span>
                 {firstNumber && (
@@ -410,6 +456,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
               onChange={(e) =>
                 setPhones(phones.map((p, i) => (i === index ? e.target.value : p)))
               }
+              dir="ltr"
               className="input tabular"
             />
             {phones.length > 1 && (

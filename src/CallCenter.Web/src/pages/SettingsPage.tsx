@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -6,6 +6,7 @@ import { listSettings, settingProblems, updateSettings } from '../api/settings'
 import type { Setting } from '../api/settings'
 import AbandonedImportCard from '../components/AbandonedImportCard'
 import ChannelsCard from '../components/ChannelsCard'
+import LoadError from '../components/LoadError'
 import PbxBlacklistCard from '../components/PbxBlacklistCard'
 
 /**
@@ -31,38 +32,61 @@ export default function SettingsPage() {
  * The whole form saves at once, because the server applies a batch all or
  * nothing — a screen that could half-apply would be worse than one that makes
  * you fix the bad field first.
+ *
+ * Settings that did not load show no form (M-W04): a blank form here would
+ * save blanks over every value. A save refused without naming a field (a 500,
+ * no network) says it was not saved, rather than nothing.
  */
 function SystemSettings() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
-  const { data: settings, isLoading } = useQuery({ queryKey: ['settings'], queryFn: listSettings })
+  const query = useQuery({ queryKey: ['settings'], queryFn: listSettings })
+  const settings = query.data
 
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [problems, setProblems] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
+  const [notSaved, setNotSaved] = useState(false)
 
-  // Fill the form once the values arrive, and again after a save returns them.
+  const fill = (values: Setting[]) => setDraft(Object.fromEntries(values.map((s) => [s.key, s.value])))
+
+  // Fill the form once the values arrive, and again from what a save returns.
+  const filled = useRef(false)
   useEffect(() => {
-    if (settings) {
-      setDraft(Object.fromEntries(settings.map((s) => [s.key, s.value])))
+    if (settings && !filled.current) {
+      filled.current = true
+      fill(settings)
     }
   }, [settings])
 
   const save = useMutation({
     mutationFn: () => updateSettings(draft),
-    onSuccess: () => {
+    onSuccess: (values) => {
       setProblems({})
+      setNotSaved(false)
       setSaved(true)
-      void queryClient.invalidateQueries({ queryKey: ['settings'] })
+      fill(values)
+      queryClient.setQueryData(['settings'], values)
     },
     onError: (error) => {
       setSaved(false)
-      setProblems(settingProblems(error))
+      const fields = settingProblems(error)
+      setProblems(fields)
+      setNotSaved(Object.keys(fields).length === 0)
     },
   })
 
-  if (isLoading) return <p className="text-slate-400">{t('app.loading')}</p>
+  if (query.isPending) return <p className="text-slate-400">{t('app.loading')}</p>
+
+  if (query.isError && !settings) {
+    return (
+      <section className="space-y-6" aria-label={t('settings.heading')}>
+        <h1 className="page-title">{t('settings.heading')}</h1>
+        <LoadError message={t('settings.failed')} onRetry={() => void query.refetch()} busy={query.isFetching} />
+      </section>
+    )
+  }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -75,7 +99,7 @@ function SystemSettings() {
   return (
     <form onSubmit={onSubmit} className="space-y-6">
       <div>
-        <h2 className="page-title">{t('settings.heading')}</h2>
+        <h1 className="page-title">{t('settings.heading')}</h1>
         <p className="page-subtitle">{t('settings.intro')}</p>
       </div>
 
@@ -90,6 +114,7 @@ function SystemSettings() {
           {t('settings.saved')}
         </p>
       )}
+      {notSaved && <p role="alert" className="notice-error">{t('common.notSaved')}</p>}
 
       <div className="card card-body space-y-5">
         {settings?.map((setting) => (
@@ -113,6 +138,13 @@ function SystemSettings() {
     </form>
   )
 }
+
+/**
+ * Settings whose values are addresses, times or lists of numbers, typed left
+ * to right in Arabic too (M-W01): "2001, 2002" would otherwise show as
+ * "2002 ,2001".
+ */
+const LTR_KEYS = new Set(['pbx.host', 'reports.internal_numbers', 'queue.auto_open_time'])
 
 function SettingField({
   setting,
@@ -155,6 +187,7 @@ function SettingField({
       ) : (
         <input
           type={setting.kind === 'Integer' ? 'number' : 'text'}
+          dir={setting.kind === 'Integer' || LTR_KEYS.has(setting.key) ? 'ltr' : undefined}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={inputClass}

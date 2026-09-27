@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { createChannel, listChannels, updateChannel } from '../api/channels'
 import type { Channel } from '../api/channels'
 import { errorCodeOf } from '../api/users'
+import LoadError from './LoadError'
 
 /**
  * The channels a message can arrive on (S-41, A-70): add, rename, reorder,
@@ -21,10 +22,11 @@ export default function ChannelsCard() {
   const [error, setError] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
 
-  const { data: channels, isLoading } = useQuery({
+  const query = useQuery({
     queryKey: ['channels', 'all'],
     queryFn: () => listChannels(true),
   })
+  const channels = query.data
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['channels'] })
   const fail = (e: unknown) => setError(t(`channels.errors.${errorCodeOf(e)}`))
@@ -81,7 +83,10 @@ export default function ChannelsCard() {
         </div>
       )}
 
-      {isLoading ? (
+      {/* Not an empty table: that would say there are no channels (M-W03). */}
+      {query.isError ? (
+        <LoadError message={t('channels.failed')} onRetry={() => void query.refetch()} busy={query.isFetching} />
+      ) : query.isPending ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : (
         <div className="overflow-x-auto">

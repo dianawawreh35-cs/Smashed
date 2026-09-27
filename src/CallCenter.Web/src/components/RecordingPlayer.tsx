@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { downloadRecording, fetchRecording } from '../api/calls'
+import { downloadBlob } from '../lib/csv'
 import { formatClock, readRecording } from '../lib/recordingWav'
 import type { HoldPeriod } from '../lib/recordingWav'
 
@@ -48,6 +49,7 @@ function Player({ communicationId }: { communicationId: string }) {
   const [state, setState] = useState<State>({ kind: 'loading' })
   const [position, setPosition] = useState(0)
   const [playing, setPlaying] = useState(false)
+  const [download, setDownload] = useState<'idle' | 'busy' | 'failed'>('idle')
 
   useEffect(() => {
     const abort = new AbortController()
@@ -115,14 +117,16 @@ function Player({ communicationId }: { communicationId: string }) {
     setPosition(seconds)
   }
 
-  async function download() {
-    const blob = await downloadRecording(communicationId)
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `call-${communicationId}.wav`
-    link.click()
-    // Revoked a moment later: straight away can cancel the save in some browsers.
-    setTimeout(() => URL.revokeObjectURL(link.href), 10_000)
+  // A download that fails says so, beside the button, rather than doing
+  // nothing at all (it used to be an unhandled rejection).
+  async function onDownload() {
+    setDownload('busy')
+    try {
+      downloadBlob(`call-${communicationId}.wav`, await downloadRecording(communicationId))
+      setDownload('idle')
+    } catch {
+      setDownload('failed')
+    }
   }
 
   return (
@@ -182,10 +186,12 @@ function Player({ communicationId }: { communicationId: string }) {
           </span>
         </div>
 
-        <button type="button" className="btn-ghost btn-sm" onClick={() => void download()}>
+        <button type="button" className="btn-ghost btn-sm" disabled={download === 'busy'} onClick={() => void onDownload()}>
           {t('calls.recording.download')}
         </button>
       </div>
+
+      {download === 'failed' && <p role="alert" className="notice-error">{t('calls.recording.failed')}</p>}
 
       {/* Every hold, as times: the marks say where, this says exactly when. */}
       {holds.length > 0 && (

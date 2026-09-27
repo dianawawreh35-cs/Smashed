@@ -9,7 +9,9 @@ import { listClassificationTypes } from '../api/classifications'
 import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
 import CallDetails from '../components/CallDetails'
+import LoadError from '../components/LoadError'
 import { FilterSelect as Select, Pager } from '../components/SearchControls'
+import { searchDir } from '../lib/bidi'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
 const PAGE_SIZE = 50
@@ -110,7 +112,7 @@ export default function ApplicationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="page-title">{t('applications.heading')}</h2>
+        <h1 className="page-title">{t('applications.heading')}</h1>
         <p className="page-subtitle">{t('applications.intro')}</p>
       </div>
 
@@ -118,7 +120,7 @@ export default function ApplicationsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <label className="field lg:col-span-2">
             <span className="field-label">{t('calls.filter.q')}</span>
-            <input className="input" value={draft.q} onChange={(e) => set('q')(e.target.value)} />
+            <input className="input" value={draft.q} dir={searchDir(draft.q)} onChange={(e) => set('q')(e.target.value)} />
           </label>
           <label className="field">
             <span className="field-label">{t('calls.filter.from')}</span>
@@ -129,22 +131,22 @@ export default function ApplicationsPage() {
             <input type="date" className="input" value={draft.to} onChange={(e) => set('to')(e.target.value)} />
           </label>
 
-          <Select label={t('applications.columns.channel')} value={draft.channelId} onChange={set('channelId')}>
+          <Select label={t('applications.columns.channel')} value={draft.channelId} onChange={set('channelId')} choices={channels}>
             {(channels.data ?? []).filter((c) => !c.isSystem).map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </Select>
-          <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')}>
+          <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={agents}>
             {(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => (
               <option key={u.id} value={u.id}>{u.displayName}</option>
             ))}
           </Select>
-          <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')}>
+          <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
             {(branches.data ?? []).map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </Select>
-          <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')}>
+          <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
             {(types.data ?? []).map((ty) => (
               <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
             ))}
@@ -181,14 +183,18 @@ export default function ApplicationsPage() {
       {results.isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : results.isError ? (
-        <p className="notice-error">{t('applications.failed')}</p>
+        <LoadError message={t('applications.failed')} onRetry={() => void results.refetch()} busy={results.isFetching} />
       ) : total === 0 ? (
         <div className="card card-body text-center">
           <p className="text-slate-300">{t('applications.empty')}</p>
           <p className="field-hint mt-1">{t('applications.emptyHint')}</p>
         </div>
       ) : (
-        <div className="card overflow-x-auto">
+        // Dimmed, not replaced, while a new search loads (as on Calls).
+        <div
+          className={`card overflow-x-auto transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
+          aria-busy={results.isPlaceholderData}
+        >
           <div className="flex items-center justify-between px-4 py-3 text-sm text-slate-400">
             <span>{t('applications.count', { count: total })}</span>
             <Pager page={page} pages={pages} onPage={setPage} />
@@ -219,7 +225,7 @@ export default function ApplicationsPage() {
                       a list they have scrolled past. */}
                   {row.id === openId && (
                     <tr>
-                      <td colSpan={COLUMNS} className="bg-ink-950/60 p-3">
+                      <td colSpan={COLUMNS} className="row-panel">
                         {/* w-0 min-w-full: as wide as the table, and never
                             wider, so opening a message cannot make every
                             column jump. */}

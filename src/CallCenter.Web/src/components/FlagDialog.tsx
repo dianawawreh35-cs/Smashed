@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { flagHistory, flagNumber, setContactFlags } from '../api/flags'
 import { errorCodeOf } from '../api/users'
+import { ltr } from '../lib/bidi'
+import LoadError from './LoadError'
 
 /** VIP, Blocked, or neither. Mutually exclusive, so one choice and two booleans on the wire. */
 type Choice = 'vip' | 'blocked' | 'none'
@@ -92,7 +94,7 @@ export default function FlagDialog({
   const heading =
     target.kind === 'contact'
       ? t('flags.heading', { name: target.name ?? t('flags.bareNumber') })
-      : t('flags.headingNumber', { number: target.number })
+      : t('flags.headingNumber', { number: ltr(target.number) })
 
   return (
     <form onSubmit={submit} className="card card-body space-y-4">
@@ -160,12 +162,22 @@ export default function FlagDialog({
 function FlagHistory({ contactId }: { contactId: string }) {
   const { t, i18n } = useTranslation()
 
-  const { data: changes, isLoading } = useQuery({
+  const history = useQuery({
     queryKey: ['contacts', 'flag-history', contactId],
     queryFn: () => flagHistory(contactId),
   })
+  const changes = history.data
 
-  if (isLoading || !changes || changes.length === 0) return null
+  // A history that failed to load is not a flag that was never changed (M-W03).
+  if (history.isError) {
+    return (
+      <div className="border-t border-ink-700 pt-3">
+        <LoadError message={t('flags.historyFailed')} onRetry={() => void history.refetch()} busy={history.isFetching} />
+      </div>
+    )
+  }
+
+  if (!changes || changes.length === 0) return null
 
   return (
     <div className="border-t border-ink-700 pt-3">

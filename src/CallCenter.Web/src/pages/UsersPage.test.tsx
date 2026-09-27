@@ -126,6 +126,54 @@ describe('users page', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('That username is already in use.')
   })
+
+  it('keeps what was typed when the server refuses a new account (M-W06)', async () => {
+    // The form used to empty itself on Add, before the server had answered.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([AGENT]))
+      .mockResolvedValueOnce(jsonResponse({ code: 'login_taken' }, 409))
+    vi.stubGlobal('fetch', withPhones(fetchMock))
+
+    renderPage()
+    await screen.findByText('Sara')
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Omar' } })
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'sara' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'longenough' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await screen.findByRole('alert')
+    expect(screen.getByLabelText('Name')).toHaveValue('Omar')
+    expect(screen.getByLabelText('Username')).toHaveValue('sara')
+    expect(screen.getByLabelText('Password')).toHaveValue('longenough')
+  })
+
+  it('clears the form once the account exists', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse([AGENT]))
+      .mockResolvedValueOnce(jsonResponse({ ...AGENT, id: 'a9', login: 'omar', displayName: 'Omar' }))
+      .mockResolvedValue(jsonResponse([AGENT]))
+    vi.stubGlobal('fetch', withPhones(fetchMock))
+
+    renderPage()
+    await screen.findByText('Sara')
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Omar' } })
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'omar' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'longenough' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => expect(screen.getByLabelText('Username')).toHaveValue(''))
+  })
+
+  it('opens a row’s form on the same dark panel as the other lists (M-W02)', async () => {
+    vi.stubGlobal('fetch', withPhones(vi.fn().mockResolvedValue(jsonResponse([AGENT]))))
+
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }))
+
+    expect(screen.getByLabelText('New password').closest('td')).toHaveClass('row-panel')
+  })
 })
 
 describe('phones and listening in (S-61, S-62)', () => {

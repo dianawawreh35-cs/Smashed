@@ -42,8 +42,11 @@ export function downloadCsv(filename: string, csv: string): void {
 
 /**
  * The same, for a file built elsewhere: R-02's full list from the server
- * (S-05), or a chart drawn as a picture (S-06). A name without an extension
- * gets `.csv`.
+ * (S-05), a chart drawn as a picture (S-06), a call's recording (S-04). A name
+ * without an extension gets `.csv`.
+ *
+ * The object URL is let go ten seconds later, not straight away: revoking it
+ * in the same tick as the click can cancel the save in Firefox and Safari.
  */
 export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob)
@@ -53,5 +56,5 @@ export function downloadBlob(filename: string, blob: Blob): void {
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  URL.revokeObjectURL(url)
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }

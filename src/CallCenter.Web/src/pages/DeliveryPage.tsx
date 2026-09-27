@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   createDeliveryArea,
@@ -12,6 +12,10 @@ import {
 } from '../api/delivery'
 import type { DeliveryArea, ImportResult } from '../api/delivery'
 import { errorCodeOf } from '../api/users'
+import ConfirmButton from '../components/ConfirmButton'
+import LoadError from '../components/LoadError'
+import { formatMoney } from '../lib/money'
+import { useDebounced } from '../lib/useDebounced'
 
 /**
  * Delivery areas: where the restaurant delivers, from which branch, at what
@@ -21,6 +25,10 @@ import { errorCodeOf } from '../api/users'
  * 166 rows for Nablus alone and live in the branches' own spreadsheets — a
  * form that takes them one at a time is a form the supervisor stops using, and
  * then the agents quote last year's prices.
+ *
+ * The search waits for the typing to stop and keeps the last rows on screen
+ * until the next arrive (M-W09), and a list that failed to load says so rather
+ * than "No delivery areas yet" (M-W03).
  */
 export default function DeliveryPage() {
   const { t } = useTranslation()
@@ -29,18 +37,21 @@ export default function DeliveryPage() {
   const [editing, setEditing] = useState<DeliveryArea | 'new' | null>(null)
   const [importing, setImporting] = useState(false)
 
-  const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: listBranches })
+  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches })
 
-  const { data: areas, isLoading } = useQuery({
-    queryKey: ['delivery-areas', query, branchId],
-    queryFn: () => searchDeliveryAreas(query, branchId || undefined),
+  const searched = useDebounced(query)
+  const list = useQuery({
+    queryKey: ['delivery-areas', searched, branchId],
+    queryFn: () => searchDeliveryAreas(searched, branchId || undefined),
+    placeholderData: keepPreviousData,
   })
+  const areas = list.data
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">{t('delivery.heading')}</h2>
+          <h1 className="page-title">{t('delivery.heading')}</h1>
           <p className="page-subtitle">{t('delivery.intro')}</p>
         </div>
         <div className="flex gap-2">
@@ -70,14 +81,17 @@ export default function DeliveryPage() {
           className="input max-w-xs"
         >
           <option value="">{t('delivery.allBranches')}</option>
-          {branches?.map((branch) => (
+          {branches.data?.map((branch) => (
             <option key={branch.id} value={branch.id}>
               {branch.name}
             </option>
           ))}
         </select>
+        {branches.isError && <BranchesFailed retry={() => void branches.refetch()} />}
 
-        {areas && <span className="text-sm text-slate-400">{t('delivery.count', { count: areas.length })}</span>}
+        {areas && !list.isError && (
+          <span className="text-sm text-slate-400">{t('delivery.count', { count: areas.length })}</span>
+        )}
       </div>
 
       {importing && <ImportPanel onClose={() => setImporting(false)} />}
@@ -86,22 +100,32 @@ export default function DeliveryPage() {
           button that asked for it. An edit opens beside its own row. */}
       {editing === 'new' && <AreaForm area={null} onClose={() => setEditing(null)} />}
 
-      {isLoading ? (
+      {list.isError ? (
+        <LoadError message={t('delivery.failed')} onRetry={() => void list.refetch()} busy={list.isFetching} />
+      ) : list.isPending ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : areas && areas.length > 0 ? (
-        <AreaTable
-          areas={areas}
-          editing={editing === 'new' ? null : editing}
-          onEdit={setEditing}
-          onCloseEdit={() => setEditing(null)}
-        />
+        <div className={list.isPlaceholderData ? 'opacity-60 transition' : 'transition'} aria-busy={list.isPlaceholderData}>
+          <AreaTable
+            areas={areas}
+            editing={editing === 'new' ? null : editing}
+            onEdit={setEditing}
+            onCloseEdit={() => setEditing(null)}
+          />
+        </div>
       ) : (
         <div className="card card-body text-center">
-          <p className="text-slate-300">{query ? t('delivery.noMatches') : t('delivery.empty')}</p>
+          <p className="text-slate-300">{searched ? t('delivery.noMatches') : t('delivery.empty')}</p>
         </div>
       )}
     </div>
   )
+}
+
+/** Under a branch drop-down whose choices did not load. */
+function BranchesFailed({ retry }: { retry: () => void }) {
+  const { t } = useTranslation()
+  return <LoadError inline message={t('common.listFailed')} onRetry={retry} />
 }
 
 function AreaTable({
@@ -116,16 +140,26 @@ function AreaTable({
   onEdit: (area: DeliveryArea) => void
   onCloseEdit: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
 
+  // Asked twice, and a refusal shown (M-W07): Remove used to delete on the
+  // first click and say nothing when the server refused.
   const remove = useMutation({
     mutationFn: deleteDeliveryArea,
+    onMutate: () => setError(null),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['delivery-areas'] }),
+    onError: (e) => setError(t(`delivery.errors.${errorCodeOf(e)}`)),
   })
 
   return (
     <div className="card overflow-x-auto">
+      {error && (
+        <div role="alert" className="notice-error m-3">
+          {error}
+        </div>
+      )}
       <table className="table">
         <thead>
           <tr>
@@ -155,7 +189,7 @@ function AreaTable({
               {/* Zero is a real price, so it is shown as a figure rather than
                   blanked — and labelled, because a bare 0 reads as missing. */}
               <td className="tabular text-slate-300">
-                {area.price === 0 ? t('delivery.free') : area.price}
+                {area.price === 0 ? t('delivery.free') : <span dir="ltr">{formatMoney(area.price, i18n.language)}</span>}
               </td>
               {/* The double-click must not reach here: two quick clicks on
                   Remove would delete the row and then open an editor for it. */}
@@ -163,14 +197,11 @@ function AreaTable({
                 <button type="button" onClick={() => onEdit(area)} className="btn-ghost btn-sm">
                   {t('delivery.edit')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => remove.mutate(area.id)}
+                <ConfirmButton
+                  label={t('delivery.remove')}
+                  onConfirm={() => remove.mutate(area.id)}
                   disabled={remove.isPending}
-                  className="btn-ghost btn-sm"
-                >
-                  {t('delivery.remove')}
-                </button>
+                />
               </td>
             </tr>
 
@@ -178,7 +209,7 @@ function AreaTable({
                 at the top of a list of 228 areas they have scrolled past. */}
             {editing?.id === area.id && (
               <tr>
-                <td colSpan={4} className="bg-ink-900/60">
+                <td colSpan={4} className="row-panel">
                   <AreaForm area={area} onClose={onCloseEdit} />
                 </td>
               </tr>
@@ -195,7 +226,7 @@ function AreaForm({ area, onClose }: { area: DeliveryArea | null; onClose: () =>
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
-  const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: listBranches })
+  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches })
 
   const [name, setName] = useState(area?.name ?? '')
   const [branchId, setBranchId] = useState(area?.branchId ?? '')
@@ -247,12 +278,13 @@ function AreaForm({ area, onClose }: { area: DeliveryArea | null; onClose: () =>
           <span className="field-label">{t('delivery.branch')}</span>
           <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="input">
             <option value="">{t('delivery.chooseBranch')}</option>
-            {branches?.map((branch) => (
+            {branches.data?.map((branch) => (
               <option key={branch.id} value={branch.id}>
                 {branch.name}
               </option>
             ))}
           </select>
+          {branches.isError && <BranchesFailed retry={() => void branches.refetch()} />}
         </label>
 
         <label className="field">
@@ -261,6 +293,7 @@ function AreaForm({ area, onClose }: { area: DeliveryArea | null; onClose: () =>
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             inputMode="decimal"
+            dir="ltr"
             className="input tabular"
           />
           <span className="field-hint">{t('delivery.priceHint')}</span>
@@ -299,7 +332,7 @@ function ImportPanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
-  const { data: branches } = useQuery({ queryKey: ['branches'], queryFn: listBranches })
+  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches })
 
   const [branchId, setBranchId] = useState('')
   const [lines, setLines] = useState('')
@@ -368,12 +401,13 @@ function ImportPanel({ onClose }: { onClose: () => void }) {
         <span className="field-label">{t('delivery.branch')}</span>
         <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="input">
           <option value="">{t('delivery.chooseBranch')}</option>
-          {branches?.map((branch) => (
+          {branches.data?.map((branch) => (
             <option key={branch.id} value={branch.id}>
               {branch.name}
             </option>
           ))}
         </select>
+        {branches.isError && <BranchesFailed retry={() => void branches.refetch()} />}
       </label>
 
       <label className="field">

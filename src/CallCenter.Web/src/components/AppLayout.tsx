@@ -1,6 +1,7 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from './LanguageSwitcher'
+import PageBoundary from './PageBoundary'
 import { useAuth } from '../auth/context'
 
 /**
@@ -20,6 +21,7 @@ export default function AppLayout() {
   const { t } = useTranslation()
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   async function onSignOut() {
     await signOut()
@@ -66,7 +68,7 @@ export default function AppLayout() {
           </div>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible">
+        <nav aria-label={t('nav.label')} className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible">
           {sections.map((section) => (
             <NavLink
               key={section.to}
@@ -106,7 +108,11 @@ export default function AppLayout() {
 
         <main className="flex-1 px-6 py-6">
           <div className="mx-auto w-full max-w-6xl">
-            <Outlet />
+            {/* Keyed on the page, so a page that failed to load does not
+                stay failed when the supervisor goes to another. */}
+            <PageBoundary key={location.pathname}>
+              <Outlet />
+            </PageBoundary>
           </div>
         </main>
       </div>

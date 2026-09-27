@@ -19,7 +19,8 @@
     "calls": "Calls",
     "applications": "Applications",
     "applicationReports": "Application reports",
-    "callReports": "Call reports"
+    "callReports": "Call reports",
+    "label": "Sections"
   },
   "login": {
     "heading": "Sign in",
@@ -34,7 +35,8 @@
       "not_a_supervisor": "This is an agent account. Please use the desktop Agent App.",
       "signed_out": "You have been signed out. Your account was changed or your sign-in ran out. Please sign in again.",
       "server_unreachable": "The server could not be reached. Check the network.",
-      "server_error": "The server reported an error. Please try again."
+      "server_error": "The server reported an error. Please try again.",
+      "too_many_attempts": "Too many sign-in attempts. Wait a few minutes, then try again."
     }
   },
   "dashboard": {
@@ -44,7 +46,7 @@
     "failed": "The figures could not be loaded. Check the server is running.",
     "tiles": {
       "communications": "Communications",
-      "split": "{{calls}} calls, {{messages}} messages",
+      "split": "Calls: {{calls}} · messages: {{messages}}",
       "orders": "Orders",
       "worth": "worth {{value}}",
       "complaints": "Complaints",
@@ -58,7 +60,7 @@
       "abandoned": "Abandoned calls",
       "abandonedNote": "Callers who gave up waiting in the queue, as of the last check of the PBX. These are the calls nobody answered: a call that rang one agent and was answered by another counts once, as answered.",
       "untaken": "Missed or rejected rings",
-      "untakenNote": "{{missed}} missed, {{rejected}} rejected. Times an agent's phone rang and they did not take it. Not counted in Communications: the queue passed the call to the next agent."
+      "untakenNote": "Missed: {{missed}} · rejected: {{rejected}}. Times an agent's phone rang and they did not take it. Not counted in Communications: the queue passed the call to the next agent."
     },
     "byType": "Today by type",
     "byChannel": "Today by channel",
@@ -94,13 +96,20 @@
       "unknown_state": "Say whether the queue is open or closed right now first: the PBX code switches it either way.",
       "busy": "Someone else is switching the queue right now. Try again in a moment.",
       "pbx_failed": "The PBX call did not work: {{error}} Check the queue on the PBX and correct the screen if it changed."
-    }
+    },
+    "failed": "Whether the queue is open could not be loaded, so it cannot be switched from here right now."
   },
   "common": {
     "notConnected": "Not connected",
     "connected": "Connected",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "loadFailed": "This could not be loaded: the server did not answer, or answered with an error.",
+    "listFailed": "The list did not load.",
+    "retry": "Try again",
+    "retrying": "Trying…",
+    "confirmRemove": "Confirm remove",
+    "notSaved": "Nothing was saved: the server did not answer, or answered with an error. What you typed is still here; try again."
   },
   "users": {
     "heading": "Users and extensions",
@@ -140,7 +149,8 @@
     "setExtension": "Set extension",
     "noExtension": "Not set",
     "secret": "SIP password",
-    "extensionHint": "One extension per agent, used for every call. Internal calls are told apart by the internal numbers list in Settings."
+    "extensionHint": "One extension per agent, used for every call. Internal calls are told apart by the internal numbers list in Settings.",
+    "failed": "The users could not be loaded."
   },
   "phones": {
     "phone": "Phone",
@@ -169,7 +179,8 @@
       "pbx_failed": "The PBX did not connect the call: {{error}}",
       "server_unreachable": "The server could not be reached.",
       "server_error": "Listening did not start. Please try again."
-    }
+    },
+    "failed": "The phones could not be read from the server."
   },
   "settings": {
     "heading": "System settings",
@@ -239,10 +250,13 @@
       "checking": "Checking…",
       "off": "Not set up: the import is off.",
       "never": "Set up, not checked yet. The first check reaches back 30 days.",
-      "lastOk": "Last checked {{when}}: {{added}} new abandoned calls.",
       "lastFailed": "Last check {{when}} failed: {{error}}",
       "lastSuccess": "Last successful check: {{when}}.",
-      "result": "{{from}} to {{to}}: {{calls}} calls, {{abandoned}} abandoned, {{added}} new."
+      "result": "{{from}} to {{to}}: calls {{calls}}, abandoned {{abandoned}}, new {{added}}.",
+      "failed": "The PBX settings could not be loaded. The form is not shown, so blanks cannot be saved over them.",
+      "lastOk_zero": "Last checked {{when}}: no new abandoned calls.",
+      "lastOk_one": "Last checked {{when}}: 1 new abandoned call.",
+      "lastOk_other": "Last checked {{when}}: {{count}} new abandoned calls."
     },
     "blacklist": {
       "heading": "PBX blacklist",
@@ -254,11 +268,13 @@
       "saved": "Blacklist settings saved.",
       "retry": "Try failed numbers again",
       "off": "Not set up: blocked numbers are only refused by the Agent Apps. Needs the extension, its password and the PBX address in the system settings.",
-      "counts": "{{onPbx}} numbers on the PBX blacklist, {{waiting}} waiting.",
+      "counts": "On the PBX blacklist: {{onPbx}}. Waiting: {{waiting}}.",
       "lastSuccess": "Last change {{when}}.",
-      "failedAdd": "could not be added ({{when}}, {{attempts}} tries): {{error}}",
-      "failedRemove": "could not be removed ({{when}}, {{attempts}} tries): {{error}}"
-    }
+      "failedAdd": "could not be added ({{when}}, tries: {{attempts}}): {{error}}",
+      "failedRemove": "could not be removed ({{when}}, tries: {{attempts}}): {{error}}",
+      "failed": "The blacklist settings could not be loaded. The form is not shown, so blanks cannot be saved over them."
+    },
+    "failed": "The settings could not be loaded. The form is not shown, so blanks cannot be saved over them."
   },
   "contacts": {
     "heading": "Contacts",
@@ -293,7 +309,6 @@
       "server_unreachable": "The server could not be reached.",
       "server_error": "The server reported an error. Please try again."
     },
-    "sameNameWarning": "There is already {{count}} contact with this name:",
     "sameNameHint": "If this is the same person, add the number to them. If it is someone else, carry on and save a separate contact.",
     "addNumberToThem": "Add this number to them",
     "intro": "Find a customer, or add one. The list is shared by every agent.",
@@ -304,7 +319,11 @@
       "blocked": "Blocked"
     },
     "flag": "Flag…",
-    "flagThisNumber": "Nobody has {{number}} — flag it anyway"
+    "flagThisNumber": "Nobody has {{number}} — flag it anyway",
+    "searchFailed": "The search did not reach the server. This is not the same as no match: try again.",
+    "sameNameFailed": "Could not check for other contacts with this name.",
+    "sameNameWarning_one": "There is already a contact with this name:",
+    "sameNameWarning_other": "There are already {{count}} contacts with this name:"
   },
   "flags": {
     "heading": "Flag {{name}}",
@@ -330,7 +349,8 @@
       "invalid_request": "The flag could not be changed. Check the fields.",
       "server_unreachable": "The server could not be reached.",
       "server_error": "The server reported an error. Please try again."
-    }
+    },
+    "historyFailed": "The changes to this flag could not be loaded."
   },
   "history": {
     "heading": "Call history",
@@ -354,7 +374,8 @@
       "Logged": "Logged",
       "NoAnswer": "Not answered"
     },
-    "channel": "Channel"
+    "channel": "Channel",
+    "failed": "The history could not be loaded."
   },
   "delivery": {
     "heading": "Delivery areas",
@@ -368,7 +389,6 @@
     "price": "Price",
     "priceHint": "0 means free delivery.",
     "free": "Free",
-    "count": "{{count}} shown",
     "add": "Add area",
     "addHeading": "New delivery area",
     "editHeading": "Edit delivery area",
@@ -389,7 +409,6 @@
     "replaceLabel": "Replace this branch’s whole list",
     "replaceHint": "Removes every area currently under this branch first, so what you paste becomes the complete list. Leave unticked to add and update only.",
     "importDone": "Added {{added}}, updated {{updated}}, removed {{removed}}.",
-    "importProblems": "{{count}} line(s) could not be used:",
     "importReasons": {
       "no_price": "no price on this line",
       "bad_price": "the price is not a number",
@@ -405,7 +424,13 @@
       "invalid_request": "It could not be saved. Check the fields.",
       "server_unreachable": "The server could not be reached.",
       "server_error": "The server reported an error. Please try again."
-    }
+    },
+    "failed": "The delivery areas could not be loaded.",
+    "count_zero": "No areas shown",
+    "count_one": "1 area shown",
+    "count_other": "{{count}} areas shown",
+    "importProblems_one": "1 line could not be used:",
+    "importProblems_other": "{{count}} lines could not be used:"
   },
   "menu": {
     "heading": "Menu",
@@ -425,7 +450,6 @@
     "pictureHint": "PNG, JPEG or WebP, up to 2 MB. Leave empty to keep the current one.",
     "priceNotShown": "Not priced",
     "free": "Free",
-    "count": "{{count}} shown",
     "add": "Add item",
     "addHeading": "New menu item",
     "editHeading": "Edit menu item",
@@ -457,14 +481,21 @@
     "newCategory": "New category",
     "addCategory": "Add category",
     "categoryName": "Category name",
-    "itemCount": "{{count}} items",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "shown": "Shown",
     "close": "Close",
     "noPicture": "No picture",
     "removePicture": "Remove the current picture",
-    "pictureFailed": "Picture failed to load"
+    "pictureFailed": "Picture failed to load",
+    "failed": "The menu could not be loaded.",
+    "categoriesFailed": "The categories could not be loaded.",
+    "count_zero": "No items shown",
+    "count_one": "1 item shown",
+    "count_other": "{{count}} items shown",
+    "itemCount_zero": "No items",
+    "itemCount_one": "1 item",
+    "itemCount_other": "{{count}} items"
   },
   "classification": {
     "heading": "Classification form",
@@ -531,7 +562,6 @@
     "failed": "The calls could not be loaded. Check the server is running.",
     "empty": "No calls match.",
     "emptyHint": "Widen the dates, or clear a filter.",
-    "count": "{{count}} calls",
     "count_one": "1 call",
     "count_other": "{{count}} calls",
     "previous": "Previous",
@@ -597,7 +627,10 @@
       "classifiedBy": "Classified by {{name}}, {{at}}",
       "history": "Changes",
       "firstClassified": "{{at}}: classified by {{name}}",
-      "changed": "{{at}}: changed by {{name}}"
+      "changed": "{{at}}: changed by {{name}}",
+      "classificationFailed": "The classification could not be loaded.",
+      "historyFailed": "The changes to the classification could not be loaded.",
+      "formFailed": "The form could not be loaded, so the call cannot be classified right now."
     },
     "open": "Open",
     "edit": {
@@ -633,7 +666,6 @@
     "failed": "The messages could not be loaded. Check the server is running.",
     "empty": "No messages match.",
     "emptyHint": "Widen the dates, or clear a filter.",
-    "count": "{{count}} messages",
     "count_one": "1 message",
     "count_other": "{{count}} messages",
     "message": "Message",
@@ -728,7 +760,8 @@
       "invalid_request": "The channel could not be saved.",
       "server_error": "The server reported an error. Please try again.",
       "server_unreachable": "The server could not be reached."
-    }
+    },
+    "failed": "The channels could not be loaded."
   },
   "callReports": {
     "heading": "Call reports",
@@ -942,11 +975,12 @@
       "fetch": "Fetch from PBX",
       "fetching": "Fetching…",
       "fetchHint": "The PBX is checked automatically; this downloads the chosen period now.",
-      "fetched": "Downloaded {{from}} to {{to}}: {{abandoned}} abandoned, {{added}} new.",
+      "fetched": "Downloaded {{from}} to {{to}}: abandoned {{abandoned}}, new {{added}}.",
       "failed": "The PBX could not be read: {{error}}",
       "lastChecked": "Last checked {{when}}.",
       "notSetUp": "The PBX import is not set up. A supervisor can enter the PBX address and login in Settings.",
-      "notYet": "Not called back"
+      "notYet": "Not called back",
+      "statusFailed": "Whether the PBX import is set up could not be loaded."
     },
     "print": "Print",
     "printPage": "Print page",

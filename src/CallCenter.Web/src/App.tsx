@@ -1,10 +1,8 @@
+import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import CallsPage from './pages/CallsPage'
 import ApplicationsPage from './pages/ApplicationsPage'
-import ApplicationReportsPage from './pages/ApplicationReportsPage'
-import CallReportsPage from './pages/CallReportsPage'
-import DashboardPage from './pages/DashboardPage'
 import UsersPage from './pages/UsersPage'
 import SettingsPage from './pages/SettingsPage'
 import ContactsPage from './pages/ContactsPage'
@@ -13,6 +11,13 @@ import MenuPage from './pages/MenuPage'
 import ClassificationPage from './pages/ClassificationPage'
 import AppLayout from './components/AppLayout'
 import RequireAuth from './components/RequireAuth'
+
+// The pages that draw charts, fetched when first opened: recharts is most of
+// the bundle, and the login screen and the lists need none of it. The layout's
+// PageBoundary shows a line while one loads.
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const CallReportsPage = lazy(() => import('./pages/CallReportsPage'))
+const ApplicationReportsPage = lazy(() => import('./pages/ApplicationReportsPage'))
 
 /**
  * Route table. Everything except the login screen sits behind RequireAuth, so

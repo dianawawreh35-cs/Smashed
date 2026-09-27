@@ -43,6 +43,12 @@ export const LoginErrorCodes = {
   NotASupervisor: 'not_a_supervisor',
   /** The server stopped accepting the sign-in part way through (N-05). */
   SignedOut: 'signed_out',
+  /**
+   * The server's login rate limit (F-12) answered 429: too many attempts
+   * from this address or for this login. Told apart from a wrong password, or
+   * the supervisor keeps typing and keeps the limit in force.
+   */
+  TooManyAttempts: 'too_many_attempts',
 } as const
 
 export type LoginErrorCode = (typeof LoginErrorCodes)[keyof typeof LoginErrorCodes]
@@ -108,6 +114,9 @@ export async function logout(sessionId: string | null): Promise<void> {
 
 function toLoginErrorCode(error: unknown): LoginErrorCode {
   if (error instanceof ApiError) {
+    // By status, not only by code: the rate limiter answers before the login
+    // endpoint runs, so its 429 may carry no problem body at all.
+    if (error.status === 429) return LoginErrorCodes.TooManyAttempts
     const code = error.code
     if (code === LoginErrorCodes.InvalidCredentials || code === LoginErrorCodes.AccountDisabled) {
       return code

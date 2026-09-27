@@ -7,6 +7,7 @@ import { getClassificationForm } from '../api/classifications'
 import type { FormDirection, FormField } from '../api/classifications'
 import { formatClock } from '../lib/recordingWav'
 import ClassificationEditor from './ClassificationEditor'
+import LoadError from './LoadError'
 import RecordingPlayer from './RecordingPlayer'
 
 /**
@@ -31,6 +32,9 @@ import RecordingPlayer from './RecordingPlayer'
  * whole panel when opened near the bottom of the window, and that movement was
  * the part that still felt wrong (24 Sep). It opens where it is, and the
  * supervisor scrolls if they want to see more.
+ *
+ * **What failed to load says so**, with a Retry (M-W03). The classification
+ * used to hold its pulsing space for ever when its request failed.
  *
  * **A message opens here too** (A-70, A-72): the same panel, with the channel
  * where a call has its direction and queue, and no recording, extension or
@@ -96,7 +100,9 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
       <div className="card-header">
         <div>
           <h2 className="font-semibold text-slate-100">
-            {summary.contactName ?? summary.remoteNumberRaw ?? t('calls.unknownCaller')}
+            {summary.contactName ?? (summary.remoteNumberRaw
+              ? <span dir="ltr">{summary.remoteNumberRaw}</span>
+              : t('calls.unknownCaller'))}
           </h2>
           <p className="text-sm text-slate-400">
             <span dir="ltr">{summary.remoteNumberRaw}</span>
@@ -110,7 +116,9 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
       </div>
 
       <div className="card-body space-y-6">
-        {details.isError && <p className="notice-error">{t('calls.details.failed')}</p>}
+        {details.isError && (
+          <LoadError message={t('calls.details.failed')} onRetry={() => void details.refetch()} busy={details.isFetching} />
+        )}
         {isMessage ? (
           // What there is to know about a message that the classification does
           // not say: who took it, on which app. The phone facts have no meaning.
@@ -171,7 +179,15 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
             </div>
 
             {editing ? (
-              form.data && (!classified || classification.data) ? (
+              form.isError ? (
+                <LoadError message={t('calls.details.formFailed')} onRetry={() => void form.refetch()} busy={form.isFetching} />
+              ) : classified && classification.isError ? (
+                <LoadError
+                  message={t('calls.details.classificationFailed')}
+                  onRetry={() => void classification.refetch()}
+                  busy={classification.isFetching}
+                />
+              ) : form.data && (!classified || classification.data) ? (
                 <ClassificationEditor
                   callId={id}
                   form={form.data}
@@ -183,7 +199,13 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
                 <div className="h-28 rounded-md bg-ink-800/40" aria-hidden="true" />
               )
             ) : classified ? (
-              classification.data ? (
+              classification.isError ? (
+                <LoadError
+                  message={t('calls.details.classificationFailed')}
+                  onRetry={() => void classification.refetch()}
+                  busy={classification.isFetching}
+                />
+              ) : classification.data ? (
                 <Classification
                   value={classification.data}
                   fields={form.data?.definition.fields ?? []}
@@ -199,6 +221,9 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
           </div>
         )}
 
+        {history.isError && (
+          <LoadError message={t('calls.details.historyFailed')} onRetry={() => void history.refetch()} busy={history.isFetching} />
+        )}
         {history.data && history.data.length > 0 && <History changes={history.data} />}
       </div>
     </section>

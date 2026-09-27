@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   Bar,
@@ -15,6 +16,7 @@ import { chartToPng } from '../lib/chartImage'
 import { downloadBlob, downloadCsv, toCsv } from '../lib/csv'
 import { printOnly } from '../lib/print'
 import type { CsvCell } from '../lib/csv'
+import LoadError from './LoadError'
 
 /**
  * One report: a table, a chart where the figures are numeric (S-06), and an
@@ -34,6 +36,11 @@ export interface ReportColumn<T> {
   /** For the screen only; the CSV always gets `value`. */
   format?: (row: T) => string
   numeric?: boolean
+  /**
+   * Text held left to right, such as a phone number (M-W01): in Arabic its
+   * groups would otherwise come out reversed. A numeric column always is.
+   */
+  ltr?: boolean
   /** Summed in a last row. Only for a count or an amount, never an average. */
   total?: boolean
   /**
@@ -115,6 +122,13 @@ export default function ReportCard<T>({
 }) {
   const { t, i18n } = useTranslation()
   const section = useRef<HTMLElement>(null)
+  const queryClient = useQueryClient()
+
+  // A card knows its rows, not the query behind them, so Retry asks again for
+  // every report on the page that failed: when one fails, it is usually the
+  // server, and the others failed with it.
+  const retry = () =>
+    void queryClient.refetchQueries({ type: 'active', predicate: (query) => query.state.status === 'error' })
 
   function onExport() {
     if (!rows) return
@@ -151,7 +165,7 @@ export default function ReportCard<T>({
 
       <div className="card-body space-y-4">
         {error ? (
-          <p className="notice-error">{t('applicationReports.failed')}</p>
+          <LoadError message={t('applicationReports.failed')} onRetry={retry} busy={loading} />
         ) : loading && !rows ? (
           // Its space, held while it comes, so the page does not jump.
           <div className="h-40 animate-pulse rounded-md bg-ink-800/60" aria-hidden="true" />
@@ -184,7 +198,7 @@ export default function ReportCard<T>({
                         <td key={c.key}
                           className={[c.numeric ? 'tabular text-center' : '', c.heat ? 'heat-cell' : ''].join(' ').trim() || undefined}
                           style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax) : undefined}>
-                          {c.numeric
+                          {c.numeric || c.ltr
                             ? <span dir="ltr">{c.format ? c.format(row) : number(c.value(row))}</span>
                             : c.format ? c.format(row) : number(c.value(row))}
                         </td>

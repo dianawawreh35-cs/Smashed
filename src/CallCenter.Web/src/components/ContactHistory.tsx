@@ -5,6 +5,7 @@ import type { CallRow } from '../api/calls'
 import { communicationsForContact } from '../api/communications'
 import type { Communication } from '../api/communications'
 import CallDetails from './CallDetails'
+import LoadError from './LoadError'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
 /**
@@ -26,14 +27,20 @@ export default function ContactHistory({ contactId }: { contactId: string }) {
   const { t } = useTranslation()
   const [openId, setOpenId] = useState<string | null>(null)
 
-  const { data: calls, isLoading } = useQuery({
+  const history = useQuery({
     queryKey: ['communications', 'by-contact', contactId],
     queryFn: () => communicationsForContact(contactId),
   })
+  const calls = history.data
+
+  // Not "no calls with this customer yet": nobody knows (M-W03).
+  if (history.isError) {
+    return <LoadError message={t('history.failed')} onRetry={() => void history.refetch()} busy={history.isFetching} />
+  }
 
   // Its space held while it comes, so the editor above it does not grow in a
   // second step when the history arrives.
-  if (isLoading) return <p className="min-h-[8rem] text-slate-400">{t('app.loading')}</p>
+  if (history.isPending) return <p className="min-h-[8rem] text-slate-400">{t('app.loading')}</p>
 
   if (!calls || calls.length === 0) {
     return (
@@ -68,7 +75,7 @@ export default function ContactHistory({ contactId }: { contactId: string }) {
               />
               {call.id === openId && (
                 <tr>
-                  <td colSpan={7} className="bg-ink-950/60 p-3">
+                  <td colSpan={7} className="row-panel">
                     {/* w-0 min-w-full: as wide as the table and never wider,
                         so opening a call cannot make every column jump. */}
                     <div className="w-0 min-w-full">

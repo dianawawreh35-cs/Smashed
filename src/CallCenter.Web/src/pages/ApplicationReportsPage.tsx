@@ -20,6 +20,7 @@ import type {
 import ReportCard, { SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportColumn } from '../components/ReportCard'
 import { Grouping, PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import { formatMoney } from '../lib/money'
 import { printPage } from '../lib/print'
 import { useReportFilters } from '../lib/reportFilters'
 
@@ -69,7 +70,7 @@ export default function ApplicationReportsPage() {
   })
 
   const c = (key: string) => t(`applicationReports.columns.${key}`)
-  const money = (v: number) => v.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const money = (v: number) => formatMoney(v, i18n.language)
 
   // One column per type seen in the period, after the fixed ones: "per type
   // within each channel" as columns, so the table stays one row per channel.
@@ -121,7 +122,7 @@ export default function ApplicationReportsPage() {
       <ReportPrintHeading title={t('applicationReports.heading')} draft={draft} />
       <div className="no-print flex items-start justify-between gap-4">
         <div>
-          <h2 className="page-title">{t('applicationReports.heading')}</h2>
+          <h1 className="page-title">{t('applicationReports.heading')}</h1>
           <p className="page-subtitle">{t('applicationReports.intro')}</p>
         </div>
         <PrintPageButton onPrint={printPage} />

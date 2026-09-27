@@ -61,8 +61,11 @@
            disabled:cursor-not-allowed disabled:opacity-40;
   }
 
+  /* The filled blue is a shade darker than the brand blue, for white text
+     at 4.7:1 (WCAG AA, M-W08; Dia chose it over dark text on 27 Sep). Links,
+     focus rings, the nav bar and the charts keep brand-500. */
   .btn-primary {
-    @apply btn bg-brand-500 text-white hover:opacity-85 active:opacity-70;
+    @apply btn bg-brand-button text-white hover:opacity-85 active:opacity-70;
   }
 
   .btn-ghost {
@@ -74,8 +77,9 @@
            hover:bg-ink-800 hover:text-slate-200;
   }
 
+  /* red-600, not 500: white on red-500 is 3.8:1, under AA (M-W08). */
   .btn-danger {
-    @apply btn bg-red-500 text-white hover:opacity-85;
+    @apply btn bg-red-600 text-white hover:opacity-85;
   }
 
   .btn-sm {
@@ -91,13 +95,14 @@
     @apply block text-xs text-slate-400;
   }
 
+  /* slate-500 is redefined in tailwind.config.js to meet AA on every surface. */
   .field-hint {
     @apply block text-xs text-slate-500;
   }
 
   .input {
     @apply w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-2 text-sm
-           text-slate-200 transition placeholder:text-slate-600
+           text-slate-200 transition placeholder:text-slate-500
            focus:border-brand-500 focus:outline-none
            disabled:opacity-50;
   }
@@ -181,9 +186,11 @@
     @apply w-full text-sm;
   }
 
+  /* Spaced capitals are an English convention. Arabic has no capitals, and
+     letter-spacing pulls its joined letters apart, so it gets none. */
   .table thead th {
     @apply border-b border-ink-700 px-4 py-3 text-start text-xs font-semibold
-           uppercase tracking-wide text-slate-400;
+           uppercase tracking-wide text-slate-400 rtl:tracking-normal;
   }
 
   .table tbody td {
@@ -192,6 +199,14 @@
 
   .table tbody tr:hover td {
     @apply bg-ink-800/60;
+  }
+
+  /* The panel a row opens underneath itself (an editor, a call's details).
+     One background on every list (M-W02), and it keeps it under the pointer:
+     the row hover above would otherwise flicker it lighter. */
+  .table tbody td.row-panel,
+  .table tbody tr:hover td.row-panel {
+    @apply bg-ink-950/60 p-3;
   }
 
   /* --- Navigation ---------------------------------------------------------

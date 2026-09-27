@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getQueue, markQueue, switchQueue } from '../api/pbxQueue'
 import type { QueueStatus, QueueSwitchResult } from '../api/pbxQueue'
+import LoadError from './LoadError'
 
 const KEY = ['pbx', 'queue']
 
@@ -18,6 +19,10 @@ const KEY = ['pbx', 'queue']
  * The queue also opens by itself every morning (queue.auto_open_time, on the
  * settings screen). The card says when, and why the day's opening did not
  * happen if it did not.
+ *
+ * **When the state cannot be loaded the card stays, and says so** (M-W03).
+ * It used to vanish, and a supervisor looking for the switch had no way to
+ * tell a server that was down from a switch that had been taken away.
  */
 export default function QueueSwitchCard() {
   const { t, i18n } = useTranslation()
@@ -44,7 +49,16 @@ export default function QueueSwitchCard() {
   })
 
   const s = status.data
-  if (status.isLoading || !s) return null
+
+  if (status.isError && !s) {
+    return (
+      <section className="card card-body space-y-3" aria-label={t('queue.heading')}>
+        <h3 className="font-semibold text-slate-100">{t('queue.heading')}</h3>
+        <LoadError message={t('queue.failed')} onRetry={() => void status.refetch()} busy={status.isFetching} />
+      </section>
+    )
+  }
+  if (!s) return null
 
   const when = (iso: string) => new Date(iso).toLocaleString(i18n.language, { dateStyle: 'short', timeStyle: 'short' })
   const busy = flip.isPending || mark.isPending

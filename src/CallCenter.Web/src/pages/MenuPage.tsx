@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   createMenuCategory,
@@ -15,7 +15,11 @@ import {
 } from '../api/menu'
 import type { MenuCategory, MenuItem } from '../api/menu'
 import { errorCodeOf } from '../api/users'
+import ConfirmButton from '../components/ConfirmButton'
+import LoadError from '../components/LoadError'
 import MenuImage from '../components/MenuImage'
+import { formatMoney } from '../lib/money'
+import { useDebounced } from '../lib/useDebounced'
 
 /**
  * The menu (S-59).
@@ -23,6 +27,10 @@ import MenuImage from '../components/MenuImage'
  * The price field is the careful part. The printed menu uses three shapes that
  * mean different things — a price, no price, and an amount added to something
  * else — and the form has to let the supervisor say which without a manual.
+ *
+ * The search waits for the typing to stop and keeps the last rows on screen
+ * until the next arrive (M-W09), and a menu that failed to load says so
+ * rather than "Nothing on the menu yet" (M-W03).
  */
 export default function MenuPage() {
   const { t } = useTranslation()
@@ -31,26 +39,33 @@ export default function MenuPage() {
   const [editing, setEditing] = useState<MenuItem | 'new' | null>(null)
   const [managingCategories, setManagingCategories] = useState(false)
 
-  // Bumped whenever an item is saved, and appended to every picture URL. The
-  // server marks pictures good for a day, so without this a supervisor who
-  // replaced a photograph would go on seeing the old one until tomorrow.
-  const [imageStamp, setImageStamp] = useState(() => Date.now())
+  // Appended to a picture's URL, and moved on for an item when it is saved.
+  // The server marks pictures good for a day, so without it a supervisor who
+  // replaced a photograph would go on seeing the old one until tomorrow. One
+  // per item: saving one item used to fetch every picture on the page again.
+  const [pageStamp] = useState(() => Date.now())
+  const [savedStamps, setSavedStamps] = useState<Record<string, number>>({})
+  const stampOf = (id: string) => savedStamps[id] ?? pageStamp
+  const onSaved = (id: string) => setSavedStamps((stamps) => ({ ...stamps, [id]: Date.now() }))
 
-  const { data: categories } = useQuery({
+  const categories = useQuery({
     queryKey: ['menu-categories'],
     queryFn: listMenuCategories,
   })
 
-  const { data: items, isLoading } = useQuery({
-    queryKey: ['menu', query, categoryId],
-    queryFn: () => searchMenu(query, categoryId || undefined),
+  const searched = useDebounced(query)
+  const list = useQuery({
+    queryKey: ['menu', searched, categoryId],
+    queryFn: () => searchMenu(searched, categoryId || undefined),
+    placeholderData: keepPreviousData,
   })
+  const items = list.data
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="page-title">{t('menu.heading')}</h2>
+          <h1 className="page-title">{t('menu.heading')}</h1>
           <p className="page-subtitle">{t('menu.intro')}</p>
         </div>
         <div className="flex gap-2">
@@ -86,14 +101,19 @@ export default function MenuPage() {
           className="input max-w-xs"
         >
           <option value="">{t('menu.allCategories')}</option>
-          {categories?.map((category) => (
+          {categories.data?.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name} ({category.itemCount})
             </option>
           ))}
         </select>
+        {categories.isError && (
+          <LoadError inline message={t('common.listFailed')} onRetry={() => void categories.refetch()} />
+        )}
 
-        {items && <span className="text-sm text-slate-400">{t('menu.count', { count: items.length })}</span>}
+        {items && !list.isError && (
+          <span className="text-sm text-slate-400">{t('menu.count', { count: items.length })}</span>
+        )}
       </div>
 
       {/* A new item has no row to sit under, so it opens here, where the
@@ -102,32 +122,36 @@ export default function MenuPage() {
       {editing === 'new' && (
         <ItemForm
           item={null}
-          imageStamp={imageStamp}
-          onSaved={() => setImageStamp(Date.now())}
+          imageStamp={pageStamp}
+          onSaved={onSaved}
           onClose={() => setEditing(null)}
         />
       )}
 
-      {isLoading ? (
+      {list.isError ? (
+        <LoadError message={t('menu.failed')} onRetry={() => void list.refetch()} busy={list.isFetching} />
+      ) : list.isPending ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : items && items.length > 0 ? (
-        <ItemTable
-          items={items}
-          imageStamp={imageStamp}
-          editing={editing === 'new' ? null : editing}
-          onEdit={setEditing}
-          renderEditor={(item) => (
-            <ItemForm
-              item={item}
-              imageStamp={imageStamp}
-              onSaved={() => setImageStamp(Date.now())}
-              onClose={() => setEditing(null)}
-            />
-          )}
-        />
+        <div className={list.isPlaceholderData ? 'opacity-60 transition' : 'transition'} aria-busy={list.isPlaceholderData}>
+          <ItemTable
+            items={items}
+            stampOf={stampOf}
+            editing={editing === 'new' ? null : editing}
+            onEdit={setEditing}
+            renderEditor={(item) => (
+              <ItemForm
+                item={item}
+                imageStamp={stampOf(item.id)}
+                onSaved={onSaved}
+                onClose={() => setEditing(null)}
+              />
+            )}
+          />
+        </div>
       ) : (
         <div className="card card-body text-center">
-          <p className="text-slate-300">{query ? t('menu.noMatches') : t('menu.empty')}</p>
+          <p className="text-slate-300">{searched ? t('menu.noMatches') : t('menu.empty')}</p>
         </div>
       )}
     </div>
@@ -151,10 +175,11 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
 
-  const { data: categories } = useQuery({
+  const categoriesQuery = useQuery({
     queryKey: ['menu-categories'],
     queryFn: listMenuCategories,
   })
+  const categories = categoriesQuery.data
 
   // Both lists are invalidated on every change: an item's row prints its
   // category's name, so renaming one leaves the table wrong until it refetches.
@@ -194,6 +219,7 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
 
   const remove = useMutation({
     mutationFn: deleteMenuCategory,
+    onMutate: () => setError(null),
     onSuccess: refresh,
     onError: fail,
   })
@@ -224,6 +250,14 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
         <div role="alert" className="notice-error">
           {error}
         </div>
+      )}
+
+      {categoriesQuery.isError && (
+        <LoadError
+          message={t('menu.categoriesFailed')}
+          onRetry={() => void categoriesQuery.refetch()}
+          busy={categoriesQuery.isFetching}
+        />
       )}
 
       <ul className="divide-y divide-ink-800">
@@ -275,14 +309,12 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
                 {t('menu.shown')}
               </label>
 
-              <button
-                type="button"
-                onClick={() => remove.mutate(category.id)}
+              {/* Asked twice, as on the items and the delivery areas (M-W07). */}
+              <ConfirmButton
+                label={t('menu.remove')}
+                onConfirm={() => remove.mutate(category.id)}
                 disabled={pending}
-                className="btn-ghost btn-sm"
-              >
-                {t('menu.remove')}
-              </button>
+              />
             </div>
           </li>
         ))}
@@ -313,37 +345,57 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
   )
 }
 
-/** What to show in the price column — the three shapes, told apart. */
-function priceLabel(item: MenuItem, t: (key: string) => string): string {
-  if (item.price === null) return t('menu.priceNotShown')
-  if (item.isSurcharge) return item.price === 0 ? t('menu.free') : `+${item.price}`
-  return String(item.price)
+/**
+ * What to show in the price column — the three shapes, told apart — in the
+ * money format every other screen uses. An amount is held left to right, so an
+ * add-on's "+2.00" keeps its sign in front in Arabic (M-W01).
+ */
+function PriceLabel({ item }: { item: MenuItem }) {
+  const { t, i18n } = useTranslation()
+  if (item.price === null) return <>{t('menu.priceNotShown')}</>
+  if (item.isSurcharge && item.price === 0) return <>{t('menu.free')}</>
+  const amount = formatMoney(item.price, i18n.language)
+  return <span dir="ltr">{item.isSurcharge ? `+${amount}` : amount}</span>
 }
 
 function ItemTable({
   items,
-  imageStamp,
+  stampOf,
   editing,
   onEdit,
   renderEditor,
 }: {
   items: MenuItem[]
-  imageStamp: number
+  /** Each item's picture stamp; see MenuPage. */
+  stampOf: (id: string) => number
   /** The item being edited, so its form can open under its own row. */
   editing: MenuItem | null
   onEdit: (item: MenuItem) => void
   renderEditor: (item: MenuItem) => ReactNode
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
 
+  // Asked twice, and a refusal shown (M-W07): Remove used to delete on the
+  // first click and say nothing when the server refused.
   const remove = useMutation({
     mutationFn: deleteMenuItem,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['menu'] }),
+    onMutate: () => setError(null),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['menu'] })
+      void queryClient.invalidateQueries({ queryKey: ['menu-categories'] })
+    },
+    onError: (e) => setError(t(`menu.errors.${errorCodeOf(e)}`)),
   })
 
   return (
     <div className="card overflow-x-auto">
+      {error && (
+        <div role="alert" className="notice-error m-3">
+          {error}
+        </div>
+      )}
       <table className="table">
         <thead>
           <tr>
@@ -366,7 +418,7 @@ function ItemTable({
               className={editing?.id === item.id ? 'bg-ink-800/40' : undefined}
             >
               <td>
-                <MenuImage itemId={item.id} hasImage={item.hasImage} stamp={imageStamp} />
+                <MenuImage itemId={item.id} hasImage={item.hasImage} stamp={stampOf(item.id)} />
               </td>
               <td className="font-medium text-slate-100">
                 {item.name}
@@ -378,22 +430,21 @@ function ItemTable({
                 )}
               </td>
               <td className="text-slate-400">{item.categoryName}</td>
-              <td className="tabular text-slate-300">{priceLabel(item, t)}</td>
-              <td className="tabular text-slate-400">{item.mealPrice ?? ''}</td>
+              <td className="tabular text-slate-300"><PriceLabel item={item} /></td>
+              <td className="tabular text-slate-400">
+                {item.mealPrice !== null && <span dir="ltr">{formatMoney(item.mealPrice, i18n.language)}</span>}
+              </td>
               {/* The double-click must not reach here: two quick clicks on
                   Remove would delete the row and then open an editor for it. */}
               <td className="text-end whitespace-nowrap" onDoubleClick={(e) => e.stopPropagation()}>
                 <button type="button" onClick={() => onEdit(item)} className="btn-ghost btn-sm">
                   {t('menu.edit')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => remove.mutate(item.id)}
+                <ConfirmButton
+                  label={t('menu.remove')}
+                  onConfirm={() => remove.mutate(item.id)}
                   disabled={remove.isPending}
-                  className="btn-ghost btn-sm"
-                >
-                  {t('menu.remove')}
-                </button>
+                />
               </td>
             </tr>
 
@@ -401,7 +452,7 @@ function ItemTable({
                 at the top of a list they have scrolled past. */}
             {editing?.id === item.id && (
               <tr>
-                <td colSpan={6} className="bg-ink-900/60">
+                <td colSpan={6} className="row-panel">
                   {renderEditor(item)}
                 </td>
               </tr>
@@ -422,14 +473,15 @@ function ItemForm({
 }: {
   item: MenuItem | null
   imageStamp: number
-  onSaved: () => void
+  /** The id of the item saved, whose picture may have changed. */
+  onSaved: (id: string) => void
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const fileInput = useRef<HTMLInputElement>(null)
 
-  const { data: categories } = useQuery({
+  const categories = useQuery({
     queryKey: ['menu-categories'],
     queryFn: listMenuCategories,
   })
@@ -494,10 +546,10 @@ function ItemForm({
 
       return saved
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ['menu'] })
       void queryClient.invalidateQueries({ queryKey: ['menu-categories'] })
-      onSaved()
+      onSaved(saved.id)
       onClose()
     },
     onError: (e) => setError(t(`menu.errors.${errorCodeOf(e)}`)),
@@ -533,12 +585,15 @@ function ItemForm({
           <span className="field-label">{t('menu.category')}</span>
           <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input">
             <option value="">{t('menu.chooseCategory')}</option>
-            {categories?.map((category) => (
+            {categories.data?.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
               </option>
             ))}
           </select>
+          {categories.isError && (
+            <LoadError inline message={t('common.listFailed')} onRetry={() => void categories.refetch()} />
+          )}
         </label>
       </div>
 
@@ -559,6 +614,7 @@ function ItemForm({
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             inputMode="decimal"
+            dir="ltr"
             className="input tabular"
           />
           <span className="field-hint">{t('menu.priceHint')}</span>
@@ -570,6 +626,7 @@ function ItemForm({
             value={mealPrice}
             onChange={(e) => setMealPrice(e.target.value)}
             inputMode="decimal"
+            dir="ltr"
             className="input tabular"
           />
           <span className="field-hint">{t('menu.mealPriceHint')}</span>

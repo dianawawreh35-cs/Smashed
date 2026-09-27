@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getPbxBlacklist, retryPbxBlacklist, savePbxBlacklist } from '../api/pbxBlacklist'
 import type { PbxBlacklist, UpdatePbxBlacklist } from '../api/pbxBlacklist'
 import { settingProblems } from '../api/settings'
+import LoadError from './LoadError'
 
 const KEY = ['pbx', 'blacklist']
 
@@ -16,7 +17,9 @@ const KEY = ['pbx', 'blacklist']
  * this card only says whether the PBX has followed. It refreshes itself while
  * numbers are waiting, since each one is a phone call of its own.
  *
- * The password is write-only, as on the PBX import card.
+ * The password is write-only, as on the PBX import card. Like that card, it
+ * shows no form when its values did not load, and says when a save failed
+ * without naming a field (M-W04).
  */
 export default function PbxBlacklistCard() {
   const { t, i18n } = useTranslation()
@@ -30,21 +33,34 @@ export default function PbxBlacklistCard() {
   const [draft, setDraft] = useState<UpdatePbxBlacklist>({ extension: '', secret: '' })
   const [problems, setProblems] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
+  const [notSaved, setNotSaved] = useState(false)
 
+  // Filled once, when the values first arrive, and again from what a save
+  // returns (M-W05). It used to refill on every refresh, and the card
+  // refreshes every 15 seconds while numbers are waiting, so what the
+  // supervisor was typing vanished mid-word.
+  const filled = useRef(false)
   useEffect(() => {
-    if (status.data) setDraft({ extension: status.data.extension, secret: '' })
+    if (status.data && !filled.current) {
+      filled.current = true
+      setDraft({ extension: status.data.extension, secret: '' })
+    }
   }, [status.data])
 
   const save = useMutation({
     mutationFn: () => savePbxBlacklist(draft),
     onSuccess: (s) => {
       setProblems({})
+      setNotSaved(false)
       setSaved(true)
+      setDraft({ extension: s.extension, secret: '' })
       queryClient.setQueryData(KEY, s)
     },
     onError: (error) => {
       setSaved(false)
-      setProblems(settingProblems(error))
+      const fields = settingProblems(error)
+      setProblems(fields)
+      setNotSaved(Object.keys(fields).length === 0)
     },
   })
 
@@ -53,7 +69,16 @@ export default function PbxBlacklistCard() {
     onSuccess: (s) => queryClient.setQueryData(KEY, s),
   })
 
-  if (status.isLoading) return <p className="text-slate-400">{t('app.loading')}</p>
+  if (status.isPending) return <p className="text-slate-400">{t('app.loading')}</p>
+
+  if (status.isError && !status.data) {
+    return (
+      <section className="space-y-4" aria-label={t('settings.blacklist.heading')}>
+        <h2 className="page-title">{t('settings.blacklist.heading')}</h2>
+        <LoadError message={t('settings.blacklist.failed')} onRetry={() => void status.refetch()} busy={status.isFetching} />
+      </section>
+    )
+  }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -74,6 +99,7 @@ export default function PbxBlacklistCard() {
       {saved && Object.keys(problems).length === 0 && (
         <p role="status" className="notice-success">{t('settings.blacklist.saved')}</p>
       )}
+      {notSaved && <p role="alert" className="notice-error">{t('common.notSaved')}</p>}
 
       <div className="card card-body space-y-5">
         <Field label={t('settings.blacklist.extension')} hint={t('settings.blacklist.extensionHint')} problem={problems.extension}>

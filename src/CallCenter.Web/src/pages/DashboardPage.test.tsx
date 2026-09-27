@@ -65,14 +65,14 @@ describe('dashboard', () => {
     renderPage()
 
     expect(await within(tile('Communications')).findByText('42')).toBeInTheDocument()
-    expect(within(tile('Communications')).getByText('37 calls, 5 messages')).toBeInTheDocument()
+    expect(within(tile('Communications')).getByText('Calls: 37 · messages: 5')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('20')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('worth 1,234.50')).toBeInTheDocument()
     expect(within(tile('Abandoned calls')).getByText('5')).toBeInTheDocument()
     // A ring one agent missed is a call the queue passed on, not an unanswered
     // one: shown on its own, not counted in Communications (Dia, 26 Sep).
     expect(within(tile('Missed or rejected rings')).getByText('7')).toBeInTheDocument()
-    expect(within(tile('Missed or rejected rings')).getByText(/^4 missed, 3 rejected\./)).toBeInTheDocument()
+    expect(within(tile('Missed or rejected rings')).getByText(/^Missed: 4 · rejected: 3\./)).toBeInTheDocument()
     expect(within(tile('Unclassified calls')).getByText('6')).toBeInTheDocument()
     expect(within(tile('Agents online')).getByText('2')).toBeInTheDocument()
 
@@ -87,7 +87,7 @@ describe('dashboard', () => {
     const fetchMock = server()
     vi.stubGlobal('fetch', fetchMock)
     renderPage()
-    await screen.findByText('37 calls, 5 messages')
+    await screen.findByText('Calls: 37 · messages: 5')
 
     // Period only: no agent, branch or type filter on the dashboard.
     expect(screen.queryByLabelText('Branch')).not.toBeInTheDocument()

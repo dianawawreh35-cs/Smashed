@@ -66,7 +66,7 @@ export function ReportFilterBar({
             onChange={(e) => set('to')(e.target.value)} />
         </label>
         {!periodOnly && showChannels && (
-          <Select label={t('applicationReports.columns.channel')} value={draft.channelId} onChange={set('channelId')}>
+          <Select label={t('applicationReports.columns.channel')} value={draft.channelId} onChange={set('channelId')} choices={channels}>
             {(channels.data ?? []).filter((ch) => includePhone || !ch.isSystem).map((ch) => (
               <option key={ch.id} value={ch.id}>{ch.name}</option>
             ))}
@@ -74,17 +74,17 @@ export function ReportFilterBar({
         )}
         {!periodOnly && (
           <>
-            <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')}>
+            <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={agents}>
               {(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => (
                 <option key={u.id} value={u.id}>{u.displayName}</option>
               ))}
             </Select>
-            <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')}>
+            <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
               {(branches.data ?? []).map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </Select>
-            <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')}>
+            <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
               {(types.data ?? []).map((ty) => (
                 <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
               ))}
@@ -146,18 +146,21 @@ export function ReportPrintHeading({
   const day = (value: string) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString(i18n.language) : '…')
   const period = draft.from === draft.to ? day(draft.from) : `${day(draft.from)} – ${day(draft.to)}`
 
-  const chosen: [string, string | undefined][] = periodOnly ? [] : [
-    [t('calls.columns.agent'), draft.agentId && agents.data?.find((u) => u.id === draft.agentId)?.displayName],
-    [t('calls.columns.branch'), draft.branchId && branches.data?.find((b) => b.id === draft.branchId)?.name],
-    [t('applicationReports.columns.channel'), draft.channelId && channels.data?.find((c) => c.id === draft.channelId)?.name],
-    [t('calls.columns.type'), draft.typeId && (() => {
+  // [label, the id chosen, its name]. A filter that is on but whose name did
+  // not load still prints, as "…": leaving it out would print "all agents"
+  // over a report that covers one (M-W03).
+  const chosen: [string, string, string | undefined][] = periodOnly ? [] : [
+    [t('calls.columns.agent'), draft.agentId, agents.data?.find((u) => u.id === draft.agentId)?.displayName],
+    [t('calls.columns.branch'), draft.branchId, branches.data?.find((b) => b.id === draft.branchId)?.name],
+    [t('applicationReports.columns.channel'), draft.channelId, channels.data?.find((c) => c.id === draft.channelId)?.name],
+    [t('calls.columns.type'), draft.typeId, (() => {
       const type = types.data?.find((ty) => ty.id === draft.typeId)
       return type && (arabic ? type.labelAr : type.labelEn)
     })()],
   ]
   const filters = chosen
-    .filter(([, value]) => value)
-    .map(([label, value]) => `${label}: ${value}`)
+    .filter(([, id]) => id)
+    .map(([label, , name]) => `${label}: ${name ?? '…'}`)
 
   // aria-hidden: on screen it is hidden and the page's own heading says the
   // same, and a second heading of the same name confuses a screen reader.

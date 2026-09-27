@@ -384,6 +384,105 @@ The server's extension must be set up (the PBX blacklist card in Settings).
       closing the tab. When the call itself ends, the bar says so.
 - [ ] **Everything above in Arabic.**
 
+### 1.11 The 27 Sep review fixes: the web app (M-W01 to M-W10) — no phone needed
+
+After pulling this, run **`npm ci`** in `src/CallCenter.Web` before `npm run dev`:
+the build tools moved up (Vite 8, Vitest 5) and the old ones will not start
+the new config. Use **Node 22.12 or later** (`node --version`; this machine has 24).
+
+**When the server is stopped.** Start the web app, sign in, then stop the
+server (not `npm run dev`).
+
+- [ ] **Contacts: search for a number**, e.g. `0599123456`. A red box says
+      *The search did not reach the server. This is not the same as no
+      match*, with **Try again**. There is **no** "Nobody has … flag it anyway"
+      button. Start the server and press **Try again**: the list appears.
+      **Screenshot the red box in both languages.**
+      *If "Nothing matched" or the flag button appears:* the failure is still
+      reading as an empty list. Tell me.
+- [ ] **The other screens, still with the server stopped.** Users, Delivery,
+      Menu and Settings each say they could not load, with **Try again**, not
+      "no users", "no delivery areas", "nothing on the menu". Settings shows
+      **no form and no Save button** on any of its cards. The dashboard keeps
+      the **Call queue** card, saying the queue's state could not be loaded.
+      On Calls, each filter drop-down says *The list did not load.*
+- [ ] **A save that fails without a field to blame.** On Settings, with the
+      server running, load the page, stop the server, press **Save
+      settings**: *Nothing was saved: the server did not answer…*, and what
+      you typed is still there.
+
+**Arabic.** Switch to العربية for these.
+
+- [ ] **A contact's phone numbers.** In Contacts, find a contact with a
+      `+970…` number (add one if needed: `+970 59 912 3456`). In the list the
+      number reads `+970 59 912 3456`, the `+` on the left, groups in order.
+      Open it: the phone boxes type left to right. Search for a number nobody
+      has, press the flag button: the heading shows the number the right way
+      round. **Screenshot the list and the open contact.**
+- [ ] **Table headings** in Arabic have no gaps between the letters.
+- [ ] **Counts of 2 and 5.** Menu → Manage categories: a category with two
+      items says **صنفان**, one with five says **5 أصناف** (not "2 صنف").
+      On Calls, a search with 2 results says **مكالمتان**, with 5
+      **5 مكالمات**. **Screenshot a 2 and a 5.** In English: "1 item", "2
+      items", never "1 items".
+
+**How it looks.**
+
+- [ ] **The main buttons** (Search, Save, Add, Open the queue) are a slightly
+      darker blue than before, with white text; **Remove / Stop listening**
+      a slightly darker red; hints under fields a little lighter. Links, the
+      bar beside the selected page and the charts keep the old blue.
+      **Screenshot a page with a primary button, in both languages.**
+- [ ] **Users: open a row** (Set extension, or Reset password). The form opens
+      on the **same dark panel** as an opened row on Calls or Contacts, not a
+      white band, and it does not flicker when the pointer moves over it.
+      **Screenshot it, in both languages.**
+- [ ] **The font is Cairo.** Every screen's letters change shape from before
+      (Segoe UI). In the browser's developer tools, Network: no request goes
+      to `fonts.googleapis.com`; the `.woff2` files come from the server.
+- [ ] **Delivery prices** show two decimals (`7.50`, not `7.5`); a menu
+      add-on shows `+2.00` with the plus in front, in Arabic too.
+
+**Behaviour.**
+
+- [ ] **Remove asks twice**, on a delivery area, a menu item and a menu
+      category. First click: the button turns red and says **Confirm
+      remove**. Wait four seconds, or press Escape, or click elsewhere: it
+      goes back. Click twice slowly: it removes. A quick double-click only
+      arms it. If the server refuses (a category that still has items), a red
+      line says why.
+- [ ] **Searching waits for you to stop typing.** Type a name quickly in
+      Contacts, Delivery or Menu: the list does not flash "Loading…" per
+      letter; the old rows dim, then change. On Calls and Applications, after
+      **Search** the table dims until the new results arrive.
+- [ ] **Saving one menu item** refreshes that item's picture only; the other
+      pictures do not blink.
+- [ ] **The report tabs by keyboard.** On Call reports, Tab onto the tabs; the
+      arrow keys move between them and open each (in Arabic the left arrow
+      goes to the next one); Home and End go to the ends.
+- [ ] **A link keeps its tab through the sign-in.** Sign out, then open
+      `http://localhost:5173/call-reports?tab=abandoned` and sign in: you land
+      on the **Abandoned** tab.
+- [ ] **Signing out leaves nothing behind.** Open Contacts, sign out, sign in
+      again: nothing from before flashes up while the page loads.
+- [ ] **The Dashboard and Call reports** show "Loading…" for a moment the
+      first time each is opened (their charts are fetched then). After an
+      update, a tab left open shows *could not be loaded* with **Try again**,
+      which reloads the page.
+- [ ] **A recording that will not download.** Open a recorded call on Calls,
+      stop the server, press **Download**: a red line says the recording
+      could not be fetched. (It used to do nothing.)
+
+**The sign-in rate limit (needs the server change from prompt 18).**
+
+- [ ] **Too many attempts.** Sign in with a wrong password again and again
+      until the server stops you: the message becomes **Too many sign-in
+      attempts. Wait a few minutes, then try again.** / **محاولات تسجيل دخول
+      كثيرة. انتظر بضع دقائق ثم حاول مرة أخرى.** **Screenshot it in both
+      languages.**
+      *If it keeps saying the password is wrong however many times:* the
+      server's limit is not in yet, or it answers something other than 429.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.

@@ -15,6 +15,7 @@ import type {
   FormField,
 } from '../api/classifications'
 import { errorCodeOf } from '../api/users'
+import LoadError from '../components/LoadError'
 
 /**
  * The classification form, as the supervisor defines it (S-40).
@@ -40,31 +41,34 @@ export default function ClassificationPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
-  const { data: form, isLoading } = useQuery({
+  const inbound = useQuery({
     queryKey: ['classification-form', 'In'],
     queryFn: () => getClassificationForm('In'),
   })
+  const form = inbound.data
 
-  const { data: outbound } = useQuery({
+  const outboundQuery = useQuery({
     queryKey: ['classification-form', 'Out'],
     queryFn: () => getClassificationForm('Out'),
   })
+  const outbound = outboundQuery.data
 
-  const { data: messages } = useQuery({
+  const messagesQuery = useQuery({
     queryKey: ['classification-form', 'None'],
     queryFn: () => getClassificationForm('None'),
   })
+  const messages = messagesQuery.data
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['classification-form'] })
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="page-title">{t('classification.heading')}</h2>
+        <h1 className="page-title">{t('classification.heading')}</h1>
         <p className="page-subtitle">{t('classification.intro')}</p>
       </div>
 
-      {isLoading ? (
+      {inbound.isPending ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : form ? (
         <>
@@ -76,6 +80,11 @@ export default function ClassificationPage() {
             types={form.types}
             onPublished={refresh}
           />
+          {/* A form that did not load says so, rather than its card being
+              missing from the page (M-W03). */}
+          {outboundQuery.isError && (
+            <LoadError message={t('classification.unavailable')} onRetry={() => void outboundQuery.refetch()} />
+          )}
           {outbound && (
             <FieldsCard
               direction="Out"
@@ -84,6 +93,9 @@ export default function ClassificationPage() {
               types={outbound.types}
               onPublished={refresh}
             />
+          )}
+          {messagesQuery.isError && (
+            <LoadError message={t('classification.unavailable')} onRetry={() => void messagesQuery.refetch()} />
           )}
           {messages && (
             <FieldsCard
@@ -96,9 +108,7 @@ export default function ClassificationPage() {
           )}
         </>
       ) : (
-        <div className="card card-body text-center">
-          <p className="text-slate-300">{t('classification.unavailable')}</p>
-        </div>
+        <LoadError message={t('classification.unavailable')} onRetry={() => void inbound.refetch()} busy={inbound.isFetching} />
       )}
     </div>
   )

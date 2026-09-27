@@ -6640,6 +6640,164 @@ names is defined, plus the keys the code looks up by name. It was the second of
 the three throwaway UI checks the *Known gaps* list below asked for. It finds
 the source from its own file path, so it runs from any build folder.
 
+## 2026-09-27 — The supervisor web app: a failure says so, and Arabic reads the right way round (M-W01 to M-W10, M-S12's web half)
+
+Prompt 19, the web half of the review. Every item was checked against the code
+first and was as the review described; none turned out wrong. In short: a
+screen whose request failed now says so, with **Try again**, instead of looking
+empty; phone numbers and signed amounts read left to right in Arabic; counts
+agree with their numbers in both languages; the main buttons meet WCAG AA; and
+the app loads about half as much before the login screen.
+
+**Three choices were Dia's (27 Sep):**
+
+- **The primary button is a darker blue, `#2F6FE0`**, with white text (4.7:1),
+  rather than dark text on the brand blue. Only filled buttons use it
+  (`brand.button` in `tailwind.config.js`); links, focus rings, the nav bar and
+  the charts keep `#4F8CFF`, so the brand colour itself is unchanged and still
+  matches the Agent App's Accent. The Agent App's own buttons were not touched
+  here (prompt 17 owns that code).
+- **Remove asks by a second click** ("Confirm remove"), not a dialog, on
+  delivery areas, menu items and menu categories (`ConfirmButton`). It goes
+  back after four seconds, on Escape or on leaving it, and the second press
+  of a double-click is ignored, so a hurried double-click only arms it. A
+  refusal is shown above the table.
+- **Vite and Vitest moved up in this task**, not a later one: Vite 8.3.1,
+  Vitest 5.0.2, `@vitejs/plugin-react` 6.1.1, with react-router 7.18.4 for
+  GHSA-wrjc-x8rr-h8h6 (no 6.x release has the fix). `npm audit` went from 7
+  advisories to **none**. No code change was needed for React Router 7.
+
+**What changed, by item.**
+
+- **M-W03, a failure is not "nothing here".** One `LoadError` (a red notice
+  with Try again) on every screen that fetches: Contacts (which no longer
+  offers to flag a number "nobody has" after a failed search), a contact's
+  history, Users, Delivery, Menu and its categories, Channels, the queue
+  switch (which stays on the dashboard instead of vanishing), a call's details
+  (the classification no longer pulses for ever), the flag dialog's history,
+  the dashboard, the classification form, the Abandoned tab's import status,
+  and a small inline form under every drop-down whose choices did not load
+  (Calls, Applications, the report filter bar, Delivery's and Menu's own). A
+  report card's Retry asks again for every report on the page that failed:
+  when one fails it is usually the server. Every `useQuery` in the app was
+  checked. Two are left as they were, on purpose: the classification's
+  question labels, which fall back to the field's key if the form cannot be
+  loaded, and the printed heading's filter names, which now print "…" instead
+  of being left out (leaving one out printed "all agents" over a report for
+  one).
+- **M-W04 and M-W05, the settings cards.** A card whose values did not load
+  shows no form, so Save cannot write blanks over the real address, login or
+  extension. A save refused without naming a field (a 500, no network) says
+  *Nothing was saved*. Each card fills its form once, and again from what a
+  save returns, never on a refresh: the blacklist card's 15-second refresh
+  wiped what was being typed, and the PBX import card had the same bug through
+  Check now.
+- **M-W06.** The new-user form is cleared only once the server has created
+  the account.
+- **The recording download** catches its failure and says so, through the
+  shared `downloadBlob`, which now lets the file's URL go ten seconds later
+  instead of in the same tick (Firefox and Safari can cancel the save).
+- **Sign-out, and the server ending the sign-in, empty the query cache.** A
+  refused request (4xx) is never retried, so a 401 after the server ends the
+  token (prompt 18) costs one request, then the login screen, with no loop:
+  tested by counting requests after it. The retry rule is `lib/queryClient`.
+- **M-W01, left to right.** Phone numbers are held left to right wherever they
+  are shown or typed (`dir="ltr"`), including the contacts list, the same-name
+  warning, the phone boxes, a report's Number column (`ReportColumn.ltr`), a
+  report's Customer column when it falls back to the number, a call's heading
+  when the caller has no name, extensions, and the settings that hold numbers
+  or addresses. Inside a translated sentence ("Nobody has {{number}}",
+  "Flag {{number}}", "… already belongs to") the number is wrapped in Unicode
+  isolates (`lib/bidi.ts`), since it has no element of its own. The Contacts and
+  Calls search boxes switch to left to right when what is typed is a number.
+- **M-W02.** Every row that opens a panel under itself uses one class,
+  `row-panel`: the Users page's white band is gone, and the panel no longer
+  flickers lighter under the pointer (the row hover used to reach it).
+- **M-W08, contrast.** `btn-primary` 4.7:1, `btn-danger` red-600 4.8:1. Tailwind's
+  `slate-500`, used for every hint and quiet line, is redefined in the config
+  as `#808DA1`: 4.7:1 on the raised surface, 5.2 on cards, 5.6 on the page.
+  Placeholders use it too (2.5:1 before), which leaves them the same grey as
+  hints, still well below typed text (15:1).
+- **M-W10, plurals.** Arabic counts have all six forms (zero, one, two, few,
+  many, other): "مكالمتان", "5 مكالمات", "11 مكالمة". English has one/other:
+  "1 item", "already 2 contacts", "1 line". A sentence with two or more numbers
+  cannot take one plural, so those were reworded to label each number
+  ("Calls: 37 · messages: 5"). **The two files no longer have identical keys**,
+  and cannot: Arabic has `_two`, `_few` and `_many` where English has none.
+  `i18n/keys.test.ts` checks what must match instead: the same labels once the
+  plural suffix is set aside, the same placeholders, and every form each
+  language's plural rules ask for.
+- **Also from the list:** Arabic table headings have no letter-spacing;
+  delivery and menu prices go through the shared money formatter (`7.50`,
+  `+2.00`); page titles are `<h1>`; the nav has a label; required questions in
+  `ClassificationEditor` carry `aria-required`; the report tabs follow the ARIA
+  tabs pattern (roving tabindex, arrows, Home and End, `aria-controls`; in
+  Arabic the left arrow is "next").
+- **M-W09 and the feel.** Contacts, Delivery, Menu and the same-name lookup
+  wait 250 ms after the last key and keep the last rows, dimmed, until the next
+  arrive. Calls and Applications dim their table after Search. Saving one menu
+  item refetches that item's picture only (a stamp per item, not one for the
+  page). The phone badges share one clock (`lib/clock.ts`), which runs only
+  while a badge shows a call or a listen-in is on.
+- **Cairo is bundled** (`@fontsource/cairo`, 400 to 700, OFL-1.1): the Google
+  Fonts link never loaded on the LAN server, so every screen was Segoe UI. The
+  licence is served with it at `/licenses/cairo-OFL.txt` (from `public/`),
+  which the OFL asks for; `THIRD-PARTY-LICENSES.md` says so.
+- **The login redirect keeps the query string**, so `?tab=abandoned` survives
+  signing in.
+- **429 on sign-in** (prompt 18's rate limit) shows *Too many sign-in
+  attempts. Wait a few minutes, then try again.* It is recognised by the
+  status, since a rate limiter may answer with no body. The key is
+  `login.errors.too_many_attempts`, beside the other sign-in errors, not
+  `auth.errors…` as the prompt named it. Tested with a mocked 429; the real
+  one waits for the server change.
+
+**Bundle, before and after** (`vite build`):
+
+| | Before | After |
+|---|---|---|
+| Loaded with the login screen | one 873.8 kB chunk (249.3 kB gzipped) | 482.7 kB (138.9 kB gzipped): the app 210.3, React and friends 265.3, two small shared chunks |
+| Loaded with the dashboard or a report | nothing more | the charts 321.1 kB (80.4 kB), their shared code 67.6 kB, and the page itself (5 to 27 kB) |
+| Source maps | 3.4 MB, linked from the bundle | written but not linked (`sourcemap: 'hidden'`) |
+| Fonts | none (Google Fonts, unreachable) | 145.6 kB of `.woff2`, of which a page fetches only the Arabic and Latin parts it uses |
+
+The dashboard, Call reports and Application reports are loaded on first
+opening (`React.lazy`), with the chart library in a `charts` chunk and React,
+the router, the query cache and i18next in `vendor`. `PageBoundary` shows a
+line while a page loads and a Try again (which reloads) if its file is gone,
+as it will be in a tab left open across an update.
+
+**Node 22.12 is what the web app's tools now support** (`engines` in
+`package.json`): Vitest 5 declares it, and Node 20 has been end-of-life since
+April. Checked here: `npm run build`, `npm run lint` and the tests pass under
+Node 22.23 and this machine's Node 24. **CI and the Dockerfile are still on
+Node 20** as this is written; prompt 18 is moving them. Under Node 20.20 the
+build and the 166 tests also pass, with npm warning about the engine, so this
+can be pushed before that change without breaking CI; it is supported only
+once it lands. After pulling, run `npm ci`: the lockfile changed under the
+whole tool chain.
+
+**Tests: 122 → 166.** One test per screen with the server stopped
+(`test/loadErrors.test.tsx`), and tests for the settings cards, Delivery
+(which had none), the new-user form, the Remove confirmation, left-to-right
+numbers and the isolate marks, the debounce, the one-picture refetch, the
+plurals and the key comparison, the 429 message, the cache emptied on sign-out
+and on a 401, the retry rule, the redirect's query string, and
+`downloadBlob`'s delay. The auth tests import the lazily loaded pages once
+before they run: the first import compiles the chart library, which under a
+loaded Node 22 run took eleven seconds inside one test.
+
+**Not done here, and why:**
+
+- The warning before the token expires, and token refresh: out of scope for
+  this task (Open items).
+- **The source maps still reach the server**: the Dockerfile copies `dist/`
+  whole into `wwwroot`, so the `.map` files are there by name, only no longer
+  linked. Leaving them out of the image is a Dockerfile change, which is the
+  server session's (Open items).
+- The Agent App's buttons keep the old blue; if the app should match, that is
+  its own change.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -6655,6 +6813,9 @@ and what comes after:
 | Next | Requirement | Depends on |
 |---|---|---|
 | **The review's "fix first" list, F-01 to F-14** | A-03, A-11, R-15, R-16, R-17, S-20, S-58, N-07 | nothing — see [REVIEW-2026-09-27.md](REVIEW-2026-09-27.md). *Agent App, 27 Sep:* F-01, F-02, F-03 (the app's half), F-08 and F-09 built; F-11 dropped, A-03 removed. **Not yet seen running**: the 27 Sep sections of the checklist, Round 3 |
+| The supervisor web app's 27 Sep fixes **seen running**, in both languages | M-W01 to M-W10 | nothing: built 27 Sep, not yet seen. Checklist 1.11, with screenshots |
+| The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet. Left out of the 27 Sep web fixes by the prompt |
+| Leave the web app's source maps out of the server image | — | a Dockerfile change: since 27 Sep they are no longer linked (`sourcemap: 'hidden'`), but `dist/` is copied whole into `wwwroot`, so they are there by name |
 | The review's Agent App items **left out of prompt 17**: a crash mid-call loses the call record and leaves raw audio in the scratch folder; the WAV is rebuilt on the UI thread at hang-up; user agents are closed but not disposed, and a 403 from a restarting PBX stops registration until the next sign-in, with no Retry; the pop-up centres on the primary monitor only; no token refresh, so the 12 h token ends a shift; `Server:HubPath` is configured and comments mention SignalR, but there is no SignalR client | A-02, A-10, A-31, N-05 | nothing |
 | Run the Agent App's tests in CI: one `dotnet test tests/CallCenter.AgentApp.Tests` step in the Windows job | — | nothing. Left out on 27 Sep only because the server session was editing `ci.yml` at the same time |
 | The upload queue's set-aside items: a way to clear one, or pass it to a supervisor. Today Try again is the only action, and a call refused as `extension_not_yours` is refused again | A-04 | Dia's call |

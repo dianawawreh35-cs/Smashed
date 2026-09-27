@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { onTokenRefused } from '../api/client'
 import { fetchCurrentUser, login as loginRequest, logout as logoutRequest } from '../api/auth'
 import type { CurrentUser } from '../api/auth'
@@ -29,6 +30,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     userRef.current = user
   }, [user])
+
+  // Nothing fetched under one sign-in outlives it: signing out, or being
+  // signed out by the server, empties the query cache, so the next supervisor
+  // on a shared browser never sees the last one's contacts or calls, even for
+  // the moment before their own arrive. Done after the render that dropped the
+  // user, which is the one that took every protected page off the screen, so
+  // nothing is left mounted to fetch again straight away.
+  const queryClient = useQueryClient()
+  const hadUser = useRef(false)
+  useEffect(() => {
+    if (user) {
+      hadUser.current = true
+    } else if (hadUser.current) {
+      hadUser.current = false
+      queryClient.clear()
+    }
+  }, [user, queryClient])
 
   // The server can end the sign-in from its side: a password reset, a disabled
   // account, a role change, or a token that ran out (N-05). Drop everything at

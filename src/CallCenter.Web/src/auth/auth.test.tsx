@@ -1,8 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from '../App'
+import { ApiError } from '../api/client'
+import { shouldRetry } from '../lib/queryClient'
 import { AuthProvider } from './AuthProvider'
 import { setToken } from './token'
 import i18n from '../i18n'
@@ -34,7 +36,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 function renderApp(path = '/login') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
         <AuthProvider>
@@ -43,7 +45,23 @@ function renderApp(path = '/login') {
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return { ...result, queryClient }
 }
+
+/**
+ * The dashboard and the reports are fetched on first opening (App.tsx). The
+ * first import of one compiles the chart library, which in a busy test run
+ * takes several seconds, so it is done once before these tests rather than
+ * inside whichever test opens a report first; the pages then load as fast as
+ * the others. The longer wait is a margin, not the expectation.
+ */
+const LAZY_PAGE = { timeout: 5_000 }
+
+beforeAll(async () => {
+  await Promise.all([import('../pages/DashboardPage'), import('../pages/CallReportsPage')])
+}, 60_000)
+
+const LOGGED_IN = { accessToken: 'token-123', expiresAt: '', user: SUPERVISOR, sessionId: 's1', extensions: null }
 
 /** Fills the form and submits it. */
 function signIn(login: string, password: string) {
@@ -72,7 +90,7 @@ describe('supervisor sign-in', () => {
     renderApp()
     signIn('supervisor', 'TempPass!2026')
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Dashboard' }, LAZY_PAGE)).toBeInTheDocument()
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/auth/login')
@@ -112,6 +130,17 @@ describe('supervisor sign-in', () => {
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
   })
 
+  it('says so when the server refuses for too many attempts', async () => {
+    // The login's rate limit (F-12) answers 429, possibly with no body: not a
+    // wrong password, and not "try again" at once.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, 429)))
+
+    renderApp()
+    signIn('supervisor', 'TempPass!2026')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many sign-in attempts. Wait a few minutes, then try again.')
+  })
+
   it('says the server is unreachable rather than blaming the password', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
 
@@ -123,6 +152,19 @@ describe('supervisor sign-in', () => {
 })
 
 describe('route guard', () => {
+  it('returns to the page asked for, query string and all', async () => {
+    // A link to a report's tab used to land on its first tab after signing in.
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/auth/login' ? jsonResponse(LOGGED_IN) : jsonResponse([]),
+    ))
+
+    renderApp('/call-reports?tab=abandoned')
+    await screen.findByRole('heading', { name: 'Sign in' })
+    signIn('supervisor', 'TempPass!2026')
+
+    expect(await screen.findByRole('tab', { name: 'Abandoned', selected: true }, LAZY_PAGE)).toBeInTheDocument()
+  })
+
   it('sends a signed-out visitor to the login screen', async () => {
     vi.stubGlobal('fetch', vi.fn())
 
@@ -138,7 +180,7 @@ describe('route guard', () => {
 
     renderApp('/dashboard')
 
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Dashboard' }, LAZY_PAGE)).toBeInTheDocument()
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/auth/me')
@@ -155,6 +197,52 @@ describe('route guard', () => {
     await waitFor(() => expect(sessionStorage.getItem('callcenter.token')).toBeNull())
     // Nobody was working, so there is nothing to explain.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('what a sign-in leaves behind', () => {
+  it('empties the query cache on sign-out', async () => {
+    // A shared browser: the next supervisor must not see the last one's data,
+    // even for the moment before their own arrives.
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/auth/login' ? jsonResponse(LOGGED_IN) : jsonResponse(url.includes('/logout') ? null : [], url.includes('/logout') ? 204 : 200),
+    ))
+
+    const { queryClient } = renderApp('/contacts')
+    signIn('supervisor', 'TempPass!2026')
+    await screen.findByRole('heading', { name: 'Contacts' })
+    await waitFor(() => expect(queryClient.getQueryCache().getAll().length).toBeGreaterThan(0))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
+
+    await screen.findByRole('heading', { name: 'Sign in' })
+    await waitFor(() => expect(queryClient.getQueryCache().getAll()).toHaveLength(0))
+  })
+
+  it('empties it too when the server ends the sign-in, and asks nothing more', async () => {
+    // The server session makes logout end the token (M-S01). A 401 must not
+    // start a loop of requests: one refusal, then the login screen.
+    setToken('token-before-the-reset')
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/auth/me' ? jsonResponse(SUPERVISOR) : jsonResponse({}, 401),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { queryClient } = renderApp('/contacts')
+    await screen.findByRole('heading', { name: 'Sign in' })
+    await waitFor(() => expect(queryClient.getQueryCache().getAll()).toHaveLength(0))
+
+    const asked = fetchMock.mock.calls.length
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(fetchMock.mock.calls.length).toBe(asked)
+  })
+
+  it('does not retry a refusal, and retries a dropped connection once', () => {
+    expect(shouldRetry(0, new ApiError(401, 'Unauthorized', null))).toBe(false)
+    expect(shouldRetry(0, new ApiError(404, 'Not Found', null))).toBe(false)
+    expect(shouldRetry(0, new ApiError(500, 'Server Error', null))).toBe(true)
+    expect(shouldRetry(0, new TypeError('Failed to fetch'))).toBe(true)
+    expect(shouldRetry(1, new TypeError('Failed to fetch'))).toBe(false)
   })
 })
 

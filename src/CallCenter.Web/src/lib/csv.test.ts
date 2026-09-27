@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { toCsv } from './csv'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { downloadBlob, toCsv } from './csv'
 
 /** The CSV export (S-05), as a pure function: what Excel will open. */
 describe('toCsv', () => {
@@ -24,5 +24,27 @@ describe('toCsv', () => {
   it('leaves a null or missing value blank, and writes numbers with a dot', () => {
     const csv = toCsv(['A', 'B', 'C'], [[null, undefined, 12.5]])
     expect(csv).toContain(',,12.5')
+  })
+})
+
+describe('downloadBlob', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('lets the file’s URL go only after the save has had time to start', () => {
+    // Revoked in the same tick as the click, Firefox and Safari can cancel the save.
+    vi.useFakeTimers()
+    URL.createObjectURL = vi.fn(() => 'blob:file')
+    const revoke = vi.fn()
+    URL.revokeObjectURL = revoke
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+
+    downloadBlob('calls.csv', new Blob(['a,b']))
+
+    expect(revoke).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(10_000)
+    expect(revoke).toHaveBeenCalledWith('blob:file')
   })
 })

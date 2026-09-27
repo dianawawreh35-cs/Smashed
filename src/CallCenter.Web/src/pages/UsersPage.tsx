@@ -10,9 +10,10 @@ import {
   setExtension,
   updateUser,
 } from '../api/users'
-import type { User } from '../api/users'
+import type { CreateUserRequest, User } from '../api/users'
 import type { AgentPhone } from '../api/pbxAgents'
 import { ListenBar, PhoneBadge } from '../components/AgentPhones'
+import LoadError from '../components/LoadError'
 import { useAgentPhones, useListen } from '../lib/agentPhones'
 
 /**
@@ -28,8 +29,10 @@ export default function UsersPage() {
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
 
-  const { data: users, isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers })
-  const { data: phones } = useAgentPhones()
+  const usersQuery = useQuery({ queryKey: ['users'], queryFn: listUsers })
+  const users = usersQuery.data
+  const phonesQuery = useAgentPhones()
+  const phones = phonesQuery.data
   const listen = useListen()
   const phoneOf = (user: User) => phones?.agents.find((p) => p.userId === user.id)
 
@@ -46,11 +49,11 @@ export default function UsersPage() {
     onError,
   })
 
-  if (isLoading) return <p className="text-slate-400">{t('app.loading')}</p>
+  if (usersQuery.isPending) return <p className="text-slate-400">{t('app.loading')}</p>
 
   return (
     <div className="space-y-6">
-      <h2 className="page-title">{t('users.heading')}</h2>
+      <h1 className="page-title">{t('users.heading')}</h1>
 
       {error && (
         <p role="alert" className="notice-error">
@@ -60,42 +63,55 @@ export default function UsersPage() {
 
       <ListenBar listening={listen.current} onStop={listen.stop} />
 
-      <CreateUserForm onSubmit={(request) => create.mutate(request)} busy={create.isPending} />
+      <CreateUserForm onSubmit={(request) => create.mutateAsync(request)} busy={create.isPending} />
 
       {phones && !phones.live && (
         <p className="notice">{t(`phones.problems.${phones.problem ?? 'no_answer'}`)}</p>
       )}
+      {/* The phones refresh every few seconds and try again by themselves, so
+          this clears on its own once the server answers. Shown over badges
+          that are already there too: they are then the last known state, and
+          "In a call" may no longer be true. */}
+      {phonesQuery.isError && (
+        <LoadError message={t('phones.failed')} onRetry={() => void phonesQuery.refetch()} busy={phonesQuery.isFetching} />
+      )}
 
-      <div className="card overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>{t('users.name')}</th>
-              <th>{t('users.login')}</th>
-              <th>{t('users.role')}</th>
-              <th>{t('users.extension')}</th>
-              <th>{t('phones.phone')}</th>
-              <th>{t('users.status')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {users?.map((user) => (
-              <UserRow
-                key={user.id}
-                user={user}
-                phone={user.role === 'Agent' ? phoneOf(user) : undefined}
-                listeningHere={listen.current?.agentId === user.id && listen.current.status !== 'failed' && listen.current.status !== 'ended'}
-                onListen={(phone) => listen.start(phone)}
-                onStopListening={listen.stop}
-                onToggle={() => toggle.mutate(user)}
-                onChanged={refresh}
-                onError={onError}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* No table at all when the list did not come: an empty one would say
+          there are no users (M-W03). */}
+      {usersQuery.isError ? (
+        <LoadError message={t('users.failed')} onRetry={() => void usersQuery.refetch()} busy={usersQuery.isFetching} />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{t('users.name')}</th>
+                <th>{t('users.login')}</th>
+                <th>{t('users.role')}</th>
+                <th>{t('users.extension')}</th>
+                <th>{t('phones.phone')}</th>
+                <th>{t('users.status')}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {users?.map((user) => (
+                <UserRow
+                  key={user.id}
+                  user={user}
+                  phone={user.role === 'Agent' ? phoneOf(user) : undefined}
+                  listeningHere={listen.current?.agentId === user.id && listen.current.status !== 'failed' && listen.current.status !== 'ended'}
+                  onListen={(phone) => listen.start(phone)}
+                  onStopListening={listen.stop}
+                  onToggle={() => toggle.mutate(user)}
+                  onChanged={refresh}
+                  onError={onError}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -136,7 +152,7 @@ function UserRow({
         <td className="tabular">
           {user.extension ? (
             <span>
-              {user.extension}
+              <span dir="ltr">{user.extension}</span>
               {/* A number without a secret cannot register, so say so plainly. */}
               {!user.hasSipCredentials && (
                 <span className="badge-vip ms-2">{t('users.noSecret')}</span>
@@ -194,14 +210,18 @@ function UserRow({
         </td>
       </tr>
 
+      {/* The same dark panel as the expanded rows on every other list
+          (M-W02). It was a near-white band, with labels at 2.5:1. */}
       {panel !== 'none' && (
-        <tr className="bg-slate-50">
-          <td colSpan={7}>
-            {panel === 'extensions' ? (
-              <ExtensionForm user={user} onDone={close} onError={onError} />
-            ) : (
-              <PasswordForm user={user} onDone={close} onError={onError} />
-            )}
+        <tr>
+          <td colSpan={7} className="row-panel">
+            <div className="card card-body animate-fade-in">
+              {panel === 'extensions' ? (
+                <ExtensionForm user={user} onDone={close} onError={onError} />
+              ) : (
+                <PasswordForm user={user} onDone={close} onError={onError} />
+              )}
+            </div>
           </td>
         </tr>
       )}
@@ -209,11 +229,17 @@ function UserRow({
   )
 }
 
+/**
+ * A new account. **The form is cleared only once the server has accepted it**
+ * (M-W06): it used to empty itself on Submit, so a refusal such as
+ * `login_taken` lost everything typed, the password included.
+ */
 function CreateUserForm({
   onSubmit,
   busy,
 }: {
-  onSubmit: (request: { login: string; displayName: string; role: string; password: string }) => void
+  /** Resolves when the account exists; rejects with the refusal, which the page shows. */
+  onSubmit: (request: CreateUserRequest) => Promise<unknown>
   busy: boolean
 }) {
   const { t } = useTranslation()
@@ -224,10 +250,15 @@ function CreateUserForm({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    onSubmit({ login, displayName, role, password })
-    setLogin('')
-    setDisplayName('')
-    setPassword('')
+    onSubmit({ login, displayName, role, password }).then(
+      () => {
+        setLogin('')
+        setDisplayName('')
+        setPassword('')
+      },
+      // Shown by the page's own error line; the fields stay as typed.
+      () => undefined,
+    )
   }
 
   return (
@@ -286,7 +317,7 @@ function ExtensionForm({
     >
       <p className="field-hint">{t('users.extensionHint')}</p>
       <div className="grid gap-3 sm:grid-cols-2 max-w-lg">
-        <Field label={t('users.extension')} value={extension} onChange={setExt} />
+        <Field label={t('users.extension')} value={extension} onChange={setExt} ltr />
         <Field
           label={t('users.secret')}
           value={secret}
@@ -353,12 +384,15 @@ function Field({
   onChange,
   type = 'text',
   placeholder,
+  ltr = false,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   type?: string
   placeholder?: string
+  /** A number, typed and shown left to right in Arabic too (M-W01). */
+  ltr?: boolean
 }) {
   return (
     <label className="field">
@@ -368,6 +402,7 @@ function Field({
         value={value}
         placeholder={placeholder}
         autoComplete="off"
+        dir={ltr ? 'ltr' : undefined}
         onChange={(e) => onChange(e.target.value)}
         className="input"
       />

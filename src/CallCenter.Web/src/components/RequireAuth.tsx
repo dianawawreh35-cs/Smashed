@@ -4,7 +4,9 @@ import { useAuth } from '../auth/context'
 
 /**
  * Wraps the supervisor pages. Anyone not signed in is sent to the login screen,
- * with the page they asked for remembered so they land there afterwards.
+ * with the page they asked for remembered so they land there afterwards —
+ * query string included, so a link to a report's tab (`?tab=abandoned`) opens
+ * that tab after signing in rather than the first one.
  */
 export default function RequireAuth() {
   const { user, isLoading } = useAuth()
@@ -23,7 +25,7 @@ export default function RequireAuth() {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />
   }
 
   return <Outlet />

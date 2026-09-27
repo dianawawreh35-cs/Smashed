@@ -6,7 +6,9 @@ import type { TypeCount } from '../api/applicationReports'
 import { ReportChart, SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportChartSpec } from '../components/ReportCard'
 import { PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import LoadError from '../components/LoadError'
 import QueueSwitchCard from '../components/QueueSwitchCard'
+import { formatMoney } from '../lib/money'
 import { printPage } from '../lib/print'
 import { useReportFilters } from '../lib/reportFilters'
 
@@ -44,7 +46,7 @@ export default function DashboardPage() {
   })
 
   const n = (v: number) => v.toLocaleString(i18n.language)
-  const money = (v: number) => v.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const money = (v: number) => formatMoney(v, i18n.language)
   const typeLabel = (ty: TypeCount) => (arabic ? ty.labelAr : ty.labelEn)
   const d = today.data
 
@@ -53,7 +55,7 @@ export default function DashboardPage() {
       <ReportPrintHeading title={t('dashboard.heading')} draft={draft} periodOnly />
       <div className="no-print flex items-start justify-between gap-4">
         <div>
-          <h2 className="page-title">{t('dashboard.heading')}</h2>
+          <h1 className="page-title">{t('dashboard.heading')}</h1>
           <p className="page-subtitle">{t('dashboard.intro')}</p>
         </div>
         <PrintPageButton onPrint={printPage} />
@@ -66,9 +68,12 @@ export default function DashboardPage() {
 
       <section className="space-y-3" aria-label={t('dashboard.today')}>
         <h3 className="font-semibold text-slate-100">{t('dashboard.today')}</h3>
-        {today.isError ? (
-          <p className="notice-error">{t('dashboard.failed')}</p>
-        ) : (
+        {/* Said when a refresh fails too: the figures below are then the last
+            ones that arrived, not today's as they stand. */}
+        {today.isError && (
+          <LoadError message={t('dashboard.failed')} onRetry={() => void today.refetch()} busy={today.isFetching} />
+        )}
+        {today.isError && !d ? null : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Tile hero label={t('dashboard.tiles.communications')} value={d ? n(d.communications) : undefined}
@@ -101,7 +106,7 @@ export default function DashboardPage() {
         <h3 className="font-semibold text-slate-100">{t('dashboard.period')}</h3>
         <ReportFilterBar draft={draft} set={set} choosePreset={choosePreset} periodOnly />
         {period.isError ? (
-          <p className="notice-error">{t('dashboard.failed')}</p>
+          <LoadError message={t('dashboard.failed')} onRetry={() => void period.refetch()} busy={period.isFetching} />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             <ChartCard title={t('dashboard.charts.perDay')} imageName="dashboard-perday" rows={period.data?.perDay}

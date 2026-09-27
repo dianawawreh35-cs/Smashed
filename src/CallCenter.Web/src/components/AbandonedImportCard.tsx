@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { fetchAbandoned, getAbandonedImport, saveAbandonedImport } from '../api/pbx'
 import type { AbandonedImport, UpdateAbandonedImport } from '../api/pbx'
 import { settingProblems } from '../api/settings'
+import LoadError from './LoadError'
 
 const KEY = ['pbx', 'abandoned-import']
 
@@ -14,6 +15,10 @@ const KEY = ['pbx', 'abandoned-import']
  *
  * The password is write-only. The server says whether one is stored, never
  * what it is, so the field starts empty and a blank save keeps the stored one.
+ *
+ * **A card that did not load shows no form** (M-W04): a blank form there
+ * would save blanks over the real address and login. And a save that fails
+ * without naming a field (a 500, no network) says so, instead of nothing.
  */
 export default function AbandonedImportCard() {
   const { t, i18n } = useTranslation()
@@ -23,12 +28,20 @@ export default function AbandonedImportCard() {
   const [draft, setDraft] = useState<UpdateAbandonedImport>({ url: '', username: '', password: '', intervalMinutes: 1 })
   const [problems, setProblems] = useState<Record<string, string>>({})
   const [saved, setSaved] = useState(false)
+  const [notSaved, setNotSaved] = useState(false)
 
-  // Fill the form once the values arrive, and again after a save returns them.
+  const fill = (s: AbandonedImport) =>
+    setDraft({ url: s.url, username: s.username, password: '', intervalMinutes: s.intervalMinutes })
+
+  // Filled once, when the values first arrive, and again from what a save
+  // returns. Not on every change to the cached status: Check now replaces it,
+  // and refilling then wiped whatever the supervisor was typing (as M-W05 did
+  // on the blacklist card).
+  const filled = useRef(false)
   useEffect(() => {
-    if (status.data) {
-      const s = status.data
-      setDraft({ url: s.url, username: s.username, password: '', intervalMinutes: s.intervalMinutes })
+    if (status.data && !filled.current) {
+      filled.current = true
+      fill(status.data)
     }
   }, [status.data])
 
@@ -36,12 +49,16 @@ export default function AbandonedImportCard() {
     mutationFn: () => saveAbandonedImport(draft),
     onSuccess: (s) => {
       setProblems({})
+      setNotSaved(false)
       setSaved(true)
+      fill(s)
       queryClient.setQueryData(KEY, s)
     },
     onError: (error) => {
       setSaved(false)
-      setProblems(settingProblems(error))
+      const fields = settingProblems(error)
+      setProblems(fields)
+      setNotSaved(Object.keys(fields).length === 0)
     },
   })
 
@@ -53,7 +70,16 @@ export default function AbandonedImportCard() {
     },
   })
 
-  if (status.isLoading) return <p className="text-slate-400">{t('app.loading')}</p>
+  if (status.isPending) return <p className="text-slate-400">{t('app.loading')}</p>
+
+  if (status.isError && !status.data) {
+    return (
+      <section className="space-y-4" aria-label={t('settings.pbx.heading')}>
+        <h2 className="page-title">{t('settings.pbx.heading')}</h2>
+        <LoadError message={t('settings.pbx.failed')} onRetry={() => void status.refetch()} busy={status.isFetching} />
+      </section>
+    )
+  }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -76,6 +102,7 @@ export default function AbandonedImportCard() {
       {saved && Object.keys(problems).length === 0 && (
         <p role="status" className="notice-success">{t('settings.pbx.saved')}</p>
       )}
+      {notSaved && <p role="alert" className="notice-error">{t('common.notSaved')}</p>}
 
       <div className="card card-body space-y-5">
         <Field label={t('settings.pbx.url')} hint={t('settings.pbx.urlHint')} problem={problems.url}>
@@ -133,7 +160,7 @@ function LastCheck({ status: s, when }: { status: AbandonedImport; when: (iso: s
       {s.lastSucceededAt && <p className="text-slate-500">{t('settings.pbx.lastSuccess', { when: when(s.lastSucceededAt) })}</p>}
     </div>
   ) : (
-    <p className="text-sm text-slate-400">{t('settings.pbx.lastOk', { when: when(s.lastCheckedAt), added: s.lastAdded ?? 0 })}</p>
+    <p className="text-sm text-slate-400">{t('settings.pbx.lastOk', { when: when(s.lastCheckedAt), count: s.lastAdded ?? 0 })}</p>
   )
 }
 

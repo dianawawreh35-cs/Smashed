@@ -122,15 +122,17 @@ afterEach(() => {
 describe('menu page', () => {
   it('tells a surcharge from a price', async () => {
     // "+2" is added to a burger; "2" would be quoted as a line of its own.
+    // In the money format every screen uses, and held left to right so the
+    // plus stays in front in Arabic (M-W01).
     stubApi()
     renderPage()
 
     const cheese = (await screen.findByText('Extra cheese')).closest('tr')!
-    expect(within(cheese).getByText('+2')).toBeInTheDocument()
+    expect(within(cheese).getByText('+2.00')).toHaveAttribute('dir', 'ltr')
 
     const smashed = screen.getByText('Smashed').closest('tr')!
-    expect(within(smashed).getByText('26')).toBeInTheDocument()
-    expect(within(smashed).getByText('36')).toBeInTheDocument()
+    expect(within(smashed).getByText('26.00')).toBeInTheDocument()
+    expect(within(smashed).getByText('36.00')).toBeInTheDocument()
   })
 
   it('sends a blank price as null rather than zero', async () => {
@@ -296,5 +298,37 @@ describe('menu page', () => {
       name: 'Desserts',
       isActive: true,
     })
+  })
+
+  it('fetches again only the picture of the item that was saved', async () => {
+    // Every picture on the page used to be fetched again after any save.
+    const BUN = { ...SMASHED, id: 'i3', name: 'Double', hasImage: true }
+    const fetchMock = stubApi([SMASHED, CHEESE, BUN])
+    renderPage()
+
+    const pictures = (id: string) => fetchMock.mock.calls.filter(([url]) => String(url).includes(`/menu/${id}/image`)).length
+    await waitFor(() => expect(pictures('i1')).toBe(1))
+    await waitFor(() => expect(pictures('i3')).toBe(1))
+
+    const row = screen.getByText('Smashed').closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: 'Edit' }))
+    fireEvent.click(within(form()).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(pictures('i1')).toBe(2))
+    expect(pictures('i3')).toBe(1)
+  })
+
+  it('asks before removing an item (M-W07)', async () => {
+    const fetchMock = stubApi()
+    renderPage()
+
+    const row = (await screen.findByText('Extra cheese')).closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE')).toBe(false)
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Confirm remove' }))
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url, init]) =>
+        String(url).includes('/menu/i2') && (init as RequestInit | undefined)?.method === 'DELETE')).toBe(true))
   })
 })

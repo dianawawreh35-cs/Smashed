@@ -36,6 +36,16 @@ export default {
           700: '#6BA0FF',
           800: '#8AB4FF',
           900: '#B9D0FF',
+          // A filled button's blue (M-W08): white on #4F8CFF is 3.2:1, under
+          // WCAG AA; on this it is 4.7:1. Only .btn-primary uses it.
+          button: '#2F6FE0',
+        },
+        // Tailwind's slate-500 is 3.4:1 on the raised surface, under AA, and
+        // the app uses it for every hint and quiet line. This one is 4.7:1 on
+        // ink-800, 5.2 on ink-900 and 5.6 on ink-950 (M-W08), and still a
+        // step below slate-400.
+        slate: {
+          500: '#808DA1',
         },
       },
       boxShadow: {

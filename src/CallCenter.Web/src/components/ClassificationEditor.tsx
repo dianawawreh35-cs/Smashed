@@ -167,7 +167,9 @@ function FieldInput({
 }) {
   const { t } = useTranslation()
   const text = typeof value === 'string' ? value : ''
+  // The star is for the eye; aria-required tells a screen reader the same.
   const required = field.required ? ' *' : ''
+  const ariaRequired = field.required ? true : undefined
 
   switch (field.kind) {
     case 'checkbox':
@@ -191,7 +193,7 @@ function FieldInput({
       return (
         <label className="field">
           <span className="field-label">{label}{required}</span>
-          <select className="input" value={text} onChange={(e) => onChange(e.target.value)}>
+          <select className="input" value={text} aria-required={ariaRequired} onChange={(e) => onChange(e.target.value)}>
             <option value="">{t('calls.edit.choose')}</option>
             {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
@@ -202,21 +204,22 @@ function FieldInput({
       return (
         <label className="field md:col-span-2">
           <span className="field-label">{label}{required}</span>
-          <textarea className="input min-h-[5rem]" value={text} onChange={(e) => onChange(e.target.value)} />
+          <textarea className="input min-h-[5rem]" value={text} aria-required={ariaRequired} onChange={(e) => onChange(e.target.value)} />
         </label>
       )
     case 'number':
       return (
         <label className="field">
           <span className="field-label">{label}{required}</span>
-          <input className="input" inputMode="decimal" dir="ltr" value={text} onChange={(e) => onChange(e.target.value)} />
+          <input className="input" inputMode="decimal" dir="ltr" value={text} aria-required={ariaRequired}
+            onChange={(e) => onChange(e.target.value)} />
         </label>
       )
     default:
       return (
         <label className="field">
           <span className="field-label">{label}{required}</span>
-          <input className="input" value={text} onChange={(e) => onChange(e.target.value)} />
+          <input className="input" value={text} aria-required={ariaRequired} onChange={(e) => onChange(e.target.value)} />
         </label>
       )
   }

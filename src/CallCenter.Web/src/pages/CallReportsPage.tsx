@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -59,6 +60,9 @@ import type {
 import ReportCard, { SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportColumn } from '../components/ReportCard'
 import { Grouping, PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import LoadError from '../components/LoadError'
+import { ltr } from '../lib/bidi'
+import { formatMoney } from '../lib/money'
 import { printPage } from '../lib/print'
 import { localDate, useReportFilters } from '../lib/reportFilters'
 
@@ -97,7 +101,7 @@ export default function CallReportsPage() {
       <ReportPrintHeading title={t('callReports.heading')} section={t(`callReports.tabs.${tab}`)} draft={draft} />
       <div className="no-print flex items-start justify-between gap-4">
         <div>
-          <h2 className="page-title">{t('callReports.heading')}</h2>
+          <h1 className="page-title">{t('callReports.heading')}</h1>
           <p className="page-subtitle">{t('callReports.intro')}</p>
         </div>
         {/* Every report on the open tab (lib/print). */}
@@ -106,22 +110,9 @@ export default function CallReportsPage() {
 
       <ReportFilterBar draft={draft} set={set} choosePreset={choosePreset} includePhone />
 
-      <div role="tablist" aria-label={t('callReports.heading')} className="flex flex-wrap gap-2 border-b border-ink-700 pb-2">
-        {TABS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={tab === name}
-            className={tab === name ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'}
-            onClick={() => setParams(name === 'overview' ? {} : { tab: name }, { replace: true })}
-          >
-            {t(`callReports.tabs.${name}`)}
-          </button>
-        ))}
-      </div>
+      <ReportTabs tab={tab} onChoose={(name) => setParams(name === 'overview' ? {} : { tab: name }, { replace: true })} />
 
-      <div role="tabpanel" aria-label={t(`callReports.tabs.${tab}`)} className="space-y-6">
+      <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)} tabIndex={0} className="space-y-6">
         {tab === 'overview' && <Overview filters={filters} />}
         {tab === 'orders' && <Orders filters={filters} />}
         {tab === 'customers' && <Customers filters={filters} />}
@@ -136,6 +127,59 @@ export default function CallReportsPage() {
 
 // ---- shared pieces ------------------------------------------------------------
 
+const PANEL_ID = 'call-reports-panel'
+const tabId = (name: Tab) => `call-reports-tab-${name}`
+
+/**
+ * The tabs, as the ARIA tabs pattern has them: one tab in the Tab order (the
+ * chosen one), the arrow keys move between them and open the one they reach,
+ * Home and End go to the ends. In Arabic the tabs run right to left, so the
+ * arrows follow what is on the screen: the left arrow moves to the next tab.
+ */
+function ReportTabs({ tab, onChoose }: { tab: Tab; onChoose: (name: Tab) => void }) {
+  const { t, i18n } = useTranslation()
+  const buttons = useRef<(HTMLButtonElement | null)[]>([])
+
+  function onKeyDown(event: KeyboardEvent, index: number) {
+    const forward = i18n.dir() === 'rtl' ? 'ArrowLeft' : 'ArrowRight'
+    const back = i18n.dir() === 'rtl' ? 'ArrowRight' : 'ArrowLeft'
+    const target =
+      event.key === forward ? (index + 1) % TABS.length
+        : event.key === back ? (index - 1 + TABS.length) % TABS.length
+          : event.key === 'Home' ? 0
+            : event.key === 'End' ? TABS.length - 1
+              : null
+    if (target === null) return
+    event.preventDefault()
+    onChoose(TABS[target])
+    buttons.current[target]?.focus()
+  }
+
+  return (
+    <div role="tablist" aria-label={t('callReports.heading')} className="flex flex-wrap gap-2 border-b border-ink-700 pb-2">
+      {TABS.map((name, index) => (
+        <button
+          key={name}
+          ref={(element) => {
+            buttons.current[index] = element
+          }}
+          id={tabId(name)}
+          type="button"
+          role="tab"
+          aria-selected={tab === name}
+          aria-controls={PANEL_ID}
+          tabIndex={tab === name ? 0 : -1}
+          className={tab === name ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'}
+          onClick={() => onChoose(name)}
+          onKeyDown={(event) => onKeyDown(event, index)}
+        >
+          {t(`callReports.tabs.${name}`)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function useFormat() {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
@@ -143,7 +187,7 @@ function useFormat() {
     t,
     arabic,
     c: (key: string) => t(`callReports.columns.${key}`),
-    money: (v: number) => v.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    money: (v: number) => formatMoney(v, i18n.language),
     percent: (v: number | null) => (v === null ? '' : `${v.toLocaleString(i18n.language, { maximumFractionDigits: 1 })}%`),
     /** A figure to one decimal, or blank when there is none (an average of nothing). */
     decimal: (v: number | null) => (v === null ? '' : v.toLocaleString(i18n.language, { maximumFractionDigits: 1 })),
@@ -175,6 +219,10 @@ const clock = (s: number | null) => (s === null ? '' : `${Math.floor(s / 60)}:${
 /** The customer, or the number when the contact has no name. */
 const customer = (r: { name?: string | null; customer?: string | null; number: string | null }) =>
   r.name ?? r.customer ?? r.number ?? ''
+
+/** The same on screen, where a number standing in for a name is held left to right (M-W01). */
+const customerShown = (r: { name?: string | null; customer?: string | null; number: string | null }) =>
+  r.name ?? r.customer ?? (r.number ? ltr(r.number) : '')
 
 // ---- Overview: R-01, R-02, R-03, R-04 per day -----------------------------------
 
@@ -310,8 +358,8 @@ function Breakdown({ filters, initial, name }: { filters: ReportFilters; initial
 function customerColumns(f: ReturnType<typeof useFormat>, which: 'calls' | 'complaints'): ReportColumn<CustomerRankRow>[] {
   const { c, money, when, stamp } = f
   return [
-    { key: 'customer', label: c('customer'), value: (r) => customer(r) },
-    { key: 'number', label: c('number'), value: (r) => r.number },
+    { key: 'customer', label: c('customer'), value: (r) => customer(r), format: (r) => customerShown(r) },
+    { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
     ...(which === 'complaints'
       ? [{ key: 'complaints', label: c('complaints'), value: (r: CustomerRankRow) => r.complaints, numeric: true }]
       : []),
@@ -350,8 +398,8 @@ function problemColumns(f: ReturnType<typeof useFormat>, withChannel: boolean): 
   return [
     { key: 'when', label: c('when'), value: (r) => stamp(r.startedAt), format: (r) => when(r.startedAt) },
     ...(withChannel ? [{ key: 'channel', label: c('channel'), value: (r: ProblemRow) => r.channel }] : []),
-    { key: 'customer', label: c('customer'), value: (r) => customer(r) },
-    { key: 'number', label: c('number'), value: (r) => r.number },
+    { key: 'customer', label: c('customer'), value: (r) => customer(r), format: (r) => customerShown(r) },
+    { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
     { key: 'agent', label: c('agent'), value: (r) => r.agent },
     { key: 'branch', label: c('branch'), value: (r) => r.branch },
     { key: 'notes', label: c('notes'), value: (r) => r.notes },
@@ -683,8 +731,8 @@ function Missed({ filters }: { filters: ReportFilters }) {
   const listColumns: ReportColumn<MissedCallRow>[] = [
     { key: 'when', label: c('when'), value: (r) => stamp(r.startedAt), format: (r) => when(r.startedAt) },
     { key: 'status', label: c('status'), value: (r) => t(`history.statuses.${r.status}`) },
-    { key: 'customer', label: c('customer'), value: (r) => customer(r) },
-    { key: 'number', label: c('number'), value: (r) => r.number },
+    { key: 'customer', label: c('customer'), value: (r) => customer(r), format: (r) => customerShown(r) },
+    { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
     { key: 'agent', label: c('agent'), value: (r) => r.agent },
     { key: 'branch', label: c('branch'), value: (r) => r.branch },
     { key: 'notes', label: c('notes'), value: (r) => r.notes },
@@ -773,8 +821,8 @@ function Abandoned({ filters }: { filters: ReportFilters }) {
   const listColumns: ReportColumn<AbandonedCallRow>[] = [
     { key: 'hungUp', label: c('hungUp'), value: (r) => stamp(r.endedAt ?? r.startedAt), format: (r) => when(r.endedAt ?? r.startedAt) },
     { key: 'wait', label: c('wait'), value: (r) => r.waitSec, format: (r) => clock(r.waitSec), numeric: true },
-    { key: 'customer', label: c('customer'), value: (r) => customer(r) },
-    { key: 'number', label: c('number'), value: (r) => r.number },
+    { key: 'customer', label: c('customer'), value: (r) => customer(r), format: (r) => customerShown(r) },
+    { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
     { key: 'queue', label: c('queue'), value: (r) => r.queue },
     { key: 'rings', label: c('rings'), value: (r) => r.rings, numeric: true, total: true },
     {
@@ -797,7 +845,13 @@ function Abandoned({ filters }: { filters: ReportFilters }) {
         >
           {fetchNow.isPending ? t('callReports.abandoned.fetching') : t('callReports.abandoned.fetch')}
         </button>
-        <p role="status" className={`text-sm ${failed ? 'text-red-400' : 'text-slate-400'}`}>{message}</p>
+        {/* Without the status the button cannot know whether it may fetch,
+            and the line would be blank: say why (M-W03). */}
+        {status.isError && !status.data ? (
+          <LoadError inline message={t('callReports.abandoned.statusFailed')} onRetry={() => void status.refetch()} />
+        ) : (
+          <p role="status" className={`text-sm ${failed ? 'text-red-400' : 'text-slate-400'}`}>{message}</p>
+        )}
       </section>
 
       <ReportCard title={t('callReports.sections.abandoned.title')} hint={t('callReports.sections.abandoned.hint')}
@@ -846,7 +900,7 @@ function Quality({ filters }: { filters: ReportFilters }) {
     { key: 'count', label: c('count'), value: (r) => r.count, numeric: true },
   ]
   const numberColumns: ReportColumn<UnknownNumberRow>[] = [
-    { key: 'number', label: c('number'), value: (r) => r.number },
+    { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
     { key: 'calls', label: c('calls'), value: (r) => r.calls, numeric: true, total: true },
     { key: 'firstAt', label: c('firstCall'), value: (r) => stamp(r.firstAt), format: (r) => when(r.firstAt) },
     { key: 'lastAt', label: c('lastCall'), value: (r) => stamp(r.lastAt), format: (r) => when(r.lastAt) },
@@ -854,7 +908,7 @@ function Quality({ filters }: { filters: ReportFilters }) {
   const nameColumns: ReportColumn<DuplicateNameRow>[] = [
     { key: 'name', label: c('name'), value: (r) => r.name },
     { key: 'contacts', label: c('contacts'), value: (r) => r.contacts, numeric: true },
-    { key: 'numbers', label: c('numbers'), value: (r) => r.numbers },
+    { key: 'numbers', label: c('numbers'), value: (r) => r.numbers, ltr: true },
   ]
 
   return (

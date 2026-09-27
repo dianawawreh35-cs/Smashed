@@ -2,7 +2,10 @@
 
 Every direct dependency of the Restaurant Call Center System, with the version
 pinned in the repository and its licence. Transitive dependencies are not listed
-individually; all of them are MIT, Apache-2.0 or BSD.
+individually; nearly all are MIT, ISC, Apache-2.0 or BSD. The exceptions are
+build tools that never reach the browser: lightningcss (MPL-2.0, Vite 8's CSS
+tool), argparse (Python-2.0, under ESLint), caniuse-lite (CC-BY-4.0) and
+minimatch (BlueOak-1.0.0).
 
 Update this file whenever a package is added, removed or bumped.
 NuGet versions come from [`Directory.Packages.props`](../Directory.Packages.props);
@@ -57,8 +60,20 @@ npm versions are the resolved versions in `src/CallCenter.Web/package-lock.json`
 | react | 18.3.1 | MIT |
 | react-dom | 18.3.1 | MIT |
 | react-i18next | 15.7.4 | MIT |
-| react-router-dom | 6.30.6 | MIT |
+| react-router-dom | 7.18.4 | MIT |
 | recharts | 2.15.4 | MIT |
+| @fontsource/cairo | 5.3.0 | OFL-1.1 |
+
+> **Note on Cairo.** The font files are bundled into the web app and served
+> by the server itself (27 Sep; the LAN server has no internet, so the Google
+> Fonts link never loaded). The SIL Open Font License 1.1 allows bundling and
+> redistributing the font with software, sold or not, on three conditions that
+> apply here: the licence and copyright notice travel with it (the build
+> serves them at `/licenses/cairo-OFL.txt`, from
+> `src/CallCenter.Web/public/licenses/`, a copy of the package's LICENSE; copy
+> it again when the package is bumped), the font is not sold on its own, and a
+> modified version is not called Cairo. We ship it unmodified. Copyright 2009
+> The Cairo Project Authors.
 
 ### Development dependencies
 
@@ -66,12 +81,12 @@ npm versions are the resolved versions in `src/CallCenter.Web/package-lock.json`
 | --- | --- | --- |
 | @testing-library/jest-dom | 6.9.1 | MIT |
 | @testing-library/react | 16.3.3 | MIT |
-| @types/node | 20.19.43 | MIT |
+| @types/node | 22.20.4 | MIT |
 | @types/react | 18.3.31 | MIT |
 | @types/react-dom | 18.3.7 | MIT |
 | @typescript-eslint/eslint-plugin | 8.70.0 | MIT |
 | @typescript-eslint/parser | 8.70.0 | MIT |
-| @vitejs/plugin-react | 4.7.0 | MIT |
+| @vitejs/plugin-react | 6.1.1 | MIT |
 | autoprefixer | 10.6.0 | MIT |
 | eslint | 8.57.1 | MIT |
 | eslint-plugin-react-hooks | 4.6.2 | MIT |
@@ -80,8 +95,8 @@ npm versions are the resolved versions in `src/CallCenter.Web/package-lock.json`
 | postcss | 8.5.28 | MIT |
 | tailwindcss | 3.4.19 | MIT |
 | typescript | 5.9.3 | Apache-2.0 |
-| vite | 5.4.21 | MIT |
-| vitest | 2.1.9 | MIT |
+| vite | 8.3.1 | MIT |
+| vitest | 5.0.2 | MIT |
 
 ## Container base images
 

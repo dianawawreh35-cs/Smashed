@@ -296,7 +296,7 @@ describe('call reports page', () => {
     expect(within(rami).getByText('Sara')).toBeInTheDocument()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Fetch from PBX' }))
-    expect(await screen.findByText('Downloaded 2026-09-18 to 2026-09-24: 36 abandoned, 2 new.')).toBeInTheDocument()
+    expect(await screen.findByText('Downloaded 2026-09-18 to 2026-09-24: abandoned 36, new 2.')).toBeInTheDocument()
     const post = fetchMock.mock.calls.find(([url, init]) => String(url).startsWith('/api/pbx/abandoned-import/fetch') && init?.method === 'POST')!
     const sent = new URL(String(post[0]), 'http://x')
     expect(sent.searchParams.get('from')).toBeTruthy()

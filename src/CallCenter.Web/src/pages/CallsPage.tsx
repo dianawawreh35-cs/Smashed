@@ -9,6 +9,8 @@ import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
 import CallDetails from '../components/CallDetails'
 import { FilterSelect as Select, Pager } from '../components/SearchControls'
+import LoadError from '../components/LoadError'
+import { searchDir } from '../lib/bidi'
 import { downloadBlob } from '../lib/csv'
 import { formatClock } from '../lib/recordingWav'
 import { noSelectOnDoubleClick } from '../lib/rows'
@@ -70,7 +72,9 @@ function toFilters(d: Draft): CallFilters {
  * **The server filters and pages.** Nothing here narrows a fetched page, which
  * would say "no calls" whenever the match was older than the page (20 Sep).
  * The filters apply on Search, not on every keystroke, so typing a number does
- * not send a query per digit across a year of calls.
+ * not send a query per digit across a year of calls. After Search the last
+ * results stay, dimmed, until the new ones arrive, so it is clear the table on
+ * screen is not yet the answer to what was asked.
  *
  * **A call opens under its own row**, by double-click or its Open button, the
  * same as the menu, delivery and users lists (21 Sep, "The editors open where
@@ -128,7 +132,7 @@ export default function CallsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="page-title">{t('calls.heading')}</h2>
+        <h1 className="page-title">{t('calls.heading')}</h1>
         <p className="page-subtitle">{t('calls.intro')}</p>
       </div>
 
@@ -136,7 +140,7 @@ export default function CallsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <label className="field lg:col-span-2">
             <span className="field-label">{t('calls.filter.q')}</span>
-            <input className="input" value={draft.q} onChange={(e) => set('q')(e.target.value)} />
+            <input className="input" value={draft.q} dir={searchDir(draft.q)} onChange={(e) => set('q')(e.target.value)} />
           </label>
           <label className="field">
             <span className="field-label">{t('calls.filter.from')}</span>
@@ -147,17 +151,17 @@ export default function CallsPage() {
             <input type="date" className="input" value={draft.to} onChange={(e) => set('to')(e.target.value)} />
           </label>
 
-          <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')}>
+          <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={agents}>
             {(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => (
               <option key={u.id} value={u.id}>{u.displayName}</option>
             ))}
           </Select>
-          <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')}>
+          <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
             {(branches.data ?? []).map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
           </Select>
-          <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')}>
+          <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
             {(types.data ?? []).map((ty) => (
               <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
             ))}
@@ -209,14 +213,17 @@ export default function CallsPage() {
       {results.isLoading ? (
         <p className="text-slate-400">{t('app.loading')}</p>
       ) : results.isError ? (
-        <p className="notice-error">{t('calls.failed')}</p>
+        <LoadError message={t('calls.failed')} onRetry={() => void results.refetch()} busy={results.isFetching} />
       ) : total === 0 ? (
         <div className="card card-body text-center">
           <p className="text-slate-300">{t('calls.empty')}</p>
           <p className="field-hint mt-1">{t('calls.emptyHint')}</p>
         </div>
       ) : (
-        <div className="card overflow-x-auto">
+        <div
+          className={`card overflow-x-auto transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
+          aria-busy={results.isPlaceholderData}
+        >
           <div className="flex items-center justify-between px-4 py-3 text-sm text-slate-400">
             <span>{t('calls.count', { count: total })}</span>
             <div className="flex items-center gap-3">
@@ -257,7 +264,7 @@ export default function CallsPage() {
                       a list they have scrolled past. */}
                   {row.id === openId && (
                     <tr>
-                      <td colSpan={COLUMNS} className="bg-ink-950/60 p-3">
+                      <td colSpan={COLUMNS} className="row-panel">
                         {/* w-0 min-w-full: as wide as the table, and never
                             wider. Without it the panel's content widened the
                             table as it opened, and every column jumped. */}

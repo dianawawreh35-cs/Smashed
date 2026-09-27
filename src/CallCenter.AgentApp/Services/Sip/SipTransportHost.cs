@@ -77,9 +77,11 @@ public sealed class SipTransportHost(ILogger<SipTransportHost> logger) : IDispos
     {
         transport.SIPRequestInTraceEvent += (local, remote, request) =>
         {
+            // The Request-URI since 27 Sep (N-05): which extension the PBX
+            // sent the call to, which the To header may not say.
             logger.LogInformation(
-                "SIP IN  {Method} from {Remote} (from {From}, to {To})",
-                request.Method, remote, request.Header.From?.FromURI?.User, request.Header.To?.ToURI?.User);
+                "SIP IN  {Method} {Uri} from {Remote} (from {From}, to {To})",
+                request.Method, request.URI, remote, request.Header.From?.FromURI?.User, request.Header.To?.ToURI?.User);
 
             logger.LogDebug("SIP IN  full message from {Remote}:\n{Message}", remote, request.ToString());
         };

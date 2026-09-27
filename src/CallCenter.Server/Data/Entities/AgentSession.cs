@@ -14,7 +14,11 @@ public class AgentSession
     public Guid UserId { get; set; }
     public User User { get; set; } = null!;
 
-    /// <summary>Machine name of the laptop.</summary>
+    /// <summary>
+    /// The laptop and the install of the app on it: machine name and a tag
+    /// made once per install (since 27 Sep; rows before that have the machine
+    /// name alone).
+    /// </summary>
     public string LaptopId { get; set; } = null!;
 
     public string? AppVersion { get; set; }
@@ -31,6 +35,6 @@ public class AgentSession
     /// </summary>
     public DateTimeOffset? LastSeenAt { get; set; }
 
-    /// <summary>Manual, Idle, AppClosed or Forced.</summary>
+    /// <summary>One of <see cref="CallCenter.Shared.Contracts.Auth.LogoutReasons"/>.</summary>
     public string? LogoutReason { get; set; }
 }

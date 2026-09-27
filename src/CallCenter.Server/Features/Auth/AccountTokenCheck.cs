@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using CallCenter.Server.Data;
+using CallCenter.Shared.Contracts.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 
@@ -110,7 +111,48 @@ public class AccountTokenCheck(CallCenterDbContext db, ILogger<AccountTokenCheck
                 "Refused a token for {UserId}: its session is closed, or the account's password, role or status has changed since it was issued",
                 context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown");
 
+            await SayWhyTheSessionClosedAsync(context);
+
             context.Fail("The session is closed, or the account has changed since this token was issued.");
+        }
+    }
+
+    /// <summary>
+    /// When the token was refused because its session was closed, the 401
+    /// says how (<see cref="LogoutReasons.SessionClosedHeader"/>). The Agent
+    /// App needs to know one case: an agent who signed in on another laptop
+    /// (N-05, 27 Sep evening) must be told so, and its phone must stop without
+    /// an un-REGISTER that would take the other laptop's registration with it.
+    /// </summary>
+    /// <remarks>
+    /// Only on the way to a 401, so a request that is accepted pays nothing.
+    /// It tells the holder of the token no more than they could know: their
+    /// own session's reason.
+    /// </remarks>
+    private async Task SayWhyTheSessionClosedAsync(TokenValidatedContext context)
+    {
+        if (context.Principal?.GetSessionId() is not { } sessionId)
+        {
+            return;
+        }
+
+        try
+        {
+            var reason = await db.AgentSessions
+                .AsNoTracking()
+                .Where(s => s.Id == sessionId && s.LoggedOutAt != null)
+                .Select(s => s.LogoutReason)
+                .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
+
+            if (reason is not null)
+            {
+                context.Response.Headers[LogoutReasons.SessionClosedHeader] = reason;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The 401 matters and the header is a courtesy.
+            logger.LogWarning(ex, "Could not read why session {SessionId} was closed", sessionId);
         }
     }
 }

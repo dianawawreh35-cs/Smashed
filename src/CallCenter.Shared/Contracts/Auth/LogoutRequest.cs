@@ -31,6 +31,25 @@ public static class LogoutReasons
     /// </summary>
     public const string PasswordReset = "PasswordReset";
 
+    /// <summary>
+    /// The agent signed in to the Agent App on another laptop, and the server
+    /// closed this session so that one agent has one phone (N-05, 27 Sep
+    /// evening). Set by the server only, so it is not in <see cref="All"/>,
+    /// the list a client may send. The app it closes is told through
+    /// <see cref="SessionClosedHeader"/>, and stops its phone without the
+    /// un-REGISTER that would take the new laptop's registration away too.
+    /// </summary>
+    public const string SignedInElsewhere = "SignedInElsewhere";
+
+    /// <summary>
+    /// The response header a 401 carries when the token was refused because
+    /// its session was closed, with the session's <c>logout_reason</c>. The
+    /// Agent App reads it to tell "signed in on another laptop" from every
+    /// other way a sign-in can end.
+    /// </summary>
+    public const string SessionClosedHeader = "X-Session-Closed";
+
+    /// <summary>What a client may send in <see cref="LogoutRequest.Reason"/>.</summary>
     public static readonly IReadOnlyList<string> All =
         new[] { Manual, Idle, AppClosed, Forced, PasswordReset };
 }

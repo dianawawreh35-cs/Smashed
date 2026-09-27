@@ -35,8 +35,8 @@ public partial class MainWindow : Window
         // The server can end the sign-in from its side (N-05). Back to the
         // sign-in screen, saying why, rather than a main screen that fails at
         // every turn.
-        services.GetRequiredService<SignedOutByServer>().SignedOut += (_, _) =>
-            Dispatcher.Invoke(() => ShowLogin(LoginErrorCodes.SignedOut));
+        services.GetRequiredService<SignedOutByServer>().SignedOut += (_, code) =>
+            Dispatcher.Invoke(() => ShowLogin(code));
 
         // F-02: what went wrong and was survived, across the top.
         services.GetRequiredService<AgentNotices>().Posted += (_, key) =>

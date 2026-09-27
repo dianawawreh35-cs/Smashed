@@ -44,7 +44,7 @@ public class SignedOutByServer
         _signIn = signIn;
         _logger = logger;
 
-        session.TokenRefused += (_, _) => OnTokenRefused();
+        session.TokenRefused += (_, because) => OnTokenRefused(because);
         // The service's state now, not the event's copy: the events can land
         // out of order (M-A07), and a stale "Connected" would put the sign-out
         // off until the next call.
@@ -52,13 +52,27 @@ public class SignedOutByServer
     }
 
     /// <summary>
-    /// Raised once the agent has been signed out, off the UI thread. The window
-    /// goes back to the sign-in screen with <see cref="LoginErrorCodes.SignedOut"/>.
+    /// Raised once the agent has been signed out, off the UI thread, with the
+    /// <see cref="LoginErrorCodes"/> value the sign-in screen shows:
+    /// <see cref="LoginErrorCodes.SignedInElsewhere"/> when the agent signed in
+    /// on another laptop (N-05), otherwise <see cref="LoginErrorCodes.SignedOut"/>.
     /// </summary>
-    public event EventHandler? SignedOut;
+    public event EventHandler<string>? SignedOut;
 
-    private void OnTokenRefused()
+    /// <summary>
+    /// Whether the server said the session was closed because the agent signed
+    /// in on another laptop. Kept from the refusal to the sign-out, which may
+    /// wait for a call to end.
+    /// </summary>
+    private volatile bool _signedInElsewhere;
+
+    private void OnTokenRefused(string? because)
     {
+        if (because == LogoutReasons.SignedInElsewhere)
+        {
+            _signedInElsewhere = true;
+        }
+
         if (Interlocked.CompareExchange(ref _state, 1, 0) != 0)
         {
             // Already waiting or already signing out. A burst of refused
@@ -93,14 +107,21 @@ public class SignedOutByServer
 
         try
         {
-            _logger.LogWarning("The server no longer accepts this sign-in; signing out.");
+            var elsewhere = _signedInElsewhere;
 
-            // Unregisters the phone first, as a manual sign-out does. The logout
-            // call to the server will be refused too, which is expected and
-            // harmless: the server already treats the token as dead.
-            await _signIn.SignOutAsync(LogoutReasons.Forced);
+            _logger.LogWarning(elsewhere
+                ? "The agent signed in on another laptop; signing out here."
+                : "The server no longer accepts this sign-in; signing out.");
 
-            SignedOut?.Invoke(this, EventArgs.Empty);
+            // Unregisters the phone first, as a manual sign-out does, except
+            // when the agent signed in elsewhere: then the PBX's one address
+            // for the extension is the other laptop's, and this one only stops
+            // (N-05). The logout call to the server will be refused too, which
+            // is expected and harmless: the server already treats the token as
+            // dead.
+            await _signIn.SignOutAsync(elsewhere ? LogoutReasons.SignedInElsewhere : LogoutReasons.Forced);
+
+            SignedOut?.Invoke(this, elsewhere ? LoginErrorCodes.SignedInElsewhere : LoginErrorCodes.SignedOut);
         }
         catch (Exception ex)
         {
@@ -108,6 +129,7 @@ public class SignedOutByServer
         }
         finally
         {
+            _signedInElsewhere = false;
             Volatile.Write(ref _state, 0);
         }
     }

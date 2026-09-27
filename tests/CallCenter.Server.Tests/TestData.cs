@@ -132,12 +132,16 @@ public class TestData(CallCenterApiFactory factory)
     /// Signs in through <c>POST /api/auth/login</c>, as the app for that role
     /// does, and returns a client carrying the token.
     /// </summary>
-    public async Task<(HttpClient Client, LoginResponse Login)> SignInAsync(User user)
+    /// <param name="laptopId">
+    /// The Agent App's laptop id; another one is another laptop. Since 27 Sep
+    /// an agent's sign-in closes their sessions on every other laptop (N-05).
+    /// </param>
+    public async Task<(HttpClient Client, LoginResponse Login)> SignInAsync(User user, string laptopId = LaptopId)
     {
         var client = Client();
 
         var request = user.Role == UserRoles.Agent
-            ? new LoginRequest(user.Login, Password, LaptopId, "test")
+            ? new LoginRequest(user.Login, Password, laptopId, "test")
             : new LoginRequest(user.Login, Password);
 
         var response = await client.PostAsJsonAsync("/api/auth/login", request);

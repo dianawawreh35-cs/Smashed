@@ -146,7 +146,7 @@ CREATE TABLE communications (
   pbx_unique_id      text,                                        -- the PBX import's key: 'issabel:' + hang-up time|number|queue (S-55)
   abandoned_call_id  uuid REFERENCES communications(id) ON DELETE SET NULL, -- on an untaken Agent App ring: the abandoned call it was part of (S-55)
   source             text NOT NULL CHECK (source IN ('AgentApp','AMI','CDR','Manual')),
-  laptop_id          text,                                        -- machine name that logged it
+  laptop_id          text,                                        -- laptop that logged it: machine name + install tag since 27 Sep (A-05)
   notes              varchar(4000),                               -- why a Missed/Rejected/NoAnswer call went that way (A-41); answered calls are classified instead
   created_at         timestamptz NOT NULL DEFAULT now(),
   updated_at         timestamptz NOT NULL DEFAULT now()
@@ -435,11 +435,11 @@ CREATE TABLE pbx_blacklist (        -- S-46: numbers the server has put on the P
 CREATE TABLE agent_sessions (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       uuid NOT NULL REFERENCES users(id),
-  laptop_id     text NOT NULL,              -- machine name
+  laptop_id     text NOT NULL,              -- machine name + install tag, DESKTOP-X-7F3A2C (since 27 Sep; the name alone before)
   app_version   text,
   logged_in_at  timestamptz NOT NULL DEFAULT now(),
   logged_out_at timestamptz,
-  logout_reason text,                       -- Manual, Idle, AppClosed, Forced, PasswordReset
+  logout_reason text,                       -- Manual, Idle, AppClosed, Forced, PasswordReset, SignedInElsewhere (N-05)
   last_seen_at  timestamptz                 -- last request with this session's token, to the minute; online = within 5 min
 );
 CREATE INDEX ix_sessions_user ON agent_sessions(user_id, logged_in_at DESC);

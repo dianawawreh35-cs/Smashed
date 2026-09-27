@@ -1238,6 +1238,66 @@ afterwards every time.
       the menu again a minute later: the picture should appear without
       restarting the app. *Before 27 Sep it stayed broken until a restart.*
 
+### One phone per agent (N-05, A-05) — built 27 Sep evening, needs the PBX and two laptops
+
+What went wrong on the evening of 27 Sep: a second copy of the app, signed in
+as the same agent, took the agent's calls. These steps check each of the four
+guards. They need the new server **and** the new Agent App on both laptops.
+
+- [ ] **One copy per laptop.** Start the Agent App, sign in, and minimise it.
+      Start it again from the Start menu or the desktop shortcut. The window
+      that is already running comes back to the front; no second window, no
+      second sign-in screen. Open Task Manager → **Details**: exactly **one**
+      `CallCenter.AgentApp.exe` (or, on the dev machine, one `dotnet.exe`
+      running `CallCenter.AgentApp.dll`). *If a second window opens:* the guard
+      is not working; send the log. *If nothing comes forward but Task Manager
+      shows one copy:* Windows would not hand over the focus; look at the
+      taskbar button, which should be flashing, and tell me.
+- [ ] **The laptop id.** On each laptop, the first log line after a start reads
+      `Agent App started. Logs: … Laptop id DESKTOP-RMSFSIV-XXXXXX`, with a
+      **different** six-character tag on each laptop. The tag stays the same
+      after closing and starting the app again.
+- [ ] **Signing in on a second laptop signs the first out.** Sign in as agent
+      A on laptop 1. Then sign in as A on laptop 2. Within about a minute
+      (at most two), laptop 1 goes back to the sign-in screen with, under the
+      password box: **"You have been signed out here because you signed in on
+      another laptop…"** / **"تم تسجيل خروجك هنا لأنك سجّلت الدخول على حاسوب
+      آخر…"**. **Screenshot it in both languages** (switch the language on the
+      sign-in screen). Meanwhile call the queue: it rings on **laptop 2**, at
+      once, not on laptop 1. Keep calling for two minutes after laptop 1 has
+      signed out: every call rings on laptop 2. *If laptop 2 stops ringing
+      after laptop 1 signs out:* the old laptop unregistered the extension;
+      send both logs.
+- [ ] **Do Not Disturb is never bypassed.** On the laptop where agent A is
+      signed in, tick **Do not disturb**. Call the queue several times: no
+      pop-up, anywhere, for A. The log shows `turned away: do not disturb is
+      on`. *This is what failed on 27 Sep: another copy with the box unticked
+      showed the pop-ups.*
+- [ ] **A killed app comes back at once.** Signed in, end
+      `CallCenter.AgentApp.exe` in Task Manager (Details → End task). Start the
+      app and sign in again straight away, then call the queue: it rings here
+      at once, not after two minutes. The log shows, just after sign-in,
+      `The PBX forgot every address it had for extension …` and then
+      `Extension … registered`. *If it says "did not confirm forgetting the
+      old addresses":* send me that line with the PBX's answer; the phone
+      still works, the old address is just replaced rather than removed.
+- [ ] **Signing out unregisters.** Sign out. The log shows
+      `Extension … unregistered`, and on the web app's Users page (S-61) the
+      extension shows **offline** at its next refresh. The same when closing
+      the app with the X while signed in.
+- [ ] **Send me one INVITE line.** After any call has rung, find the line
+      `SIP IN  "INVITE" sip:…` in the log and send it. It shows which
+      extension the PBX addressed the call to; guard 4 relies on it, and it
+      has never been seen before.
+- [ ] **Only this agent's calls (hard to cause, try once).** Sign in as agent
+      A, then unplug the network (or drop the VPN), sign out (the un-REGISTER
+      cannot reach the PBX), plug it back in, and sign in as agent B on the
+      same laptop. Within two minutes, ring **A's** extension directly from
+      another phone. Nothing rings on this laptop, and nothing appears in B's
+      call log. The log has a warning `A call for extension <A> arrived here,
+      signed in as <B>: refused 480`. *Before this change B's screen would
+      have shown A's call.*
+
 ---
 
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)

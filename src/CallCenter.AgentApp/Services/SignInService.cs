@@ -117,15 +117,22 @@ public class SignInService(
     /// </summary>
     public async Task SignOutAsync(string reason = LogoutReasons.Manual, CancellationToken ct = default)
     {
+        // The agent signed in on another laptop, and the server has closed
+        // this session already (N-05). The PBX's one address for the
+        // extension is that laptop's now, and an un-REGISTER from here would
+        // take it away, so this laptop only stops. Nor is there a session to
+        // close.
+        var elsewhere = reason == LogoutReasons.SignedInElsewhere;
+
         // Unregister first, so the PBX stops offering calls to this laptop
         // before the agent is told they are signed out. Then end anything still
         // up: handing a live call to the next shift would be worse than
         // dropping it.
-        sip.Stop();
+        await sip.StopAsync(unregister: !elsewhere, ct);
         calls.Stop();
         blockList.StopRefreshing();
 
-        if (session.SessionId is { } sessionId)
+        if (session.SessionId is { } sessionId && !elsewhere)
         {
             await api.LogoutAsync(sessionId, reason, ct);
         }
@@ -147,6 +154,7 @@ public class SignInService(
     {
         LoginErrorCodes.InvalidCredentials or LoginErrorCodes.AccountDisabled or LoginErrorCodes.EmptyFields
             or LoginErrorCodes.ServerUnreachable or LoginErrorCodes.NotAnAgent or LoginErrorCodes.SignedOut
+            or LoginErrorCodes.SignedInElsewhere
             => code,
         _ => LoginErrorCodes.ServerError,
     };

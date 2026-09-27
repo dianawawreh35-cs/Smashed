@@ -67,10 +67,14 @@ public class AuthService(
         if (user.Role == UserRoles.Agent && fromAgentApp)
         {
             var now = DateTimeOffset.UtcNow;
+            var laptopId = request.LaptopId!.Trim();
+
+            await CloseOtherSessionsAsync(user, laptopId, now, ct);
+
             session = new AgentSession
             {
                 UserId = user.Id,
-                LaptopId = request.LaptopId!.Trim(),
+                LaptopId = laptopId,
                 AppVersion = request.AppVersion,
                 LoggedInAt = now,
                 LastSeenAt = now,
@@ -100,6 +104,48 @@ public class AuthService(
             ToDto(user),
             sessionId,
             fromAgentApp ? await BuildExtensionsAsync(user, ct) : null), null);
+    }
+
+    /// <summary>
+    /// One Agent App sign-in per agent (N-05, 27 Sep evening): signing in
+    /// closes every session the agent still has open, saved with the new one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// On 27 Sep calls were missed because a second copy of the app was signed
+    /// in as the same agent and held the extension's registration at the PBX,
+    /// so the rings went where nobody was looking. A closed session ends its
+    /// token (M-S01), so the other copy's next request is a 401 and it signs
+    /// itself out.
+    /// </para>
+    /// <para>
+    /// <b>Another laptop</b> gets <see cref="LogoutReasons.SignedInElsewhere"/>,
+    /// which its app shows the agent, and which tells it to leave the PBX
+    /// registration alone: on chan_sip any un-REGISTER removes the extension's
+    /// one address, and by then that address is this laptop's.
+    /// <b>The same install signing in again</b> (the same laptop id, which
+    /// since 27 Sep carries a tag per install) is closing a session whose app
+    /// is gone, since one install runs one copy; it is recorded as
+    /// <see cref="LogoutReasons.AppClosed"/>, which is what happened to it.
+    /// </para>
+    /// </remarks>
+    private async Task CloseOtherSessionsAsync(User user, string laptopId, DateTimeOffset now, CancellationToken ct)
+    {
+        var open = await db.AgentSessions
+            .Where(s => s.UserId == user.Id && s.LoggedOutAt == null)
+            .ToListAsync(ct);
+
+        foreach (var other in open)
+        {
+            other.LoggedOutAt = now;
+            other.LogoutReason = other.LaptopId == laptopId
+                ? LogoutReasons.AppClosed
+                : LogoutReasons.SignedInElsewhere;
+
+            logger.LogInformation(
+                "Agent {Login} signed in from {LaptopId}: closed session {SessionId} on {OtherLaptopId} ({Reason})",
+                user.Login, laptopId, other.Id, other.LaptopId, other.LogoutReason);
+        }
     }
 
     /// <summary>

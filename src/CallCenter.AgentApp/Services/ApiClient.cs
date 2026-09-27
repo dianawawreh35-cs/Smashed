@@ -649,8 +649,10 @@ public class ApiClient(
     {
         if (response.StatusCode == HttpStatusCode.Unauthorized && request.Headers.Authorization is not null)
         {
-            logger.LogWarning("The server refused this sign-in ({Path})", request.RequestUri);
-            session.ReportTokenRefused();
+            var because = AgentSession.SessionClosedBecause(response);
+            logger.LogWarning("The server refused this sign-in ({Path}); session closed: {Reason}",
+                request.RequestUri, because ?? "not said");
+            session.ReportTokenRefused(because);
         }
     }
 

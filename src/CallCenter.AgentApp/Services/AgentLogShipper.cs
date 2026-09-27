@@ -169,6 +169,7 @@ public class AgentLogShipper(
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             using var response = await http.SendAsync(request, ct);
+            NoteIfRefused(response);
 
             switch (response.StatusCode)
             {
@@ -201,6 +202,20 @@ public class AgentLogShipper(
         return true;
     }
 
+    /// <summary>
+    /// A 401 is the sign-in ending (N-05), and is passed on as the API
+    /// client's are. This sender talks to the server every 30 seconds, more
+    /// often than anything else, so it is how a copy whose agent signed in on
+    /// another laptop finds out soonest, and stops taking that agent's calls.
+    /// </summary>
+    private void NoteIfRefused(HttpResponseMessage response)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            session.ReportTokenRefused(AgentSession.SessionClosedBecause(response));
+        }
+    }
+
     /// <summary>What the server has of this laptop's files, or null if it could not be asked.</summary>
     private async Task<Dictionary<string, long>?> AskAsync(HttpClient http, string token, CancellationToken ct)
     {
@@ -209,6 +224,7 @@ public class AgentLogShipper(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         using var response = await http.SendAsync(request, ct);
+        NoteIfRefused(response);
 
         if (!response.IsSuccessStatusCode)
         {

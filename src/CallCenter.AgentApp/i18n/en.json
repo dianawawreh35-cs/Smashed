@@ -258,7 +258,8 @@
       "server_unreachable": "The server could not be reached. Check the network.",
       "server_error": "The server reported an error. Please try again.",
       "not_an_agent": "This is a supervisor account. Supervisors use the web app in the browser.",
-      "signed_out": "You have been signed out. Your account was changed or your sign-in ran out. Please sign in again."
+      "signed_out": "You have been signed out. Your account was changed or your sign-in ran out. Please sign in again.",
+      "signed_in_elsewhere": "You have been signed out here because you signed in on another laptop. Calls now ring there. To take calls on this laptop, sign in again."
     }
   },
   "menu": {

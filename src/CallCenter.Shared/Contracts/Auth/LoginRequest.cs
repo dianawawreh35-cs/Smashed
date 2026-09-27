@@ -9,8 +9,12 @@ namespace CallCenter.Shared.Contracts.Auth;
 /// <param name="Login">Username, matched case-insensitively.</param>
 /// <param name="Password">Plain password, checked against the BCrypt hash.</param>
 /// <param name="LaptopId">
-/// Machine name of the laptop. Laptops are shared between shifts (A-05), so the
-/// session row records which machine this login happened on. Only the Agent App
+/// Which laptop, and which install of the app on it: the machine name and a
+/// short tag made once per install, <c>DESKTOP-RMSFSIV-7F3A2C</c> (since 27 Sep;
+/// it was the machine name alone, and the three laptops had one name between
+/// them). Laptops are shared between shifts (A-05), so the session row records
+/// where this login happened, and an Agent App sign-in closes the agent's
+/// sessions on every other laptop (N-05). Only the Agent App
 /// sends it, and an agent's session and SIP details are only issued with it: the
 /// web app leaves it out, so an agent signing in there is given neither.
 /// </param>
@@ -54,4 +58,10 @@ public static class LoginErrorCodes
     /// has just gone back to.
     /// </summary>
     public const string SignedOut = "signed_out";
+
+    /// <summary>
+    /// Set by the Agent App: the server closed this sign-in because the same
+    /// agent signed in on another laptop (<see cref="LogoutReasons.SignedInElsewhere"/>).
+    /// </summary>
+    public const string SignedInElsewhere = "signed_in_elsewhere";
 }

@@ -1114,6 +1114,12 @@ public class CallService(
             return;
         }
 
+        // N-05, guard 4: not this agent's call, so not reported as a busy one.
+        if (RefusedAsForAnotherExtension(request))
+        {
+            return;
+        }
+
         // One extension, one call. In practice this is a direct dial: a queue
         // skips a member who is already talking, so a second INVITE means
         // somebody rang the extension itself.
@@ -1132,6 +1138,55 @@ public class CallService(
             request.Header?.CallId ?? Guid.NewGuid().ToString(),
             identity.Number, identity.DisplayName, SipCustomHeaders.QueueFrom(request),
             CallOutcome.Busy, now, null, now));
+    }
+
+    /// <summary>
+    /// Turns away an INVITE addressed to an extension this app is not signed
+    /// in as (N-05, guard 4; see <see cref="CallAddressee"/>). True when it did.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Nothing shown, nothing played, and <b>nothing reported</b>: it is not
+    /// this agent's call, and filing it under this extension is exactly the
+    /// mistake being stopped. A warning in the log, with both extensions, is
+    /// the only trace, and it is the one that says the PBX still holds an old
+    /// address for this laptop.
+    /// </para>
+    /// <para>
+    /// <b>480 Temporarily Unavailable.</b> Not a 6xx, which tells the PBX to
+    /// try nowhere else and would take the call from the whole queue. Not 486
+    /// Busy, which is what Do Not Disturb and a second call say, and would show
+    /// the other agent as busy on a phone they are not using. Not 404 Not
+    /// Found: the extension does exist, only not here, and Asterisk turns a
+    /// 404 into "unallocated number", which on a direct dial the caller hears
+    /// as a number that does not work. 480 means "reached, but not available
+    /// now", which is the truth, and the queue moves on to the next member.
+    /// </para>
+    /// </remarks>
+    private bool RefusedAsForAnotherExtension(SIPRequest request)
+    {
+        string? mine;
+
+        lock (_gate)
+        {
+            mine = _extensions?.Extension;
+        }
+
+        var requestUriUser = request.URI?.User;
+        var toUser = request.Header?.To?.ToURI?.User;
+
+        if (CallAddressee.IsFor(mine, requestUriUser, toUser))
+        {
+            return false;
+        }
+
+        logger.LogWarning(
+            "A call for extension {Addressed} arrived here, signed in as {Extension}: refused 480 and not reported (N-05). "
+            + "The PBX still has this laptop's address for the other extension. Request-URI {Uri}, To {To}",
+            CallAddressee.Named(requestUriUser, toUser), mine, request.URI, toUser);
+
+        Decline(request, SIPResponseStatusCodesEnum.TemporarilyUnavailable, "for another extension");
+        return true;
     }
 
     /// <summary>
@@ -1202,6 +1257,14 @@ public class CallService(
         // of those is free to take a call. OnTransportRequest, which runs
         // after this, turns it away as busy and reports it.
         if (State.Status is not CallStatus.Idle)
+        {
+            return;
+        }
+
+        // N-05, guard 4: before the block list and Do Not Disturb, because a
+        // call for another extension is not this agent's to block, refuse or
+        // report.
+        if (RefusedAsForAnotherExtension(request))
         {
             return;
         }

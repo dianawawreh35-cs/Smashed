@@ -77,6 +77,15 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+        // N-05, guard 1: one copy per Windows sign-in, decided before anything
+        // starts. A second copy starts no phone: it brings the first forward
+        // and goes, quietly, before it has a log or a window.
+        if (!ClaimSingleInstance())
+        {
+            Shutdown(0);
+            return;
+        }
+
         try
         {
             await StartAsync();
@@ -91,6 +100,59 @@ public partial class App : Application
             // OnExit closes whatever did start, and flushes the log.
             Shutdown(1);
         }
+    }
+
+    /// <summary>This copy's claim to be the only one (N-05), held until the end of <see cref="OnExit"/>.</summary>
+    private SingleInstance? _singleInstance;
+
+    /// <summary>Why the claim could not be made, logged once there is a log.</summary>
+    private Exception? _singleInstanceError;
+
+    /// <summary>Set when <see cref="OnExit"/> begins.</summary>
+    private volatile bool _exiting;
+
+    /// <summary>
+    /// False when another copy is already running here, and has been asked to
+    /// come forward. A claim that fails for any other reason lets this copy
+    /// run: an app that will not start at all is worse than two copies.
+    /// </summary>
+    private bool ClaimSingleInstance()
+    {
+        try
+        {
+            _singleInstance = SingleInstance.Claim();
+            return _singleInstance is not null;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or WaitHandleCannotBeOpenedException)
+        {
+            _singleInstanceError = ex;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Another copy was started: this one's window comes forward instead
+    /// (N-05). A deliberate launch by the agent, so taking the focus is right
+    /// here, unlike the ringing pop-up (M-A05), which is Topmost and stays
+    /// above this window whichever has the keyboard.
+    /// </summary>
+    private void BringMainWindowForward()
+    {
+        // Closing: a closed window cannot be shown again.
+        if (_exiting || MainWindow is not { } window)
+        {
+            return;
+        }
+
+        Log.Information("The app was started again; this copy comes forward instead of a second one");
+
+        if (window.WindowState == WindowState.Minimized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Show();
+        window.Activate();
     }
 
     private async Task StartAsync()
@@ -135,7 +197,14 @@ public partial class App : Application
 
         await _host.StartAsync();
 
-        Log.Information("Agent App started. Logs: {LogDirectory}", LogDirectory);
+        Log.Information(
+            "Agent App started. Logs: {LogDirectory}. Laptop id {LaptopId}", LogDirectory, LaptopInfo.LaptopId);
+
+        if (_singleInstanceError is not null)
+        {
+            Log.Warning(_singleInstanceError,
+                "Could not check for another copy of the app; carrying on without the check");
+        }
 
         // Whatever the last shift left behind, before any sign-in: a laptop that
         // starts with no network must still reject blocked callers (A-17).
@@ -166,6 +235,8 @@ public partial class App : Application
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();
+
+        _singleInstance?.OnShowRequested(() => Dispatcher.BeginInvoke(BringMainWindowForward));
     }
 
     /// <summary>
@@ -431,6 +502,8 @@ public partial class App : Application
     /// </remarks>
     protected override void OnExit(ExitEventArgs e)
     {
+        _exiting = true;
+
         try
         {
             if (_host is { } host)
@@ -449,6 +522,12 @@ public partial class App : Application
 
         Log.Information("Agent App stopped");
         Log.CloseAndFlush();
+
+        // Last, after the un-REGISTER (N-05). A copy started while this one is
+        // still closing, for at most ShutdownLimit, finds it and exits rather
+        // than starting a phone beside a registration still being taken
+        // down; started again a moment later, it runs.
+        _singleInstance?.Dispose();
 
         base.OnExit(e);
     }

@@ -135,6 +135,22 @@ public sealed class AgentLogShipperTests : IDisposable
     }
 
     [Fact]
+    public async Task A_refused_sign_in_is_passed_on_with_the_reason_the_server_gave()
+    {
+        // N-05: this sender talks to the server every 30 seconds, so it is how
+        // a copy whose agent signed in on another laptop finds out soonest.
+        SignIn();
+        string? heard = null;
+        _session.TokenRefused += (_, because) => heard = because;
+        Write("one\n");
+
+        _server.SessionClosed = LogoutReasons.SignedInElsewhere;
+        await Shipper().ShipAsync();
+
+        heard.Should().Be(LogoutReasons.SignedInElsewhere);
+    }
+
+    [Fact]
     public void A_piece_is_cut_at_its_last_line_break_and_a_giant_line_goes_whole()
     {
         var path = Path.Combine(_directory, File);
@@ -161,6 +177,9 @@ public sealed class AgentLogShipperTests : IDisposable
 
         public bool LoseNextAnswer { get; set; }
 
+        /// <summary>When set, every request is refused 401 with this as the session's closing reason.</summary>
+        public string? SessionClosed { get; set; }
+
         public int Requests { get; private set; }
 
         public List<string> Order { get; } = [];
@@ -180,6 +199,13 @@ public sealed class AgentLogShipperTests : IDisposable
             }
 
             request.Headers.Authorization?.Parameter.Should().Be("token");
+
+            if (SessionClosed is { } reason)
+            {
+                var refused = new HttpResponseMessage(HttpStatusCode.Unauthorized);
+                refused.Headers.Add(LogoutReasons.SessionClosedHeader, reason);
+                return refused;
+            }
             var parts = request.RequestUri!.AbsolutePath.Trim('/').Split('/').Skip(2).ToArray();
 
             if (request.Method == HttpMethod.Get)

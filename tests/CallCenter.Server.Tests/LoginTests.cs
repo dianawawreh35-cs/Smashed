@@ -197,16 +197,90 @@ public class LoginTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
-    public async Task Closing_one_session_leaves_the_account_s_other_sessions_working()
+    public async Task Signing_in_on_another_laptop_closes_the_first_and_its_token_says_why()
     {
+        // N-05, 27 Sep evening: calls went to a second copy signed in as the
+        // same agent. One Agent App sign-in per agent now.
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (first, firstLogin) = await data.SignInAsync(agent, "DESKTOP-RMSFSIV-AAAAAA");
+        var (second, secondLogin) = await data.SignInAsync(agent, "DESKTOP-RMSFSIV-BBBBBB");
+
+        var closed = await data.QueryAsync(db => db.AgentSessions.SingleAsync(s => s.Id == firstLogin.SessionId));
+        closed.LoggedOutAt.Should().NotBeNull();
+        closed.LogoutReason.Should().Be(LogoutReasons.SignedInElsewhere);
+
+        var refused = await first.GetAsync("/api/auth/me");
+        refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized, "a closed session ends its token (M-S01)");
+        refused.Headers.GetValues(LogoutReasons.SessionClosedHeader).Should().Equal(
+            [LogoutReasons.SignedInElsewhere], "the app stops its phone without an un-REGISTER only when told this");
+
+        (await second.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+        var open = await data.QueryAsync(db => db.AgentSessions.SingleAsync(s => s.Id == secondLogin.SessionId));
+        open.LoggedOutAt.Should().BeNull();
+    }
+
+    [DatabaseFact]
+    public async Task Signing_in_again_from_the_same_install_closes_the_older_session_as_app_closed()
+    {
+        // The same laptop id is the same install, which runs one copy: the
+        // app that opened the older session is gone (a crash, a power cut).
         var agent = await data.CreateUserAsync(UserRoles.Agent);
         var (first, firstLogin) = await data.SignInAsync(agent);
-        var (second, _) = await data.SignInAsync(agent);
+        var (_, secondLogin) = await data.SignInAsync(agent);
 
-        await first.PostAsJsonAsync("/api/auth/logout", new LogoutRequest(firstLogin.SessionId!.Value, LogoutReasons.Manual));
+        var sessions = await data.QueryAsync(db =>
+            db.AgentSessions.Where(s => s.UserId == agent.Id).ToDictionaryAsync(s => s.Id));
 
-        (await first.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await second.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+        sessions[firstLogin.SessionId!.Value].LogoutReason.Should().Be(LogoutReasons.AppClosed);
+        sessions[secondLogin.SessionId!.Value].LoggedOutAt.Should().BeNull();
+
+        var refused = await first.GetAsync("/api/auth/me");
+        refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        refused.Headers.GetValues(LogoutReasons.SessionClosedHeader).Should().Equal([LogoutReasons.AppClosed]);
+    }
+
+    [DatabaseFact]
+    public async Task A_web_sign_in_closes_none_of_the_agent_s_sessions()
+    {
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (app, _) = await data.SignInAsync(agent);
+
+        // What the web app sends: no laptop id. It refuses the agent anyway.
+        (await data.Client().PostAsJsonAsync("/api/auth/login", new { login = agent.Login, password = TestData.Password }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await app.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await SessionCountAsync(agent.Id)).Should().Be(1);
+    }
+
+    [DatabaseFact]
+    public async Task One_agent_signing_in_leaves_other_agents_signed_in()
+    {
+        var sara = await data.CreateUserAsync(UserRoles.Agent);
+        var lelian = await data.CreateUserAsync(UserRoles.Agent);
+        var (saraApp, _) = await data.SignInAsync(sara, "DESKTOP-RMSFSIV-AAAAAA");
+
+        await data.SignInAsync(lelian, "DESKTOP-RMSFSIV-BBBBBB");
+
+        (await saraApp.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [DatabaseFact]
+    public async Task A_token_refused_for_a_changed_account_says_nothing_about_its_session()
+    {
+        // The header is for a closed session. A changed password leaves the
+        // session open and the app signs out the ordinary way, un-REGISTER
+        // and all.
+        var agent = await data.CreateUserAsync(UserRoles.Agent);
+        var (client, _) = await data.SignInAsync(agent);
+
+        await ResetPasswordCommand.RunAsync(
+            factory.Services, ["reset-password", "--user", agent.Login, "--password", "NewPass!2026"]);
+
+        var refused = await client.GetAsync("/api/auth/me");
+        refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        refused.Headers.GetValues(LogoutReasons.SessionClosedHeader).Should().Equal(
+            [LogoutReasons.PasswordReset], "reset-password closes the session too, and the header says so");
     }
 
     [DatabaseFact]
@@ -235,9 +309,22 @@ public class LoginTests(CallCenterApiFactory factory)
     [DatabaseFact]
     public async Task Reset_password_closes_every_session_the_account_had_open()
     {
+        // A sign-in closes the agent's other sessions since 27 Sep (N-05), so
+        // the second open one is a row from before then, put in directly.
         var agent = await data.CreateUserAsync(UserRoles.Agent);
         var (_, first) = await data.SignInAsync(agent);
-        var (_, second) = await data.SignInAsync(agent);
+        var older = await data.QueryAsync(async db =>
+        {
+            var row = new Data.Entities.AgentSession
+            {
+                UserId = agent.Id,
+                LaptopId = "DESKTOP-RMSFSIV",
+                LoggedInAt = DateTimeOffset.UtcNow.AddHours(-1),
+            };
+            db.AgentSessions.Add(row);
+            await db.SaveChangesAsync();
+            return row.Id;
+        });
 
         var exitCode = await ResetPasswordCommand.RunAsync(
             factory.Services, ["reset-password", "--user", agent.Login, "--password", "NewPass!2026"]);
@@ -246,7 +333,7 @@ public class LoginTests(CallCenterApiFactory factory)
 
         var sessions = await data.QueryAsync(db =>
             db.AgentSessions.Where(s => s.UserId == agent.Id).ToListAsync());
-        sessions.Select(s => s.Id).Should().BeEquivalentTo([first.SessionId!.Value, second.SessionId!.Value]);
+        sessions.Select(s => s.Id).Should().BeEquivalentTo([first.SessionId!.Value, older]);
         sessions.Should().OnlyContain(s => s.LoggedOutAt != null && s.LogoutReason == LogoutReasons.PasswordReset);
     }
 
@@ -332,11 +419,13 @@ public class LoginTests(CallCenterApiFactory factory)
     [DatabaseFact]
     public async Task Signing_in_again_does_not_retire_the_token_from_an_earlier_sign_in()
     {
-        // Two laptops, or the Agent App and a reload: the stamp only changes when
-        // the account does, so a second sign-in leaves the first one working.
-        var agent = await data.CreateUserAsync(UserRoles.Agent);
-        var (first, _) = await data.SignInAsync(agent);
-        await data.SignInAsync(agent);
+        // Two browsers, or a reload: the stamp only changes when the account
+        // does, so a second sign-in leaves the first one working. An agent's
+        // Agent App sign-in is the exception since 27 Sep: it closes the
+        // agent's other session (N-05), tested above.
+        var supervisor = await data.CreateUserAsync(UserRoles.Supervisor);
+        var (first, _) = await data.SignInAsync(supervisor);
+        await data.SignInAsync(supervisor);
 
         (await first.GetAsync("/api/auth/me")).StatusCode.Should().Be(HttpStatusCode.OK);
     }

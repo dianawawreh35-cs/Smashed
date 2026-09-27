@@ -17,16 +17,33 @@ public class AgentSession
     /// acts on it. Here, rather than on <see cref="ApiClient"/>, because there is
     /// one session per process and a new API client per consumer.
     /// </summary>
-    public event EventHandler? TokenRefused;
+    /// <remarks>
+    /// The argument is the session's <c>logout_reason</c> when the server said
+    /// its session was closed (<see cref="LogoutReasons.SessionClosedHeader"/>),
+    /// otherwise null.
+    /// </remarks>
+    public event EventHandler<string?>? TokenRefused;
 
-    /// <summary>Called by <see cref="ApiClient"/> when a request carrying the token was refused.</summary>
-    public void ReportTokenRefused()
+    /// <summary>
+    /// Called by <see cref="ApiClient"/> and <see cref="AgentLogShipper"/> when
+    /// a request carrying the token was refused.
+    /// </summary>
+    public void ReportTokenRefused(string? sessionClosedBecause = null)
     {
         if (IsSignedIn)
         {
-            TokenRefused?.Invoke(this, EventArgs.Empty);
+            TokenRefused?.Invoke(this, sessionClosedBecause);
         }
     }
+
+    /// <summary>
+    /// Why the server says the session was closed, from a refused response
+    /// (N-05): the header's value, or null when it sent none.
+    /// </summary>
+    public static string? SessionClosedBecause(System.Net.Http.HttpResponseMessage response) =>
+        response.Headers.TryGetValues(LogoutReasons.SessionClosedHeader, out var values)
+            ? values.FirstOrDefault()
+            : null;
 
     public CurrentUserDto? User { get; private set; }
 

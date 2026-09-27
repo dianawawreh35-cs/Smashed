@@ -7374,18 +7374,188 @@ refused) and the page (the section only with a zip, both files in one go, the
 installer kept when the zip is refused). Not seen running yet: TESTING-checklist.md,
 Round 2, "Installing from the web app", the two zip steps.
 
+## 2026-09-27 (evening) — One phone per agent: four guards after the missed calls (N-05, A-05)
+
+**In plain terms.** On the evening of 27 Sep, after v0.4.0/v0.4.1 and the new
+Agent App went out, calls were missed: two agents' apps showed Connected and
+never rang, and one agent with Do Not Disturb on still got pop-ups. The server
+and the PBX were fine. The calls were going to **a second copy of the app
+signed in as the same agent**, somewhere the agent was not looking, and nothing
+stopped that. Now four things do: a laptop runs one copy of the app; signing in
+makes the PBX forget every old address for the extension; the server lets an
+agent be signed in on one laptop at a time; and the app refuses a call meant
+for a different extension. Prompt 20.
+
+**What the records showed** (prompt 20 has the detail). 2008 and 2009 rang at
+the PBX and their apps saw nothing; 2010's app turned its rings away with Do
+Not Disturb, yet four rings were recorded Rejected, which only a person
+pressing Reject makes, so another copy with the switch off was showing them.
+All three sign-ins came from one laptop id, `DESKTOP-RMSFSIV`: the laptops were
+set up from one Windows image and share a name. The laptops' own logs were not
+available (the log sender, N-12, is not released yet); the design does not
+depend on them.
+
+### The four guards
+
+1. **One copy per Windows sign-in** (`SingleInstance`). A named mutex,
+   `Local\Smashed.CallCenter.AgentApp`, taken at the top of `App.OnStartup`
+   before anything else. A second launch signals a named event and exits
+   before it has a log or a window; the first copy's window comes forward
+   (restored if minimised, activated: a deliberate launch, so taking the focus
+   is right; the ringing pop-up stays Topmost above it, so M-A05 is untouched).
+   **The mutex is held by existing, not owned:** the first copy keeps the handle
+   open and never waits on it. So there is nothing to abandon, and no
+   `AbandonedMutexException` to handle: when a copy crashes or is ended in Task
+   Manager, Windows closes its handles and the next start is the first. Owning
+   it would have tied it to the UI thread across an `async void` start-up and a
+   pumping shutdown. It is released at the very end of `OnExit`, after the
+   un-REGISTER, so a copy started during those at most 5 seconds exits, and
+   runs if started again a moment later.
+2. **At sign-in the PBX forgets every old address** (`RegisterRequests`,
+   `SipRegistrationService.Start`). Before SIPSorcery's registration agent
+   starts, the app sends its own REGISTER with `Contact: *` and `Expires: 0`
+   (RFC 3261 §10.2.2), answering the PBX's digest challenge, and waits up to
+   5 s for the answer; the registration goes ahead either way. SIPSorcery's
+   `SIPRegistrationUserAgent` cannot send a star contact, so the request is
+   built by hand; a test checks the star survives the challenge's re-send.
+   chan_sip, as I read its source (`parse_register_contact`), takes `*` or any
+   `Expires: 0` as "this peer is unregistered". **Not yet seen against the real
+   PBX**: the checklist step reads the log line that says whether it answered
+   200.
+3. **One Agent App sign-in per agent** (`AuthService.CloseOtherSessionsAsync`).
+   An Agent App sign-in closes every session the agent still has open, in the
+   same save as the new one. Another laptop's is closed as
+   **`SignedInElsewhere`**; the same laptop id's (the same install signing in
+   again, after a crash) as `AppClosed`, which is what happened to it. The next
+   request from the closed copy is a 401 (M-S01), which now carries
+   **`X-Session-Closed: <reason>`**, read from the closed row only on the way to
+   a 401. The app then signs out and says **"You have been signed out here
+   because you signed in on another laptop…"**, in both languages. A web
+   sign-in (no laptop id) closes nothing. The log sender now passes its 401s on
+   too, and it talks to the server every 30 s, so the other copy notices within
+   about 30 s (the block-list refresh, the next fastest, is 2 minutes).
+4. **Only this agent's calls** (`CallAddressee`, in `CallService`). Before the
+   block list and Do Not Disturb, an INVITE naming only other extensions is
+   refused **480 Temporarily Unavailable**, shown nowhere, not reported, and
+   logged as a warning with both extensions. This is the shared-laptop case:
+   agent A signs out without the un-REGISTER reaching the PBX, B signs in on
+   the same socket, and A's calls arrive at B's screen.
+
+### Dia's decisions, asked before building
+
+- **The reason and the message:** a new `LogoutReasons.SignedInElsewhere`, and
+  the sign-in screen's message on the app that was signed out.
+- **The laptop id:** the Windows name plus a six-character tag made once per
+  install and kept in `%LOCALAPPDATA%\CallCenter\install-id`:
+  `DESKTOP-RMSFSIV-7F3A2C`. Readable and different on every laptop, with no
+  database change. It is what `LaptopId` carries everywhere: the session, every
+  call row (`communications.laptop_id`), messages, and the folder the server
+  keeps the laptop's log in (N-12), which would otherwise have been one folder
+  for three laptops whose files fought over the same offsets. Old rows keep the
+  bare name. A laptop reinstalled keeps its tag (the folder survives an
+  install); a new Windows profile gets a new one, which costs nothing.
+
+### A correction to the prompt: the signed-out copy must not un-REGISTER
+
+The prompt expected the copy closed by guard 3 to sign out "which
+un-REGISTERs". On chan_sip that would undo the fix: an extension has **one**
+address at the PBX, and any `Expires: 0` REGISTER, from any address, removes
+it. By the time the old laptop notices, that address is the new laptop's, so
+its un-REGISTER would take the agent's phone off the PBX until the new
+laptop's next refresh, up to 2 minutes. So a sign-out for `SignedInElsewhere`
+stops refreshing and says nothing to the PBX, and does not call logout either
+(the session is already closed). Every other sign-out, manual, idle, app
+closed, password reset, still unregisters.
+
+**M-A01, verified.** Until now the un-REGISTER at sign-out and exit was
+SIPSorcery's `Stop()`, which queues its zero-expiry REGISTER on the thread pool
+and returns; the app could shut the transport before it went, or before the
+PBX's challenge to it was answered. It is now the app's own REGISTER with the
+Contact the agent registered (captured through `AdjustRegister`), awaited for
+at most 2 s inside the 5 s shutdown limit.
+
+### Why 480 for someone else's call, and why the check is lenient
+
+Not a 6xx, which tells the PBX to try nowhere else and takes the call from the
+whole queue. Not 486 Busy, which is what Do Not Disturb says and would show the
+other agent busy on a phone they are not using. Not 404: the extension exists,
+just not here, and Asterisk turns 404 into "unallocated number", which a direct
+caller hears as a number that does not work. 480 is "reached, not available
+now", and the queue moves on.
+
+The registration puts the extension in its Contact, and Asterisk addresses an
+INVITE to that Contact, so the Request-URI's user should be the extension; the
+To user is the extension dialled. The To user is in every log since 18 Sep
+(`to 2001` on queue calls); **the Request-URI has never been seen on a real
+INVITE**, because the log line did not carry it. It does now. So a call is refused
+only when **every** user it names is another extension; one naming this
+extension, or none, is taken as before. A wrong guess about the headers can
+therefore not silence the phone.
+
+### Shared
+
+Three constants, no change of shape: `LogoutReasons.SignedInElsewhere` (not in
+`LogoutReasons.All`, the list a client may send: only the server sets it),
+`LogoutReasons.SessionClosedHeader`, and `LoginErrorCodes.SignedInElsewhere`
+for the sign-in screen's label. The Agent App builds with them.
+
+### What is left, and known limits
+
+- **A small window during guard 3.** Between the new sign-in and the old copy
+  noticing (up to about 30 s), the old copy may refresh its registration and
+  take the address back. If it does, the new laptop misses rings until its own
+  next refresh, up to 2 minutes, once. Closing it would need the server to push
+  the sign-out, and the app has no SignalR client (Open items).
+- **An old app does none of this.** A copy from before this change on any
+  laptop has no single-instance guard, and when closed by guard 3 it signs out
+  the old way, un-REGISTER included, which on chan_sip takes the new laptop off
+  the PBX until its next refresh. Hence: the new Agent App on all three laptops
+  the same day, every running copy closed first, and no copy left in a second
+  folder.
+- **Rename the laptops** (`AGENT-1` to `AGENT-3`): the tag tells installs
+  apart, but the name is what a person reads in the reports and the logs.
+- **Not in this task:** pausing the agent in the queue for Do Not Disturb (the
+  app answers busy, like any softphone; the fault was the second copy), and the
+  queue's 6–7 s ring per agent, which is Issabel's setting, not ours.
+
+### Tested
+
+Agent App: 48 tests, 24 of them new, 11 of those cases of one rule (the single-instance claim, a second start
+bringing the first forward, the laptop id and its file, the 401's reason
+through the API client and through the log sender, the star REGISTER and its
+authenticated re-send, the one-binding un-REGISTER, and the call addressee
+rule). Server, against PostgreSQL: a second laptop closes the first as
+`SignedInElsewhere` and its token answers 401 saying so; the same install
+closes the older row as `AppClosed`; a web sign-in closes nothing; another
+agent is untouched; a password reset's 401 says `PasswordReset`. Two older
+tests assumed an agent could be signed in twice and were changed: the stamp
+test now signs a supervisor in twice, and the reset test puts in a second open
+session as a row from before the change. **Not seen running**: nothing here
+can be, without the PBX and two laptops. TESTING-checklist.md, Round 3, "One
+phone per agent".
+
+**To deploy:** the server first (the header and the one-sign-in rule), then
+the new Agent App on **all three laptops the same day**, every running copy
+closed first (Task Manager → Details → `CallCenter.AgentApp.exe`). A new app
+against the old server works, without guard 3; an old app against the new
+server is signed out when its agent signs in elsewhere, the old way.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
 is where history belongs.
 
 **Last reconciled: 2026-09-27 (after the code review and its three fix
-prompts, 17 to 19, read against every dated entry since 18 September).**
+prompts, 17 to 19, read against every dated entry since 18 September; the
+release rows again after prompt 20, the same evening).**
 
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
-`v0.3.2` (RELEASING.md). Everything the Agent App does on a call is built and
+`v0.4.1` since the evening of 27 Sep, with Agent App 0.4.0 on the three
+laptops (RELEASING.md). That evening calls were missed to a second copy of the
+app; the guards against it are built, not released (27 Sep evening entry).
+Everything the Agent App does on a call is built and
 has met the real PBX: ringing, answer, hold, mute, the pop-up with the caller,
 blocking, outbound dialling, recording, and classification, which has been
 complete since 21 September (server, form, designer, the way back to a skipped
@@ -7395,13 +7565,15 @@ channels, the reports and the dashboard, the POS lookup, and the abandoned
 calls from the PBX. The server's own extension (26 Sep) is the fifth: it keeps
 the PBX's blacklist in step with the Blocked flag, opens and closes the queue,
 shows each agent's phone state and lets a supervisor listen in. The 27 Sep
-review's fixes are built in all three apps but **not yet released or seen
+review's fixes went out in v0.4.0 and v0.4.1 but are **not yet seen
 running**.
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **Release the 27 Sep fixes and put them on the server** | review F-01 to F-14 and most M-items | a tag, then `update.sh` with the steps in the 27 Sep server entries: new `deploy/` files, one `docker compose up -d`, the backup cron line |
-| **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | the release above, for anything that needs the new server |
+| **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |
+| **Rename the three laptops** from `DESKTOP-RMSFSIV` to `AGENT-1`, `AGENT-2`, `AGENT-3` (Windows Settings → System → About → Rename this PC) | A-05, N-12 | Dia, at the laptops. The app tells them apart without it since 27 Sep evening, but the name is the part a person reads |
+| **The Users page: each agent's laptop, app version, and a "signed in twice" warning** | S-61, N-05 | nothing: the sessions have the laptop id and version. Worth doing next |
+| **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | nothing: v0.4.1 is on the server |
 | **Install from the web app on one laptop** (S-63): upload an installer, sign in as an agent, download, install over the zip's copy, and look for a second copy of the app on the laptop. Screenshots of the page as an agent and as a supervisor, in both languages | S-63, N-11 | a server with the new image and `docker-compose.yml`. It could not be run on Dia's laptop (policy) |
 | The Agent App notices a newer version at sign-in and installs it silently (the rest of A-82). The server side and the installer's `/VERYSILENT` are ready | A-82 | Dia's call, once S-63 is seen working |
 | **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
@@ -7409,7 +7581,7 @@ running**.
 | **The web app's sign-out ends its token**, as the Agent App's has since 27 Sep (M-S01) | N-05 | a session row for web sign-ins, which changes what the dashboard's *agents online* counts. Then decide whether 12 hours is still right for the web token |
 | The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet |
 | **A container that is not root** (M-D02) and **HTTPS on the LAN** (M-D06) | N-05 | changes the production server and, for HTTPS, a new Agent App build on the laptops. What each takes is in the 27 Sep part 4 entry. Until then the runbook says plainly that it is HTTP |
-| The review's Agent App items **left out of prompt 17**: a crash mid-call loses the call record and leaves raw audio in the scratch folder; the WAV is rebuilt on the UI thread at hang-up; user agents are closed but not disposed, and a 403 from a restarting PBX stops registration until the next sign-in, with no Retry; the pop-up centres on the primary monitor only; no token refresh, so the 12 h token ends a shift; `Server:HubPath` is configured and comments mention SignalR, but there is no SignalR client | A-02, A-10, A-31, N-05 | nothing |
+| The review's Agent App items **left out of prompt 17**: a crash mid-call loses the call record and leaves raw audio in the scratch folder; the WAV is rebuilt on the UI thread at hang-up; user agents are closed but not disposed, and a 403 from a restarting PBX stops registration until the next sign-in, with no Retry; the pop-up centres on the primary monitor only; no token refresh, so the 12 h token ends a shift; `Server:HubPath` is configured and comments mention SignalR, but there is no SignalR client, so an app signed out because its agent signed in elsewhere finds out at its next request, about 30 s, not at once (27 Sep evening) | A-02, A-10, A-31, N-05 | nothing |
 | The upload queue's set-aside items: a way to clear one, or pass it to a supervisor. Today Try again is the only action, and a call refused as `extension_not_yours` is refused again | A-04 | Dia's call |
 | `CallService`'s state rules have no automated test (27 Sep entry, F-09) | A-12 | pulling the state machine out of `CallService` into something that can be built without SIPSorcery and a sound card |
 | Drop the SQLitePCLRaw pin in `Directory.Packages.props` and the Agent App's explicit reference to it: EF Core 10.0.12 asks for 2.1.12 itself | — | the Agent App's project file, next time it is open |

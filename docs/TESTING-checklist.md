@@ -862,6 +862,34 @@ Built 27 Sep. The first needs the PBX; the other two do not.
       survived an error that used to close it. **Send me the log from that
       minute**; it names the fault. Its **Dismiss** / **إخفاء** button hides it.
 
+### The 27 Sep review fixes: the phone never stays busy (F-09, M-A02, M-A07, M-A08) — needs the PBX
+
+The races themselves happen in milliseconds and cannot be forced by hand. What
+can be checked is that ordinary calls still behave, and that the phone is free
+afterwards every time.
+
+- [ ] **Ten calls in a row, every kind.** Answer and let the caller hang up;
+      answer and hang up yourself; Reject; let one ring out; dial out and
+      Cancel; dial out and let it be answered. After each, the pop-up goes and
+      **the next incoming call rings**. *If a call is ever answered "busy" with
+      nothing on screen:* that is exactly what F-09 was. Send me the log.
+- [ ] **Hang up on the caller the instant you press Answer.** Have the calling
+      phone hang up at the same moment you click Answer, a few times. The pop-up
+      goes, and the next call rings. Same with **Auto answer** on.
+- [ ] **Dial, then Cancel immediately**, before the customer's phone rings. It
+      must not ring at all, and the log says NoAnswer.
+- [ ] **Unplug the headset during a call (M-A02).** A red line appears on the
+      pop-up under the timer: "The microphone is not working…" or "The
+      headset's sound is not working…", in the app's language. The call stays
+      up, and the log says which device failed. Plug it back in; the next call
+      starts without the red line. *If nothing appears:* the device kept
+      running on the laptop's own speakers, which is not a failure. Check the
+      log for "The microphone failed" or "The speaker failed".
+- [ ] **The ring and the key beeps still sound (M-A08).** They now play through
+      a different Windows audio path. Ring the extension, dial a few digits on
+      the Dial screen, and let an outgoing call ring out: all three tones as
+      before. Press Answer during the ring: it stops at once.
+
 ---
 
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)

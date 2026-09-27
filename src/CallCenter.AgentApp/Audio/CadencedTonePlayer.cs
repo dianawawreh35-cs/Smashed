@@ -14,6 +14,13 @@ namespace CallCenter.AgentApp.Audio;
 /// or lose on install. Played on the Windows default output, where the call's
 /// audio goes too, so it is heard in the same headset. Never throws out of
 /// <see cref="Start"/>: a laptop with no output device still gets the call.
+///
+/// <b><c>WaveOutEvent</c>, not <c>WaveOut</c> (M-A08).</b> <c>WaveOut</c>
+/// delivers its buffers through window messages or callbacks on the thread
+/// that made it, and these tones are started on SIP threads and stopped from
+/// the UI: stopping a callback-driven <c>WaveOut</c> from another thread is a
+/// known NAudio deadlock on some drivers. <c>WaveOutEvent</c> has a playback
+/// thread of its own, so either thread may start or stop it.
 /// </remarks>
 /// <param name="frequencies">The sine waves mixed together, in Hz.</param>
 /// <param name="cadence">
@@ -29,7 +36,7 @@ public abstract class CadencedTonePlayer(
     double[] frequencies, double[] cadence, float volume, ILogger logger, double warbleHz = 0) : IDisposable
 {
     private readonly Lock _gate = new();
-    private WaveOut? _output;
+    private WaveOutEvent? _output;
 
     /// <summary>Starts the tone. Does nothing if it is already playing.</summary>
     public void Start()
@@ -43,7 +50,7 @@ public abstract class CadencedTonePlayer(
 
             try
             {
-                var output = new WaveOut();
+                var output = new WaveOutEvent();
                 output.Init(new Pattern(frequencies, cadence, volume, warbleHz));
                 output.Play();
                 _output = output;
@@ -58,7 +65,7 @@ public abstract class CadencedTonePlayer(
     /// <summary>Stops the tone. Safe to call when it is not playing.</summary>
     public void Stop()
     {
-        WaveOut? output;
+        WaveOutEvent? output;
 
         lock (_gate)
         {

@@ -357,12 +357,13 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
         Close();
     }
 
-    private void OnCallStateChanged(object? sender, CallState state)
+    private void OnCallStateChanged(object? sender, CallState _)
     {
-        // Raised on a SIP thread.
+        // Raised on a SIP thread. The state is read again once on the UI
+        // thread, as the pop-up does: the events can arrive out of order (M-A07).
         _dispatcher.BeginInvoke(() =>
         {
-            IsOnCall = state.Status != CallStatus.Idle;
+            IsOnCall = _calls.State.Status != CallStatus.Idle;
 
             if (IsOnCall && IsPlaying)
             {

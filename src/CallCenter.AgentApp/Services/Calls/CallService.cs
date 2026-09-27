@@ -125,16 +125,52 @@ public class CallService(
     private string? _callId;
 
     /// <summary>
-    /// Set while this app is the one hanging up.
+    /// Which call is at the front, as a number that only ever goes up (F-09).
+    /// </summary>
+    /// <remarks>
+    /// A new number for every call that rings or is dialled, and for the front
+    /// becoming empty again. Everything that waits — answering, dialling,
+    /// building the media — takes the number when it starts and changes the
+    /// state only if it is still the same when it finishes. Without it a BYE
+    /// landing during the answer had already ended the call, and the answer
+    /// then built "Connected" out of the idle state: the pop-up went, the
+    /// service stayed Connected, and every later call was answered 486 Busy.
+    /// The Call-ID cannot do this job: a call being dialled has none until it
+    /// is answered, and the listener's user agent is the same object for every
+    /// call. A call parked on hold (A-24) keeps its number and gets it back.
+    /// </remarks>
+    private long _generation;
+
+    /// <summary>
+    /// The last number handed out. Separate from <see cref="_generation"/>,
+    /// which goes back to a parked call's number when it returns (A-24): one
+    /// counter would then hand out a number some finished call still holds.
+    /// </summary>
+    private long _lastGeneration;
+
+    /// <summary>
+    /// The call this app is hanging up, by <see cref="_generation"/>, or 0.
     /// </summary>
     /// <remarks>
     /// <see cref="SIPUserAgent.OnCallHungup"/> fires for <b>both</b> ends: it is
     /// raised from inside <c>Hangup()</c> as well as when a BYE arrives. Without
-    /// this flag every agent-initiated hang-up was logged as "the other party
-    /// hung up", which is exactly backwards and is the sort of line somebody
-    /// spends an hour believing while debugging something else.
+    /// this every agent-initiated hang-up was logged as "the other party hung
+    /// up", which is exactly backwards and is the sort of line somebody spends
+    /// an hour believing while debugging something else.
+    ///
+    /// A call number rather than a flag (F-09): the flag was set by Cancel
+    /// during dialling and never cleared, so if the customer answered as the
+    /// agent gave up, their later BYE was ignored and the phone stayed busy.
+    /// A number stops matching the moment the call it names is over.
     /// </remarks>
-    private bool _hangingUpLocally;
+    private long _hangingUp;
+
+    /// <summary>
+    /// The call the agent gave up on while it was still being set up, by
+    /// <see cref="_generation"/>, or 0. Read before the INVITE goes, so a
+    /// Cancel pressed while the microphone was opening rings nobody.
+    /// </summary>
+    private long _cancelledDial;
 
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event EventHandler<CallState>? StateChanged;
@@ -157,6 +193,13 @@ public class CallService(
     /// recording" (A-32) amounts to in practice.
     /// </remarks>
     public event EventHandler<CallRecording>? RecordingReady;
+
+    /// <summary>
+    /// Raised when the microphone or speaker of the call in progress fails
+    /// (M-A02). Until 27 Sep nothing listened: a call with no headset
+    /// connected with no sound, and not a line in the log.
+    /// </summary>
+    public event EventHandler<AudioFailure>? AudioFailed;
 
     public CallState State
     {
@@ -350,7 +393,17 @@ public class CallService(
             CloseMedia(held.Media);
         }
 
-        Set(CallState.Idle);
+        CallState idle;
+
+        lock (_gate)
+        {
+            // Anything still waiting on the old line is over too (F-09).
+            _generation = ++_lastGeneration;
+            _state = CallState.Idle;
+            idle = _state;
+        }
+
+        StateChanged?.Invoke(this, idle);
     }
 
     /// <summary>
@@ -390,6 +443,7 @@ public class CallService(
         SIPUserAgent agent;
         AgentExtensionsDto? extensions;
         CallState? held = null;
+        long generation;
 
         lock (_gate)
         {
@@ -416,20 +470,20 @@ public class CallService(
                 // hold, still recording its hold — and the new call gets a user
                 // agent of its own, since the parked one still has its dialogue.
                 held = _state;
-                _held = new HeldLine(_agent, _media, _audio, _recorder, _callId, _state);
+                _held = new HeldLine(_agent, _media, _audio, _recorder, _callId, _state, _generation);
                 _agent = new SIPUserAgent(transport.Transport, null);
                 WireCallEvents(_agent);
                 _media = null;
                 _audio = null;
                 _recorder = null;
                 _callId = null;
-                _hangingUpLocally = false;
 
                 logger.LogInformation("The call on hold is parked while another call is placed");
             }
 
             agent = _agent;
             _lastDialFailure = null;
+            generation = _generation = ++_lastGeneration;
 
             // The slot is claimed here, inside the lock, rather than after the
             // media is built: everything below takes long enough for a second
@@ -451,11 +505,29 @@ public class CallService(
         try
         {
             var (media, audio) = CreateMedia();
+            bool current;
+            bool cancelled;
 
             lock (_gate)
             {
-                _media = media;
-                _audio = audio;
+                current = generation == _generation;
+                cancelled = _cancelledDial == generation;
+
+                if (current && !cancelled)
+                {
+                    _media = media;
+                    _audio = audio;
+                }
+            }
+
+            if (!current || cancelled)
+            {
+                // F-09: the agent gave up, or the call was ended, while the
+                // microphone was opening. The media is this method's own and
+                // nobody else will close it; no INVITE has gone.
+                CloseMedia(media);
+                Finish(agent, "the agent gave up on the outgoing call", CallOutcome.NoAnswer, generation);
+                return;
             }
 
             var answered = await agent.Call(
@@ -474,7 +546,7 @@ public class CallService(
                     failure = _lastDialFailure;
                 }
 
-                Finish(agent, Explain(failure), OutcomeFor(failure));
+                Finish(agent, Explain(failure), OutcomeFor(failure), generation);
                 return;
             }
 
@@ -482,22 +554,46 @@ public class CallService(
             // ringing must not talk over their first word.
             ringback.Stop();
 
+            CallState connected;
+            bool ended;
+
             lock (_gate)
             {
-                // The dialogue exists now, and with it the call's own reference.
-                // The classification form is keyed on this (A-40), so without it
-                // the call would work and be unclassifiable.
-                _callId = agent.Dialogue?.CallId;
+                // F-09: only the call this was dialled for, and only if it is
+                // still being dialled. A BYE that landed while Call() was
+                // returning has finished and reported it already, and building
+                // Connected now would leave the phone busy for good.
+                ended = generation != _generation || _state.Status is not CallStatus.Dialling;
+                connected = _state;
+
+                if (!ended)
+                {
+                    // The dialogue exists now, and with it the call's own
+                    // reference. The classification form is keyed on this
+                    // (A-40), so without it the call would work and be
+                    // unclassifiable.
+                    _callId = agent.Dialogue?.CallId;
+
+                    _state = _state with
+                    {
+                        Status = CallStatus.Connected,
+                        ConnectedAt = DateTimeOffset.Now,
+                        SipCallId = _callId,
+                        Held = _held?.State,
+                    };
+
+                    connected = _state;
+                }
             }
 
-            StartRecording(media, audio);
-
-            Set(State with
+            if (ended)
             {
-                Status = CallStatus.Connected,
-                ConnectedAt = DateTimeOffset.Now,
-                SipCallId = _callId,
-            });
+                logger.LogInformation("The outgoing call ended as it was answered; it stays ended");
+                return;
+            }
+
+            StartRecording(generation, media, audio);
+            StateChanged?.Invoke(this, connected);
 
             logger.LogInformation("Outgoing call answered");
         }
@@ -506,7 +602,7 @@ public class CallService(
             // A missing microphone is the usual cause, and it must not take the
             // app down.
             logger.LogError(ex, "The call to {Number} could not be placed", digits);
-            Finish(agent, "the call could not be placed", CallOutcome.Failed);
+            Finish(agent, "the call could not be placed", CallOutcome.Failed, generation);
         }
     }
 
@@ -548,14 +644,18 @@ public class CallService(
     {
         SIPUserAgent? agent;
         SIPServerUserAgent? pending;
+        long generation;
+        bool ringing;
 
         lock (_gate)
         {
             agent = _agent;
             pending = _pending;
+            generation = _generation;
+            ringing = _state.Status is CallStatus.Ringing;
         }
 
-        if (agent is null || pending is null)
+        if (agent is null || pending is null || !ringing)
         {
             return;
         }
@@ -585,36 +685,89 @@ public class CallService(
 
             if (!prepared)
             {
-                (media, audio) = CreateMedia();
+                var (built, builtAudio) = CreateMedia();
+                bool keep;
+                bool gone;
 
                 lock (_gate)
                 {
-                    _media = media;
-                    _audio = audio;
+                    // F-09: with auto answer, this and PrepareMedia build at
+                    // the same moment. Whichever gets here first is used; the
+                    // other is closed, rather than overwritten and left holding
+                    // an audio device until the process ends.
+                    gone = generation != _generation;
+                    keep = !gone && _media is null;
+
+                    if (keep)
+                    {
+                        _media = built;
+                        _audio = builtAudio;
+                    }
+
+                    media = _media;
+                    audio = _audio;
                 }
+
+                if (!keep)
+                {
+                    CloseMedia(built);
+                }
+
+                if (gone)
+                {
+                    // The caller gave up while the microphone was opening. What
+                    // is in _media now, if anything, is the next call's.
+                    return;
+                }
+            }
+
+            if (media is null || audio is null)
+            {
+                // The caller gave up while the microphone was opening, and the
+                // call's media went with them.
+                return;
             }
 
             var mediaReadyAt = clock.ElapsedMilliseconds;
 
-            var answered = await agent.Answer(pending, media!);
+            var answered = await agent.Answer(pending, media);
 
             var answeredAt = clock.ElapsedMilliseconds;
 
             if (!answered)
             {
                 logger.LogWarning("The call could not be answered");
-                Finish(agent, "the call could not be answered");
+                Finish(agent, "the call could not be answered", generation: generation);
                 return;
             }
 
+            CallState connected;
+            bool ended;
+
             lock (_gate)
             {
-                _pending = null;
+                // F-09: the same rule as for a dialled call. A caller who hung
+                // up while the answer was on its way has been finished and
+                // reported as missed; Connected must not be built on top.
+                ended = generation != _generation || _state.Status is not CallStatus.Ringing;
+
+                if (!ended)
+                {
+                    _pending = null;
+                    _state = _state with { Status = CallStatus.Connected, ConnectedAt = DateTimeOffset.Now };
+                }
+
+                connected = _state;
             }
 
-            StartRecording(media!, audio!);
+            if (ended)
+            {
+                logger.LogInformation("The caller hung up as the call was answered; it stays ended");
+                return;
+            }
 
-            Set(State with { Status = CallStatus.Connected, ConnectedAt = DateTimeOffset.Now });
+            StartRecording(generation, media, audio);
+            StateChanged?.Invoke(this, connected);
 
             // The timings are the point of this line: "Answer takes a moment"
             // can only be fixed once it says which moment.
@@ -628,7 +781,7 @@ public class CallService(
             // An audio device that has vanished is the usual cause, and it must
             // not take the app down mid-call.
             logger.LogError(ex, "Answering the call failed");
-            Finish(agent, "answering failed");
+            Finish(agent, "answering failed", generation: generation);
         }
     }
 
@@ -651,12 +804,34 @@ public class CallService(
     {
         SIPUserAgent? agent;
         CallState state;
+        long generation;
 
         lock (_gate)
         {
             agent = _agent;
             state = _state;
-            _hangingUpLocally = true;
+            generation = _generation;
+
+            if (state.Status is CallStatus.Connected)
+            {
+                _hangingUp = generation;
+            }
+            else if (state.Status is CallStatus.Dialling)
+            {
+                // F-09: no "hanging up" mark for a call being dialled. There
+                // is no BYE of ours to tell apart, and the mark used to outlive
+                // the call: a customer answering as the agent gave up had
+                // their BYE ignored. If the answer crosses the Cancel, the
+                // call connects and the agent has Hang up in front of them.
+                _cancelledDial = generation;
+            }
+        }
+
+        // Nothing to hang up on: no call, or one still ringing, which is
+        // Reject's to end. A keyboard shortcut can arrive in either (M-A05).
+        if (state.Status is CallStatus.Idle or CallStatus.Ringing)
+        {
+            return;
         }
 
         // A call that is still being placed has no dialogue to end, so there is
@@ -689,7 +864,7 @@ public class CallService(
             logger.LogWarning(ex, "Hanging up did not complete cleanly");
         }
 
-        Finish(agent, "hung up by the agent", CallOutcome.Answered);
+        Finish(agent, "hung up by the agent", CallOutcome.Answered, generation);
     }
 
     /// <summary>
@@ -710,11 +885,13 @@ public class CallService(
     {
         WindowsAudioEndPoint? audio;
         CallState state;
+        long generation;
 
         lock (_gate)
         {
             audio = _audio;
             state = _state;
+            generation = _generation;
         }
 
         if (audio is null || state.Status is not CallStatus.Connected)
@@ -732,7 +909,7 @@ public class CallService(
         }
 
         logger.LogInformation("Microphone {Action}", mute ? "muted" : "unmuted");
-        Set(State with { IsMuted = mute });
+        Change(generation, s => s with { IsMuted = mute });
     }
 
     /// <summary>
@@ -770,12 +947,14 @@ public class CallService(
         SIPUserAgent? agent;
         CallState state;
         CallRecorder? recorder;
+        long generation;
 
         lock (_gate)
         {
             agent = _agent;
             state = _state;
             recorder = _recorder;
+            generation = _generation;
         }
 
         if (agent is null || state.Status is not CallStatus.Connected)
@@ -818,7 +997,7 @@ public class CallService(
         recorder?.MarkHold(hold);
 
         logger.LogInformation("Call {Action}", hold ? "put on hold" : "taken off hold");
-        Set(State with { IsOnHold = hold });
+        Change(generation, s => s with { IsOnHold = hold });
     }
 
     /// <summary>
@@ -1086,11 +1265,39 @@ public class CallService(
         // Busy is handled in OnTransportRequest: the user agent never raises
         // this event for a second call.
 
+        var callId = request.Header?.CallId;
+        long generation;
+
+        lock (_gate)
+        {
+            // F-09: the line is claimed here, under the lock, not by the check
+            // at the top. An outgoing call started in the same instant would
+            // otherwise have its Dialling written over with this Ringing.
+            if (_state.Status is not CallStatus.Idle)
+            {
+                // OnTransportRequest, which runs next, turns it away as busy.
+                return;
+            }
+
+            generation = _generation = ++_lastGeneration;
+
+            // Set with the claim: OnTransportRequest tells this INVITE from a
+            // second call by it. Null-conditional to match the header read
+            // above: an INVITE with no header at all would not get this far,
+            // but the two should not disagree about whether that is possible.
+            _callId = callId;
+            _state = new CallState(
+                CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null, callId);
+        }
+
         var uas = agent.AcceptCall(request);
 
         lock (_gate)
         {
-            _pending = uas;
+            if (generation == _generation)
+            {
+                _pending = uas;
+            }
         }
 
         // 180 Ringing: the caller hears ringback rather than silence while the
@@ -1107,7 +1314,7 @@ public class CallService(
         logger.LogInformation(
             "Incoming call from {Caller} ({Name}) via queue {Queue}, Call-ID {CallId}",
             caller ?? "withheld", identity.DisplayName ?? "no name", queue ?? "none",
-            request.Header.CallId);
+            callId);
 
         // When no queue came through, say what the INVITE actually carried.
         // Otherwise a dialplan that never set the header and a header this app
@@ -1121,17 +1328,7 @@ public class CallService(
                 extra is null || extra.Count == 0 ? "(none)" : string.Join(" | ", extra));
         }
 
-        lock (_gate)
-        {
-            // Null-conditional to match the header read above: an INVITE with no
-            // header at all would not get this far, but the two should not
-            // disagree about whether that is possible.
-            _callId = request.Header?.CallId;
-        }
-
-        Set(new CallState(
-            CallStatus.Ringing, caller, identity.DisplayName, queue, DateTimeOffset.Now, null,
-            _callId));
+        StateChanged?.Invoke(this, State);
 
         // The ring (A-10). The pop-up alone is silent, and an agent looking at
         // another screen or another window never saw it. Not for auto answer,
@@ -1144,7 +1341,7 @@ public class CallService(
         // The microphone, speaker and RTP session are built now, while the
         // agent is reading the pop-up, rather than when they press Answer.
         // Off this thread for the same reason as auto answer below.
-        _ = Task.Run(PrepareMedia);
+        _ = Task.Run(() => PrepareMedia(generation));
 
         // A-18: auto answer. The state goes out first, so the pop-up is already
         // on screen showing who this is by the time the line opens — an agent
@@ -1177,7 +1374,7 @@ public class CallService(
 
         lock (_gate)
         {
-            if (_hangingUpLocally)
+            if (_hangingUp == _generation)
             {
                 // Our own Hangup() raised this. HangUp() finishes the call
                 // itself, once the BYE is away.
@@ -1192,11 +1389,21 @@ public class CallService(
     {
         SIPServerUserAgent? pending;
         SIPUserAgent? agent;
+        long generation;
 
         lock (_gate)
         {
+            // Only a ringing call can be rejected. Without this, Reject pressed
+            // on a connected call (a shortcut, M-A05) finished it with no BYE,
+            // leaving the customer on a line nobody was on.
+            if (_state.Status is not CallStatus.Ringing)
+            {
+                return;
+            }
+
             pending = _pending;
             agent = _agent;
+            generation = _generation;
             _pending = null;
         }
 
@@ -1210,7 +1417,7 @@ public class CallService(
         }
 
         logger.LogInformation("Call ended: {Why}", why);
-        Finish(agent, why, CallOutcome.RejectedByAgent);
+        Finish(agent, why, CallOutcome.RejectedByAgent, generation);
     }
 
     /// <summary>
@@ -1236,7 +1443,7 @@ public class CallService(
     /// recording. The events are only subscribed once a recorder exists, so a
     /// failure here costs nothing per frame afterwards.
     /// </remarks>
-    private void StartRecording(VoIPMediaSession media, WindowsAudioEndPoint audio)
+    private void StartRecording(long generation, VoIPMediaSession media, WindowsAudioEndPoint audio)
     {
         if (!recording.Value.Enabled)
         {
@@ -1245,10 +1452,17 @@ public class CallService(
 
         try
         {
+            string? callId;
+
+            lock (_gate)
+            {
+                callId = _callId;
+            }
+
             // Named for the call, not the clock: this is the name the server
             // will attach to the call record, and two calls in the same second
             // would otherwise collide.
-            var name = (_callId ?? Guid.NewGuid().ToString()).Replace(':', '_');
+            var name = (callId ?? Guid.NewGuid().ToString()).Replace(':', '_');
 
             foreach (var invalid in Path.GetInvalidFileNameChars())
             {
@@ -1263,13 +1477,30 @@ public class CallService(
                 return;
             }
 
+            bool keep;
+
             lock (_gate)
             {
-                _recorder = recorder;
+                // F-09: only onto the call it was started for. A call finished
+                // between the answer and here has already stopped whatever
+                // recorder it had, and one attached now would never be stopped.
+                keep = generation == _generation && _state.Status is CallStatus.Connected && _recorder is null;
+
+                if (keep)
+                {
+                    _recorder = recorder;
+                    media.OnAudioFrameReceived += recorder.WriteRemote;
+                    audio.OnAudioSourceEncodedFrameReady += recorder.WriteLocal;
+                }
             }
 
-            media.OnAudioFrameReceived += recorder.WriteRemote;
-            audio.OnAudioSourceEncodedFrameReady += recorder.WriteLocal;
+            if (!keep)
+            {
+                // Nothing was written to it, so stopping it leaves no file.
+                recorder.Stop();
+                recorder.Dispose();
+                return;
+            }
 
             logger.LogInformation("Recording this call to {Path}", recorder.FilePath);
         }
@@ -1351,7 +1582,7 @@ public class CallService(
     /// its own when it gets there first, and a rejected call's media is closed
     /// by <see cref="Finish"/> like any other.
     /// </remarks>
-    private void PrepareMedia()
+    private void PrepareMedia(long generation)
     {
         VoIPMediaSession media;
         WindowsAudioEndPoint audio;
@@ -1371,7 +1602,7 @@ public class CallService(
 
         lock (_gate)
         {
-            if (_state.Status is CallStatus.Ringing && _media is null)
+            if (_state.Status is CallStatus.Ringing && _generation == generation && _media is null)
             {
                 _media = media;
                 _audio = audio;
@@ -1410,7 +1641,47 @@ public class CallService(
         // where the SDP said would be a call with no sound.
         media.AcceptRtpFromAny = true;
 
+        // M-A02: a headset unplugged, or no device at all. Until 27 Sep this
+        // went nowhere, and the call connected in silence.
+        audio.OnAudioSourceError += error => OnAudioError(audio, AudioFailure.Microphone, error);
+        audio.OnAudioSinkError += error => OnAudioError(audio, AudioFailure.Speaker, error);
+
         return (media, audio);
+    }
+
+    /// <summary>
+    /// A microphone or speaker failure, logged and passed on, but only for the
+    /// call in progress: media thrown away after losing a race (F-09) can still
+    /// report a device it never used.
+    /// </summary>
+    private void OnAudioError(WindowsAudioEndPoint audio, AudioFailure which, string? error)
+    {
+        bool current;
+
+        lock (_gate)
+        {
+            current = ReferenceEquals(audio, _audio) || ReferenceEquals(audio, _held?.Audio);
+        }
+
+        logger.LogWarning(
+            "The {Device} failed{Current}: {Error}",
+            which is AudioFailure.Microphone ? "microphone" : "speaker",
+            current ? string.Empty : " on media no longer in use",
+            error);
+
+        if (!current)
+        {
+            return;
+        }
+
+        try
+        {
+            AudioFailed?.Invoke(this, which);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An audio failure could not be shown to the agent");
+        }
     }
 
     private void CloseMedia()
@@ -1454,7 +1725,13 @@ public class CallService(
     /// changes when a call ends, so an event arriving late from a call already
     /// finished must not finish whatever has come to the front since.
     /// </param>
-    private void Finish(SIPUserAgent? agent, string why, CallOutcome? outcome = null)
+    /// <param name="generation">
+    /// The call this is meant to finish, when the caller knows it (F-09). The
+    /// listener's user agent carries every ordinary call, so the agent alone
+    /// cannot tell a late failure from the last call apart from the call
+    /// ringing now.
+    /// </param>
+    private void Finish(SIPUserAgent? agent, string why, CallOutcome? outcome = null, long? generation = null)
     {
         CallState state;
         CallState next;
@@ -1472,13 +1749,19 @@ public class CallService(
                 return;
             }
 
+            if (generation is { } forCall && forCall != _generation)
+            {
+                // Over already, on this same line; what is at the front now is
+                // another call, and not this caller's to end.
+                return;
+            }
+
             state = _state;
             callId = _callId;
             recorder = _recorder;
             media = _media;
             audio = _audio;
             _pending = null;
-            _hangingUpLocally = false;
 
             if (agent is not null && !ReferenceEquals(agent, _listener))
             {
@@ -1507,6 +1790,7 @@ public class CallService(
                 _recorder = held.Recorder;
                 _callId = held.CallId;
                 _state = held.State;
+                _generation = held.Generation;
                 _held = null;
             }
             else
@@ -1517,6 +1801,10 @@ public class CallService(
                 _recorder = null;
                 _callId = null;
                 _state = CallState.Idle;
+
+                // Whatever was still waiting on the call just ended now finds
+                // it gone (F-09).
+                _generation = ++_lastGeneration;
             }
 
             next = _state;
@@ -1676,14 +1964,29 @@ public class CallService(
         }
     }
 
-    private void Set(CallState state)
+    /// <summary>
+    /// Changes the connected call at the front, for mute and hold (F-09).
+    /// </summary>
+    /// <remarks>
+    /// Applied to the state as it is now, inside the lock, and only if it is
+    /// still the call the change was asked for and still connected. The old
+    /// way read the state, let go of the lock, and wrote back the copy: a
+    /// hang-up in between had its Idle overwritten by a stale Connected.
+    /// </remarks>
+    private void Change(long generation, Func<CallState, CallState> change)
     {
+        CallState state;
+
         lock (_gate)
         {
-            // The parked call (A-24) is whatever is parked now, not whatever
-            // was parked when the caller read State: the customer on hold may
-            // have hung up in between.
-            _state = state.IsActive ? state with { Held = _held?.State } : state;
+            if (generation != _generation || _state.Status is not CallStatus.Connected)
+            {
+                return;
+            }
+
+            // The parked call (A-24) is whatever is parked now: the customer
+            // on hold may have hung up since the change was asked for.
+            _state = change(_state) with { Held = _held?.State };
             state = _state;
         }
 
@@ -1703,5 +2006,13 @@ public class CallService(
         WindowsAudioEndPoint? Audio,
         CallRecorder? Recorder,
         string? CallId,
-        CallState State);
+        CallState State,
+        long Generation);
+}
+
+/// <summary>Which half of the headset failed (M-A02).</summary>
+public enum AudioFailure
+{
+    Microphone,
+    Speaker,
 }

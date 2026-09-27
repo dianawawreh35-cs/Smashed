@@ -214,6 +214,17 @@
                    HorizontalAlignment="Center"
                    Margin="0,6,0,0"
                    Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- M-A02: the headset failed. Until 27 Sep the call simply had no
+             sound, and nothing on screen or in the log said why. -->
+        <TextBlock Text="{Binding AudioProblem}"
+                   Foreground="{StaticResource Danger}"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Visibility="{Binding AudioProblem, Converter={StaticResource NotNullToVisibility}}" />
       </StackPanel>
 
       <ScrollViewer x:Name="Body"

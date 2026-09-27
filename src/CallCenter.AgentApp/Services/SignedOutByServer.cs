@@ -45,7 +45,10 @@ public class SignedOutByServer
         _logger = logger;
 
         session.TokenRefused += (_, _) => OnTokenRefused();
-        calls.StateChanged += (_, state) => OnCallState(state);
+        // The service's state now, not the event's copy: the events can land
+        // out of order (M-A07), and a stale "Connected" would put the sign-out
+        // off until the next call.
+        calls.StateChanged += (_, _) => OnCallState(calls.State);
     }
 
     /// <summary>

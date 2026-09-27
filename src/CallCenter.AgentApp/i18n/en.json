@@ -64,6 +64,8 @@
     "incoming": "Incoming call",
     "internal": "Internal call",
     "outgoing": "Outgoing call",
+    "microphoneFailed": "The microphone is not working. Check the headset is plugged in; the customer may not hear you.",
+    "speakerFailed": "The headset's sound is not working. Check it is plugged in; you may not hear the customer.",
     "mute": "Mute",
     "muted": "Muted",
     "numberWithheld": "Number withheld",

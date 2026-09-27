@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
 
@@ -88,8 +89,19 @@ public partial class App : Application
     {
         Directory.CreateDirectory(LogDirectory);
 
+        // The levels come from appsettings.json's "Serilog" section (M-A02),
+        // read here because the logger is made before the host. Until 27 Sep
+        // the section was never read, so the "SIPSorcery" and "Microsoft"
+        // levels in it meant nothing.
+        var settings = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddEnvironmentVariables("CALLCENTER_")
+            .Build();
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
+            .ReadFrom.Configuration(settings)
             .Enrich.FromLogContext()
             .WriteTo.Console()
             .WriteTo.File(
@@ -107,6 +119,11 @@ public partial class App : Application
                 .AddEnvironmentVariables("CALLCENTER_"))
             .ConfigureServices(ConfigureServices)
             .Build();
+
+        // M-A02: SIPSorcery logs through a factory of its own, which nothing
+        // set, so the library's own warnings (a device that would not open,
+        // RTP that stopped) went nowhere.
+        SIPSorcery.LogFactory.Set(_host.Services.GetRequiredService<ILoggerFactory>());
 
         await _host.StartAsync();
 

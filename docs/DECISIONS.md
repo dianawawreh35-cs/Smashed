@@ -6338,6 +6338,82 @@ it yet:** the test job is Linux, and the Windows job only builds. Adding a
 `dotnet test` step to the Windows job is one line, not made here because the
 server session is changing `ci.yml` at the same time (F-06).
 
+## 2026-09-27 — The phone never stays busy: the call service's races (F-09, M-A02, M-A07, M-A08)
+
+Part 2 of prompt 17. All three races in F-09 were there as the review said; the
+first is still only *plausible* as a race (nobody has caught one), but the code
+path is certain, and the result was a phone busy until restart.
+
+**One rule closes all three.** Every call at the front has a number,
+`_generation`, handed out when it rings or is dialled and replaced when the
+front goes empty. Anything that waits (the answer, the INVITE, building the
+microphone and speaker) takes the number when it starts and, when it comes
+back, changes the state **under `_gate`**, and only if the number and the
+status are still the ones it started with. The Call-ID could not do this: a
+call being dialled has none until it is answered, and the listener's user agent
+is the same object for every ordinary call. A call parked on hold (A-24) takes
+its number with it and gets it back. Numbers come from a separate counter, so a
+returning parked call can never lead to a number being handed out twice.
+
+1. **The answer racing the BYE.** `AnswerAsync` and `DialAsync` built Connected
+   from whatever the state was when the answer returned. A BYE in between had
+   already finished the call (Idle, reported missed or unanswered), so they
+   built Connected out of Idle: the pop-up went, the service stayed Connected,
+   and every later INVITE was refused 486 Busy. Now the change to Connected
+   happens under the lock, only if the call is still Ringing or Dialling with
+   the same number. Otherwise it stays ended, and the log says "ended as it was
+   answered". The recorder attaches under the same rule, so a recorder started
+   for a call that has just ended is closed at once rather than left open.
+2. **Cancel during dialling.** `HangUp` set `_hangingUpLocally` for a call
+   being dialled and nothing ever cleared it, so if the customer answered as
+   the agent gave up, their later BYE was taken for our own and ignored. The
+   flag is now `_hangingUp`, the number of the call being hung up, set only for
+   a connected call: it stops matching the moment that call is over. A Cancel
+   pressed while the microphone is still opening is remembered
+   (`_cancelledDial`) and no INVITE goes. **Decided:** if the answer crosses a
+   Cancel already on the wire, the call connects and the agent has Hang up in
+   front of them. Hanging up on a customer who has just said hello, on the
+   agent's behalf, seemed the worse surprise.
+3. **Auto answer against `PrepareMedia`.** Both built media at once, and the
+   answer overwrote the prepared session, whose audio device stayed open until
+   the process ended: about one device handle per auto-answered call. Now
+   whichever is first is used and the other is closed, both ways round.
+
+**Also closed while in there, because the keyboard shortcuts (M-A05) make them
+reachable:** Reject now does nothing unless the call is ringing (on a connected
+call it used to finish it with no BYE, leaving the customer on a line nobody
+was on); Hang up does nothing while ringing or idle (it used to report a
+ringing call as answered). Mute and Hold change the state through the same
+rule, so a hang-up landing between reading and writing the state can no longer
+be undone by a stale copy. An incoming call claims the line under the lock, so
+an outgoing call started in the same instant is not overwritten.
+
+**M-A07.** The pop-up no longer applies the state carried by the event. It reads
+the service's state when its turn on the UI thread comes, with `BeginInvoke`,
+so out-of-order events cannot bring back a call the service has finished, and a
+SIP thread never waits on the UI. The recording player and the forced sign-out
+(N-05) do the same.
+
+**M-A02.** The microphone's and speaker's error events are logged and shown on
+the pop-up in red (`call.microphoneFailed`, `call.speakerFailed`), for the call
+in progress only: media thrown away after losing a race can still report a
+device. `SIPSorcery.LogFactory` is set to the app's logger factory, and the
+logger now reads the `Serilog` section of `appsettings.json`, which it never
+did. So the `SIPSorcery: Warning` and `Microsoft: Warning` levels there now
+apply. The second one also quietens the host's own start-up lines.
+
+**M-A08.** The ring, the ringback and the key beeps use `WaveOutEvent`, which
+has its own playback thread, instead of `WaveOut` made on SIP threads and
+stopped from the UI.
+
+**Not tested automatically, and why.** The prompt asked for the state rules to
+be tested without a PBX if possible. They live inside `CallService` together
+with SIPSorcery's user agents and the Windows audio endpoint. A loopback SIP
+harness would ring the real speakers, open the real sound card and write the
+laptop's real `settings.json`. Pulling the state machine out to test it on its
+own is the broader rewrite the prompt asked not to do in the file where a
+mistake costs a live customer. The checklist has the calls to make instead.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

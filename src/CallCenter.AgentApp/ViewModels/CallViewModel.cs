@@ -54,6 +54,11 @@ public partial class CallViewModel : ObservableObject
         _calls.StateChanged += OnStateChanged;
         _calls.CallFinished += OnCallFinished;
 
+        // M-A02: said on the pop-up, where the agent is looking, rather than
+        // only in the log.
+        _calls.AudioFailed += (_, which) => _dispatcher.BeginInvoke(() =>
+            AudioProblemKey = which is AudioFailure.Microphone ? "call.microphoneFailed" : "call.speakerFailed");
+
         // The PBX's name hides itself once the real contact arrives, and that
         // arrives on another object, so this view model has to be told.
         Caller.PropertyChanged += (_, e) =>
@@ -333,6 +338,16 @@ public partial class CallViewModel : ObservableObject
     /// call is answered: a timer counting how long a phone has been ringing
     /// would read as call duration and end up in somebody's report.
     /// </summary>
+    /// <summary>
+    /// The headset failed during this call (M-A02), as a label key so it
+    /// follows the language. Cleared when the next call arrives.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AudioProblem))]
+    private string? _audioProblemKey;
+
+    public string? AudioProblem => AudioProblemKey is null ? null : Localizer[AudioProblemKey];
+
     public string Duration => State.Duration is { } elapsed
         ? $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}"
         : string.Empty;
@@ -381,9 +396,23 @@ public partial class CallViewModel : ObservableObject
     /// Brings the call onto the screen, or takes it away. Marshalled: this
     /// arrives on a SIP thread.
     /// </summary>
-    private void OnStateChanged(object? sender, CallState state) =>
-        _dispatcher.Invoke(() =>
+    /// <remarks>
+    /// <b>The state is read again once on the UI thread (M-A07)</b>, rather
+    /// than taken from the event. The service raises the event outside its
+    /// lock, from SIP threads and the UI thread at once, so two of them can
+    /// arrive in the wrong order, and the pop-up used to show whichever came
+    /// last: a call it had just been told was over could come back as
+    /// Connected. Reading the service's own answer means the pop-up shows the
+    /// state the service has now, whatever order the events land in. A second
+    /// event finds nothing new and changes nothing.
+    ///
+    /// Queued with <c>BeginInvoke</c>, so a SIP thread is never held waiting
+    /// on the UI.
+    /// </remarks>
+    private void OnStateChanged(object? sender, CallState _) =>
+        _dispatcher.BeginInvoke(() =>
         {
+            var state = _calls.State;
             var wasActive = State.IsActive;
             var wasConnected = State.Status is CallStatus.Connected;
 
@@ -416,6 +445,7 @@ public partial class CallViewModel : ObservableObject
                 // something to hold the next caller up over.
                 Classification.Close();
                 CloseNotes();
+                AudioProblemKey = null;
 
                 if (state.Status is not CallStatus.Connected)
                 {
@@ -444,5 +474,6 @@ public partial class CallViewModel : ObservableObject
         OnPropertyChanged(nameof(HoldLabel));
         OnPropertyChanged(nameof(DirectionBadge));
         OnPropertyChanged(nameof(HeldNumber));
+        OnPropertyChanged(nameof(AudioProblem));
     }
 }

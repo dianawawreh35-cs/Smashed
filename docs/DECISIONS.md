@@ -6414,6 +6414,60 @@ laptop's real `settings.json`. Pulling the state machine out to test it on its
 own is the broader rewrite the prompt asked not to do in the file where a
 mistake costs a live customer. The checklist has the calls to make instead.
 
+## 2026-09-27 — The review's server fixes, part 1: what was broken or wrong
+
+The first part of [prompt 18](prompts/18-server-review-fixes.md): the review
+items that were broken or gave wrong figures that day. Each one was checked
+against the code first; all six were as the review described.
+
+- **The delivery price-list paste works (S-58, F-04).** It had answered 500
+  every time: the database connection retries on failure, and EF will not let
+  code open a transaction by hand under a retrying connection. It now goes
+  through the retrying strategy, as `ApplicationsService` already did, and a
+  retry starts the whole import again from nothing. There was no other
+  hand-opened transaction in the server. Two database tests post real imports.
+- **Only a supervisor opens or closes a complaint (R-17, F-05).** Dia, 27 Sep:
+  supervisor-only, and from a supervisor null means "leave it as it is". The
+  Agent App never showed the tick and always sent null, so an agent correcting
+  a note put a closed complaint back to open.
+- **"Today" on clock-change days (S-20, F-06).** Hebron's clocks change at 02:00
+  (28 Mar 2026 forward, 24 Oct 2026 back), so midnight is never skipped or
+  repeated, but "today" was built from midnight at the offset in force *now*. On
+  24 October the dashboard would have left out 00:00-01:00 from 02:00 onwards.
+  Each midnight now takes its own offset (`ReportScope.StartOfDay`). The CI
+  test job runs in `TZ=Asia/Hebron`, as production does. New tests: every day
+  of 2026 and 2027 at three times of day, the two named days to the minute, and
+  a database test of 24 October with a call across midnight and the repeated
+  hour. The random test day now skips clock-change days. The rest of
+  `Features/` was searched for the same mistake: nothing else builds a
+  midnight from another instant's offset. The call-search "to" bound
+  (`end.Date…`) converts through the local zone and is right.
+  - The laptop here is on Windows' "West Bank Standard Time", which has the
+    same 2026 rules, so the Hebron tests run locally too; elsewhere they say
+    *skipped*, not passed.
+- **The backup cannot report success on an empty dump (N-07, F-07).**
+  `backup.sh` now has `set -Eeuo pipefail`. It writes the dump under a
+  temporary name, checks it with `gzip -t` and checks for pg_dump's closing
+  line, and only then renames it. The name carries the time
+  (`db-2026-09-27-033000.sql.gz`), so `update.sh`'s dump no longer overwrites the
+  night's. Tried here with a stand-in for docker: with the database "down" it
+  prints *backup FAILED* and leaves the earlier dumps alone. `update.sh`
+  already had `pipefail`; there are no other scripts in `deploy/`.
+- **POS-created customers count as new (R-16, F-10).** Dia, 27 Sep: a label on
+  every contact saying where it came from, `contacts.source`, one of `Seed`,
+  `Agent`, `Pos`. The migration works it out for existing rows: a creator means
+  `Agent`; no creator and made in the seed's ten seconds means `Seed`; no
+  creator at any other time means `Pos`. Checked on the dev database before
+  deciding: 15,288 `Seed`, 1 `Pos` (a customer the POS lookup added on 26 Sep,
+  who had been counted as returning), 121 `Agent`. That one contact is also in
+  the seed file; its seeded copy had gone by the 26th, which is why the POS
+  could make it again.
+- **The A-42 edit window reads the injected clock (M-S08),** and has the test
+  it was missing: a call at 23:55 may be changed at 23:59 and not at 00:05.
+
+**Not changed:** `SaveClassificationRequest.Resolved` keeps its shape and its
+place in `CallCenter.Shared`; only the server's handling of it changed.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

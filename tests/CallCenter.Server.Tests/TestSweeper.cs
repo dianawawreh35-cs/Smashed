@@ -21,7 +21,7 @@ namespace CallCenter.Server.Tests;
 /// which were already chosen to be unmistakable: users whose login starts
 /// <c>test-</c> or <c>rec-agent-</c>, calls whose SIP Call-ID ends <c>@test</c> or
 /// starts <c>rec-</c> and ends <c>@pbx</c> (the recording tests), branches named
-/// <c>Test branch</c> plus a suffix, types named <c>TestType</c> or
+/// <c>Test branch</c> plus a suffix (and their delivery areas), types named <c>TestType</c> or
 /// <c>AccessType</c> plus a suffix, channels with an eight-hex-digit suffix,
 /// forms with a version at or above 100,000. Contacts are the one thing without
 /// a pattern: the tests give them real-looking names and numbers so matching
@@ -111,6 +111,8 @@ public static class TestSweeper
             DELETE FROM classification_types t
              WHERE (t.name ~ '^(TestType|AccessType)[0-9a-f]{{8}}$' OR t.name ~ '^Test-[0-9a-f]{{7}}$')
                AND NOT EXISTS (SELECT 1 FROM classifications c WHERE c.type_id = t.id);
+            DELETE FROM delivery_areas
+             WHERE branch_id IN (SELECT id FROM branches WHERE name ~ '^Test branch [0-9a-f]{{8}}$');
             DELETE FROM branches b
              WHERE b.name ~ '^Test branch [0-9a-f]{{8}}$'
                AND NOT EXISTS (SELECT 1 FROM communications m WHERE m.branch_id = b.id)

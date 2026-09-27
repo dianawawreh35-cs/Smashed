@@ -34,3 +34,26 @@ public sealed class DatabaseTheoryAttribute : TheoryAttribute
         }
     }
 }
+
+/// <summary>
+/// A test that only means something in the restaurant's time zone, where the
+/// clocks change on known days (F-06). CI runs in <c>TZ=Asia/Hebron</c>, as the
+/// production container does; a laptop set to "West Bank Standard Time" is the
+/// same zone. Anywhere else it is reported as skipped.
+/// </summary>
+public sealed class HebronFactAttribute : FactAttribute
+{
+    public HebronFactAttribute(bool needsDatabase = false)
+    {
+        if (!IsHebron)
+        {
+            Skip = $"Needs the restaurant's time zone (TZ=Asia/Hebron); this run is in {TimeZoneInfo.Local.Id}.";
+        }
+        else if (needsDatabase && !CallCenterApiFactory.HasDatabase)
+        {
+            Skip = "Needs PostgreSQL: set ConnectionStrings__Default to run it.";
+        }
+    }
+
+    public static bool IsHebron => TimeZoneInfo.Local.Id is "Asia/Hebron" or "West Bank Standard Time";
+}

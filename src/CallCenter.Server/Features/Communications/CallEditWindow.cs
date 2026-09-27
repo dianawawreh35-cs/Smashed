@@ -21,7 +21,7 @@ namespace CallCenter.Server.Features.Communications;
 /// written: a call taken at 23:55 and classified at 00:05 belongs to the day it
 /// happened.
 /// </remarks>
-public class CallEditWindow(SettingsService settings)
+public class CallEditWindow(SettingsService settings, TimeProvider clock)
 {
     public enum Refusal
     {
@@ -55,10 +55,12 @@ public class CallEditWindow(SettingsService settings)
         }
 
         // Local time, not UTC: "the same day" means the agent's day. A shift
-        // ending after midnight UTC is still the same evening in Hebron.
+        // ending after midnight UTC is still the same evening in Hebron. The
+        // injected clock, not DateTimeOffset.Now, so the edge can be tested
+        // (M-S08, 27 Sep review).
         var startedLocal = communication.StartedAt.ToLocalTime().Date;
 
-        return startedLocal == DateTimeOffset.Now.Date
+        return startedLocal == clock.GetLocalNow().Date
             ? null
             : Refusal.Closed;
     }

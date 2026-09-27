@@ -275,70 +275,82 @@ public class DeliveryAreasService(CallCenterDbContext db, ILogger<DeliveryAreasS
             parsed[normalised] = (name, price);
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-        var removed = 0;
-
-        if (request.Replace)
+        // S-58, F-04: the context retries on failure (Program.cs), and EF refuses
+        // a transaction opened by hand outside the retrying strategy, so this
+        // answered 500 every time. Inside it, a retry runs the whole block
+        // again, which is why the counts and the refusals start afresh in it.
+        var written = await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            removed = await db.DeliveryAreas
-                .Where(a => a.BranchId == request.BranchId)
-                .ExecuteDeleteAsync(ct);
-        }
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        // Everything with one of these names, whichever branch it belongs to —
-        // the unique index is global, so a name held by another branch has to be
-        // reported rather than silently stolen.
-        var names = parsed.Keys.ToList();
+            var removed = 0;
+            var refused = new List<ImportProblem>();
 
-        var existing = await db.DeliveryAreas
-            .Where(a => names.Contains(a.NameNormalised))
-            .ToListAsync(ct);
-
-        var byName = existing.ToDictionary(a => a.NameNormalised);
-
-        var added = 0;
-        var updated = 0;
-
-        foreach (var (normalised, (name, price)) in parsed)
-        {
-            if (byName.TryGetValue(normalised, out var area))
+            if (request.Replace)
             {
-                if (area.BranchId != request.BranchId)
+                removed = await db.DeliveryAreas
+                    .Where(a => a.BranchId == request.BranchId)
+                    .ExecuteDeleteAsync(ct);
+            }
+
+            // Everything with one of these names, whichever branch it belongs to —
+            // the unique index is global, so a name held by another branch has to be
+            // reported rather than silently stolen.
+            var names = parsed.Keys.ToList();
+
+            var existing = await db.DeliveryAreas
+                .Where(a => names.Contains(a.NameNormalised))
+                .ToListAsync(ct);
+
+            var byName = existing.ToDictionary(a => a.NameNormalised);
+
+            var added = 0;
+            var updated = 0;
+
+            foreach (var (normalised, (name, price)) in parsed)
+            {
+                if (byName.TryGetValue(normalised, out var area))
                 {
-                    problems.Add(new ImportProblem(0, name, "other_branch"));
+                    if (area.BranchId != request.BranchId)
+                    {
+                        refused.Add(new ImportProblem(0, name, "other_branch"));
+                        continue;
+                    }
+
+                    area.Name = name;
+                    area.Price = price;
+                    area.IsActive = true;
+                    area.UpdatedBy = actingUserId;
+                    area.UpdatedAt = DateTimeOffset.UtcNow;
+                    updated++;
                     continue;
                 }
 
-                area.Name = name;
-                area.Price = price;
-                area.IsActive = true;
-                area.UpdatedBy = actingUserId;
-                area.UpdatedAt = DateTimeOffset.UtcNow;
-                updated++;
-                continue;
+                db.DeliveryAreas.Add(new DeliveryArea
+                {
+                    Name = name,
+                    NameNormalised = normalised,
+                    BranchId = request.BranchId,
+                    Price = price,
+                    CreatedBy = actingUserId,
+                    UpdatedBy = actingUserId,
+                });
+
+                added++;
             }
 
-            db.DeliveryAreas.Add(new DeliveryArea
-            {
-                Name = name,
-                NameNormalised = normalised,
-                BranchId = request.BranchId,
-                Price = price,
-                CreatedBy = actingUserId,
-                UpdatedBy = actingUserId,
-            });
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return (Added: added, Updated: updated, Removed: removed, Refused: refused);
+        });
 
-            added++;
-        }
-
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        problems.AddRange(written.Refused);
 
         logger.LogInformation(
             "Delivery import for branch {BranchId}: {Added} added, {Updated} updated, {Removed} removed, {Problems} rejected",
-            request.BranchId, added, updated, removed, problems.Count);
+            request.BranchId, written.Added, written.Updated, written.Removed, problems.Count);
 
-        return (new ImportDeliveryAreasResult(added, updated, removed, problems), null);
+        return (new ImportDeliveryAreasResult(written.Added, written.Updated, written.Removed, problems), null);
     }
 }

@@ -256,8 +256,8 @@ All filterable by time period; also by agent, branch, channel where applicable.
 - **Answered** and **average duration**: answered calls only, and the duration is talk time, answered to ended.
 - **An order** is a communication classified as Order, and **order value** is its classification's value; a value on anything else is not revenue.
 - **Unclassified** is an answered call with no classification (A-41).
-- **A customer** is a saved contact; a number nobody saved is not a customer and is listed under R-18. **New** (R-16) means saved here in that period; the customers carried over from the old system are always returning.
-- **Follow-up status** (R-05, R-17) is the classification's *Follow-up required* and *Resolved* ticks.
+- **A customer** is a saved contact; a number nobody saved is not a customer and is listed under R-18. **New** (R-16) means made here in that period, whether a person saved it or the POS lookup did (A-67); the customers carried over from the old system are always returning. *(27 Sep 2026: the POS lookup's contacts had been counted as returning by mistake. Each contact now records where it came from.)*
+- **Follow-up status** (R-05, R-17) is the classification's *Follow-up required* and *Resolved* ticks. **Only a supervisor sets or clears Resolved** (27 Sep 2026); an agent's save leaves it as it was.
 - **Duplicate contacts** (R-18) share a name, normalised as the name search normalises it (A-80).
 - **Internal calls** (S-48) are in no figure.
 

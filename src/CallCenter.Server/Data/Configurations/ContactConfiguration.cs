@@ -9,8 +9,13 @@ public class ContactConfiguration : IEntityTypeConfiguration<Contact>
 {
     public void Configure(EntityTypeBuilder<Contact> builder)
     {
-        builder.ToTable("contacts");
+        builder.ToTable("contacts", t =>
+            t.HasCheckConstraint("ck_contacts_source", In("source", ContactSources.All)));
         builder.HasKey(x => x.Id);
+
+        // A default in the database too, so a row inserted by hand (tools/demo-data)
+        // is a person's, as the application's own inserts are.
+        builder.Property(x => x.Source).HasMaxLength(10).IsRequired().HasDefaultValue(ContactSources.Agent);
 
         builder.Property(x => x.IsVip).HasDefaultValue(false);
         builder.Property(x => x.IsBlocked).HasDefaultValue(false);
@@ -37,4 +42,8 @@ public class ContactConfiguration : IEntityTypeConfiguration<Contact>
         // Full-text search over name + address (A-61). Created in the migration
         // as raw SQL - EF cannot express a GIN index over an expression.
     }
+
+    /// <summary>Renders a CHECK constraint body: <c>col IN ('a','b')</c>.</summary>
+    private static string In(string column, IReadOnlyList<string> allowed) =>
+        $"{column} IN ({string.Join(",", allowed.Select(v => $"'{v}'"))})";
 }

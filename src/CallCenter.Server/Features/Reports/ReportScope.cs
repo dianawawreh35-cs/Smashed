@@ -124,14 +124,37 @@ public static class ReportScope
     public static DateTime Local(DateTimeOffset at) => at.ToLocalTime().DateTime;
 
     /// <summary>The start of the restaurant's today, and of its tomorrow, as instants.</summary>
+    /// <remarks>
+    /// Each midnight at its own offset (S-20, F-06 of the 27 Sep review). This
+    /// once took today's midnight at the offset in force <i>now</i>, so on the
+    /// day the clocks go back (24 October 2026, 02:00 back to 01:00) the
+    /// afternoon's dashboard left out the calls from 00:00 to 01:00, and on the
+    /// day they go forward it took in the previous evening's last hour. A day
+    /// with a clock change is 23 or 25 hours long.
+    /// </remarks>
     public static (DateTimeOffset Start, DateTimeOffset End) Today(DateTimeOffset? now = null)
     {
-        var local = (now ?? DateTimeOffset.Now).ToLocalTime();
-        var start = new DateTimeOffset(local.Date, local.Offset);
-        // The offset of tomorrow's midnight, not today's: a day with a clock
-        // change is 23 or 25 hours long.
-        var next = local.Date.AddDays(1);
-        return (start, new DateTimeOffset(next, TimeZoneInfo.Local.GetUtcOffset(next)));
+        var date = Local(now ?? DateTimeOffset.Now).Date;
+        return (StartOfDay(date), StartOfDay(date.AddDays(1)));
+    }
+
+    /// <summary>The instant the restaurant's <paramref name="date"/> begins.</summary>
+    /// <remarks>
+    /// Hebron's clocks change at 02:00, so its midnight is never skipped or
+    /// repeated, but the rule is written for a zone where it is. Clocks going
+    /// back over midnight make it happen twice: the day begins at the first,
+    /// which has the larger offset. Clocks going forward over it skip it:
+    /// <see cref="TimeZoneInfo.GetUtcOffset(DateTime)"/> then gives the standard
+    /// offset, which lands on the moment the clocks jump, where the day begins.
+    /// </remarks>
+    public static DateTimeOffset StartOfDay(DateTime date)
+    {
+        var zone = TimeZoneInfo.Local;
+        var midnight = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
+        var offset = zone.IsAmbiguousTime(midnight)
+            ? zone.GetAmbiguousTimeOffsets(midnight).Max()
+            : zone.GetUtcOffset(midnight);
+        return new DateTimeOffset(midnight, offset);
     }
 
     public static string Day(DateTime local) => local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

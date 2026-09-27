@@ -76,6 +76,8 @@ CREATE TABLE contacts (
   flag_changed_at  timestamptz,
   created_by       uuid REFERENCES users(id),
   created_at       timestamptz NOT NULL DEFAULT now(),
+  source           varchar(10) NOT NULL DEFAULT 'Agent'
+                   CONSTRAINT ck_contacts_source CHECK (source IN ('Seed','Agent','Pos')),
   updated_by       uuid REFERENCES users(id),
   updated_at       timestamptz NOT NULL DEFAULT now(),
   merged_into_id   uuid REFERENCES contacts(id), -- set when this contact was merged into another (soft delete)
@@ -99,6 +101,7 @@ CREATE INDEX ix_contacts_name ON contacts USING gin (to_tsvector('simple', coale
 Notes
 - Matching a caller: normalise → exact match on `normalised`; if none, match on `last9` (handles 05x vs 9705x vs +9705x). Unique index on `normalised` gives duplicate detection for free.
 - Merge = move phones and communications to the target, set `merged_into_id` and `deleted_at` on the source. Never hard-delete.
+- `source` (migration `AddContactSource`, 27 Sep 2026): where the contact came from. `Seed` is the old system's customer book loaded by `seed`, `Agent` anything a person saved in either app, `Pos` a contact the POS lookup made (A-67). R-16 counts every contact as new in the period it was made except `Seed`. It used to be read from an empty `created_by`, which the POS lookup's contacts have too (F-10). The migration worked the existing rows out: a creator → `Agent`; no creator and made within ten minutes of the first creator-less contact (the seed runs once, in about ten seconds) → `Seed`; any other creator-less contact → `Pos`.
 
 ---
 
@@ -489,7 +492,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 | R‑12/13 by channel, order value | communications ⨝ channels ⨝ classifications.order_value |
 | R‑14 cancellation rate | classifications by type |
 | R‑15 agent productivity | communications by agent_id |
-| R‑16 new vs returning, inactive | contacts + min(started_at) per contact |
+| R‑16 new vs returning, inactive | contacts(source, created_at) + min(started_at) per contact |
 | R‑17 complaint handling | classifications.resolved_at, follow_up_tasks |
 | R‑18 data quality | communications without classification / contact; contact_phones duplicates |
 | R‑20/21 abandoned, SLA | communications(status, wait_sec) |

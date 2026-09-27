@@ -209,6 +209,8 @@ public class PosCustomerSync(
                 NameNormalised = ContactsService.NormalisedName(name),
                 Address = address,
                 Notes = notes,
+                // R-16: new here, although nobody typed it in (F-10).
+                Source = ContactSources.Pos,
             };
 
             contact.Phones.Add(new ContactPhone

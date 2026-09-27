@@ -239,12 +239,14 @@ public class ReportCube(CallCenterDbContext db)
 
     /// <summary>
     /// R-16: per bucket, how many customers called, and how many of them were
-    /// new — saved by somebody here in that bucket or after it (a contact
-    /// saved from the pop-up takes its earlier calls with it, A-11). A contact
-    /// nobody saved here, <c>created_by</c> empty, came with the old system's
-    /// customer book (the seed) and is never new: they were customers before
-    /// this system existed, and "saved in September" would otherwise make all
-    /// 15,289 of them new in the month it went live. The buckets are the
+    /// new — made here in that bucket or after it (a contact saved from the
+    /// pop-up takes its earlier calls with it, A-11), by a person or by the POS
+    /// lookup (A-67). A contact from the old system's customer book, source
+    /// <c>Seed</c>, is never new: they were customers before this system
+    /// existed, and "saved in September" would otherwise make all 15,288 of
+    /// them new in the month it went live. That used to be read from an empty
+    /// <c>created_by</c>, which the POS lookup's contacts have too, so they were
+    /// never new either (F-10, 27 Sep). The buckets are the
     /// restaurant's days, weeks or months, cut in .NET and passed as instants,
     /// for the same reason the segments are.
     /// </summary>
@@ -288,7 +290,7 @@ public class ReportCube(CallCenterDbContext db)
             WITH b AS (SELECT * FROM unnest(@b_from, @b_to, @b_key) AS b(f, t, k))
             SELECT b.k AS "Bucket",
                    count(DISTINCT c.contact_id)::int AS "Customers",
-                   (count(DISTINCT c.contact_id) FILTER (WHERE ct.created_by IS NOT NULL AND ct.created_at >= b.f))::int AS "New"
+                   (count(DISTINCT c.contact_id) FILTER (WHERE ct.source <> 'Seed' AND ct.created_at >= b.f))::int AS "New"
             FROM communications c
             JOIN b ON c.started_at >= b.f AND c.started_at < b.t
             JOIN contacts ct ON ct.id = c.contact_id
@@ -302,7 +304,7 @@ public class ReportCube(CallCenterDbContext db)
             .SqlQueryRaw<BucketCustomers>(sql, parameters.Cast<object>().ToArray()).ToListAsync(ct), ct);
         return rows.Select(r => (r.Bucket, r.Customers, r.New)).ToList();
 
-        static DateTimeOffset At(DateTime local) => new(local, TimeZoneInfo.Local.GetUtcOffset(local));
+        static DateTimeOffset At(DateTime local) => ReportScope.StartOfDay(local);
     }
 
     private sealed class BucketCustomers

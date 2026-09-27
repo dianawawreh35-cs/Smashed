@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using CallCenter.Server.Data;
+using CallCenter.Server.Data.Entities;
 using CallCenter.Server.Features.Contacts;
 using CallCenter.Server.Features.Pos;
 using CallCenter.Shared;
@@ -52,6 +53,7 @@ public class PosLookupTests(CallCenterApiFactory factory)
         contact.Address.Should().Be($"{City} - {Street}");
         contact.Notes.Should().Be("ويلز نقدي");
         contact.CreatedBy.Should().BeNull("the POS made it, not an agent");
+        contact.Source.Should().Be(ContactSources.Pos, "so R-16 counts it as new, which it once never did (F-10)");
         contact.Phones.Select(p => p.Raw).Should().BeEquivalentTo([mobile, second]);
         contact.Phones.Single(p => p.IsPrimary).Raw.Should().Be(mobile);
         (await ContactOfAsync(earlier.Id)).Should().Be(contact.Id);

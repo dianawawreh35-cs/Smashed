@@ -403,9 +403,15 @@ public class ClassificationService(
         // Resolved is only meaningful on a complaint (R-17). Recording it on an
         // order would put rows into the complaint-resolution report that were
         // never complaints.
+        //
+        // Only a supervisor changes it, and a null from them means "leave it as
+        // it is" (R-17, F-05 of the 27 Sep review). The Agent App never offers
+        // the tick and always sends null, so an agent fixing a typo in the notes,
+        // or the offline queue delivering a save late, used to put a complaint
+        // the supervisor had closed back to open.
         if (type.Name.Equals("Complaint", StringComparison.OrdinalIgnoreCase))
         {
-            if (request.Resolved != classification.Resolved)
+            if (actorIsSupervisor && request.Resolved is not null && request.Resolved != classification.Resolved)
             {
                 classification.Resolved = request.Resolved;
                 classification.ResolvedAt = request.Resolved == true ? now : null;

@@ -313,7 +313,7 @@ public class CallReportsTests(CallCenterApiFactory factory)
         var customers = (await d.GetAsync<List<CustomerBaseRowDto>>("calls/customers", a, "groupBy=day")).Single();
         (customers.Bucket, customers.Customers, customers.New, customers.Returning).Should().Be((d.DayKey, 2, 1, 1));
         var carriedOver = (await d.GetAsync<List<CustomerBaseRowDto>>("calls/customers", d.BranchB, "groupBy=day")).Single();
-        (carriedOver.Customers, carriedOver.New).Should().Be((1, 0), "a contact nobody here saved came with the old system's book");
+        (carriedOver.Customers, carriedOver.New).Should().Be((1, 0), "a contact from the old system's book is never new");
         var top = await d.GetAsync<List<CustomerRankRowDto>>("calls/top-customers", a, "by=value");
         top.Should().ContainSingle().Which.Should().Match<CustomerRankRowDto>(c => c.ContactId == d.CustomerX && c.Orders == 2 && c.OrderValue == 80m);
         // Inactive is measured back from today over every order: X last ordered years ago.
@@ -346,6 +346,37 @@ public class CallReportsTests(CallCenterApiFactory factory)
         (await d.GetAsync<DataQualityDto>("calls/data-quality", a)).DuplicateNames.Should().BeGreaterThan(0);
     }
 
+    /// <summary>
+    /// R-16's "new", by where a contact came from (F-10, 27 Sep): the POS
+    /// lookup's contacts have nobody's name on them, as the seed's do, and were
+    /// never counted as new until the source was stored.
+    /// </summary>
+    [DatabaseFact]
+    public async Task A_contact_from_the_POS_is_new_and_one_from_the_old_system_is_not()
+    {
+        var d = await DayAsync(seedDay: false);
+        var seeded = await data.CreateContactAsync("من الدفتر القديم", TestData.NewMobile());
+        var fromPos = await data.CreateContactAsync("من نقطة البيع", TestData.NewMobile());
+        var typed = await data.CreateContactAsync("أدخله موظف", TestData.NewMobile());
+
+        await data.QueryAsync(async db =>
+        {
+            var rows = await db.Contacts.Where(c => c.Id == seeded.Id || c.Id == fromPos.Id || c.Id == typed.Id).ToListAsync();
+            rows.Single(c => c.Id == seeded.Id).Source = ContactSources.Seed;
+            rows.Single(c => c.Id == fromPos.Id).Source = ContactSources.Pos;
+            rows.Single(c => c.Id == typed.Id).CreatedBy = d.AgentOne;
+            return await db.SaveChangesAsync();
+        });
+
+        foreach (var contact in new[] { seeded.Id, fromPos.Id, typed.Id })
+        {
+            await d.CallAsync(d.BranchA, d.At(12), Directions.In, CommunicationStatuses.Answered, d.AgentOne, contact);
+        }
+
+        var row = (await d.GetAsync<List<CustomerBaseRowDto>>("calls/customers", d.BranchA, "groupBy=day")).Single();
+        (row.Customers, row.New, row.Returning).Should().Be((3, 2, 1), "the POS's contact and the agent's are new, the seed's is not");
+    }
+
     // ---- the restaurant's clock ------------------------------------------------------
 
     [Fact]
@@ -366,14 +397,102 @@ public class CallReportsTests(CallCenterApiFactory factory)
         }
     }
 
+    /// <summary>
+    /// S-20's "today", every day of two years, at three times of day: it begins at
+    /// that date's midnight and ends at the next one's, whatever the clocks did
+    /// in between (F-06). In UTC this proves little; CI runs it in Hebron time,
+    /// and so does a laptop set to "West Bank Standard Time".
+    /// </summary>
+    [Fact]
+    public void Today_runs_from_its_own_midnight_to_the_next_on_every_day_including_clock_changes()
+    {
+        var zone = TimeZoneInfo.Local;
+        var lengths = new HashSet<double>();
+
+        for (var date = new DateTime(2026, 1, 1); date < new DateTime(2028, 1, 1); date = date.AddDays(1))
+        {
+            foreach (var time in new[] { new TimeSpan(0, 30, 0), new TimeSpan(12, 0, 0), new TimeSpan(23, 30, 0) })
+            {
+                var wall = date + time;
+                var now = new DateTimeOffset(wall, zone.GetUtcOffset(wall));
+                var (start, end) = ReportScope.Today(now);
+
+                start.ToLocalTime().DateTime.Should().Be(date, $"today began at midnight on {date:yyyy-MM-dd} ({time})");
+                end.ToLocalTime().DateTime.Should().Be(date.AddDays(1), $"and ended at the next midnight ({time})");
+                now.Should().BeOnOrAfter(start).And.BeBefore(end);
+                lengths.Add((end - start).TotalHours);
+            }
+        }
+
+        if (zone.GetAdjustmentRules().Length > 0 && zone.SupportsDaylightSavingTime)
+        {
+            lengths.Should().Contain([23, 24, 25], "a zone with daylight saving has short and long days");
+        }
+    }
+
+    /// <summary>The two days the review named, in Hebron time only.</summary>
+    [HebronFact]
+    public void In_Hebron_24_October_2026_is_25_hours_and_28_March_2026_is_23()
+    {
+        var autumn = ReportScope.Today(new DateTimeOffset(2026, 10, 24, 15, 0, 0, TimeSpan.FromHours(2)));
+        autumn.Start.Should().Be(new DateTimeOffset(2026, 10, 23, 21, 0, 0, TimeSpan.Zero), "00:00 is still summer time, +03:00");
+        autumn.End.Should().Be(new DateTimeOffset(2026, 10, 24, 22, 0, 0, TimeSpan.Zero));
+
+        var spring = ReportScope.Today(new DateTimeOffset(2026, 3, 28, 15, 0, 0, TimeSpan.FromHours(3)));
+        spring.Start.Should().Be(new DateTimeOffset(2026, 3, 27, 22, 0, 0, TimeSpan.Zero), "00:00 is still winter time, +02:00");
+        spring.End.Should().Be(new DateTimeOffset(2026, 3, 28, 21, 0, 0, TimeSpan.Zero));
+    }
+
+    /// <summary>
+    /// The day the clocks go back, 02:00 to 01:00, through the reports: each call
+    /// on its own day and hour, the repeated hour counted twice over, and a call
+    /// that begins before midnight and ends after it on the day it began.
+    /// </summary>
+    [HebronFact(needsDatabase: true)]
+    public async Task On_the_day_the_clocks_go_back_every_call_lands_on_its_own_day_and_hour()
+    {
+        var date = new DateTime(2026, 10, 24);
+        var d = await DayAsync(seedDay: false, on: date);
+        var a = d.BranchA;
+        DateTimeOffset Local(int hour, int minute, int offset) =>
+            new(date.Year, date.Month, date.Day, hour, minute, 0, TimeSpan.FromHours(offset));
+
+        var eve = new DateTimeOffset(2026, 10, 23, 23, 59, 0, TimeSpan.FromHours(3)); // ends 00:01, two minutes later
+        await d.CallAsync(a, eve, Directions.In, CommunicationStatuses.Answered, d.AgentOne, d.CustomerX);
+        await d.CallAsync(a, Local(0, 30, 3), Directions.In, CommunicationStatuses.Answered, d.AgentOne, d.CustomerX);
+        await d.CallAsync(a, Local(1, 30, 3), Directions.In, CommunicationStatuses.Answered, d.AgentOne, d.CustomerX);
+        await d.CallAsync(a, Local(1, 30, 2), Directions.In, CommunicationStatuses.Answered, d.AgentOne, d.CustomerY);
+        await d.CallAsync(a, Local(23, 30, 2), Directions.In, CommunicationStatuses.Answered, d.AgentOne, d.CustomerY);
+
+        var from = Instant(ReportScope.StartOfDay(date.AddDays(-1)));
+        var to = Instant(ReportScope.StartOfDay(date.AddDays(1)));
+        var byDay = (await d.Supervisor.GetFromJsonAsync<List<CallBreakdownRowDto>>(
+            $"/api/reports/calls/breakdown?branchId={a}&from={from}&to={to}&groupBy=day"))!;
+
+        byDay.Should().Contain(r => r.Key == "2026-10-23" && r.Calls == 1, "a call is on the day it began, though it ended after midnight");
+        byDay.Should().Contain(r => r.Key == "2026-10-24" && r.Calls == 4, "00:30 is the 24th, although it is 23 October in UTC");
+
+        var hours = (await d.Supervisor.GetFromJsonAsync<List<PeakHourRowDto>>(
+            $"/api/reports/calls/peak-hours?branchId={a}&from={Instant(ReportScope.StartOfDay(date))}&to={to}"))!;
+        hours.Single(h => h.Hour == 0).Total.Should().Be(1);
+        hours.Single(h => h.Hour == 1).Total.Should().Be(2, "01:00 to 02:00 happened twice");
+        hours.Single(h => h.Hour == 23).Total.Should().Be(1);
+        hours.Where(h => h.Hour is not (0 or 1 or 23)).Sum(h => h.Total).Should().Be(0);
+    }
+
     // ---- helpers -------------------------------------------------------------------
 
     private static string Instant(DateTimeOffset at) => Uri.EscapeDataString(at.ToString("o", CultureInfo.InvariantCulture));
 
+    /// <summary>
+    /// The restaurant's midnight before <paramref name="now"/>, at midnight's own
+    /// offset. It took <paramref name="now"/>'s offset once, the same mistake as
+    /// the code it checks (F-06), so on a clock-change day both were wrong together.
+    /// </summary>
     private static DateTimeOffset ReportDay(DateTimeOffset now)
     {
-        var local = now.ToLocalTime();
-        return new DateTimeOffset(local.Date, local.Offset);
+        var date = now.ToLocalTime().Date;
+        return new DateTimeOffset(date, TimeZoneInfo.Local.GetUtcOffset(date));
     }
 
     private sealed class KnownDay(TestData data)
@@ -521,7 +640,7 @@ public class CallReportsTests(CallCenterApiFactory factory)
     /// and Z by nobody here (as the old system's customers were).
     /// </code>
     /// </summary>
-    private async Task<KnownDay> DayAsync(bool seedDay = true)
+    private async Task<KnownDay> DayAsync(bool seedDay = true, DateTime? on = null)
     {
         await data.EnsurePhoneChannelAsync();
         var one = await data.CreateUserAsync();
@@ -535,7 +654,15 @@ public class CallReportsTests(CallCenterApiFactory factory)
         var suffix = Guid.NewGuid().ToString("N")[..8];
 
         // A day years back, different on every run, at the restaurant's midnight.
-        var date = new DateTime(2019, 1, 1).AddDays(Random.Shared.Next(0, 2500));
+        // Never a clock-change day: the calls are placed by adding hours to
+        // midnight, and on a 23- or 25-hour day "midnight plus 13 hours" is not
+        // 13:00, so about one run in 200 failed once CI ran in Hebron time
+        // (F-06). Those days have tests of their own.
+        var date = on ?? new DateTime(2019, 1, 1).AddDays(Random.Shared.Next(0, 2500));
+        while (on is null && TimeZoneInfo.Local.GetUtcOffset(date) != TimeZoneInfo.Local.GetUtcOffset(date.AddDays(2)))
+        {
+            date = date.AddDays(3);
+        }
         var dayStart = new DateTimeOffset(date, TimeZoneInfo.Local.GetUtcOffset(date));
 
         var ids = await data.QueryAsync(async db =>
@@ -635,14 +762,15 @@ public class CallReportsTests(CallCenterApiFactory factory)
 
         // R-16: X was saved by an agent a month before the day (returning);
         // Y was saved by an agent now, after the day (new, A-11 takes the
-        // earlier calls along); Z was saved by nobody here, as the old
-        // system's customers were (returning, though saved now).
+        // earlier calls along); Z came with the old system's customer book
+        // (returning, though loaded now).
         await data.QueryAsync(async db =>
         {
-            var saved = await db.Contacts.Where(c => c.Id == x.Id || c.Id == y.Id).ToListAsync();
+            var saved = await db.Contacts.Where(c => c.Id == x.Id || c.Id == y.Id || c.Id == z.Id).ToListAsync();
             saved.Single(c => c.Id == x.Id).CreatedBy = one.Id;
             saved.Single(c => c.Id == x.Id).CreatedAt = dayStart.AddDays(-30);
             saved.Single(c => c.Id == y.Id).CreatedBy = two.Id;
+            saved.Single(c => c.Id == z.Id).Source = ContactSources.Seed;
             return await db.SaveChangesAsync();
         });
 

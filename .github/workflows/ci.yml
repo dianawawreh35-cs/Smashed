@@ -70,6 +70,10 @@ jobs:
       # (runbook step 5). Its presence is also what tells the test host there is
       # a database to migrate — see CallCenterApiFactory.
       ConnectionStrings__Default: "Host=localhost;Port=5432;Database=callcenter;Username=callcenter;Password=callcenter"
+      # The restaurant's zone, as the production container has it (Dockerfile).
+      # In UTC the reports' days and "today" (S-20) are never cut by a clock
+      # change, so a mistake there passed CI for months (F-06, 27 Sep).
+      TZ: Asia/Hebron
 
     steps:
       - uses: actions/checkout@v4

@@ -97,6 +97,7 @@ public class SchemaTests
     [InlineData("follow_up_tasks", "ck_follow_up_tasks_status")]
     [InlineData("follow_up_tasks", "ck_follow_up_tasks_created_from")]
     [InlineData("pbx_events_raw", "ck_pbx_events_raw_source")]
+    [InlineData("contacts", "ck_contacts_source")]
     public void Check_constraints_from_the_schema_are_present(string table, string constraint)
     {
         var entity = Model.GetEntityTypes().Single(e => e.GetTableName() == table);
@@ -110,6 +111,7 @@ public class SchemaTests
     [InlineData("communications", "ck_communications_kind", new[] { CommunicationKinds.Call, CommunicationKinds.App })]
     [InlineData("communications", "ck_communications_direction", new[] { Directions.In, Directions.Out, Directions.None })]
     [InlineData("follow_up_tasks", "ck_follow_up_tasks_status", new[] { TaskStatuses.Open, TaskStatuses.Done, TaskStatuses.Cancelled })]
+    [InlineData("contacts", "ck_contacts_source", new[] { Data.Entities.ContactSources.Seed, Data.Entities.ContactSources.Agent, Data.Entities.ContactSources.Pos })]
     public void Check_constraints_allow_exactly_the_documented_values(
         string table, string constraint, string[] expected)
     {

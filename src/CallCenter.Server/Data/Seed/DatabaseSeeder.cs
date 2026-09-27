@@ -418,6 +418,8 @@ public class DatabaseSeeder(
                     NameNormalised = NameNormalizer.Normalize(row.Name) is { Length: > 0 } n ? n : null,
                     Address = Blank(row.Address),
                     Notes = Blank(row.Notes),
+                    // R-16: carried over, so never counted as a new customer.
+                    Source = ContactSources.Seed,
                 };
 
                 foreach (var phone in phones)

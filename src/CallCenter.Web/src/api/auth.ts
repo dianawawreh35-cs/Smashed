@@ -1,5 +1,6 @@
 /**
- * Sign-in for the supervisor app (S-01).
+ * Sign-in for the web app: supervisors (S-01), and agents, who see only the
+ * Agent App download page (S-63).
  *
  * The same endpoints the Agent App uses. The shapes here mirror
  * `CallCenter.Shared.Contracts.Auth` — they are hand-written, so a change on
@@ -39,8 +40,6 @@ export const LoginErrorCodes = {
   EmptyFields: 'empty_fields',
   ServerUnreachable: 'server_unreachable',
   ServerError: 'server_error',
-  /** A real account, but an agent's. Agents belong in the desktop app. */
-  NotASupervisor: 'not_a_supervisor',
   /** The server stopped accepting the sign-in part way through (N-05). */
   SignedOut: 'signed_out',
   /**
@@ -80,12 +79,9 @@ export async function login(loginName: string, password: string): Promise<LoginR
     throw new LoginError(toLoginErrorCode(error))
   }
 
-  // The API authenticates anyone; this app is for supervisors (S-01, N-10).
-  // An agent who lands here is told where to go rather than shown empty screens.
-  if (response.user.role !== UserRoles.Supervisor) {
-    throw new LoginError(LoginErrorCodes.NotASupervisor)
-  }
-
+  // Agents are let in since S-63, for the Agent App download page and nothing
+  // else: the routes keep them off the supervisor pages (RequireSupervisor),
+  // and the server opens no agent session for a sign-in with no laptop id.
   return response
 }
 

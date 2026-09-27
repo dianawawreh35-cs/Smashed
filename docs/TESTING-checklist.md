@@ -698,6 +698,44 @@ started from its bin folder; on the restaurant's server,
 - [ ] **The laptop keeps 3 days.** A few days later:
       `%LOCALAPPDATA%\CallCenter\logs` has at most three `agent-*.log` files.
 
+### Installing from the web app (S-63, N-11) — built 27 Sep, never run
+
+The installer could not be run on Dia's laptop (its policy blocks unsigned
+programs under the user profile), so the first install is on an agent's
+laptop. Build first: `tools\agent-app\publish.ps1`.
+
+- [ ] **Upload.** Sign in to the web app as a supervisor. **Agent App** is
+      the last item in the menu. Before any upload it says none has been
+      uploaded. Choose `publish\SmashedAgentApp-Setup-<version>.exe`: the
+      Version box fills in by itself. **Upload**: after a few seconds it
+      says agents now download that version, and the card above shows it,
+      with its size (about 70 MB) and the time. *If it says the file is not
+      a Windows program, the zip was chosen instead.*
+- [ ] **A wrong file is refused.** Choose the `.zip` renamed to `.exe`:
+      *not a Windows program*, and the card still shows the version before.
+- [ ] **An agent sees one page.** Sign out, sign in with an agent account.
+      It opens on **Agent App**; the menu has that item alone, and no
+      upload form. Type `/dashboard` in the address bar: it comes back to
+      Agent App. The dashboard's *agents online* does not count this
+      agent for the browser sign-in. *If an agent sees the dashboard,
+      RequireSupervisor is not in the route.*
+- [ ] **Download and install over the zip's copy.** On a laptop that has
+      the app in `C:\SmashedAgentApp` from the zip, with the app open:
+      **Download the installer**, open the file. Windows' blue *protected
+      your PC* screen: *More info*, *Run anyway*. The installer asks to
+      close the Agent App, installs with no administrator prompt, and
+      offers to start it. It starts, the offline queue and the block list
+      are as they were, and signing in works.
+- [ ] **Only one copy on the laptop.** Search the laptop for
+      `CallCenter.AgentApp.exe` (Downloads, Desktop, Documents): the only
+      one is in `C:\SmashedAgentApp`. Delete any other folder, and any
+      desktop shortcut that points to it. *Two copies signed in as one
+      agent take each other's calls (prompt 20).*
+- [ ] **Arabic.** Switch the web app to Arabic: the page reads right to
+      left, and the version number reads `0.4.1`, not reversed.
+- [ ] **Screenshots** of the page as an agent and as a supervisor, in
+      both languages.
+
 ---
 
 ## Round 3 — the telephone

@@ -85,6 +85,9 @@ deploy/data/*
 # data/menu-images, relative to the server project; Windows folds it into Data).
 # The shipped photographs are embedded from Data/Seed/MenuImages instead.
 src/CallCenter.Server/[Dd]ata/menu-images/
+# The Agent App installer a development server was given (AgentAppInstaller:Path,
+# S-63): a 60-80 MB program that must never be committed.
+src/CallCenter.Server/[Dd]ata/agent-app/
 
 ## ---------- OS ----------
 .DS_Store

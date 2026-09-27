@@ -9,8 +9,10 @@ import ContactsPage from './pages/ContactsPage'
 import DeliveryPage from './pages/DeliveryPage'
 import MenuPage from './pages/MenuPage'
 import ClassificationPage from './pages/ClassificationPage'
+import AgentAppPage from './pages/AgentAppPage'
 import AppLayout from './components/AppLayout'
 import RequireAuth from './components/RequireAuth'
+import RequireSupervisor from './components/RequireSupervisor'
 
 // The pages that draw charts, fetched when first opened: recharts is most of
 // the bundle, and the login screen and the lists need none of it. The layout's
@@ -22,7 +24,9 @@ const ApplicationReportsPage = lazy(() => import('./pages/ApplicationReportsPage
 /**
  * Route table. Everything except the login screen sits behind RequireAuth, so
  * a new supervisor page is protected by being added here rather than by
- * remembering to guard it (S-01).
+ * remembering to guard it (S-01). Agents may sign in too, for the Agent App
+ * page alone (S-63): every other page is also behind RequireSupervisor, which
+ * sends an agent to it.
  */
 export default function App() {
   return (
@@ -30,17 +34,20 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/calls" element={<CallsPage />} />
-          <Route path="/call-reports" element={<CallReportsPage />} />
-          <Route path="/applications" element={<ApplicationsPage />} />
-          <Route path="/application-reports" element={<ApplicationReportsPage />} />
-          <Route path="/contacts" element={<ContactsPage />} />
-          <Route path="/delivery" element={<DeliveryPage />} />
-          <Route path="/menu" element={<MenuPage />} />
-          <Route path="/classification" element={<ClassificationPage />} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/agent-app" element={<AgentAppPage />} />
+          <Route element={<RequireSupervisor />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/calls" element={<CallsPage />} />
+            <Route path="/call-reports" element={<CallReportsPage />} />
+            <Route path="/applications" element={<ApplicationsPage />} />
+            <Route path="/application-reports" element={<ApplicationReportsPage />} />
+            <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/delivery" element={<DeliveryPage />} />
+            <Route path="/menu" element={<MenuPage />} />
+            <Route path="/classification" element={<ClassificationPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

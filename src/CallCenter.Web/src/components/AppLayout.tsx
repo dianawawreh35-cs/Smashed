@@ -2,10 +2,12 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from './LanguageSwitcher'
 import PageBoundary from './PageBoundary'
+import { UserRoles } from '../api/auth'
 import { useAuth } from '../auth/context'
 
 /**
- * The shell around the signed-in supervisor pages.
+ * The shell around the signed-in pages: all of them for a supervisor, and the
+ * Agent App download alone for an agent (S-63).
  *
  * Navigation is a sidebar rather than links in the header: the SRS gives the
  * supervisor app seven areas (S-02 search, reports R-01 to R-21, contacts,
@@ -28,7 +30,10 @@ export default function AppLayout() {
     navigate('/login', { replace: true })
   }
 
-  const sections = [
+  // An agent signed in here has one page, the Agent App download (S-63).
+  const agentSections = [{ to: '/agent-app', label: t('nav.agentApp') }]
+
+  const supervisorSections = [
     { to: '/dashboard', label: t('nav.dashboard') },
     { to: '/calls', label: t('nav.calls') },
     // The call reports right under Calls, as the application reports sit
@@ -44,7 +49,11 @@ export default function AppLayout() {
     { to: '/classification', label: t('nav.classification') },
     { to: '/users', label: t('nav.users') },
     { to: '/settings', label: t('nav.settings') },
+    // Where a supervisor uploads a new version for the laptops (S-63).
+    { to: '/agent-app', label: t('nav.agentApp') },
   ]
+
+  const sections = user?.role === UserRoles.Supervisor ? supervisorSections : agentSections
 
   return (
     <div className="min-h-screen lg:flex">

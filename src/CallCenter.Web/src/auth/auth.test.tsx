@@ -117,17 +117,34 @@ describe('supervisor sign-in', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/disabled/i)
   })
 
-  it('refuses an agent account and points them at the desktop app', async () => {
-    // The API authenticates anyone; this app is for supervisors (S-01, N-10).
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      jsonResponse({ accessToken: 'token-123', expiresAt: '', user: AGENT, sessionId: null, extensions: null }),
+  it('signs an agent in to the Agent App page and nothing else', async () => {
+    // S-63: agents download the installer here. The menu offers them that
+    // page alone, and the supervisor pages send them back to it.
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/auth/login'
+        ? jsonResponse({ accessToken: 'token-123', expiresAt: '', user: AGENT, sessionId: null, extensions: null })
+        : jsonResponse({ code: 'no_installer' }, 404),
     ))
 
     renderApp()
     signIn('sara', 'whatever')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/desktop Agent App/i)
-    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Agent App' })).toBeInTheDocument()
+    expect(await screen.findByText('No installer has been uploaded yet. Ask your supervisor.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Upload a new version' })).not.toBeInTheDocument()
+  })
+
+  it('sends an agent who opens a supervisor page to the Agent App page', async () => {
+    setToken('token-123')
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (url: string) =>
+      url === '/api/auth/me' ? jsonResponse(AGENT) : jsonResponse({ code: 'no_installer' }, 404),
+    ))
+
+    renderApp('/users')
+
+    expect(await screen.findByRole('heading', { name: 'Agent App' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Users' })).not.toBeInTheDocument()
   })
 
   it('says so when the server refuses for too many attempts', async () => {

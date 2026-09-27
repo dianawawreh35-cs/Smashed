@@ -20,6 +20,7 @@
     "applications": "Applications",
     "applicationReports": "Application reports",
     "callReports": "Call reports",
+    "agentApp": "Agent App",
     "label": "Sections"
   },
   "login": {
@@ -32,11 +33,45 @@
       "empty_fields": "Enter your username and password.",
       "invalid_credentials": "The username or password is not correct.",
       "account_disabled": "This account has been disabled. Ask an administrator to re-enable it.",
-      "not_a_supervisor": "This is an agent account. Please use the desktop Agent App.",
       "signed_out": "You have been signed out. Your account was changed or your sign-in ran out. Please sign in again.",
       "server_unreachable": "The server could not be reached. Check the network.",
       "server_error": "The server reported an error. Please try again.",
       "too_many_attempts": "Too many sign-in attempts. Wait a few minutes, then try again."
+    }
+  },
+  "agentApp": {
+    "heading": "Agent App",
+    "intro": "The desktop app agents take calls with. Download it here to install it on a laptop, or to update one.",
+    "version": "Version {{version}}",
+    "details": "{{size}} MB · uploaded {{date}}",
+    "download": "Download the installer",
+    "downloading": "Downloading…",
+    "downloadFailed": "The download failed. Check the network, then try again.",
+    "noneAgent": "No installer has been uploaded yet. Ask your supervisor.",
+    "noneSupervisor": "No installer has been uploaded yet. Upload one below.",
+    "failed": "Which version is available could not be checked. Check the server is running.",
+    "steps": {
+      "heading": "Installing or updating",
+      "close": "Close the Agent App if it is open.",
+      "open": "Open the file you downloaded. If Windows says it protected your PC, choose More info, then Run anyway.",
+      "follow": "Follow the steps. The app keeps its settings and any calls still waiting to upload.",
+      "start": "Start it from the Smashed Agent App shortcut on the desktop, and sign in."
+    },
+    "upload": {
+      "heading": "Upload a new version",
+      "intro": "Build it with tools\\agent-app\\publish.ps1, then choose publish\\SmashedAgentApp-Setup-<version>.exe. Agents are offered it at once, and it replaces the version before.",
+      "file": "Installer (.exe)",
+      "version": "Version",
+      "versionHint": "Taken from the file name. Check it is the version you built.",
+      "submit": "Upload",
+      "uploading": "Uploading…",
+      "done": "Agents now download version {{version}}.",
+      "errors": {
+        "bad_version": "The version must look like 0.4.1.",
+        "not_a_program": "That file is not a Windows program. Choose the SmashedAgentApp-Setup file.",
+        "too_large": "The file is larger than 400 MB.",
+        "failed": "The upload failed. Check the server is running, then try again."
+      }
     }
   },
   "dashboard": {

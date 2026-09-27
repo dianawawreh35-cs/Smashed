@@ -3,8 +3,13 @@
 #   powershell -ExecutionPolicy Bypass -File tools\agent-app\publish.ps1
 #   powershell -ExecutionPolicy Bypass -File tools\agent-app\publish.ps1 -Server http://192.168.1.100
 #
-# Writes publish\agent-app-<version>\ (the folder the laptops run) and
-# publish\SmashedAgentApp-<version>.zip (the same folder, to carry over).
+# Writes publish\agent-app-<version>\ (the folder the laptops run),
+# publish\SmashedAgentApp-<version>.zip (the same folder, to carry over), and
+# publish\SmashedAgentApp-Setup-<version>.exe, the installer a supervisor
+# uploads on the web app's Agent App page for agents to download (S-63).
+#
+# The installer needs Inno Setup 6, once per build machine:
+#   winget install --id JRSoftware.InnoSetup -e --scope user
 #
 # The app has no screen for the server address: it reads Server:BaseUrl from
 # the appsettings.json beside the program. The repository's copy says
@@ -31,8 +36,19 @@ if (-not $Version) {
 
 $out = Join-Path $repo "publish\agent-app-$Version"
 $zip = Join-Path $repo "publish\SmashedAgentApp-$Version.zip"
+$setup = Join-Path $repo "publish\SmashedAgentApp-Setup-$Version.exe"
+
+# Found before the long build, so a missing tool fails in a second, not after it.
+$iscc = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
+    (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
+    (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe")
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $iscc) { throw "Inno Setup 6 is not installed: winget install --id JRSoftware.InnoSetup -e --scope user" }
+
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
 if (Test-Path $zip) { Remove-Item -Force $zip }
+if (Test-Path $setup) { Remove-Item -Force $setup }
 
 Write-Host "Building Agent App $Version for $Server"
 dotnet publish src\CallCenter.AgentApp\CallCenter.AgentApp.csproj `
@@ -51,7 +67,15 @@ $json = [regex]::Replace($json, $pattern, "`${1}$Server`${2}", 1)
 
 Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip
 
+# The installer, from the folder as published, with the address already in it.
+& $iscc /Q "/DAppVersion=$Version" "/DSourceDir=$out" "/DOutputDir=$(Join-Path $repo 'publish')" `
+    (Join-Path $PSScriptRoot "installer.iss")
+if ($LASTEXITCODE -ne 0) { throw "Inno Setup could not build the installer" }
+
 $size = "{0:N0} MB" -f ((Get-Item $zip).Length / 1MB)
+$setupSize = "{0:N0} MB" -f ((Get-Item $setup).Length / 1MB)
 Write-Host "Server address: $Server"
 Write-Host "Folder:         $out"
 Write-Host "Zip:            $zip ($size)"
+Write-Host "Installer:      $setup ($setupSize)"
+Write-Host "Upload the installer on the web app's Agent App page."

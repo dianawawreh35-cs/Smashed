@@ -72,10 +72,14 @@ services:
       # nightly rsync copies unchanged files once and pg_dump re-dumps them
       # every night.
       MenuImages__Path: /data/menu-images
+      # The Agent App installer agents download from the web app (S-63). Not
+      # in the nightly backup: it is rebuilt from its git tag if lost.
+      AgentAppInstaller__Path: /data/agent-app
       TZ: ${TZ:-Asia/Hebron}
     volumes:
       - ./data/recordings:/data/recordings
       - ./data/menu-images:/data/menu-images
+      - ./data/agent-app:/data/agent-app
       - ./data/logs:/app/logs
     depends_on:
       db:

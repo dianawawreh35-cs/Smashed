@@ -423,10 +423,9 @@ reboot).
   turns it off for a site that would rather run them by hand. Fine for one
   server; if a second API instance is ever added, two could migrate at once and
   this should move behind a PostgreSQL advisory lock.
-- **`/downloads/AgentApp-Setup.exe`.** Runbook step 10 installs the agent app
-  from the server; A-82/N-11 require updates to be served the same way. The API
-  needs a downloads endpoint and the build needs an installer — neither is
-  scaffolded.
+- ~~**`/downloads/AgentApp-Setup.exe`.**~~ **Resolved 2026-09-27 (S-63):**
+  the installer is built by `publish.ps1`, uploaded on the web app's Agent App
+  page, and downloaded there by agents who sign in.
 - **Ports 80 and 5001.** Resolved: the 5001 rule is dropped, since nothing ever
   listened there. The API now also binds port 80 so the supervisor reaches the
   dashboard by typing the server address with no port number; the SPA's
@@ -7212,6 +7211,93 @@ as before; a new Agent App against an old server gets 404 and keeps trying,
 logging that once on the laptop, while the old server logs a line for each
 try. So the server goes first.
 
+## 2026-09-27 — Agents install the Agent App from the web app (S-63, N-11)
+
+Asked by Dia: agents sign in to the web app and install the latest Agent App,
+and the latest version is uploaded there. New requirement **S-63**; A-01 and
+S-01 changed (the web app used to refuse agents), N-11 built, A-82 in part.
+Dia's choice, asked before building: **an installer** the agent double-clicks,
+not the zip to unpack by hand and not yet the app updating itself.
+
+- **Agents sign in to the web app and see one page.** `auth.ts` no longer
+  refuses the Agent role. Every supervisor page sits behind
+  `RequireSupervisor`, which sends an agent to `/agent-app`, and the menu
+  shows an agent that page alone. The server was already safe for this: a
+  sign-in with no laptop id opens no agent session (27 Sep review), so an
+  agent in the browser has no SIP secret there and does not count as online.
+  The supervisor endpoints refuse an agent's token themselves; the guard only
+  keeps agents off pages that would show nothing but failures. The
+  `not_a_supervisor` sign-in message is gone from both language files.
+- **The server keeps one installer**, the latest upload, as a file under
+  `AgentAppInstaller:Path` (`/data/agent-app` in the container, a new mount in
+  `docker-compose.yml`), with `current.json` beside it saying which version it
+  is, who uploaded it and when. No history: an older version is never what a
+  laptop should get, and any version can be rebuilt from its tag. Not a
+  database row, for the reason the menu photographs are not (60–80 MB in every
+  night's `pg_dump`), and **no migration**. Not in the nightly backup either:
+  it is rebuilt with `publish.ps1` if lost.
+- **Endpoints:** `GET /api/agent-app` (what is on offer, 404 `no_installer`
+  before the first upload) and `GET /api/agent-app/installer` (the file), for
+  any signed-in account; `PUT /api/agent-app/installer?version=` for a
+  supervisor, the body being the program itself, straight to disk, up to
+  400 MB. Refused: a version that is not three or four numbers
+  (`bad_version`, and nothing in it can reach a path); a file that does not
+  start `MZ`, as every Windows program does, so the zip picked by mistake is
+  refused on the server and not on a laptop (`not_a_program`). The upload is
+  written to a temporary file and moved over the old one only when complete,
+  so a failed or refused upload leaves the last installer as it was.
+  Signed-in, not anonymous, as Dia asked: the program carries the server's
+  address.
+- **The download is fetched, then saved** (`requestBlob`), as recordings are:
+  a plain link cannot carry the token. 68 MB over the LAN is seconds, and the
+  button says *Downloading…* meanwhile. The version is offered for upload from
+  the file name `publish.ps1` writes, so it is seldom typed.
+- **The installer is Inno Setup** (free, a build tool only: nothing of it
+  ships except its own setup program, so nothing new for
+  `THIRD-PARTY-LICENSES.md`). My choice, since it does not change what the
+  client gets. It installs into **`C:\SmashedAgentApp`, where the laptops
+  have run the zip from the start**, so an existing laptop is upgraded in
+  place. It needs no administrator rights. It **clears the folder before
+  copying** the new version, because a leftover file from an older
+  self-contained build can be loaded by mistake; the app writes nothing there,
+  and its data is in `%LOCALAPPDATA%\CallCenter`, never touched. It closes
+  a running Agent App first (after asking), makes the desktop and Start-menu
+  shortcuts, speaks Arabic on an Arabic Windows, and can run silently
+  (`/VERYSILENT`), which is what A-82's self-update will use. Velopack was the
+  other candidate: it brings self-update with it, but installs per user into
+  `%LOCALAPPDATA%`, away from the folder the laptops use, and needs code in
+  the app's start-up. Not worth it before A-82 is asked for.
+- **Compression `lzma2/fast`:** 20 s and 68 MB from the 185 MB folder, against
+  six minutes and 57 MB at the maximum. `publish.ps1` builds the installer
+  after the zip, and fails in a second, before the long build, if Inno Setup
+  is missing (`winget install --id JRSoftware.InnoSetup -e --scope user`,
+  installed on Dia's laptop on 27 Sep). The zip is still made, for carrying
+  over.
+- **Unsigned**, as the app is (RELEASING, "Executable policy"): a downloaded
+  unsigned program gets Windows' *protected your PC* screen, so the page's
+  install steps say to choose *More info*, then *Run anyway*.
+
+Tests: the endpoints (who may do what, the round trip, a replacement, a
+refused file keeps the last, bad versions), the page (the version and
+download, the server down, an upload and a refusal), and sign-in (an agent
+lands on the Agent App page, and a supervisor page sends them back to it).
+The installer was built from the 0.4.0 folder; **it has not been run**: this
+laptop's policy blocks unsigned programs under the user profile (DEVELOPING.md),
+as it blocks the app itself, and the agents' laptops do not. Not seen running
+yet either way. Steps are in TESTING-checklist.md, Round 2, under "Installing
+from the web app".
+
+**To deploy:** a new server image, and the new `docker-compose.yml` copied to
+the server before `update.sh` (one new mount; the folder is made on first
+start). No migration, no Agent App change: the installer wraps the app as it
+is. Then build with `publish.ps1`, sign in as a supervisor, open **Agent App**
+and upload `publish\SmashedAgentApp-Setup-<version>.exe`.
+
+**Watch for a second copy (prompt 20).** A laptop that has the app in a
+folder other than `C:\SmashedAgentApp` keeps it after installing, and two
+copies signed in as one agent is what lost calls on the evening of 27 Sep.
+The checklist says to look for one on each laptop the first time.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -7240,6 +7326,8 @@ running**.
 |---|---|---|
 | **Release the 27 Sep fixes and put them on the server** | review F-01 to F-14 and most M-items | a tag, then `update.sh` with the steps in the 27 Sep server entries: new `deploy/` files, one `docker compose up -d`, the backup cron line |
 | **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | the release above, for anything that needs the new server |
+| **Install from the web app on one laptop** (S-63): upload an installer, sign in as an agent, download, install over the zip's copy, and look for a second copy of the app on the laptop. Screenshots of the page as an agent and as a supervisor, in both languages | S-63, N-11 | a server with the new image and `docker-compose.yml`. It could not be run on Dia's laptop (policy) |
+| The Agent App notices a newer version at sign-in and installs it silently (the rest of A-82). The server side and the installer's `/VERYSILENT` are ready | A-82 | Dia's call, once S-63 is seen working |
 | **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
 | The report cards' own CSV export (`src/lib/csv.ts`) neutralises formula cells and writes numbers as `="0599…"`, as the server's call-search export has since 27 Sep | R-02, S-05 | nothing: the web half only |
 | **The web app's sign-out ends its token**, as the Agent App's has since 27 Sep (M-S01) | N-05 | a session row for web sign-ins, which changes what the dashboard's *agents online* counts. Then decide whether 12 hours is still right for the web token |

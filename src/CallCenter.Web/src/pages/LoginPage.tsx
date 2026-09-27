@@ -7,7 +7,10 @@ import type { LoginErrorCode } from '../api/auth'
 import { useAuth } from '../auth/context'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 
-/** Supervisor sign-in (S-01). Browser on the LAN; agents use the desktop app. */
+/**
+ * Sign-in (S-01), browser on the LAN. Supervisors go on to the dashboard;
+ * agents, whose work is in the desktop app, to its download page (S-63).
+ */
 export default function LoginPage() {
   const { t } = useTranslation()
   const { user, isLoading, signIn, signedOutByServer } = useAuth()
@@ -97,8 +100,8 @@ export default function LoginPage() {
             />
           </label>
 
-          {/* Wrong password, disabled account, an agent in the wrong app, or the
-              server being down: one place, so it is always looked for here. */}
+          {/* Wrong password, disabled account, or the server being down: one
+              place, so it is always looked for here. */}
           {errorCode && (
             <p role="alert" className="notice-error">
               {t(`login.errors.${errorCode}`)}

@@ -149,7 +149,7 @@ docker compose version
 
 **Work**
 ```bash
-sudo mkdir -p /opt/callcenter/data/postgres /opt/callcenter/data/recordings /opt/callcenter/data/menu-images /opt/callcenter/backups
+sudo mkdir -p /opt/callcenter/data/postgres /opt/callcenter/data/recordings /opt/callcenter/data/menu-images /opt/callcenter/data/agent-app /opt/callcenter/backups
 sudo chown -R smashed:smashed /opt/callcenter
 cd /opt/callcenter
 ```
@@ -471,7 +471,7 @@ gunzip -c backups/db-<date>-<time>.sql.gz | docker compose exec -T db psql -U ca
 
 **Work**
 1. Supervisor app → Users → add the agents: name and login, then each one's **extension and its SIP password**. One extension per agent since 17 September 2026: the one the queue rings and that calls customers and branches alike (SRS 2.3); earlier copies of this step asked for two and a default branch. The server's own extension (step 8.3) is not an agent's and is not added here.
-2. On each of the 4 laptops: plug in the headset and make it the **Windows default** for both output and input (Settings → System → Sound). The Agent App has no device choice of its own (A-03 was removed on 27 Sep 2026): calls, the ring and recordings all use the Windows defaults. Then install the Agent App and log in as an agent. **The app has no screen for the server address.** It reads `Server:BaseUrl` from the `appsettings.json` beside the program, which must be `http://192.168.1.100`. The file in the repo says `http://localhost:5000`, for development, so set it in the build that goes to the laptops. The download link `http://192.168.1.100/downloads/AgentApp-Setup.exe` and the installer are not built yet (DECISIONS, open items). Until they are, copy the published folder as `RELEASING.md` describes.
+2. On each of the 4 laptops: plug in the headset and make it the **Windows default** for both output and input (Settings → System → Sound). The Agent App has no device choice of its own (A-03 was removed on 27 Sep 2026): calls, the ring and recordings all use the Windows defaults. Then install the Agent App and log in as an agent. **The app has no screen for the server address.** It reads `Server:BaseUrl` from the `appsettings.json` beside the program, which must be `http://192.168.1.100`. The file in the repo says `http://localhost:5000`, for development; `publish.ps1` writes the real address into the build that goes to the laptops. **To install (S-63):** build with `publish.ps1`, sign in to the web app as a supervisor, open **Agent App** and upload `publish\SmashedAgentApp-Setup-<version>.exe`. Then, on each laptop, open `http://192.168.1.100` in the browser, sign in with that laptop's agent account, choose **Download the installer**, and run it (Windows' *protected your PC* screen: *More info*, then *Run anyway*). It installs into `C:\SmashedAgentApp` and puts a shortcut on the desktop. Carrying the zip over, as `RELEASING.md` describes, still works where the browser cannot reach the server.
 3. Windows Firewall prompt → **Allow** on private networks. If missed: Windows Security → Firewall → Allow an app → tick the Agent App.
 4. Test on each laptop: internal call between two agents (pop-up, audio both ways, recording plays back, classification form opens), then a real call from a mobile through the trunk.
 5. Log out and log in as a different agent on the same laptop; confirm the other agent's extensions register and only their calls show.

@@ -204,15 +204,19 @@ before there is a machine to test against.
 ## Building the Agent App for the laptops
 
 The Agent App is **not** part of the Docker release — that image is the server
-and the supervisor web app. The desktop app is built and copied to the four
-laptops by hand (SRS §11, N-11).
+and the supervisor web app. The desktop app is built here, uploaded to the
+server on the web app's **Agent App** page, and each agent installs it from
+there (N-11, S-63).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\agent-app\publish.ps1
 ```
 
-That publishes into `publish\agent-app-<version>\` and zips it as
-`publish\SmashedAgentApp-<version>.zip`. The version comes from the latest git
+That publishes into `publish\agent-app-<version>\`, zips it as
+`publish\SmashedAgentApp-<version>.zip`, and builds the installer,
+`publish\SmashedAgentApp-Setup-<version>.exe` (about 70 MB, 20 seconds). The
+installer needs Inno Setup on the build machine, once:
+`winget install --id JRSoftware.InnoSetup -e --scope user`. The version comes from the latest git
 tag, so build it after tagging a release. `publish\` is git-ignored.
 
 **The server address is written in by the script.** The app has no screen for
@@ -221,13 +225,21 @@ and the repository's copy says `http://localhost:5000` for development. The
 script puts `http://192.168.1.100` into the published copy only. For another
 site, pass `-Server http://<address>`.
 
-**On each laptop:** unzip to `C:\SmashedAgentApp\`, not the Downloads folder,
-so it survives someone tidying up. Make a desktop shortcut to
-`CallCenter.AgentApp.exe`, then start it. To update, close the app, replace the
-folder's contents with the new zip's, and start it again. Its local data (the
-offline call queue, the block list, the logs) is under
-`%LOCALAPPDATA%\CallCenter` and is kept. This lasts until the installer and the
-server's download link exist (DECISIONS, open items).
+**Put it on the server:** sign in to the web app as a supervisor, open
+**Agent App**, choose the `SmashedAgentApp-Setup-<version>.exe` file (the
+version fills itself in from the name) and **Upload**. It replaces the
+version before, and every agent is offered it at once.
+
+**On each laptop:** the agent signs in to the web app with their own account,
+sees only the Agent App page, downloads the installer and runs it. It installs
+into `C:\SmashedAgentApp\`, closes the app first if it is open, clears the old
+version's files, and makes the desktop shortcut. No administrator rights are
+needed. The app's own data (the offline call queue, the block list, the logs)
+is under `%LOCALAPPDATA%\CallCenter` and is kept.
+
+**Without the browser**, the zip still works: unzip it over
+`C:\SmashedAgentApp\` with the app closed. Never into a second folder: two
+copies signed in as one agent take each other's calls (prompt 20).
 
 **Self-contained on purpose.** The app targets `net10.0-windows`, and
 `--self-contained true` bundles the runtime with it — about 185 MB and roughly

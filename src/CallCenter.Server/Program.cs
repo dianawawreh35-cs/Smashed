@@ -149,6 +149,12 @@ try
         .Bind(builder.Configuration.GetSection(MenuImageOptions.SectionName))
         .ValidateDataAnnotations();
     builder.Services.AddSingleton<MenuImageStore>();
+    // N-11, S-63: the Agent App installer a supervisor uploads and agents
+    // download from the web app.
+    builder.Services.AddOptions<CallCenter.Server.Features.AgentAppInstaller.AgentAppInstallerOptions>()
+        .Bind(builder.Configuration.GetSection(CallCenter.Server.Features.AgentAppInstaller.AgentAppInstallerOptions.SectionName))
+        .ValidateDataAnnotations();
+    builder.Services.AddSingleton<CallCenter.Server.Features.AgentAppInstaller.AgentAppInstallerStore>();
     builder.Services.AddScoped<MenuService>();
     builder.Services.AddScoped<ClassificationService>();
     builder.Services.AddScoped<ClassificationTypeService>();

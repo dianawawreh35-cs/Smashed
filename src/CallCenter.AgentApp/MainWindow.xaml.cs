@@ -30,8 +30,25 @@ public partial class MainWindow : Window
         services.GetRequiredService<SignedOutByServer>().SignedOut += (_, _) =>
             Dispatcher.Invoke(() => ShowLogin(LoginErrorCodes.SignedOut));
 
+        // F-02: what went wrong and was survived, across the top.
+        services.GetRequiredService<AgentNotices>().Posted += (_, key) =>
+            Dispatcher.BeginInvoke(() => ShowNotice(key));
+        localizer.LanguageChanged += (_, _) => ShowNotice(_noticeKey);
+
         ShowLogin();
     }
+
+    /// <summary>The notice on screen, as a label key, so it follows the language.</summary>
+    private string? _noticeKey;
+
+    private void ShowNotice(string? key)
+    {
+        _noticeKey = key;
+        NoticeText.Text = key is null ? string.Empty : Localizer[key];
+        NoticeBar.Visibility = key is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void OnDismissNotice(object sender, RoutedEventArgs e) => ShowNotice(null);
 
     /// <summary>Bound by the window's XAML for its title and direction.</summary>
     public Localizer Localizer { get; }

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using CallCenter.AgentApp.Data;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Calls;
@@ -38,7 +39,52 @@ public partial class App : Application
         ((App)Current)._host?.Services
         ?? throw new InvalidOperationException("The host has not been started yet.");
 
+    /// <summary>
+    /// More unhandled UI-thread exceptions than this inside
+    /// <see cref="ExceptionStormWindow"/> is a fault repeating on every layout
+    /// pass or timer tick, not a one-off, and is treated as fatal (F-02).
+    /// </summary>
+    private const int ExceptionStormLimit = 20;
+
+    private static readonly TimeSpan ExceptionStormWindow = TimeSpan.FromSeconds(10);
+
+    private readonly Queue<DateTimeOffset> _recentExceptions = new();
+
+    /// <summary>
+    /// Shown when the app cannot start. In both languages at once: it can fail
+    /// before the language files are read, and the agent must be able to read
+    /// it either way (A-80).
+    /// </summary>
+    private const string StartupFailedText =
+        "تعذّر تشغيل مركز الاتصال. أغلقه وأعد فتحه، وإن تكرر ذلك فأبلغ المشرف.\n\n"
+        + "The Call Center app could not start. Close it and open it again; if it happens again, tell your supervisor.";
+
     protected override async void OnStartup(StartupEventArgs e)
+    {
+        // F-02: the handlers go on before anything that can throw, and the
+        // whole start-up is inside one try. This method is async void, so an
+        // exception escaping it ended the process with nothing on screen.
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+        try
+        {
+            await StartAsync();
+            base.OnStartup(e);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "The Agent App could not start");
+
+            MessageBox.Show(StartupFailedText, "Call Center", MessageBoxButton.OK, MessageBoxImage.Error);
+
+            // OnExit closes whatever did start, and flushes the log.
+            Shutdown(1);
+        }
+    }
+
+    private async Task StartAsync()
     {
         Directory.CreateDirectory(LogDirectory);
 
@@ -52,11 +98,6 @@ public partial class App : Application
                 retainedFileCountLimit: 14,
                 shared: true)
             .CreateLogger();
-
-        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-            Log.Fatal(args.ExceptionObject as Exception, "Unhandled exception");
-        DispatcherUnhandledException += (_, args) =>
-            Log.Error(args.Exception, "Unhandled dispatcher exception");
 
         _host = Host.CreateDefaultBuilder()
             .UseSerilog()
@@ -97,8 +138,85 @@ public partial class App : Application
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();
+    }
 
-        base.OnStartup(e);
+    /// <summary>
+    /// An exception nothing caught, on the UI thread (F-02). Logged, and the
+    /// app carries on. Until 27 Sep this handler only logged, so WPF went on
+    /// to end the process, and one faulted button took the phone with it,
+    /// mid-call if there was one.
+    /// </summary>
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)
+    {
+        if (IsFatal(args.Exception) || IsExceptionStorm())
+        {
+            // Not handled: the process ends, but with the reason on disk.
+            Log.Fatal(args.Exception, "Unhandled exception on the UI thread; the app has to close");
+            Log.CloseAndFlush();
+            return;
+        }
+
+        Log.Error(args.Exception, "Unhandled exception on the UI thread; the app carries on");
+        args.Handled = true;
+
+        try
+        {
+            _host?.Services.GetService<AgentNotices>()?.Post("app.problem");
+        }
+        catch (Exception ex)
+        {
+            // The host may already be going. Telling the agent is a courtesy;
+            // it must not become a second fault.
+            Log.Warning(ex, "Could not tell the agent about the exception");
+        }
+    }
+
+    /// <summary>
+    /// A failure the process cannot survive, whatever this handler says. Those
+    /// are left to end it rather than leaving an app in an unknown state.
+    /// </summary>
+    private static bool IsFatal(Exception ex) =>
+        ex is OutOfMemoryException or AccessViolationException or InvalidProgramException
+            or System.Runtime.InteropServices.SEHException;
+
+    /// <summary>
+    /// Whether this exception is one of many in a few seconds. A fault in a
+    /// binding or a timer repeats on every pass, and handling each one would
+    /// leave a frozen window that no longer offers Hang up. Ending the app is
+    /// the lesser harm then: it can be started again.
+    /// </summary>
+    private bool IsExceptionStorm()
+    {
+        var now = DateTimeOffset.Now;
+        _recentExceptions.Enqueue(now);
+
+        while (_recentExceptions.Count > 0 && now - _recentExceptions.Peek() > ExceptionStormWindow)
+        {
+            _recentExceptions.Dequeue();
+        }
+
+        return _recentExceptions.Count > ExceptionStormLimit;
+    }
+
+    /// <summary>
+    /// A task that failed with nobody awaiting it (F-02). It never ends the
+    /// process on .NET 10, which is exactly why it has to be logged: otherwise
+    /// the failure leaves no trace at all.
+    /// </summary>
+    private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs args)
+    {
+        Log.Error(args.Exception, "A background task failed and nothing was waiting for it");
+        args.SetObserved();
+    }
+
+    /// <summary>
+    /// An exception on a thread of its own. The process ends whatever is done
+    /// here; the point is that the reason reaches the file first.
+    /// </summary>
+    private static void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs args)
+    {
+        Log.Fatal(args.ExceptionObject as Exception, "Unhandled exception; the app has to close");
+        Log.CloseAndFlush();
     }
 
     /// <summary>
@@ -114,6 +232,8 @@ public partial class App : Application
         // One session object for the process: every view model asks it who is
         // signed in, rather than passing the answer around.
         services.AddSingleton<AgentSession>();
+        // F-02: the line across the main window that says something went wrong.
+        services.AddSingleton<AgentNotices>();
         services.AddSingleton<AgentSettingsStore>();
         services.AddSingleton<Localizer>();
         services.AddSingleton<SipTransportHost>();
@@ -182,22 +302,30 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// How long closing the app may take. The sign-out, the un-REGISTER and the
+    /// host stopping all share it, and an agent closing the laptop lid will
+    /// not wait longer (M-A01).
+    /// </summary>
+    private static readonly TimeSpan ShutdownLimit = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// Best-effort sign-out during shutdown. Failures are swallowed: the app is
     /// closing either way, and the idle timer closes a session left open.
     /// </summary>
-    private async Task SignOutOnExitAsync()
+    private static async Task SignOutOnExitAsync(IHost host, CancellationToken ct)
     {
         try
         {
-            var session = _host!.Services.GetRequiredService<AgentSession>();
+            var session = host.Services.GetRequiredService<AgentSession>();
             if (!session.IsSignedIn)
             {
                 return;
             }
 
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(3));
 
-            await _host.Services.GetRequiredService<SignInService>()
+            await host.Services.GetRequiredService<SignInService>()
                 .SignOutAsync(LogoutReasons.AppClosed, timeout.Token);
         }
         catch (Exception ex)
@@ -206,25 +334,97 @@ public partial class App : Application
         }
     }
 
-    protected override async void OnExit(ExitEventArgs e)
+    /// <summary>
+    /// Everything closing involves, in order: the server session and the PBX
+    /// registration (both inside the sign-out), then the host.
+    /// </summary>
+    private static async Task ShutDownHostAsync(IHost host)
     {
-        if (_host is not null)
+        using var limit = new CancellationTokenSource(ShutdownLimit);
+
+        // Close the server-side session so a laptop that is simply shut down
+        // does not look signed in until the idle timer catches it (A-05), and
+        // unregister, so the PBX stops offering it calls.
+        await SignOutOnExitAsync(host, limit.Token);
+
+        try
         {
-            // The pop-up refuses to close while the app is running, so it has to
-            // be told the app is really going.
-            _host.Services.GetRequiredService<CallPopupWindow>().ShutDown();
+            await host.StopAsync(limit.Token);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "The host did not stop cleanly");
+        }
 
-            // Close the server-side session so a laptop that is simply shut down
-            // does not look signed in until the idle timer catches it (A-05).
-            await SignOutOnExitAsync();
+        host.Dispose();
+    }
 
-            await _host.StopAsync(TimeSpan.FromSeconds(5));
-            _host.Dispose();
+    /// <remarks>
+    /// <b>Not async (M-A01).</b> It used to be <c>async void</c>, and WPF does
+    /// not wait for one: at the first await the method returned, the process
+    /// ended, and the logout, the un-REGISTER, the host stop and the last log
+    /// lines most likely never ran. The PBX went on offering calls to a closed
+    /// laptop until the registration expired.
+    ///
+    /// Now this method waits for the work, for at most
+    /// <see cref="ShutdownLimit"/>. The wait pumps the dispatcher rather than
+    /// blocking it: stopping the call service tells the pop-up, on this thread,
+    /// and a plain <c>Wait()</c> would hold that up until the limit ran out.
+    /// </remarks>
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try
+        {
+            if (_host is { } host)
+            {
+                // The pop-up refuses to close while the app is running, so it
+                // has to be told the app is really going.
+                host.Services.GetService<CallPopupWindow>()?.ShutDown();
+
+                WaitPumping(ShutDownHostAsync(host), ShutdownLimit);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Shutting down did not complete cleanly");
         }
 
         Log.Information("Agent App stopped");
-        await Log.CloseAndFlushAsync();
+        Log.CloseAndFlush();
 
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// Waits for <paramref name="work"/>, or for <paramref name="limit"/>,
+    /// while still running whatever is sent to the UI thread meanwhile.
+    /// </summary>
+    private void WaitPumping(Task work, TimeSpan limit)
+    {
+        if (work.IsCompleted)
+        {
+            return;
+        }
+
+        try
+        {
+            var frame = new DispatcherFrame();
+
+            using var timer = new System.Threading.Timer(_ => frame.Continue = false, null, limit, Timeout.InfiniteTimeSpan);
+            work.ContinueWith(_ => frame.Continue = false, TaskScheduler.Default);
+
+            Dispatcher.PushFrame(frame);
+        }
+        catch (InvalidOperationException)
+        {
+            // The dispatcher will not run a frame any more. Wait plainly; the
+            // limit still holds.
+            work.Wait(limit);
+        }
+
+        if (!work.IsCompleted)
+        {
+            Log.Warning("Shutting down took longer than {Limit}; the app closes anyway", limit);
+        }
     }
 }

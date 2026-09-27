@@ -501,11 +501,29 @@ public partial class CallerViewModel : ObservableObject
 
         ResetForm();
         Show(contact);
+
+        // F-01: the token is read before FormFinished, never after. When the
+        // caller has already rung off, the handler closes the pop-up, and that
+        // clears this view model, which cancels and disposes forCall. Reading
+        // its Token then threw ObjectDisposedException and took the app down.
+        var ct = forCall?.Token ?? CancellationToken.None;
+
         FormFinished?.Invoke(this, EventArgs.Empty);
 
-        if (forCall is not null)
+        // The pop-up has gone, and the totals with it: nobody is left to show
+        // them to.
+        if (forCall is null || !ReferenceEquals(forCall, _lookup))
         {
-            await LoadCardAsync(contact.Id, forCall.Token);
+            return;
+        }
+
+        try
+        {
+            await LoadCardAsync(contact.Id, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // The pop-up closed while the totals were on their way. Normal.
         }
     }
 

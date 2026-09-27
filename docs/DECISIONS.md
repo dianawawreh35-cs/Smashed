@@ -6266,6 +6266,78 @@ supervisor refused, by the owner ending the stream and hanging up).
 `UsersPage.test.tsx`: the badges, Listen shown only for a call, Stop sending
 the DELETE.
 
+## 2026-09-27 — A full code review, and what it found
+
+A read-only sweep of all three apps, the shared library, the tests and the
+deployment files. The findings, with file and line for each, are in
+[REVIEW-2026-09-27.md](REVIEW-2026-09-27.md); nothing was changed while making it.
+
+Fourteen items are marked **fix first**. The ones that most change the picture:
+
+- **The Agent App crashes** when a new customer is saved from the pop-up after
+  the caller has hung up (A-11), and **any** UI-thread exception closes it,
+  because the dispatcher handler never marks the exception handled (F-01, F-02).
+- **Logging a call trusts the extension in the request** and reassigns the
+  call's agent, and the offline buffer is shared by everyone on a laptop, so
+  one agent's queued calls are filed as the next agent's (F-03). Affects R-15.
+- **The delivery price-list paste always answers 500** (S-58, F-04).
+- **An agent's re-save un-resolves a complaint** (R-17, F-05).
+- **"Today" is an hour wrong on clock-change days**; the next is 24 October
+  2026, and CI cannot see it because it runs in UTC (S-20, F-06).
+- **`backup.sh` reports success on an empty dump** (N-07, F-07).
+- **A-03 is not built**: there is no audio device choice (F-11).
+
+The review also found this section's *Where to pick up* out of date: it still
+lists classification (complete 21 September) and S-46 (the server's blacklist
+sync is built) as not started. It needs rewriting from the current state; that
+is noted, not done here.
+
+## 2026-09-27 — The Agent App stops dying: F-01, F-02, M-A01
+
+The first part of the review's Agent App fixes (prompt 17), committed on its own
+so it can ship before the rest. All three were checked against the code first
+and were as the review described.
+
+**F-01, the crash after saving a new customer (A-11).**
+`CallerViewModel.AfterSaveAsync` raised `FormFinished`, and when the caller had
+already rung off the handler closed the pop-up, which clears the caller and
+disposes the lookup's token source. The next line read that token. Now the token
+is read before the event, and after it the method checks the lookup is still the
+one it started with; if the pop-up has gone, the caller's totals are not fetched
+at all. The rest of the view models were searched for the same shape (raise an
+event, then use state the handler may have cleared). The only other case is
+`ClassificationFormViewModel.SaveAsync`, which sets "Saved" on a form the
+handler has just closed: harmless, because `Begin` resets it, and left alone.
+
+**F-02, every UI-thread exception closed the app.** The dispatcher handler now
+marks the exception handled, logs it, and shows a line across the top of the
+main window (`AgentNotices`, label `app.problem`). A line and not a message box,
+on purpose: a modal box raised during a call sits over the pop-up and can keep
+Hang up from the agent. Two kinds are still left to end the process: the ones
+nothing survives (out of memory, access violation), and more than 20 in ten
+seconds, because that is a fault repeating on every layout pass, and handling
+each one leaves a frozen window with no Hang up. A restarted app is the lesser
+harm. `TaskScheduler.UnobservedTaskException` is logged; it no longer ends a
+.NET process, which is why nothing ever saw those failures. The start-up is one
+try: a failure logs, shows one message in both languages at once (the language
+files may not be loaded yet), and exits, rather than disappearing.
+
+**M-A01, shutdown was never waited for.** `OnExit` was `async void`, so the
+process ended at its first await. It now waits, for at most five seconds shared
+between the sign-out (with its own three), the un-REGISTER inside it and the
+host stop, and then flushes the log. The wait pumps the dispatcher instead of
+blocking it: stopping the call service tells the pop-up, on the UI thread, and a
+blocking wait would stall that until the limit ran out.
+
+**A test project for the Agent App.** `tests/CallCenter.AgentApp.Tests`,
+Windows-only like the app, references the app and builds its view models with no
+window: a dispatcher on a thread of the test's own, and `ApiClient` over a
+stubbed `HttpMessageHandler`. The F-01 test fails on the old code with exactly
+the review's `ObjectDisposedException` and passes on the new. **CI does not run
+it yet:** the test job is Linux, and the Windows job only builds. Adding a
+`dotnet test` step to the Windows job is one line, not made here because the
+server session is changing `ci.yml` at the same time (F-06).
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -6280,6 +6352,7 @@ and what comes after:
 
 | Next | Requirement | Depends on |
 |---|---|---|
+| **The review's "fix first" list, F-01 to F-14** | A-03, A-11, R-15, R-16, R-17, S-20, S-58, N-07 | nothing — see [REVIEW-2026-09-27.md](REVIEW-2026-09-27.md) |
 | **Classification: the form and the supervisor's designer** | A-40, S-40 | nothing — A-14 landed |
 | Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
 | Export the blocked list for Issabel | S-46 | nothing — now the **only** route to PBX-level blocking |

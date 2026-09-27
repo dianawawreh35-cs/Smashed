@@ -16,5 +16,31 @@
     the signed-in shell. The phone's status used to live in a bar along the
     bottom; it now sits in the rail, where the agent is already looking.
   -->
-  <ContentControl x:Name="ShellContent" />
+  <DockPanel>
+
+    <!-- F-02: something went wrong and the app carried on. A line, not a
+         message box, so it never sits over the pop-up during a call. -->
+    <Border x:Name="NoticeBar"
+            DockPanel.Dock="Top"
+            Visibility="Collapsed"
+            Background="{StaticResource Surface}"
+            BorderBrush="{StaticResource Warning}"
+            BorderThickness="0,0,0,2"
+            Padding="16,8">
+      <DockPanel>
+        <Button x:Name="NoticeDismiss"
+                DockPanel.Dock="Right"
+                Style="{StaticResource GhostButton}"
+                Content="{Binding Localizer[app.dismiss]}"
+                Click="OnDismissNotice" />
+        <TextBlock x:Name="NoticeText"
+                   Foreground="{StaticResource Warning}"
+                   TextWrapping="Wrap"
+                   VerticalAlignment="Center"
+                   Margin="0,0,12,0" />
+      </DockPanel>
+    </Border>
+
+    <ContentControl x:Name="ShellContent" />
+  </DockPanel>
 </Window>

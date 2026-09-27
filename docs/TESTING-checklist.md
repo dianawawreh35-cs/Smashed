@@ -836,6 +836,34 @@ audio plays, the Windows default output device.*
 
 ---
 
+### The 27 Sep review fixes: the app no longer dies (F-01, F-02, M-A01)
+
+Built 27 Sep. The first needs the PBX; the other two do not.
+
+- [ ] **Save a new customer after the caller has hung up (F-01, A-11).** Ring
+      2001 from a number nobody has on file. Press **Save as new customer**,
+      then hang up the calling phone *before* saving. Type a name and press
+      **Save customer**. The pop-up closes and **the app stays open**, still
+      registered. In Contacts, the new customer is there with the number.
+      *Until 27 Sep this closed the whole app,* and the phone stopped
+      registering until someone reopened it. *If the app still closes:* it is
+      an old build; check the `bin` date. Then do it once more with the call
+      still up: the pop-up shows the customer's name, and stays.
+- [ ] **Close the app while signed in (M-A01).** Sign in, wait for "Phone
+      ready", close the window. It takes up to about five seconds, not longer.
+      Then in the web app's Users screen, `dia20` shows as signed out at once,
+      rather than when the idle timer catches it. The last lines of the log
+      (`%LOCALAPPDATA%\CallCenter\logs\agent-<date>.log`) are "Signed out
+      (AppClosed)" and "Agent App stopped". *If neither line is there:* the
+      shutdown still is not being waited for; tell me.
+- [ ] **The line across the top (F-02).** Nothing in normal use should make it
+      appear, so this is a check that it never does: if an amber line saying
+      "Something went wrong, and the app carried on" ever shows, the app
+      survived an error that used to close it. **Send me the log from that
+      minute**; it names the fault. Its **Dismiss** / **إخفاء** button hides it.
+
+---
+
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)
 
 The agent's player is in the call log now (see "Hearing a recording in the call

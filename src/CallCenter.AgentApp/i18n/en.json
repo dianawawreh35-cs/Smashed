@@ -2,7 +2,9 @@
   "app": {
     "title": "Call Center",
     "subtitle": "Smashed Burger",
-    "language": "Language"
+    "language": "Language",
+    "problem": "Something went wrong, and the app carried on. The phone is still working. If it keeps happening, tell your supervisor.",
+    "dismiss": "Dismiss"
   },
   "applications": {
     "intro": "Conversations that came on WhatsApp, Facebook, Instagram or another app, not by phone. Record one here; your own are listed under App logs.",

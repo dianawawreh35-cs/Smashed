@@ -7584,6 +7584,49 @@ dev database: `menu 4 created`, with 14 categories in printed order.
 `docker compose exec api dotnet CallCenter.Server.dll seed` once (runbook,
 *Updating later*). No migration, no deploy files, no Agent App change.
 
+## 2026-09-27 (late) — Answering a call opens the caller's POS cart (A-85)
+
+**In plain terms.** Asked for by Dia: "once I answer a call, open
+`https://smashed-ps.com/app/cart/{callingnumber}`". Now, when an agent
+answers an incoming call, the Agent App opens that page in the laptop's
+default browser with the caller's number, so the order can be started while
+the customer is still talking.
+
+**The number goes in the POS's own form,** `0599123456`, through
+`PhoneNormalizer.ToNational`, the same as the customer lookup (A-67): the POS
+answers nothing else. A withheld number, an extension or a foreign number has
+no such form and opens nothing, rather than an empty cart.
+
+**When.** Once per call, as the line connects, in the same place the
+classification form opens (`CallViewModel.OnStateChanged`), so auto answer
+opens it too and a held customer coming back does not open it again.
+Incoming calls only: "answer" is the word Dia used, and an outbound call is
+usually a call back about an order that already exists. Internal calls and a
+second line over a held customer never take a form, and never open a cart.
+
+**What it costs.** The browser comes to the front and takes the keyboard.
+The pop-up stays on top, but the call shortcuts (A-12) are not global, so
+they wait until the agent clicks back into the app. A new tab opens on every
+answered call; nothing reuses the last one, since a browser gives an app no
+way to do that.
+
+**Configuration, not code.** `PosCart:Enabled` and `PosCart:UrlTemplate` in
+the Agent App's appsettings.json, with the same defaults compiled in, so a
+laptop keeping an older settings file still gets it. Starting the browser
+runs off the UI thread and never throws: a failure is a warning in the log
+and the call goes on.
+
+**Tested.** `PosCartTests` (11 cases): a mobile in every form it arrives in
+becomes `0599123456`, a landline `022345678`, and withheld, extension and
+foreign numbers give no page. Agent App suite: 59 passed. Not yet tried on a
+real call.
+
+**To deploy:** Agent App only; no server change. Published as Agent App
+`0.5.2` with `publish.ps1 -Version 0.5.2`, without a git tag: the latest tag,
+`v0.5.1`, is the menu release and does not contain this. Upload the 0.5.2
+installer and zip on the web app's Agent App page. The next server release
+should be tagged `v0.5.2` or later, so versions never go backwards.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

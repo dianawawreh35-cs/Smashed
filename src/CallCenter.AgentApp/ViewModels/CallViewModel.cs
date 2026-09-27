@@ -24,12 +24,14 @@ public partial class CallViewModel : ObservableObject
 {
     private readonly CallService _calls;
     private readonly CallLogReporter _reporter;
+    private readonly PosCart _posCart;
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _timer;
 
     public CallViewModel(
         CallService calls,
         CallLogReporter reporter,
+        PosCart posCart,
         ClassificationFormViewModel classification,
         CallerViewModel caller,
         Localizer localizer,
@@ -37,6 +39,7 @@ public partial class CallViewModel : ObservableObject
     {
         _calls = calls;
         _reporter = reporter;
+        _posCart = posCart;
         _dispatcher = dispatcher;
         Classification = classification;
         Caller = caller;
@@ -450,6 +453,14 @@ public partial class CallViewModel : ObservableObject
                 {
                     _formCallId = state.SipCallId;
                     Classification.Begin(state.SipCallId, Classification.Extension, state.IsOutbound);
+
+                    // A-85: the caller's cart on the POS, for a call they
+                    // made. Once per call, as the form: not again when a held
+                    // customer comes back.
+                    if (!state.IsOutbound)
+                    {
+                        _posCart.Open(state.Number);
+                    }
                 }
             }
             else

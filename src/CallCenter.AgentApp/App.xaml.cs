@@ -327,6 +327,7 @@ public partial class App : Application
         services.Configure<ServerOptions>(context.Configuration.GetSection(ServerOptions.SectionName));
         services.Configure<DialingOptions>(context.Configuration.GetSection(DialingOptions.SectionName));
         services.Configure<RecordingOptions>(context.Configuration.GetSection(RecordingOptions.SectionName));
+        services.Configure<PosCartOptions>(context.Configuration.GetSection(PosCartOptions.SectionName));
 
         // One session object for the process: every view model asks it who is
         // signed in, rather than passing the answer around.
@@ -404,6 +405,7 @@ public partial class App : Application
         // skipped. One instance between them meant an incoming call wiped out
         // what the agent was typing in the log.
         services.AddTransient<ClassificationFormViewModel>();
+        services.AddSingleton<PosCart>();
         services.AddSingleton<CallViewModel>();
         services.AddSingleton<CallPopupWindow>();
 

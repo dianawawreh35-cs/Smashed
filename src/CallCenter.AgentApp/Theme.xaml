@@ -111,6 +111,38 @@
     <Setter Property="Margin" Value="0,14,0,5" />
   </Style>
 
+  <!-- Text that can be selected and copied (A-84): a read-only TextBox drawn
+       as the TextBlock it replaces - same font, size and colour, no border,
+       no background, no box. The host is a Decorator, not the usual
+       ScrollViewer, so the mouse wheel over it still scrolls the page it sits
+       in. Its -2 margin takes back the 2 a TextBox keeps each side of its
+       text for the caret, so the text starts where a TextBlock's does. -->
+  <Style TargetType="views:SelectableText">
+    <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="SelectionBrush" Value="{StaticResource Accent}" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="views:SelectableText">
+          <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+            <Decorator x:Name="PART_ContentHost" Margin="-2,0" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="SelectableSubtle" TargetType="views:SelectableText" BasedOn="{StaticResource {x:Type views:SelectableText}}">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+  </Style>
+
   <!-- ===== Buttons ================================================= -->
   <Style x:Key="ButtonBase" TargetType="Button">
     <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
@@ -715,6 +747,8 @@
     <Setter Property="FontSize" Value="{StaticResource FontSizeBody}" />
     <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
     <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+    <!-- Right-click a cell to copy it or its row (A-84). -->
+    <Setter Property="views:GridCopy.IsEnabled" Value="True" />
   </Style>
 
   <!-- ===== DatePicker ===============================================

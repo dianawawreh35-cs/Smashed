@@ -301,5 +301,10 @@
   },
   "appLogs": {
     "intro": "Your own application conversations: today's can be edited, older ones are read only."
+  },
+  "copy": {
+    "copy": "Copy",
+    "selectAll": "Select all",
+    "row": "Copy row"
   }
 }

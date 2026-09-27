@@ -7113,6 +7113,49 @@ chunk of the built bundle in headless Chrome: all eight load, and the app
 draws its sign-in page. The same check on the v0.4.0 bundle reproduces the
 crash.
 
+## 2026-09-27 — The Agent App's text can be selected and copied (A-84)
+
+Asked by Dia: nothing on the Agent App's screens could be copied, not even
+the caller's number. Every read-out was a WPF `TextBlock`, which only draws
+text; the only selectable text was inside the boxes an agent types into.
+New requirement **A-84** in the SRS.
+
+- **`SelectableText`** (`Views/SelectableText.cs`) is a read-only `TextBox`
+  styled in `Theme.xaml` to look exactly like the TextBlock it replaces: no
+  border or background, the same fonts and colours (`SelectableSubtle` for
+  the `Subtle` look), and the text in the same place. A TextBox keeps 2 px
+  each side of its text for the caret; the template takes it back, and a
+  test measures the two side by side. Its host is a `Decorator`, not a
+  ScrollViewer, so the mouse wheel over it still scrolls the page. Drag or
+  double-click to select; Ctrl+C, or right-click → Copy / Select all, in the
+  agent's language (`copy.*` in the i18n files).
+- **It binds `Value`, not `Text`.** A TextBox's Text binds two ways by
+  default, and a two-way binding to a get-only property throws when the
+  screen opens. Overriding that default in the subclass does nothing (WPF
+  merges the flag with the base's), which the first version of the test
+  caught, so the text comes in through a one-way property of its own.
+- **56 read-outs on 10 screens changed**: the pop-up (number, held number,
+  name, address, notes, queue, flag reason, PBX name, audio problem, same-name
+  matches, form and note messages); the call log's opened call, hold times,
+  player message and unsent list; App logs' opened message; Applications'
+  customer and messages; the menu (name, category, description, prices);
+  delivery areas (name, branch, price); the signed-in name and phone summary
+  in the rail; the sign-in error; the notice bar; and the status messages
+  beside the search boxes. The unsent list's reason used to trim with its
+  whole text in a tooltip; a text box cannot trim, so it wraps instead.
+  **Left as they were:** headings, field labels, intros, empty-list messages,
+  buttons, the live call timer and the dial pad's hints.
+- **The lists copy by right-click instead** (`Views/GridCopy.cs`, on every
+  DataGrid through the theme). A row there is clicked to choose it and
+  double-clicked to open it, and a text box in each cell would take both
+  clicks. Right-click a cell: **Copy** copies it, **Copy row** the row's
+  non-empty cells, tab-separated. The call log's direction and note columns
+  have `ClipboardContentBinding`, so they copy their words rather than
+  nothing. Ctrl+C on a chosen row still copies the whole row, as WPF does.
+
+Not seen running yet: the Agent App was open during the change. Steps are in
+TESTING-checklist.md, Round 2, under "Copying text".
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

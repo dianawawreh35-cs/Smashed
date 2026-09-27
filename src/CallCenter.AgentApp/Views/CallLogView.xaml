@@ -142,17 +142,16 @@
                     <TextBlock Grid.Column="0" Text="{Binding When}" Foreground="{StaticResource Text}" />
                     <TextBlock Grid.Column="1" Text="{Binding Kind}" Foreground="{StaticResource Text}" />
                     <!-- A number reads left to right in Arabic too. -->
-                    <TextBlock Grid.Column="2"
-                               Text="{Binding Number}"
-                               FontFamily="{StaticResource MonoFont}"
-                               Foreground="{StaticResource Text}"
-                               FlowDirection="LeftToRight"
-                               HorizontalAlignment="Left" />
-                    <TextBlock Grid.Column="3"
-                               Text="{Binding Reason}"
-                               Style="{StaticResource Subtle}"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding Reason}" />
+                    <local:SelectableText Grid.Column="2"
+                                          Value="{Binding Number}"
+                                          FontFamily="{StaticResource MonoFont}"
+                                          Foreground="{StaticResource Text}"
+                                          FlowDirection="LeftToRight"
+                                          HorizontalAlignment="Left" />
+                    <local:SelectableText Grid.Column="3"
+                                          Value="{Binding Reason}"
+                                          Style="{StaticResource SelectableSubtle}"
+                                          TextWrapping="Wrap" />
                   </Grid>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -205,11 +204,11 @@
               Command="{Binding ClearFiltersCommand}"
               Visibility="{Binding HasFilters, Converter={StaticResource BoolToVisibility}}" />
 
-      <TextBlock Text="{Binding StatusMessage}"
-                 Style="{StaticResource Subtle}"
-                 VerticalAlignment="Center"
-                 Margin="14,0,0,0"
-                 Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
+      <local:SelectableText Value="{Binding StatusMessage}"
+                            Style="{StaticResource SelectableSubtle}"
+                            VerticalAlignment="Center"
+                            Margin="14,0,0,0"
+                            Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
     </WrapPanel>
 
     <Border Grid.Row="2" Grid.ColumnSpan="2"
@@ -320,8 +319,10 @@
           <DataGrid.Columns>
             <!-- A-21: which way the call went. An arrow in, an arrow out; the
                  word is in the tooltip. Before this an answered outgoing call
-                 was indistinguishable from an answered incoming one. -->
-            <DataGridTemplateColumn Width="38" MinWidth="38" MaxWidth="38">
+                 was indistinguishable from an answered incoming one. The word is
+                 also what the column copies (A-84). -->
+            <DataGridTemplateColumn Width="38" MinWidth="38" MaxWidth="38"
+                                    ClipboardContentBinding="{Binding DirectionLabel}">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Grid ToolTip="{Binding DirectionLabel}" Background="Transparent">
@@ -390,8 +391,10 @@
 
             <!-- A-41: highlighted until classified. A chip rather than a column
                  of ticks and blanks, so a glance down the list shows the work
-                 left rather than the work done. -->
-            <DataGridTemplateColumn Width="Auto" MinWidth="110" MaxWidth="200">
+                 left rather than the work done. It copies the note, the one
+                 text in it an agent would want elsewhere (A-84). -->
+            <DataGridTemplateColumn Width="Auto" MinWidth="110" MaxWidth="200"
+                                    ClipboardContentBinding="{Binding Notes}">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <Grid>
@@ -448,14 +451,14 @@
         </Grid.RowDefinitions>
 
         <StackPanel Orientation="Horizontal">
-          <TextBlock Text="{Binding Opened.Who}"
-                     Foreground="{StaticResource Text}"
-                     FontWeight="SemiBold" />
-          <TextBlock Text="{Binding Opened.Number}"
-                     FontFamily="{StaticResource MonoFont}"
-                     Foreground="{StaticResource TextMuted}"
-                     FlowDirection="LeftToRight"
-                     Margin="10,0,0,0" />
+          <local:SelectableText Value="{Binding Opened.Who}"
+                                Foreground="{StaticResource Text}"
+                                FontWeight="SemiBold" />
+          <local:SelectableText Value="{Binding Opened.Number}"
+                                FontFamily="{StaticResource MonoFont}"
+                                Foreground="{StaticResource TextMuted}"
+                                FlowDirection="LeftToRight"
+                                Margin="10,0,0,0" />
         </StackPanel>
 
         <Button Grid.Column="1" Grid.RowSpan="2"
@@ -466,18 +469,18 @@
 
         <!-- When, which way, how long, how it ended, through which queue. -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,4,0,0">
-          <TextBlock Text="{Binding Opened.StartedAt}"
-                     Style="{StaticResource Subtle}"
-                     FontFamily="{StaticResource MonoFont}"
-                     FlowDirection="LeftToRight" />
-          <TextBlock Text="{Binding Opened.DirectionLabel}" Style="{StaticResource Subtle}" Margin="14,0,0,0" />
-          <TextBlock Text="{Binding Opened.Duration}"
-                     Style="{StaticResource Subtle}"
-                     FontFamily="{StaticResource MonoFont}"
-                     FlowDirection="LeftToRight"
-                     Margin="14,0,0,0" />
-          <TextBlock Text="{Binding Opened.Status}" Style="{StaticResource Subtle}" Margin="14,0,0,0" />
-          <TextBlock Text="{Binding Opened.Queue}" Style="{StaticResource Subtle}" Margin="14,0,0,0" />
+          <local:SelectableText Value="{Binding Opened.StartedAt}"
+                                Style="{StaticResource SelectableSubtle}"
+                                FontFamily="{StaticResource MonoFont}"
+                                FlowDirection="LeftToRight" />
+          <local:SelectableText Value="{Binding Opened.DirectionLabel}" Style="{StaticResource SelectableSubtle}" Margin="14,0,0,0" />
+          <local:SelectableText Value="{Binding Opened.Duration}"
+                                Style="{StaticResource SelectableSubtle}"
+                                FontFamily="{StaticResource MonoFont}"
+                                FlowDirection="LeftToRight"
+                                Margin="14,0,0,0" />
+          <local:SelectableText Value="{Binding Opened.Status}" Style="{StaticResource SelectableSubtle}" Margin="14,0,0,0" />
+          <local:SelectableText Value="{Binding Opened.Queue}" Style="{StaticResource SelectableSubtle}" Margin="14,0,0,0" />
         </StackPanel>
 
         <StackPanel Grid.Row="2" Grid.ColumnSpan="2">
@@ -540,20 +543,20 @@
 
         <!-- Every hold, as times: the marks under the bar say where, this says
              exactly when. -->
-        <TextBlock Text="{Binding Player.HoldsText}"
-                   Style="{StaticResource Subtle}"
-                   Foreground="{StaticResource Warning}"
-                   TextWrapping="Wrap"
-                   Margin="0,8,0,0"
-                   Visibility="{Binding Player.HasHolds, Converter={StaticResource BoolToVisibility}}" />
+        <local:SelectableText Value="{Binding Player.HoldsText}"
+                              Style="{StaticResource SelectableSubtle}"
+                              Foreground="{StaticResource Warning}"
+                              TextWrapping="Wrap"
+                              Margin="0,8,0,0"
+                              Visibility="{Binding Player.HasHolds, Converter={StaticResource BoolToVisibility}}" />
 
         <!-- Loading, or why there is nothing to play - or, under the player,
              that it is waiting for a live call to end. -->
-        <TextBlock Text="{Binding Player.Message}"
-                   Style="{StaticResource Subtle}"
-                   TextWrapping="Wrap"
-                   Margin="0,10,0,0"
-                   Visibility="{Binding Player.HasMessage, Converter={StaticResource BoolToVisibility}}" />
+        <local:SelectableText Value="{Binding Player.Message}"
+                              Style="{StaticResource SelectableSubtle}"
+                              TextWrapping="Wrap"
+                              Margin="0,10,0,0"
+                              Visibility="{Binding Player.HasMessage, Converter={StaticResource BoolToVisibility}}" />
         </StackPanel>
       </Grid>
     </Border>
@@ -596,10 +599,10 @@
                    Margin="0,8,0,0"
                    TextWrapping="Wrap" />
 
-        <TextBlock Text="{Binding Classification.Message}"
-                   Style="{StaticResource Subtle}"
-                   Margin="0,4,0,0"
-                   TextWrapping="Wrap" />
+        <local:SelectableText Value="{Binding Classification.Message}"
+                              Style="{StaticResource SelectableSubtle}"
+                              Margin="0,4,0,0"
+                              TextWrapping="Wrap" />
       </StackPanel>
     </Border>
 
@@ -633,10 +636,10 @@
                   Command="{Binding CloseCallCommand}" />
         </StackPanel>
 
-        <TextBlock Text="{Binding NotesMessage}"
-                   Style="{StaticResource Subtle}"
-                   Margin="0,4,0,0"
-                   TextWrapping="Wrap" />
+        <local:SelectableText Value="{Binding NotesMessage}"
+                              Style="{StaticResource SelectableSubtle}"
+                              Margin="0,4,0,0"
+                              TextWrapping="Wrap" />
       </StackPanel>
     </Border>
 

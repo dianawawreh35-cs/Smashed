@@ -638,6 +638,38 @@ must be running: a message is not queued offline (Dia, 25 Sep).
       Number / Time boxes greyed and a note that it was written on an earlier
       day. The supervisor can still change it from the web app.
 
+### Copying text (A-84) — built 27 Sep, never run
+
+Paste each one into Notepad to check what was copied.
+
+- [ ] **Nothing looks different.** Open Menu, Delivery, Call log and
+      Applications, in both languages. The text is where it was, the same
+      size and colour, with no box or border around it. *If any text has
+      moved, grown a box, or been cut off:* screenshot it.
+- [ ] **Select and copy.** In Menu, drag across an item's name: it turns
+      blue. Ctrl+C, paste: the name. Double-click a price: the number is
+      selected. Right-click it: **Copy** and **Select all**, dark, in the
+      app's language (نسخ / تحديد الكل in Arabic). No Cut, no Paste.
+- [ ] **It cannot be typed into.** Click a name in Menu and type: nothing
+      changes. Press Tab from the Menu search box: the cursor does not stop
+      on the names.
+- [ ] **The page still scrolls.** In Menu, with the pointer over an item's
+      description, turn the mouse wheel: the list scrolls.
+- [ ] **The lists.** In the Call log, right-click a call's number: **Copy**
+      and **Copy row**. Copy, paste: the number only. Copy row, paste: the
+      direction, time, customer, number, queue, duration, status and note,
+      separated by tabs. Right-click the recording icon: only Copy row.
+      A single click still chooses a row, and a double-click still opens it.
+      The same in App logs and Contacts.
+- [ ] **The opened call.** Open a call in the Call log: its customer, number
+      and time can be selected and copied. The same for an opened message in
+      App logs, and the customer found in Applications.
+- [ ] **An error.** Sign out, and sign in with a wrong password: the red
+      message can be selected and copied.
+- [ ] *(Needs the PBX.)* **The pop-up.** On a call, select the caller's
+      number and name and copy them. While the text is selected, the call's
+      keys still work: Ctrl+Shift+H holds, Ctrl+Shift+E hangs up.
+
 ---
 
 ## Round 3 — the telephone

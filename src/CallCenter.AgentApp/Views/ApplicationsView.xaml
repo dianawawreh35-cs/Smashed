@@ -74,17 +74,17 @@
 
           <!-- Who it is (A-10 rules, reused): found, looking, nobody on file,
                or could not check. Never blank once a number is typed. -->
-          <TextBlock Text="{Binding Customer.Name}"
-                     Foreground="{StaticResource Text}"
-                     FontWeight="SemiBold"
-                     TextWrapping="Wrap"
-                     Margin="0,6,0,0"
-                     Visibility="{Binding Customer.HasName, Converter={StaticResource BoolToVisibility}}" />
-          <TextBlock Text="{Binding Customer.Address}"
-                     Style="{StaticResource Subtle}"
-                     TextWrapping="Wrap"
-                     Margin="0,2,0,0"
-                     Visibility="{Binding Customer.HasAddress, Converter={StaticResource BoolToVisibility}}" />
+          <local:SelectableText Value="{Binding Customer.Name}"
+                                Foreground="{StaticResource Text}"
+                                FontWeight="SemiBold"
+                                TextWrapping="Wrap"
+                                Margin="0,6,0,0"
+                                Visibility="{Binding Customer.HasName, Converter={StaticResource BoolToVisibility}}" />
+          <local:SelectableText Value="{Binding Customer.Address}"
+                                Style="{StaticResource SelectableSubtle}"
+                                TextWrapping="Wrap"
+                                Margin="0,2,0,0"
+                                Visibility="{Binding Customer.HasAddress, Converter={StaticResource BoolToVisibility}}" />
           <Border Background="{StaticResource Warning}"
                   CornerRadius="{StaticResource CornerSmall}"
                   Padding="8,2"
@@ -129,7 +129,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <StackPanel Margin="0,0,0,6">
-                        <TextBlock FontSize="11" Text="{Binding Name}" Foreground="{StaticResource Text}" />
+                        <local:SelectableText FontSize="11" Value="{Binding Name}" Foreground="{StaticResource Text}" />
                         <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
                                           RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                 Style="{StaticResource SmallButton}"
@@ -166,12 +166,12 @@
                       Command="{Binding Customer.CancelNewCustomerCommand}" />
             </StackPanel>
 
-            <TextBlock Text="{Binding Customer.FormMessage}"
-                       Foreground="{StaticResource Warning}"
-                       FontSize="11"
-                       Margin="0,6,0,0"
-                       TextWrapping="Wrap"
-                       Visibility="{Binding Customer.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
+            <local:SelectableText Value="{Binding Customer.FormMessage}"
+                                  Foreground="{StaticResource Warning}"
+                                  FontSize="11"
+                                  Margin="0,6,0,0"
+                                  TextWrapping="Wrap"
+                                  Visibility="{Binding Customer.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
           </StackPanel>
 
           <!-- When the customer wrote. Now by default; an agent may set it
@@ -202,12 +202,12 @@
                      FontWeight="SemiBold"
                      Margin="0,0,0,10" />
 
-          <TextBlock Text="{Binding FormUnavailable}"
-                     Foreground="{StaticResource Warning}"
-                     FontSize="11"
-                     TextWrapping="Wrap"
-                     Margin="0,0,0,8"
-                     Visibility="{Binding FormUnavailable, Converter={StaticResource NotNullToVisibility}}" />
+          <local:SelectableText Value="{Binding FormUnavailable}"
+                                Foreground="{StaticResource Warning}"
+                                FontSize="11"
+                                TextWrapping="Wrap"
+                                Margin="0,0,0,8"
+                                Visibility="{Binding FormUnavailable, Converter={StaticResource NotNullToVisibility}}" />
 
           <ItemsControl ItemsSource="{Binding Classification.Fields}">
             <ItemsControl.ItemContainerStyle>
@@ -239,18 +239,18 @@
           </StackPanel>
 
           <!-- Recorded, or why not. A refusal keeps what was typed on screen. -->
-          <TextBlock Text="{Binding RecordMessage}"
-                     Foreground="{StaticResource Warning}"
-                     FontSize="11"
-                     Margin="0,8,0,0"
-                     TextWrapping="Wrap"
-                     Visibility="{Binding RecordFailed, Converter={StaticResource BoolToVisibility}}" />
-          <TextBlock Text="{Binding RecordMessage}"
-                     Foreground="{StaticResource Success}"
-                     FontSize="11"
-                     Margin="0,8,0,0"
-                     TextWrapping="Wrap"
-                     Visibility="{Binding RecordFailed, Converter={StaticResource InverseBoolToVisibility}}" />
+          <local:SelectableText Value="{Binding RecordMessage}"
+                                Foreground="{StaticResource Warning}"
+                                FontSize="11"
+                                Margin="0,8,0,0"
+                                TextWrapping="Wrap"
+                                Visibility="{Binding RecordFailed, Converter={StaticResource BoolToVisibility}}" />
+          <local:SelectableText Value="{Binding RecordMessage}"
+                                Foreground="{StaticResource Success}"
+                                FontSize="11"
+                                Margin="0,8,0,0"
+                                TextWrapping="Wrap"
+                                Visibility="{Binding RecordFailed, Converter={StaticResource InverseBoolToVisibility}}" />
           </StackPanel>
         </Grid>
       </Border>

@@ -1,6 +1,7 @@
 <Window x:Class="CallCenter.AgentApp.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
         Title="{Binding Localizer[app.title]}"
         Icon="/Assets/app.ico"
         Height="740" Width="1180"
@@ -33,11 +34,11 @@
                 Style="{StaticResource GhostButton}"
                 Content="{Binding Localizer[app.dismiss]}"
                 Click="OnDismissNotice" />
-        <TextBlock x:Name="NoticeText"
-                   Foreground="{StaticResource Warning}"
-                   TextWrapping="Wrap"
-                   VerticalAlignment="Center"
-                   Margin="0,0,12,0" />
+        <local:SelectableText x:Name="NoticeText"
+                              Foreground="{StaticResource Warning}"
+                              TextWrapping="Wrap"
+                              VerticalAlignment="Center"
+                              Margin="0,0,12,0" />
       </DockPanel>
     </Border>
 

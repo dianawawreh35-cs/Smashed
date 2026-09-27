@@ -118,14 +118,14 @@
             <TextBlock Text="{Binding Localizer[applications.emptyTitle]}"
                        Foreground="{StaticResource TextMuted}"
                        HorizontalAlignment="Center" />
-            <TextBlock Text="{Binding StatusMessage}"
-                       Style="{StaticResource Subtle}"
-                       Foreground="{StaticResource TextFaint}"
-                       Margin="0,6,0,0"
-                       TextWrapping="Wrap"
-                       TextAlignment="Center"
-                       HorizontalAlignment="Center"
-                       Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
+            <local:SelectableText Value="{Binding StatusMessage}"
+                                  Style="{StaticResource SelectableSubtle}"
+                                  Foreground="{StaticResource TextFaint}"
+                                  Margin="0,6,0,0"
+                                  TextWrapping="Wrap"
+                                  TextAlignment="Center"
+                                  HorizontalAlignment="Center"
+                                  Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
           </StackPanel>
 
           <!-- Sorting off and horizontal scrolling disabled for the reasons
@@ -243,17 +243,17 @@
               </Grid.RowDefinitions>
 
               <StackPanel Orientation="Horizontal">
-                <TextBlock Text="{Binding Opened.Who}"
-                           Foreground="{StaticResource Text}"
-                           FontWeight="SemiBold" />
-                <TextBlock Text="{Binding Opened.Channel}"
-                           Style="{StaticResource Subtle}"
-                           Margin="12,0,0,0" />
-                <TextBlock Text="{Binding Opened.StartedAt}"
-                           Style="{StaticResource Subtle}"
-                           FontFamily="{StaticResource MonoFont}"
-                           FlowDirection="LeftToRight"
-                           Margin="12,0,0,0" />
+                <local:SelectableText Value="{Binding Opened.Who}"
+                                      Foreground="{StaticResource Text}"
+                                      FontWeight="SemiBold" />
+                <local:SelectableText Value="{Binding Opened.Channel}"
+                                      Style="{StaticResource SelectableSubtle}"
+                                      Margin="12,0,0,0" />
+                <local:SelectableText Value="{Binding Opened.StartedAt}"
+                                      Style="{StaticResource SelectableSubtle}"
+                                      FontFamily="{StaticResource MonoFont}"
+                                      FlowDirection="LeftToRight"
+                                      Margin="12,0,0,0" />
               </StackPanel>
 
               <Button Grid.Column="1" Grid.RowSpan="2"
@@ -305,12 +305,12 @@
                         Command="{Binding SaveEditCommand}" />
               </StackPanel>
 
-              <TextBlock Grid.Row="3" Grid.ColumnSpan="2"
-                         Text="{Binding EditMessage}"
-                         Style="{StaticResource Subtle}"
-                         Margin="0,6,0,0"
-                         TextWrapping="Wrap"
-                         Visibility="{Binding EditMessage, Converter={StaticResource NotNullToVisibility}}" />
+              <local:SelectableText Grid.Row="3" Grid.ColumnSpan="2"
+                                    Value="{Binding EditMessage}"
+                                    Style="{StaticResource SelectableSubtle}"
+                                    Margin="0,6,0,0"
+                                    TextWrapping="Wrap"
+                                    Visibility="{Binding EditMessage, Converter={StaticResource NotNullToVisibility}}" />
             </Grid>
           </Border>
 
@@ -352,10 +352,10 @@
                          Margin="0,8,0,0"
                          TextWrapping="Wrap" />
 
-              <TextBlock Text="{Binding OpenedClassification.Message}"
-                         Style="{StaticResource Subtle}"
-                         Margin="0,4,0,0"
-                         TextWrapping="Wrap" />
+              <local:SelectableText Value="{Binding OpenedClassification.Message}"
+                                    Style="{StaticResource SelectableSubtle}"
+                                    Margin="0,4,0,0"
+                                    TextWrapping="Wrap" />
             </StackPanel>
           </Border>
         </StackPanel>

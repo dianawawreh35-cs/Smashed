@@ -202,6 +202,7 @@ branch number is a settings change, not a PBX change and a visit to four laptops
 | A-81 | Pop-up appears within one second of the call ringing. | Must |
 | A-82 | Automatic updates of the Agent App from the server. | Should |
 | A-83 | Agent status indicator (Available / On call / Away) visible to the supervisor. | Could |
+| A-84 | Text the agent may need elsewhere can be selected and copied: the caller's number, name, address and notes in the pop-up; names, numbers and addresses in Applications, App logs and the call log; menu items and prices; delivery areas and prices; and error messages. **Added 27 Sep 2026 (Dia):** by dragging or double-clicking, then Ctrl+C or right-click → Copy. In the lists (call log, App logs, contacts) a row is clicked to choose it and double-clicked to open it, so there right-click → Copy copies the cell, and Copy row the whole row. Headings, labels and buttons are not selectable. | Should |
 
 ---
 

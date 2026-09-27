@@ -46,12 +46,12 @@
                        FontWeight="SemiBold"
                        Foreground="{StaticResource Warning}"
                        VerticalAlignment="Center" />
-            <TextBlock Text="{Binding HeldNumber}"
-                       FontFamily="{StaticResource MonoFont}"
-                       Foreground="{StaticResource Text}"
-                       FlowDirection="LeftToRight"
-                       Margin="8,0,0,0"
-                       VerticalAlignment="Center" />
+            <local:SelectableText Value="{Binding HeldNumber}"
+                                  FontFamily="{StaticResource MonoFont}"
+                                  Foreground="{StaticResource Text}"
+                                  FlowDirection="LeftToRight"
+                                  Margin="8,0,0,0"
+                                  VerticalAlignment="Center" />
           </StackPanel>
         </Border>
 
@@ -92,13 +92,13 @@
                      Foreground="{StaticResource OnWarning}" />
         </Border>
 
-        <TextBlock Text="{Binding Caller.FlagReason}"
-                   Style="{StaticResource Subtle}"
-                   HorizontalAlignment="Center"
-                   TextAlignment="Center"
-                   Margin="0,4,0,0"
-                   TextWrapping="Wrap"
-                   Visibility="{Binding Caller.HasFlagReason, Converter={StaticResource BoolToVisibility}}" />
+        <local:SelectableText Value="{Binding Caller.FlagReason}"
+                              Style="{StaticResource SelectableSubtle}"
+                              HorizontalAlignment="Center"
+                              TextAlignment="Center"
+                              Margin="0,4,0,0"
+                              TextWrapping="Wrap"
+                              Visibility="{Binding Caller.HasFlagReason, Converter={StaticResource BoolToVisibility}}" />
 
         <!-- Which queue rang, above the number: it changes how the agent answers,
              and they read it before they have said anything. -->
@@ -108,41 +108,41 @@
                 Margin="0,10,0,0"
                 HorizontalAlignment="Center"
                 Visibility="{Binding HasQueue, Converter={StaticResource BoolToVisibility}}">
-          <TextBlock Text="{Binding Queue}"
-                     FontSize="12"
-                     FontWeight="SemiBold"
-                     Foreground="{StaticResource Text}" />
+          <local:SelectableText Value="{Binding Queue}"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Foreground="{StaticResource Text}" />
         </Border>
 
         <!-- The number, large: it is the only thing identifying the caller until
              the contact lookup arrives (A-11, A-16). -->
-        <TextBlock Text="{Binding Number}"
-                   FontFamily="{StaticResource MonoFont}"
-                   FontSize="26"
-                   Foreground="{StaticResource Text}"
-                   HorizontalAlignment="Center"
-                   FlowDirection="LeftToRight"
-                   Margin="0,8,0,0" />
+        <local:SelectableText Value="{Binding Number}"
+                              FontFamily="{StaticResource MonoFont}"
+                              FontSize="26"
+                              Foreground="{StaticResource Text}"
+                              HorizontalAlignment="Center"
+                              FlowDirection="LeftToRight"
+                              Margin="0,8,0,0" />
 
         <!-- Who it is (A-10). The name is the size of a name, not a footnote:
              it is what the agent greets them by. -->
-        <TextBlock Text="{Binding Caller.Name}"
-                   FontSize="18"
-                   FontWeight="SemiBold"
-                   Foreground="{StaticResource Text}"
-                   HorizontalAlignment="Center"
-                   TextAlignment="Center"
-                   TextWrapping="Wrap"
-                   Margin="0,8,0,0"
-                   Visibility="{Binding Caller.HasName, Converter={StaticResource BoolToVisibility}}" />
+        <local:SelectableText Value="{Binding Caller.Name}"
+                              FontSize="18"
+                              FontWeight="SemiBold"
+                              Foreground="{StaticResource Text}"
+                              HorizontalAlignment="Center"
+                              TextAlignment="Center"
+                              TextWrapping="Wrap"
+                              Margin="0,8,0,0"
+                              Visibility="{Binding Caller.HasName, Converter={StaticResource BoolToVisibility}}" />
 
-        <TextBlock Text="{Binding Caller.Address}"
-                   Style="{StaticResource Subtle}"
-                   HorizontalAlignment="Center"
-                   TextAlignment="Center"
-                   TextWrapping="Wrap"
-                   Margin="0,4,0,0"
-                   Visibility="{Binding Caller.HasAddress, Converter={StaticResource BoolToVisibility}}" />
+        <local:SelectableText Value="{Binding Caller.Address}"
+                              Style="{StaticResource SelectableSubtle}"
+                              HorizontalAlignment="Center"
+                              TextAlignment="Center"
+                              TextWrapping="Wrap"
+                              Margin="0,4,0,0"
+                              Visibility="{Binding Caller.HasAddress, Converter={StaticResource BoolToVisibility}}" />
 
         <!-- A-16 asks for the notes at the top, so the agent adjusts immediately.
              Boxed rather than another grey line: it is the one thing here that
@@ -152,10 +152,10 @@
                 Padding="10,6"
                 Margin="0,8,0,0"
                 Visibility="{Binding Caller.HasNotes, Converter={StaticResource BoolToVisibility}}">
-          <TextBlock Text="{Binding Caller.Notes}"
-                     Foreground="{StaticResource Text}"
-                     FontSize="12"
-                     TextWrapping="Wrap" />
+          <local:SelectableText Value="{Binding Caller.Notes}"
+                                Foreground="{StaticResource Text}"
+                                FontSize="12"
+                                TextWrapping="Wrap" />
         </Border>
 
         <!-- Totals (A-10): how many orders, complaints and cancellations this
@@ -200,11 +200,11 @@
 
         <!-- Whatever name the PBX sent, small, and only while the real contact is
              unknown (A-11). -->
-        <TextBlock Text="{Binding CallerName}"
-                   Style="{StaticResource Subtle}"
-                   HorizontalAlignment="Center"
-                   Margin="0,4,0,0"
-                   Visibility="{Binding HasCallerName, Converter={StaticResource BoolToVisibility}}" />
+        <local:SelectableText Value="{Binding CallerName}"
+                              Style="{StaticResource SelectableSubtle}"
+                              HorizontalAlignment="Center"
+                              Margin="0,4,0,0"
+                              Visibility="{Binding HasCallerName, Converter={StaticResource BoolToVisibility}}" />
 
         <!-- Only while connected, and empty before then, so a ring is never
              mistaken for a call that has been running for two minutes. -->
@@ -218,14 +218,14 @@
 
         <!-- M-A02: the headset failed. Until 27 Sep the call simply had no
              sound, and nothing on screen or in the log said why. -->
-        <TextBlock Text="{Binding AudioProblem}"
-                   Foreground="{StaticResource Danger}"
-                   FontWeight="SemiBold"
-                   HorizontalAlignment="Center"
-                   TextAlignment="Center"
-                   TextWrapping="Wrap"
-                   Margin="0,8,0,0"
-                   Visibility="{Binding AudioProblem, Converter={StaticResource NotNullToVisibility}}" />
+        <local:SelectableText Value="{Binding AudioProblem}"
+                              Foreground="{StaticResource Danger}"
+                              FontWeight="SemiBold"
+                              HorizontalAlignment="Center"
+                              TextAlignment="Center"
+                              TextWrapping="Wrap"
+                              Margin="0,8,0,0"
+                              Visibility="{Binding AudioProblem, Converter={StaticResource NotNullToVisibility}}" />
       </StackPanel>
 
       <ScrollViewer x:Name="Body"
@@ -264,7 +264,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <StackPanel Margin="0,0,0,6">
-                        <TextBlock FontSize="11" Text="{Binding Name}" Foreground="{StaticResource Text}" />
+                        <local:SelectableText FontSize="11" Value="{Binding Name}" Foreground="{StaticResource Text}" />
                         <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
                                           RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                 Style="{StaticResource SmallButton}"
@@ -303,12 +303,12 @@
 
             <!-- Why it was not saved: offline, a number already on someone. What
                  was typed stays, so the agent only presses Save again. -->
-            <TextBlock Text="{Binding Caller.FormMessage}"
-                       Foreground="{StaticResource Warning}"
-                       FontSize="11"
-                       Margin="0,6,0,0"
-                       TextWrapping="Wrap"
-                       Visibility="{Binding Caller.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
+            <local:SelectableText Value="{Binding Caller.FormMessage}"
+                                  Foreground="{StaticResource Warning}"
+                                  FontSize="11"
+                                  Margin="0,6,0,0"
+                                  TextWrapping="Wrap"
+                                  Visibility="{Binding Caller.FormMessage, Converter={StaticResource NotNullToVisibility}}" />
           </StackPanel>
 
           <!-- The classification form (A-40). On screen from the moment the call is
@@ -358,10 +358,10 @@
                        Margin="0,8,0,0"
                        TextWrapping="Wrap" />
 
-            <TextBlock Text="{Binding Classification.Message}"
-                       Style="{StaticResource Subtle}"
-                       Margin="0,4,0,0"
-                       TextWrapping="Wrap" />
+            <local:SelectableText Value="{Binding Classification.Message}"
+                                  Style="{StaticResource SelectableSubtle}"
+                                  Margin="0,4,0,0"
+                                  TextWrapping="Wrap" />
           </StackPanel>
 
           <!-- An outbound call the customer did not pick up (A-41). Never
@@ -398,11 +398,11 @@
             </StackPanel>
 
             <!-- M-A03: the note was neither queued nor sent; it is still here. -->
-            <TextBlock Text="{Binding NotesMessage}"
-                       Foreground="{StaticResource Warning}"
-                       FontSize="11"
-                       Margin="0,6,0,0"
-                       TextWrapping="Wrap" />
+            <local:SelectableText Value="{Binding NotesMessage}"
+                                  Foreground="{StaticResource Warning}"
+                                  FontSize="11"
+                                  Margin="0,6,0,0"
+                                  TextWrapping="Wrap" />
           </StackPanel>
         </StackPanel>
       </ScrollViewer>

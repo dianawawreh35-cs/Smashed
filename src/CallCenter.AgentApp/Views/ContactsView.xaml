@@ -1,6 +1,7 @@
 <UserControl x:Class="CallCenter.AgentApp.Views.ContactsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
              Background="{StaticResource Bg}">
@@ -42,11 +43,11 @@
               Margin="8,0,0,0"
               Command="{Binding SearchCommand}" />
 
-      <TextBlock Text="{Binding StatusMessage}"
-                 Style="{StaticResource Subtle}"
-                 VerticalAlignment="Center"
-                 Margin="14,0,0,0"
-                 Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
+      <local:SelectableText Value="{Binding StatusMessage}"
+                            Style="{StaticResource SelectableSubtle}"
+                            VerticalAlignment="Center"
+                            Margin="14,0,0,0"
+                            Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
     </StackPanel>
 
     <!-- Results -->
@@ -168,7 +169,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <StackPanel Margin="0,0,0,6">
-                    <TextBlock FontSize="11" Text="{Binding Name}" />
+                    <local:SelectableText FontSize="11" Value="{Binding Name}" />
                     <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
                                       RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                             Style="{StaticResource SmallButton}"

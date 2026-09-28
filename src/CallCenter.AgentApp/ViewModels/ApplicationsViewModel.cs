@@ -325,15 +325,20 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            RecordFailed = false;
-            RecordMessageKey = "applications.recorded";
-
             // A-73: the branch is remembered for the next message; the channel
             // simply stays selected.
             _lastBranchId = Classification.Fields.OfType<BranchFieldViewModel>()
                 .FirstOrDefault()?.Selected?.Branch.Id ?? _lastBranchId;
 
             StartNext();
+
+            // After StartNext, not before: emptying the number box clears the
+            // message, and until 28 Sep it cleared this one. The agent saw no
+            // confirmation, only the blank form's "Still needed: Call type",
+            // and pressed Record again: five messages recorded in four minutes.
+            RecordFailed = false;
+            RecordMessageKey = "applications.recorded";
+
             _ = RefreshAsync(CancellationToken.None);
         }
         catch (Exception ex)
@@ -351,6 +356,7 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ClearForm()
     {
+        RecordFailed = false;
         RecordMessageKey = null;
         StartNext();
     }

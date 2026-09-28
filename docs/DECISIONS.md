@@ -7627,6 +7627,35 @@ real call.
 installer and zip on the web app's Agent App page. The next server release
 should be tagged `v0.5.2` or later, so versions never go backwards.
 
+## 2026-09-28 — Recording a message said "Still needed: Call type" after it had worked (A-70)
+
+**In plain terms.** Dia, on the live server: recording a message on
+Applications "always says call type needed". It did not fail. The agent log
+from `DESKTOP-RMSFSIV` shows five `POST /api/communications/applications`
+between 19:03 and 19:07, every one answered 200 and followed by the list's
+refresh. Five messages were recorded.
+
+**Why it looked refused.** Two things on the screen after a save:
+
+- The confirmation never showed. `RecordAsync` set "Message recorded." and
+  then called `StartNext`, which empties the number box; `OnNumberChanged`
+  clears the message, so it went at once.
+- The blank form for the next message pre-selects the last branch (A-73).
+  Selecting it makes the form recount what is missing, and with no type yet
+  the orange line under it read "Still needed: Call type", in the colour of
+  a refusal.
+
+**The fix.** The confirmation is set after `StartNext`. The "Still needed"
+line on Applications shows only once Record has been refused, and Clear
+hides it again. The call pop-up and the call log keep theirs as they were:
+there a form starts with a call, not straight after a save.
+
+**Tested.** Agent App suite: 59 passed. Not yet seen on screen.
+
+**Still to do:** the five messages from 19:03 to 19:07 on the live server
+are real rows, in that agent's App logs; any that were test presses need
+deciding on. The fix reaches the laptops with the next Agent App build.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

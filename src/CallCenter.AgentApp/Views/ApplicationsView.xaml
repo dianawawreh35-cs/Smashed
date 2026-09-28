@@ -218,10 +218,14 @@
             </ItemsControl.ItemContainerStyle>
           </ItemsControl>
 
+          <!-- Only once Record has been refused. On a blank form it read as a
+               refusal: the next message's empty type, right after the last
+               one was recorded (28 Sep). -->
           <TextBlock Text="{Binding Classification.Missing}"
                      Foreground="{StaticResource Warning}"
                      FontSize="11"
-                     TextWrapping="Wrap" />
+                     TextWrapping="Wrap"
+                     Visibility="{Binding RecordFailed, Converter={StaticResource BoolToVisibility}}" />
           </StackPanel>
 
           <!-- ===== Record, under both halves ===== -->

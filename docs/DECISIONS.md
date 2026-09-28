@@ -7654,7 +7654,12 @@ there a form starts with a call, not straight after a save.
 
 **Still to do:** the five messages from 19:03 to 19:07 on the live server
 are real rows, in that agent's App logs; any that were test presses need
-deciding on. The fix reaches the laptops with the next Agent App build.
+deciding on.
+
+**To deploy:** Agent App only; no server change. Published as Agent App
+`0.5.3` with `publish.ps1 -Version 0.5.3`, without a git tag, as 0.5.2 was;
+it carries the POS cart (A-85) too. Upload the 0.5.3 installer and zip on
+the web app's Agent App page, and install it on each laptop.
 
 # Open items (live)
 

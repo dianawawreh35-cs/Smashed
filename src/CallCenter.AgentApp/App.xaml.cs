@@ -232,6 +232,9 @@ public partial class App : Application
         // N-12: the log goes to the server, from the file, whenever signed in.
         _host.Services.GetRequiredService<AgentLogShipper>().RunEvery(TimeSpan.FromSeconds(30));
 
+        // A-82: a newer version uploaded on the web app is offered in a bar.
+        _host.Services.GetRequiredService<AppUpdateViewModel>().CheckEvery(TimeSpan.FromMinutes(15));
+
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();
@@ -408,6 +411,9 @@ public partial class App : Application
         services.AddSingleton<PosCart>();
         services.AddSingleton<CallViewModel>();
         services.AddSingleton<CallPopupWindow>();
+        // One bar for the process: it outlives sign-outs, so an update found
+        // during the shift is still offered on the sign-in screen (A-82).
+        services.AddSingleton<AppUpdateViewModel>();
 
         // The screens below are transient and resolved from the scope the
         // window makes for each sign-in and sign-out (M-A06), which disposes

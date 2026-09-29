@@ -6,6 +6,14 @@
     "problem": "Something went wrong, and the app carried on. The phone is still working. If it keeps happening, tell your supervisor.",
     "dismiss": "Dismiss"
   },
+  "update": {
+    "ready": "A new version of the app is ready: {version}.",
+    "howLong": "Updating closes the app for about half a minute. It opens again by itself; then sign in.",
+    "afterCall": "Finish the call first. You can update as soon as it is over.",
+    "downloading": "Downloading the update…",
+    "failed": "The update could not be downloaded. Try again in a moment; if it keeps failing, tell your supervisor.",
+    "now": "Update now"
+  },
   "applications": {
     "intro": "Conversations that came on WhatsApp, Facebook, Instagram or another app, not by phone. Record one here; your own are listed under App logs.",
     "recordHeading": "Record a message",

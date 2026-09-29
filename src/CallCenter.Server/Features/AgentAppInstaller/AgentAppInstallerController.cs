@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CallCenter.Server.Features.Auth;
+using CallCenter.Shared.Contracts.AgentApp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

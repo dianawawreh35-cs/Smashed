@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using CallCenter.Shared.Contracts.AgentApp;
 using Microsoft.Extensions.Options;
 
 namespace CallCenter.Server.Features.AgentAppInstaller;
@@ -17,23 +18,6 @@ public class AgentAppInstallerOptions
     [Required]
     public string Path { get; set; } = "data/agent-app";
 }
-
-/// <summary>The installer the laptops are offered now, and the zip beside it.</summary>
-/// <param name="Version">As the supervisor gave it at upload, e.g. <c>0.4.1</c>.</param>
-/// <param name="FileName">What the browser saves the installer as.</param>
-/// <param name="UploadedBy">The supervisor's login.</param>
-/// <param name="ZipFileName">
-/// The same version as a zip, for when the installer will not run on a laptop
-/// (S-63). Null when none was uploaded with this version.
-/// </param>
-public record AgentAppInstallerDto(
-    string Version,
-    string FileName,
-    long SizeBytes,
-    DateTimeOffset UploadedAt,
-    string UploadedBy,
-    string? ZipFileName = null,
-    long? ZipSizeBytes = null);
 
 /// <summary>
 /// The one Agent App installer the server hands out (N-11, A-82): the latest a

@@ -236,7 +236,17 @@ version before, and every agent is offered them at once. The zip is the
 fallback for a laptop the installer will not run on; it is optional, but
 without it an agent has nothing to try when the installer fails.
 
-**On each laptop:** the agent signs in to the web app with their own account,
+**From 0.5.3 on, the app offers it itself (A-82).** Within 15 minutes of the
+upload, or at the next sign-in, every laptop on 0.5.3 or later shows a bar:
+*A new version of the app is ready*, with **Update now**. The agent presses
+it between calls (it is off during one); the app downloads the installer,
+closes, installs it silently and opens again, and the agent signs in. No
+Windows prompt comes up, since the app fetched the file and not a browser.
+If a laptop does not update, its install log is in
+`%LOCALAPPDATA%\CallCenter\updates\install-<version>.log`, and the app's log
+says why. Only the copy in `C:\SmashedAgentApp\` updates itself.
+
+**On each laptop, the first time** (or on one older than 0.5.3): the agent signs in to the web app with their own account,
 sees only the Agent App page, downloads the installer and runs it. It installs
 into `C:\SmashedAgentApp\`, closes the app first if it is open, clears the old
 version's files, and makes the desktop shortcut. No administrator rights are

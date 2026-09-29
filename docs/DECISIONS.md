@@ -7757,6 +7757,69 @@ reported, and the update went on to healthy.
 **To deploy:** copy `deploy/backup.sh` to `/opt/callcenter/` and
 `chmod +x backup.sh`. No image change; it works with whatever version runs.
 
+## 2026-09-29 — The Agent App offers its own updates: a bar and Update now (A-82)
+
+**In plain terms.** Asked by Dia: once a new version is uploaded on the web
+app's Agent App page, the app tells the agent, and one click updates it.
+The agent chooses when. Nothing installs on its own (Dia's choice, 29 Sep,
+over updating by itself at sign-in).
+
+- **When it asks.** At every sign-in and every 15 minutes after, with
+  `GET /api/agent-app`, which the server has had since S-63. A version
+  higher than the app's own is offered; one that cannot be read never is.
+  Signed out, it does not ask, but a bar already up stays, and the sign-in
+  screen is the best moment to press it.
+- **The bar**, across the top of the window on both screens: *A new version
+  of the app is ready: 0.5.4*, what updating does, and **Update now**. The
+  button is off while a call is on (a held one too) and while the pop-up
+  still holds an unsaved form or notes, and the line says "Finish the call
+  first". The new copy would start without them.
+- **Update now** downloads the installer into
+  `%LOCALAPPDATA%\CallCenter\updates\`, a `.part` file moved into place only
+  at the size the server described: a supervisor uploading again
+  mid-download changes the file, and half an installer must never run. A
+  call that rings during the download wins, and the update waits. Then the
+  installer starts with `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG`, and
+  only then does the app close, signing out and unregistering on the way
+  (M-A01). A failure to start leaves the agent a working app and "could
+  not be downloaded" rather than no app.
+- **No Windows prompt.** The "Windows protected your PC" screen checks the
+  mark a browser puts on a downloaded file; the app's own download carries
+  none. The installer needs no administrator rights. Its `[Run]` gains a
+  line for silent runs only (`Check: WizardSilent`), so the new version
+  starts by itself; before, a silent install left the laptop with no app
+  open.
+- **Only the copy in `C:\SmashedAgentApp` updates.** The installer always
+  writes there, so a developer's build or a zip unpacked into a second
+  folder would install another app and stay as it was, and two copies are
+  what took each other's calls on 27 Sep (N-05). Such a copy logs why it is
+  not offered updates.
+- `AgentAppInstallerDto` moved from the server to `CallCenter.Shared`, as
+  every other contract is, for the app to read. The JSON is unchanged, so
+  the server on `v0.5.1` answers it as it is.
+
+**Rejected:** updating by itself at sign-in (recommended first; Dia chose to
+let the agent decide), and Velopack (the 27 Sep S-63 entry: another install
+folder, and code in the app's start-up).
+
+**Not done here:** the Users page showing each agent's app version, to see
+who has not pressed it. The version is saved at sign-in
+(`agent_sessions.app_version`) but not sent to the page; it needs a server
+and web release, so it is its own change. A "required" update that cannot
+be skipped is left until one is needed.
+
+**Tested.** `AppUpdateTests` (12): only a newer version is offered, the
+server's answer is read, a whole installer is kept, a short one or none is
+never left to run, and a copy outside the install folder is not the
+installed one. Agent App suite: 71 passed; the server's installer tests,
+26, after the move. **Not run end to end:** this laptop's policy blocks
+installing (S-63 entry), so the first real update is on an agent laptop,
+0.5.3 to the next version.
+
+**To deploy:** Agent App only; no server change. In **0.5.3**, published
+without a git tag. Each laptop installs 0.5.3 by hand once (the last time);
+from the next upload on, the bar does it.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -7793,8 +7856,7 @@ running**.
 | **The Users page: each agent's laptop, app version, and a "signed in twice" warning** | S-61, N-05 | nothing: the sessions have the laptop id and version. Worth doing next |
 | **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | nothing: v0.4.1 is on the server |
 | **Install from the web app on one laptop** (S-63): upload an installer, sign in as an agent, download, install over the zip's copy, and look for a second copy of the app on the laptop. Screenshots of the page as an agent and as a supervisor, in both languages | S-63, N-11 | a server with the new image and `docker-compose.yml`. It could not be run on Dia's laptop (policy) |
-| The Agent App notices a newer version at sign-in and installs it silently (the rest of A-82). The server side and the installer's `/VERYSILENT` are ready | A-82 | Dia's call, once S-63 is seen working |
-| **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
+| **See Update now work on an agent laptop** (A-82, built 29 Sep): with 0.5.3 installed by hand, upload the next version and look for the bar within 15 minutes, the button off during a call, and the app back on the new version after pressing it, with no Windows prompt. Screenshots of the bar in both languages | A-82 | 0.5.3 on the laptops, then any later version uploaded || **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
 | The report cards' own CSV export (`src/lib/csv.ts`) neutralises formula cells and writes numbers as `="0599…"`, as the server's call-search export has since 27 Sep | R-02, S-05 | nothing: the web half only |
 | **The web app's sign-out ends its token**, as the Agent App's has since 27 Sep (M-S01) | N-05 | a session row for web sign-ins, which changes what the dashboard's *agents online* counts. Then decide whether 12 hours is still right for the web token |
 | The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet |

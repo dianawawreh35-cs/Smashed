@@ -21,6 +21,7 @@ public partial class MainWindow : Window
 
         _services = services;
         Localizer = localizer;
+        Updater = services.GetRequiredService<AppUpdateViewModel>();
 
         DataContext = this;
 
@@ -86,6 +87,9 @@ public partial class MainWindow : Window
 
     /// <summary>Bound by the window's XAML for its title and direction.</summary>
     public Localizer Localizer { get; }
+
+    /// <summary>The update bar across the top (A-82), shown on both screens.</summary>
+    public AppUpdateViewModel Updater { get; }
 
     /// <param name="reason">
     /// One of <see cref="LoginErrorCodes"/>, shown under the password box, when

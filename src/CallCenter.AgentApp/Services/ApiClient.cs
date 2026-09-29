@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using CallCenter.Shared.Contracts.AgentApp;
 using CallCenter.Shared.Contracts.Auth;
 using CallCenter.Shared.Contracts.Classifications;
 using CallCenter.Shared.Contracts.Communications;
@@ -629,6 +630,95 @@ public class ApiClient(
                 communicationId, ex.Message);
 
             return Result<byte[]>.Failed(ApiStatus.Unreachable, LoginErrorCodes.ServerUnreachable);
+        }
+    }
+
+    /// <summary>
+    /// Which Agent App version the supervisor last uploaded (S-63), for the
+    /// update bar (A-82). <c>no_installer</c> (404) before the first upload.
+    /// </summary>
+    public Task<Result<AgentAppInstallerDto>> GetAgentAppInstallerAsync(CancellationToken ct = default) =>
+        SendAsync<AgentAppInstallerDto>(
+            () => new HttpRequestMessage(HttpMethod.Get, "api/agent-app"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// Saves the installer the server offers now to <paramref name="path"/>
+    /// (A-82), whole or not at all.
+    /// </summary>
+    /// <remarks>
+    /// Streamed to a <c>.part</c> file and moved into place only once it is
+    /// the size the server described: a supervisor uploading a newer version
+    /// mid-download changes the file under us, and half of one program run as
+    /// an installer is the worst outcome here. As with a recording, only the
+    /// headers are held to the usual timeout; 70 MB takes longer than that.
+    ///
+    /// Written by this app, not a browser, so Windows never marks it as from
+    /// the internet and runs it without the "Windows protected your PC" screen.
+    /// </remarks>
+    public async Task<Result<object>> DownloadAgentAppInstallerAsync(
+        string path, long expectedBytes, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/agent-app/installer");
+
+        if (session.AccessToken is { } token)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        var partial = path + ".part";
+
+        try
+        {
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                NoteIfTokenRefused(response, request);
+                logger.LogWarning("The update could not be downloaded: {StatusCode}", (int)response.StatusCode);
+
+                return Result<object>.Failed(
+                    ApiStatus.ServerError, await ReadErrorCodeAsync(response, LoginErrorCodes.ServerError, ct));
+            }
+
+            await using (var body = await response.Content.ReadAsStreamAsync(ct))
+            await using (var file = File.Create(partial))
+            {
+                await body.CopyToAsync(file, ct);
+            }
+
+            var length = new FileInfo(partial).Length;
+
+            if (length != expectedBytes)
+            {
+                logger.LogWarning(
+                    "The update arrived as {Length} bytes, not the {Expected} described; not installed",
+                    length, expectedBytes);
+                File.Delete(partial);
+
+                return Result<object>.Failed(ApiStatus.ServerError, "installer_incomplete");
+            }
+
+            File.Move(partial, path, overwrite: true);
+
+            return Result<object>.Ok(default!);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException
+                                   or UnauthorizedAccessException && !ct.IsCancellationRequested)
+        {
+            logger.LogWarning("The update could not be downloaded ({Reason})", ex.Message);
+
+            try
+            {
+                File.Delete(partial);
+            }
+            catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+            {
+                // Left for the next attempt, which clears the folder first.
+            }
+
+            return Result<object>.Failed(ApiStatus.Unreachable, LoginErrorCodes.ServerUnreachable);
         }
     }
 

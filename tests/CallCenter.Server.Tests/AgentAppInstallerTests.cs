@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using CallCenter.Server.Data.Entities;
 using CallCenter.Server.Features.AgentAppInstaller;
 using CallCenter.Server.Features.Auth;
+using CallCenter.Shared.Contracts.AgentApp;
 using CallCenter.Shared;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;

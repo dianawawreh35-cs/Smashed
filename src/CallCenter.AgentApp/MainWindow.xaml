@@ -19,6 +19,35 @@
   -->
   <DockPanel>
 
+    <!-- A-82: a newer version is ready. The agent chooses when: the button is
+         off during a call, since updating closes the app and the phone. -->
+    <Border DockPanel.Dock="Top"
+            Visibility="{Binding Updater.IsOffered, Converter={StaticResource BoolToVisibility}}"
+            Background="{StaticResource AccentDim}"
+            BorderBrush="{StaticResource Accent}"
+            BorderThickness="0,0,0,2"
+            Padding="16,8">
+      <DockPanel>
+        <Button DockPanel.Dock="Right"
+                Style="{StaticResource PrimaryButton}"
+                MinWidth="120"
+                VerticalAlignment="Center"
+                Content="{Binding Localizer[update.now]}"
+                Command="{Binding Updater.UpdateNowCommand}" />
+        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+          <TextBlock Text="{Binding Updater.Headline}"
+                     Foreground="{StaticResource Text}"
+                     FontWeight="SemiBold"
+                     TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Updater.Status}"
+                     Style="{StaticResource Subtle}"
+                     FontSize="11"
+                     Margin="0,2,0,0"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
     <!-- F-02: something went wrong and the app carried on. A line, not a
          message box, so it never sits over the pop-up during a call. -->
     <Border x:Name="NoticeBar"

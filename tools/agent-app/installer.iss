@@ -80,3 +80,6 @@ Name: "{autoprograms}\Smashed Agent App"; Filename: "{app}\CallCenter.AgentApp.e
 
 [Run]
 Filename: "{app}\CallCenter.AgentApp.exe"; Description: "{cm:LaunchProgram,Smashed Agent App}"; Flags: nowait postinstall skipifsilent
+; A-82: the app's Update now runs this silently and closes itself, so the new
+; version is started here or the agent is left with no app open.
+Filename: "{app}\CallCenter.AgentApp.exe"; Flags: nowait; Check: WizardSilent

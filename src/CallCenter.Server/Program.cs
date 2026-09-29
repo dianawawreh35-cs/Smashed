@@ -96,6 +96,8 @@ try
     builder.Services.Configure<CallCenter.Server.Features.AgentLogs.AgentLogOptions>(
         builder.Configuration.GetSection(CallCenter.Server.Features.AgentLogs.AgentLogOptions.SectionName));
     builder.Services.AddSingleton<CallCenter.Server.Features.AgentLogs.AgentLogStore>();
+    builder.Services.AddScoped<CallCenter.Server.Features.AgentLogs.AgentLogNicknames>();
+    builder.Services.AddScoped<CallCenter.Server.Features.AgentLogs.AgentLogAcknowledgements>();
     builder.Services.AddHostedService<CallCenter.Server.Workers.AgentLogRetentionWorker>();
 
     // A-67: every few minutes, ask the restaurant POS about recent callers

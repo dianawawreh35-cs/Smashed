@@ -82,6 +82,60 @@ public class AgentLogsEndpointTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
+    public async Task A_supervisor_names_a_laptop_and_a_blank_name_forgets_it()
+    {
+        var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+        var laptop = Laptop();
+        await agent.PostAsync($"/api/agent-logs/{laptop}/{File}?offset=0", Body("x\n"));
+
+        var named = await supervisor.PutAsJsonAsync(
+            $"/api/agent-logs/{laptop}/nickname", new SetAgentLogNicknameRequest("  Front desk  "));
+        named.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await named.Content.ReadFromJsonAsync<SetAgentLogNicknameRequest>())!.Nickname.Should().Be("Front desk");
+
+        var laptops = await supervisor.GetFromJsonAsync<List<AgentLogLaptopDto>>("/api/agent-logs");
+        laptops!.Single(l => l.Laptop == laptop).Nickname.Should().Be("Front desk");
+
+        (await supervisor.PutAsJsonAsync($"/api/agent-logs/{laptop}/nickname", new SetAgentLogNicknameRequest(" ")))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        laptops = await supervisor.GetFromJsonAsync<List<AgentLogLaptopDto>>("/api/agent-logs");
+        laptops!.Single(l => l.Laptop == laptop).Nickname.Should().BeNull();
+
+        (await supervisor.PutAsJsonAsync($"/api/agent-logs/{laptop}/nickname", new SetAgentLogNicknameRequest(new string('x', 41))))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await agent.PutAsJsonAsync($"/api/agent-logs/{laptop}/nickname", new SetAgentLogNicknameRequest("Mine")))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [DatabaseFact]
+    public async Task A_supervisor_acknowledges_the_errors_and_every_supervisor_reads_it()
+    {
+        var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+        var (other, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+        var laptop = Laptop();
+        var request = new AcknowledgeAgentLogErrorsRequest("2026-09-29", new Dictionary<string, int> { [laptop] = 3 });
+
+        var saved = await supervisor.PutAsJsonAsync("/api/agent-logs/_acknowledged", request);
+        saved.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var read = await other.GetFromJsonAsync<AgentLogAcknowledgementDto>("/api/agent-logs/_acknowledged");
+        read!.Date.Should().Be("2026-09-29");
+        read.Errors.Should().Equal(new Dictionary<string, int> { [laptop] = 3 });
+        read.By.Should().NotBeNullOrEmpty();
+
+        (await supervisor.PutAsJsonAsync("/api/agent-logs/_acknowledged", request with { Date = "29/09/2026" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await supervisor.PutAsJsonAsync("/api/agent-logs/_acknowledged",
+                request with { Errors = new Dictionary<string, int> { ["../etc"] = 1 } }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await agent.PutAsJsonAsync("/api/agent-logs/_acknowledged", request))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await agent.GetAsync("/api/agent-logs/_acknowledged")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [DatabaseFact]
     public async Task A_supervisor_cannot_write_an_agents_log()
     {
         var (client, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));

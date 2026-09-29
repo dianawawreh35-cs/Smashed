@@ -21,13 +21,72 @@ namespace CallCenter.Server.Features.AgentLogs;
 /// </remarks>
 [ApiController]
 [Route(AgentLogNames.Route)]
-public class AgentLogsController(AgentLogStore store) : ControllerBase
+public class AgentLogsController(
+    AgentLogStore store, AgentLogNicknames nicknames, AgentLogAcknowledgements acknowledgements) : ControllerBase
 {
-    /// <summary>Every laptop that has sent a log, and its days with their errors and warnings.</summary>
+    /// <summary>Every laptop that has sent a log, its nickname, and its days with their errors and warnings.</summary>
     [HttpGet]
     [Authorize(AuthPolicies.SupervisorOnly)]
     [ProducesResponseType<IReadOnlyList<AgentLogLaptopDto>>(StatusCodes.Status200OK)]
-    public ActionResult<IReadOnlyList<AgentLogLaptopDto>> Laptops() => Ok(store.Laptops());
+    public async Task<ActionResult<IReadOnlyList<AgentLogLaptopDto>>> Laptops(CancellationToken ct)
+    {
+        var names = await nicknames.AllAsync(ct);
+
+        return Ok(store.Laptops()
+            .Select(l => l with { Nickname = names.GetValueOrDefault(l.Laptop) })
+            .ToList());
+    }
+
+    /// <summary>The latest acknowledgement of the errors, for the Logs page's red line. Empty when there has been none.</summary>
+    /// <remarks>
+    /// Under an underscore, which no laptop's name can start with
+    /// (<see cref="AgentLogNames.IsLaptop"/>), so it can never be mistaken for
+    /// the agents' <c>GET {laptop}</c>.
+    /// </remarks>
+    [HttpGet("_acknowledged")]
+    [Authorize(AuthPolicies.SupervisorOnly)]
+    [ProducesResponseType<AgentLogAcknowledgementDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<ActionResult<AgentLogAcknowledgementDto?>> Acknowledged(CancellationToken ct) =>
+        Ok(await acknowledgements.LatestAsync(ct));
+
+    /// <summary>Acknowledges the errors the page counted, so its red line goes until there are more.</summary>
+    [HttpPut("_acknowledged")]
+    [Authorize(AuthPolicies.SupervisorOnly)]
+    [ProducesResponseType<AgentLogAcknowledgementDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Acknowledge(AcknowledgeAgentLogErrorsRequest request, CancellationToken ct)
+    {
+        var problem = AgentLogAcknowledgements.Problem(request);
+
+        return problem is not null
+            ? Problem(StatusCodes.Status400BadRequest, "bad_acknowledgement", problem, "Not acknowledged")
+            : Ok(await acknowledgements.AcknowledgeAsync(request, User.GetRequiredUserId(), ct));
+    }
+
+    /// <summary>Names a laptop for the Logs page, or with a blank name forgets its nickname.</summary>
+    /// <response code="200">Saved. The body is the laptop's nickname now, null when it has none.</response>
+    [HttpPut("{laptop}/nickname")]
+    [Authorize(AuthPolicies.SupervisorOnly)]
+    [ProducesResponseType<SetAgentLogNicknameRequest>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Nickname(string laptop, SetAgentLogNicknameRequest request, CancellationToken ct)
+    {
+        if (!AgentLogNames.IsLaptop(laptop))
+        {
+            return Problem(StatusCodes.Status400BadRequest, "bad_name",
+                "The laptop name is not one the server keeps logs under.", "Nickname not saved");
+        }
+
+        if (request.Nickname?.Trim().Length > AgentLogNicknames.MaxLength)
+        {
+            return Problem(StatusCodes.Status400BadRequest, "nickname_too_long",
+                $"A nickname is at most {AgentLogNicknames.MaxLength} characters.", "Nickname not saved");
+        }
+
+        var name = await nicknames.SetAsync(laptop, request.Nickname, User.GetRequiredUserId(), ct);
+        return Ok(new SetAgentLogNicknameRequest(name));
+    }
 
     /// <summary>One day of one laptop's log, as entries, newest first.</summary>
     /// <param name="levels">One of <see cref="AgentLogLevels"/>; everything when left out.</param>
@@ -93,9 +152,9 @@ public class AgentLogsController(AgentLogStore store) : ControllerBase
         };
     }
 
-    private ObjectResult Problem(int status, string code, string detail)
+    private ObjectResult Problem(int status, string code, string detail, string title = "Log not saved")
     {
-        var problem = new ProblemDetails { Title = "Log not saved", Detail = detail, Status = status };
+        var problem = new ProblemDetails { Title = title, Detail = detail, Status = status };
         problem.Extensions["code"] = code;
 
         return StatusCode(status, problem);

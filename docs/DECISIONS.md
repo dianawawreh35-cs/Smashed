@@ -7661,6 +7661,64 @@ deciding on.
 it carries the POS cart (A-85) too. Upload the 0.5.3 installer and zip on
 the web app's Agent App page, and install it on each laptop.
 
+## 2026-09-28 — The Logs page: today by default, a date box, a scrolling log, laptop nicknames, acknowledging errors (S-64)
+
+**In plain terms.** Dia asked for three things on the Logs page: show today's
+logs by default with a date filter instead of the day list; make the log box
+scroll instead of growing the page; and let supervisors give the laptops
+nicknames, since the Windows names (`DESKTOP-RMSFSIV`) say nothing.
+
+- **One date for the page**, in a date box beside "Keep up to date", today
+  when the page opens. It replaces each laptop's list of days: one date
+  answers "what happened on Tuesday" across every laptop at once. The box
+  runs from the oldest day any laptop has to today; **Today** appears once
+  another date is picked. Left on today, the page follows the clock, so a
+  page open past midnight moves to the new day.
+- **The laptop list is that date's.** Counts, the red edge and the order
+  (errors that day, then a log that day, then most recently heard from) are
+  for the picked date. A laptop with nothing that day stays in the list with
+  "No log that day", and opening it says so instead of asking the server.
+  The red line at the top still counts **today's** errors, whatever the date.
+- **The entries scroll in their own box**, at most 70% of the window high, so
+  the filters and Next error stay in view. Next error scrolls inside it.
+- **Nicknames.** Above a laptop's log, **Give it a name** (or **Rename**)
+  opens a box; Save keeps it for every supervisor, and an empty name goes
+  back to the Windows name. The list and the heading show the nickname, with
+  the Windows name small under it, since that is what the runbook's
+  commands and the server's folders use. At most 40 characters.
+  `PUT /api/agent-logs/{laptop}/nickname`, supervisors only.
+- **Kept in `settings`**, one row per laptop under
+  `agent_logs.nickname.<laptop>`, as the PBX switches keep theirs: **no
+  migration**, and the Settings page lists only its own catalogue, so they
+  do not show there. Not beside the log files, because a laptop's folder
+  goes when its last file passes retention and the name should still be
+  there when it comes back.
+- **Acknowledge** (asked 29 Sep), on the red line about today's errors. It
+  keeps each laptop's error count at that moment, with who and when, and the
+  line goes **for every supervisor**: it is the team's, and one answer is
+  enough. **New errors bring it back**, counting only those ("1 new error
+  today since it was acknowledged"), so a fault after the acknowledgement is
+  not hidden by it. Once acknowledged, a grey line says by whom and when. A
+  new day starts unacknowledged. The laptops' red edges and counts stay:
+  they describe the day, not the alert. If the acknowledgement cannot be
+  read, the line shows. One `settings` row, `agent_logs.errors_acknowledged`,
+  as JSON; `GET`/`PUT /api/agent-logs/_acknowledged`, supervisors only, under
+  an underscore no laptop name can start with, so it cannot be taken for the
+  agents' `GET {laptop}`.
+
+A first version of the date box and scroll, on 28 Sep, was undone on disk
+when another session committed A-70 from its own copy of the files; it was
+put back with the nicknames.
+
+**Tested.** Web: the Logs page and translation tests, 25 passed (ten new on
+the Logs page: three on the date, one on the scroll, one on a date with no
+log, two on nicknames, three on acknowledging); type check and lint clean.
+Server: the 29 agent-log tests pass against the test database, two new
+(nicknames; acknowledging). Not yet seen on screen.
+
+**To deploy:** server and web app (the web app is built into the server's
+image); no migration, no deploy file changed. No Agent App change.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above

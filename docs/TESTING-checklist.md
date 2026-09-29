@@ -522,8 +522,22 @@ log on the server (Round 2, "The log reaches the server").
 - [ ] **Next error.** With several errors on screen, press **Next error**:
       the list moves to the first and rings it; again, the next; after the
       last, back to the first.
-- [ ] **Another day.** The day box lists each day with its counts. Pick
-      yesterday's: that day's log.
+- [ ] **Another day.** The page opens on today's date. Pick yesterday in
+      the date box: the laptops' counts are yesterday's, and the log is that
+      day's; a laptop that sent nothing then says "No log that day".
+      **Today** brings it back.
+- [ ] **Scrolls.** On a day with many entries the log scrolls inside its
+      own box, and the filters above it stay on screen.
+- [ ] **A nickname.** Above a laptop's log press **Give it a name**, type
+      "Front desk" and Save: the list and the heading say Front desk, with
+      the Windows name small under it. Reload, or open the page as another
+      supervisor: still Front desk. **Rename**, empty the box and Save: the
+      Windows name again.
+- [ ] **Acknowledge.** With errors today, press **Acknowledge** on the red
+      line: it goes, and a grey line says you acknowledged it and when. Open
+      the page as another supervisor: no red line there either. Make one
+      more error in the Agent App and wait a minute: the red line is back,
+      saying "1 new error today since it was acknowledged".
 - [ ] **Keeps up.** Leave the page open with "Keep up to date" ticked, and use
       the Agent App: new entries appear within a minute without refreshing.
       Untick it: they stop until you tick it or reload.

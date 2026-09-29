@@ -4,7 +4,7 @@ import LogsPage from './LogsPage'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
 import { jsonResponse, renderWithClient, routes } from '../test/http'
-import type { AgentLogLaptop, AgentLogPage } from '../api/agentLogs'
+import type { AgentLogAcknowledgement, AgentLogLaptop, AgentLogPage } from '../api/agentLogs'
 
 /** The Agent Apps' logs (N-12), against a stubbed `fetch`. */
 
@@ -40,8 +40,12 @@ const PAGE: AgentLogPage = {
   warnings: 1,
 }
 
-function stub(laptops: AgentLogLaptop[] = [QUIET, BROKEN]) {
+/** Nobody has acknowledged the errors yet, unless told otherwise. */
+const NOT_ACKNOWLEDGED = () => jsonResponse(null, 204)
+
+function stub(laptops: AgentLogLaptop[] = [QUIET, BROKEN], acknowledged: AgentLogAcknowledgement | null = null) {
   const fetchMock = vi.fn(routes([
+    ['/agent-logs/_acknowledged', () => (acknowledged ? jsonResponse(acknowledged) : NOT_ACKNOWLEDGED())],
     [/\/agent-logs\/[^/]+\/[^/?]+/, () => jsonResponse(PAGE)],
     ['/agent-logs', () => jsonResponse(laptops)],
   ]))
@@ -121,6 +125,144 @@ describe('logs page', () => {
     expect(second).toHaveFocus()
     fireEvent.click(next)
     expect(first).toHaveFocus()
+  })
+
+  it('opens on today, and says so for a laptop that sent nothing today', async () => {
+    const OLD: AgentLogLaptop = {
+      laptop: 'LAPTOP-OLD',
+      lastWriteAt: '2026-01-01T10:00:00Z',
+      days: [{ file: 'agent-20260101.log', date: '2026-01-01', bytes: 10, errors: 3, warnings: 0, lastWriteAt: '2026-01-01T10:00:00Z' }],
+    }
+    const fetchMock = stub([OLD, QUIET, BROKEN])
+    renderWithClient(<LogsPage />)
+
+    const laptops = within(await screen.findByRole('navigation', { name: 'Laptops' })).getAllByRole('button')
+    expect(screen.getByLabelText('Date')).toHaveValue(date)
+    // Its errors are from another day, so it goes last and does not count.
+    expect(laptops[2]).toHaveTextContent('LAPTOP-OLD')
+    expect(laptops[2]).toHaveTextContent('No log that day')
+    expect(laptops[2]).not.toHaveTextContent('3 errors')
+
+    fireEvent.click(laptops[2])
+    expect(await screen.findByText(`This laptop sent nothing on ${date}.`)).toBeInTheDocument()
+    expect(logRequests(fetchMock).some((url) => url.includes('/agent-logs/LAPTOP-OLD/'))).toBe(false)
+  })
+
+  it('reads another date, and goes back to today', async () => {
+    const fetchMock = stub()
+    renderWithClient(<LogsPage />)
+
+    await screen.findByText(/The call could not be logged/)
+    expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-01-01' } })
+    await waitFor(() =>
+      expect(logRequests(fetchMock).some((url) => url.includes('/agent-logs/LAPTOP-BROKEN/agent-20260101.log'))).toBe(true),
+    )
+    // The quiet laptop sent nothing that day.
+    expect(screen.getByRole('button', { name: /LAPTOP-QUIET/ })).toHaveTextContent('No log that day')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+    expect(screen.getByLabelText('Date')).toHaveValue(date)
+  })
+
+  it('does not keep the last day on screen for a date the laptop has none', async () => {
+    stub()
+    renderWithClient(<LogsPage />)
+
+    await screen.findByText(/The call could not be logged/)
+    fireEvent.click(screen.getByRole('button', { name: /LAPTOP-QUIET/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Next error' })).toBeEnabled())
+
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-01-01' } })
+    expect(await screen.findByText('This laptop sent nothing on 2026-01-01.')).toBeInTheDocument()
+    expect(screen.queryByText(/The call could not be logged/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next error' })).toBeDisabled()
+  })
+
+  it('scrolls the entries inside their own box', async () => {
+    stub()
+    renderWithClient(<LogsPage />)
+
+    const list = (await screen.findByText(/The call could not be logged/)).closest('ol')!
+    expect(list.className).toContain('overflow-y-auto')
+    expect(list.className).toContain('max-h-[70vh]')
+  })
+
+  it('shows a nickname in place of the Windows name, with the Windows name under it', async () => {
+    stub([{ ...QUIET, nickname: 'Front desk' }, BROKEN])
+    renderWithClient(<LogsPage />)
+
+    const quiet = await screen.findByRole('button', { name: /Front desk/ })
+    expect(quiet).toHaveTextContent('LAPTOP-QUIET')
+
+    fireEvent.click(quiet)
+    expect(await screen.findByRole('heading', { name: 'Front desk' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument()
+  })
+
+  it('names a laptop and asks for the list again', async () => {
+    let named: string | null = null
+    const fetchMock = vi.fn(routes([
+      ['/agent-logs/_acknowledged', NOT_ACKNOWLEDGED],
+      [/\/agent-logs\/LAPTOP-BROKEN\/nickname/, (_url, init) => {
+        named = JSON.parse(String(init?.body)).nickname
+        return jsonResponse({ nickname: named })
+      }],
+      [/\/agent-logs\/[^/]+\/[^/?]+/, () => jsonResponse(PAGE)],
+      ['/agent-logs', () => jsonResponse([QUIET, { ...BROKEN, nickname: named }])],
+    ]))
+    vi.stubGlobal('fetch', fetchMock)
+    renderWithClient(<LogsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Give it a name' }))
+    fireEvent.change(screen.getByLabelText('Nickname for LAPTOP-BROKEN'), { target: { value: '  Kitchen  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByRole('heading', { name: 'Kitchen' })).toBeInTheDocument()
+    expect(named).toBe('Kitchen')
+    const put = fetchMock.mock.calls.find(([url]) => String(url).includes('/nickname'))!
+    expect(put[1]?.method).toBe('PUT')
+  })
+
+  it('acknowledges the errors: the red line goes, and says who', async () => {
+    let sent: { date: string; errors: Record<string, number> } | null = null
+    const fetchMock = vi.fn(routes([
+      ['/agent-logs/_acknowledged', (_url, init) => {
+        if (init?.method !== 'PUT') return NOT_ACKNOWLEDGED()
+        sent = JSON.parse(String(init.body))
+        return jsonResponse({ ...sent!, by: 'Supervisor', at: new Date().toISOString() })
+      }],
+      [/\/agent-logs\/[^/]+\/[^/?]+/, () => jsonResponse(PAGE)],
+      ['/agent-logs', () => jsonResponse([QUIET, BROKEN])],
+    ]))
+    vi.stubGlobal('fetch', fetchMock)
+    renderWithClient(<LogsPage />)
+
+    const alert = await screen.findByRole('status')
+    fireEvent.click(within(alert).getByRole('button', { name: 'Acknowledge' }))
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
+    expect(sent).toEqual({ date, errors: { 'LAPTOP-BROKEN': 2 } })
+    expect(screen.getByText(/Today's errors acknowledged by Supervisor/)).toBeInTheDocument()
+    // The laptop still shows its day's errors: only the line at the top goes.
+    expect(screen.getByRole('button', { name: /LAPTOP-BROKEN/ })).toHaveTextContent('2 errors')
+  })
+
+  it('comes back with only the errors that arrived after the acknowledgement', async () => {
+    stub([QUIET, BROKEN], { date, errors: { 'LAPTOP-BROKEN': 1 }, by: 'Supervisor', at: new Date().toISOString() })
+    renderWithClient(<LogsPage />)
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('1 new error today since it was acknowledged. Laptops affected: 1.'),
+    )
+  })
+
+  it("does not count yesterday's acknowledgement for today", async () => {
+    stub([QUIET, BROKEN], { date: '2026-01-01', errors: { 'LAPTOP-BROKEN': 5 }, by: 'Supervisor', at: '2026-01-01T10:00:00Z' })
+    renderWithClient(<LogsPage />)
+
+    expect(await screen.findByRole('status')).toHaveTextContent('2 errors today. Laptops affected: 1.')
   })
 
   it('switches laptop', async () => {

@@ -4,7 +4,22 @@ namespace CallCenter.Shared.Contracts.AgentLogs;
 /// <param name="Laptop">Its folder name: the machine name, cleaned (<see cref="AgentLogNames.Laptop"/>).</param>
 /// <param name="LastWriteAt">When the server last took a piece of its log.</param>
 /// <param name="Days">Its daily files, newest first.</param>
-public record AgentLogLaptopDto(string Laptop, DateTimeOffset LastWriteAt, IReadOnlyList<AgentLogDayDto> Days);
+/// <param name="Nickname">What the supervisors call it, when they have named it.</param>
+public record AgentLogLaptopDto(
+    string Laptop, DateTimeOffset LastWriteAt, IReadOnlyList<AgentLogDayDto> Days, string? Nickname = null);
+
+/// <summary>The supervisors have seen today's errors: each laptop's count when they did.</summary>
+/// <param name="Date">The day acknowledged, <c>yyyy-MM-dd</c>.</param>
+/// <param name="Errors">Each laptop's errors that day, as the page counted them.</param>
+/// <param name="By">The supervisor who acknowledged, by display name.</param>
+public record AgentLogAcknowledgementDto(
+    string Date, IReadOnlyDictionary<string, int> Errors, string? By, DateTimeOffset At);
+
+/// <summary>Acknowledges the errors counted on <paramref name="Date"/>, laptop by laptop.</summary>
+public record AcknowledgeAgentLogErrorsRequest(string Date, IReadOnlyDictionary<string, int> Errors);
+
+/// <summary>A laptop's new nickname. Blank or null removes it.</summary>
+public record SetAgentLogNicknameRequest(string? Nickname);
 
 /// <summary>One day's file on the server.</summary>
 /// <param name="File">As the laptop names it, <c>agent-20260927.log</c>.</param>

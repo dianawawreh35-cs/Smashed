@@ -433,6 +433,15 @@ anything fails, it prints `backup FAILED`, exits with an error, and the dumps
 already there are left alone. The time in the name means the dump `update.sh`
 makes before an update never replaces the night's.
 
+**Without the second disk** (since 29 Sep 2026): if nothing is mounted at
+`/mnt/backup` (checked with `mountpoint`, so an empty folder there does not
+count), it still makes and checks the dump, keeps it in `backups/`, and removes
+the old ones, then prints a `WARNING` line saying the database is on this disk
+only and the recordings and menu photographs were not copied, and still ends
+with `backup OK`. So `update.sh` can back up before an update without the disk.
+That dump protects against a bad update, not against the disk failing; the
+disk is still needed (N-07).
+
 Schedule nightly at 03:30:
 ```bash
 crontab -e

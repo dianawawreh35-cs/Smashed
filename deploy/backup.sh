@@ -9,6 +9,8 @@
 #   - needs rsync (runbook step 1)
 #   - a copy of the dump on the second disk       -> /mnt/backup/
 #   - both locations pruned after 30 days
+#   - no disk mounted at /mnt/backup: the dump is kept here, a WARNING line
+#     says nothing reached the second disk, and the run still succeeds
 #
 # Install (see the runbook):
 #   chmod +x backup.sh
@@ -49,10 +51,20 @@ gzip -t "$PARTIAL"
 zcat "$PARTIAL" | tail -n 20 | grep -c "PostgreSQL database dump complete" > /dev/null
 
 mv "$PARTIAL" "$DUMP"
-
-rsync -a --delete data/recordings/ /mnt/backup/recordings/
-rsync -a --delete data/menu-images/ /mnt/backup/menu-images/
-cp "$DUMP" /mnt/backup/
 find backups -name 'db-*.sql.gz' -mtime +30 -delete
-find /mnt/backup -name 'db-*.sql.gz' -mtime +30 -delete
+
+# N-07. Only when the second disk is really mounted there: an empty folder at
+# /mnt/backup would take the copy onto the server's own disk and fill it. With
+# no disk, the dump stays here and the run still succeeds, so update.sh can
+# back up before an update (29 Sep 2026: /mnt/backup had never existed, and
+# every update needed --no-backup and a dump made by hand).
+if mountpoint -q /mnt/backup; then
+    rsync -a --delete data/recordings/ /mnt/backup/recordings/
+    rsync -a --delete data/menu-images/ /mnt/backup/menu-images/
+    cp "$DUMP" /mnt/backup/
+    find /mnt/backup -name 'db-*.sql.gz' -mtime +30 -delete
+else
+    echo "$(date "+%F %T") WARNING: no disk mounted at /mnt/backup - the database is saved on this disk only, and the recordings and menu photographs are not copied anywhere"
+fi
+
 echo "$(date "+%F %T") backup OK: /opt/callcenter/$DUMP"

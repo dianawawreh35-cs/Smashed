@@ -7719,6 +7719,44 @@ Server: the 29 agent-log tests pass against the test database, two new
 **To deploy:** server and web app (the web app is built into the server's
 image); no migration, no deploy file changed. No Agent App change.
 
+## 2026-09-29 — `backup.sh` works without the second disk, and says so (N-07)
+
+**In plain terms.** `./update.sh … --pull` stopped on the server on 29 Sep:
+the backup it runs first could not copy to `/mnt/backup`, because that disk
+has never been installed. Every update since 26 Sep had needed a dump made by
+hand and `--no-backup`. Now the backup saves the database on the server's own
+disk and warns that nothing reached the second disk, so updates back up by
+themselves again.
+
+- **The copy to the second disk runs only when a disk is mounted there**
+  (`mountpoint -q /mnt/backup`). Otherwise the script prints a `WARNING` line
+  (database on this disk only, recordings and menu photographs not copied)
+  and carries on to `backup OK`, which `update.sh` shows and reads the dump's
+  name from, as before.
+- **A folder is not a disk.** Before, an empty `/mnt/backup` folder with no
+  disk behind it would have taken the recordings onto the server's own disk,
+  filling it, and reported `backup OK`. `mountpoint` refuses that case.
+- **Old dumps are removed again.** The 30-day clean-up of `backups/` now runs
+  before the second-disk step; it had sat after the failing copy, so nothing
+  had been removed since the script was installed. The hand-made
+  `db-before-*.sql.gz` files match its pattern and go after 30 days too.
+- **What did not change:** a dump that fails its checks still fails the run,
+  and with a disk mounted a failing copy still fails it (the second disk
+  mounted but broken is worth stopping an update for).
+- **Rejected:** a flag to allow running without the disk. The warning in
+  every run's output and in `backup.log` does the same job without anyone
+  having to remember it, and the disk is still on the must-fix list.
+
+The local dump protects against a bad update, not a dead disk. N-07 is still
+not met.
+
+**Tested** on the server on 29 Sep, by `./update.sh v0.5.1 --pull`: the
+`WARNING` line, then `backup OK` with the dump's name, which `update.sh`
+reported, and the update went on to healthy.
+
+**To deploy:** copy `deploy/backup.sh` to `/opt/callcenter/` and
+`chmod +x backup.sh`. No image change; it works with whatever version runs.
+
 # Open items (live)
 
 Kept current. Resolved entries are deleted, not ticked — the decision log above
@@ -7803,6 +7841,9 @@ needed any more.
   checked, and the restore test the contract makes an acceptance item. Before
   v0.3.0 the database was dumped by hand to
   `/opt/callcenter/backups/db-before-v0.3.0.sql.gz` (1.7 MB), on the same disk.
+  Since 29 Sep `backup.sh` keeps the dump on the server's disk and warns when
+  no disk is mounted, so updates no longer need `--no-backup`; that is not a
+  backup against the disk failing.
 
 The four items open on 2026-09-20 are closed; see the decision entries for 19
 and 20 September. The open items above are work, not blockers.

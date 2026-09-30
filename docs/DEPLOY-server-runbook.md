@@ -157,7 +157,7 @@ From your laptop, copy the deployment files from the repository's `deploy/`
 folder, **as they are**:
 ```bash
 cd deploy
-scp docker-compose.yml .env.example backup.sh update.sh smashed@192.168.1.100:/opt/callcenter/
+scp docker-compose.yml .env.example backup.sh update.sh auto-update.sh callcenter-auto-update.service callcenter-auto-update.timer smashed@192.168.1.100:/opt/callcenter/
 ```
 Back on the server:
 ```bash
@@ -556,11 +556,14 @@ prints the dump to restore first. What the last update started from is kept in
 `backups/last-update.env`.
 
 Copy `update.sh` alongside the other files in step 5 (`chmod +x update.sh`).
-**When a release changes a file in `deploy/`, copy it to the server again**
-(the release notes in DECISIONS say so). `update.sh` replaces the image, not
-these files.
+`update.sh` replaces the image, not these files. **The nightly update copies
+them** (next section), from the first release after 29 Sep 2026. Updating by
+hand to a release that changes a file in `deploy/`, copy it to the server
+again first (the release notes in DECISIONS say so).
 
-**When a release adds menu items, run the seed once after the update:**
+**When a release adds menu items, run the seed once after the update.** The
+nightly update does it by itself when the tag message says `deploy: seed`
+(RELEASING.md); by hand:
 ```bash
 docker compose exec api dotnet CallCenter.Server.dll seed
 ```
@@ -571,6 +574,65 @@ an item the supervisor **renamed**: its old name counts as missing, so the seed
 adds it again, and the supervisor hides or deletes that copy.
 The tag on the saved image **must** match the version you pass — the script
 refuses if `callcenter-api-v1.2.tar` does not contain `callcenter-api:v1.2`.
+
+---
+
+## Updating by itself at night
+
+**What it does:** at 04:30 every night the server asks GitHub whether a newer
+release exists, and if one does it installs it with `./update.sh --pull`, the
+same backup, health check and rollback as by hand. A release marked
+`deploy: manual` in its tag message is left for you. What it checks and why:
+[RELEASING.md](RELEASING.md#by-itself-at-night).
+
+It needs internet on site and the `docker login` from step 6 (Option B), done
+as `smashed`. Check that first; it should print `Login Succeeded`:
+```bash
+read -s T && echo "$T" | docker login ghcr.io -u dianawawreh35-cs --password-stdin; unset T
+```
+
+**Work** — once, after step 9's backup cron is in place. `auto-update.sh` and
+the two `callcenter-auto-update.*` files come from the repository's `deploy/`
+folder (step 5 copies them):
+```bash
+cd /opt/callcenter
+chmod +x auto-update.sh
+./auto-update.sh --check          # what tonight would do; installs nothing
+sudo cp callcenter-auto-update.service callcenter-auto-update.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now callcenter-auto-update.timer
+systemctl list-timers callcenter-auto-update.timer    # NEXT should say 04:30
+```
+`--check` should end with `Up to date on v…` or `Will update … -> …` then
+`--check: nothing changed`. An `ERROR` line says what is missing, usually the
+login.
+
+**Check it worked**, the morning after a release:
+```bash
+tail -30 /opt/callcenter/backups/auto-update.log
+```
+`Done: v1.2 is live` is a good night. `Up to date on v1.2` is a night with
+nothing new. Anything with `ERROR` needs you.
+
+**Change the hour:** edit `OnCalendar=` in
+`/etc/systemd/system/callcenter-auto-update.timer` (keep it after the 03:30
+backup, and while the call center is closed), then
+`sudo systemctl daemon-reload`.
+
+**Switch it off** (every release by hand again), and back on:
+```bash
+sudo systemctl disable --now callcenter-auto-update.timer
+sudo systemctl enable --now callcenter-auto-update.timer
+```
+
+**Run it now** instead of waiting for the night. Only when nobody is taking
+calls:
+```bash
+sudo systemctl start callcenter-auto-update.service
+```
+
+The timer does not catch up: a server that was off at 04:30 waits for the next
+night rather than updating the moment it is switched on.
 
 ---
 

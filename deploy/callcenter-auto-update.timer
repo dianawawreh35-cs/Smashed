@@ -1,0 +1,16 @@
+# When auto-update.sh runs: every night at 04:30, an hour after the backup
+# (03:30) and while the call center is closed. To change the hour, edit
+# OnCalendar and run: sudo systemctl daemon-reload
+#
+# Persistent=false on purpose: a server that was off at 04:30 must not catch
+# up by updating when it is switched on, in the middle of a shift.
+
+[Unit]
+Description=Call center: nightly check for a new release
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 Asia/Hebron
+Persistent=false
+
+[Install]
+WantedBy=timers.target

@@ -7829,6 +7829,66 @@ is where history belongs.
 prompts, 17 to 19, read against every dated entry since 18 September; the
 release rows again after prompt 20, the same evening).**
 
+## 2026-09-29 — The server installs a new release by itself, at night
+
+**In plain terms.** Until now a release sat in GitHub until someone copied it
+to the server. Now the server checks once a night, at 04:30, and installs a
+newer release itself with the same `update.sh --pull` as by hand: backup,
+health check, rollback. A release that needs a person there says
+`deploy: manual` in its tag message and is left alone. This changes what
+"release" means (RELEASING.md): **a release goes live that night.**
+
+- **The server asks; GitHub cannot tell it.** It is LAN-only with no ports
+  open, so a push from GitHub is impossible. `deploy/auto-update.sh` lists the
+  versions in the image store with the token from the server's `docker login`,
+  and compares them with the `org.opencontainers.image.version` label of the
+  running image. Run by `callcenter-auto-update.timer` as `smashed`.
+- **04:30, and no catching up.** An hour after the 03:30 backup, while the call
+  center is closed. `Persistent=false`: a server that was off at 04:30 must not
+  update when it is switched on, mid-shift. The hour was chosen without
+  checking the restaurant's closing time; the runbook says how to move it.
+- **The tag message is the switch.** `release.yml` reads the annotated tag's
+  message and labels the image `callcenter.deploy.manual` and
+  `callcenter.deploy.seed`. `deploy: manual` stops the nightly update below
+  that version, and it says so in its log every night. `deploy: seed` runs the
+  seed after the update. Every version between the running one and the newest
+  is read, oldest first, so a manual step or a seed in the middle is not
+  skipped over.
+- **The seed only when asked, not after every update.** It adds a menu item
+  the supervisor renamed or deleted back again (27 Sep night entry), so running
+  it every time would undo their edits.
+- **Each image carries its own deploy files** (`/deploy` in the image:
+  `docker-compose.yml`, `update.sh`, `backup.sh`, `auto-update.sh`). The
+  nightly update copies the changed ones over first, keeps the old ones in
+  `backups/deploy-<version>-<time>/`, and puts them back if `update.sh` rolled
+  back. Never `.env`. v0.4.0 and v0.5.0 each needed files copied by hand; that
+  ends with the first release built after this change.
+- **Only plain versions.** `v1.2.3` installs; a test build (`v1.2-test`) never
+  does, and a server running one is left alone.
+- **Rejected:** a self-hosted GitHub runner on the server (a GitHub token that
+  can run any workflow on the call center's machine, for nothing a timer cannot
+  do), and installing the moment a release appears (it would restart the API
+  mid-shift).
+- **Not done: telling anyone.** A night that failed is in
+  `backups/auto-update.log` only. A failed update that had already migrated the
+  database leaves the call center down until the dump is restored, the same as
+  by hand. A status line on the supervisor's Settings screen would close this.
+- **Not done: the laptops.** The Agent App updates from the web app (A-82). A
+  release the old Agent App cannot work with must be `deploy: manual`.
+
+**Tested** against a fake `docker` and `curl` on the development machine: up
+to date; three newer versions (`v0.10.0` sorted above `v0.7.0`); a seed asked
+for by a version in the middle; `deploy: manual` in the middle (stopped at the
+version before) and first (nothing installed); `--check`; `update.sh` failing
+and rolling back (old deploy files put back) and failing after a migration
+(new files kept); a test build running. **Not yet run on the server**, nor
+the tag-message labels in a real release.
+
+**To deploy:** the first release after this change carries it. Then, once, on
+the server: copy `deploy/auto-update.sh` and the two `callcenter-auto-update.*`
+files to `/opt/callcenter/`, and follow the runbook's *Updating by itself at
+night*. Until the timer is enabled nothing changes.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -7851,6 +7911,7 @@ running**.
 | Next | Requirement | Depends on |
 |---|---|---|
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |
+| **Switch on the nightly update** on the server: copy `auto-update.sh` and the two `callcenter-auto-update.*` files, run `./auto-update.sh --check`, enable the timer (runbook, *Updating by itself at night*). The one-phone release above needs the laptops the same day, so tag it `deploy: manual` | — | the first release built after 29 Sep (its image carries the deploy files); the server's `docker login` done as `smashed` |
 | **The crispy burgers on the live server**: after that update, run `seed` once and look for `menu 4 created`, then find ناشوز in the Agent App's menu | A-66 | the server on `v0.5.1`, which carries everything in `v0.5.0` too (27 Sep night entry) |
 | **Rename the three laptops** from `DESKTOP-RMSFSIV` to `AGENT-1`, `AGENT-2`, `AGENT-3` (Windows Settings → System → About → Rename this PC) | A-05, N-12 | Dia, at the laptops. The app tells them apart without it since 27 Sep evening, but the name is the part a person reads |
 | **The Users page: each agent's laptop, app version, and a "signed in twice" warning** | S-61, N-05 | nothing: the sessions have the laptop id and version. Worth doing next |

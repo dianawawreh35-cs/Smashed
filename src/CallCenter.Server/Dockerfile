@@ -58,6 +58,10 @@ RUN mkdir -p /data/recordings /app/logs
 
 COPY --from=build /app/publish ./
 
+# This version's deploy files, which auto-update.sh copies to the server
+# before it installs the version. Never .env: that holds the site's secrets.
+COPY deploy/docker-compose.yml deploy/update.sh deploy/backup.sh deploy/auto-update.sh /deploy/
+
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

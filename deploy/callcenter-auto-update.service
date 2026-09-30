@@ -1,0 +1,18 @@
+# Runs auto-update.sh once. Started by callcenter-auto-update.timer.
+# Install: docs/DEPLOY-server-runbook.md, "Updating by itself at night".
+
+[Unit]
+Description=Call center: install a new release if one is published
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# The user that ran `docker login ghcr.io` and owns /opt/callcenter.
+User=smashed
+WorkingDirectory=/opt/callcenter
+ExecStart=/opt/callcenter/auto-update.sh
+StandardOutput=append:/opt/callcenter/backups/auto-update.log
+StandardError=append:/opt/callcenter/backups/auto-update.log
+# A migration on a year of calls, plus the backup before it.
+TimeoutStartSec=45min

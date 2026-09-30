@@ -7,10 +7,13 @@ There are two different actions and it matters which one you mean:
 | You say | What happens | Changes the call centre? |
 | --- | --- | --- |
 | **"push"** | commit + push to GitHub. CI builds and tests it. | no |
-| **"release"** / **"release v1.2"** | push, then tag a version. GitHub builds and publishes the image. | no |
-| **"deploy"** | copy the image to the server and run `update.sh`. | **yes** |
+| **"release"** / **"release v1.2"** | push, then tag a version. GitHub builds and publishes the image. | **yes, at 04:30 that night**, unless the tag says `deploy: manual` |
+| **"deploy"** | install it now, by hand: copy the image to the server and run `update.sh`. | **yes, now** |
 
-Nothing reaches the call centre until you explicitly say *deploy*.
+Since 29 Sep 2026 the server installs a new release by itself at night
+([auto-update.sh](../deploy/auto-update.sh)). So a release is a promise that
+the version can go live without anyone there, and what it needs is said in its
+tag message (below).
 
 ---
 
@@ -58,6 +61,39 @@ git push --tags
 
 The image is private — it inherits this repository's visibility.
 
+### The tag message tells the server what the release needs
+
+The server's nightly update reads two lines from the tag message:
+
+```bash
+git tag -a v1.2 -m "Crispy burgers on the menu
+
+deploy: seed"
+```
+
+| Line in the tag message | What the server does at 04:30 |
+| --- | --- |
+| *(neither)* | installs it |
+| `deploy: seed` | installs it, then runs the seed once (a release that adds menu items) |
+| `deploy: manual` | **does not install it.** It stops at the version before, and says so in its log every night until someone deploys it by hand |
+
+Use `deploy: manual` when the release needs something the server cannot do for
+itself:
+
+- a new value in `.env` (a secret, a token);
+- the laptops updated the same day, because the new server and the old Agent
+  App do not work together (as with v0.5.0's one-sign-in rule);
+- anything you want to watch go live.
+
+Changes to `docker-compose.yml`, `update.sh`, `backup.sh` or `auto-update.sh`
+do **not** need it: each image carries its own copies of them, and the nightly
+update puts them on the server first. That starts with the first release after
+29 Sep 2026; older images carry none.
+
+A tag without a message (`git tag v1.2`) has neither line, so it installs.
+Only plain versions (`v1.2.3`) install by themselves; a test build
+(`v1.2-test`) never does.
+
 ### Version numbers
 
 `vMAJOR.MINOR.PATCH`, and the tag must start with `v` or the workflow will not fire.
@@ -80,8 +116,12 @@ pull fetches (27 Sep 2026).
 
 ## "deploy" — put it on the call centre's server
 
-**This is the only step that affects people taking orders.** Do it when the
-call centre is quiet, never mid-service.
+Usually nothing to do: the server installs a release by itself at night
+(below). Deploy by hand when a release is marked `deploy: manual`, or when a
+fix cannot wait for 04:30.
+
+**This affects people taking orders.** Do it when the call centre is quiet,
+never mid-service.
 
 Two routes — pick whichever suits the call centre's network.
 
@@ -117,6 +157,45 @@ never becomes ready it rolls back automatically, **but only if the database
 is as it was before**. If the new version has already applied a migration, it
 stops. It says so, and prints the pre-update dump to restore first (runbook
 step 9). `./update.sh --rollback` goes back deliberately, under the same rule.
+
+### By itself, at night
+
+At 04:30 every night (an hour after the 03:30 backup) a timer on the server runs
+[`auto-update.sh`](../deploy/auto-update.sh). In plain terms: the server asks
+GitHub "is there a newer version than mine?", and if there is, it runs the same
+`./update.sh <version> --pull` you would.
+
+Step by step, it:
+
+1. reads the version running, and lists the versions in the image store;
+2. reads the tag message of every newer one, oldest first, and stops below the
+   first marked `deploy: manual`;
+3. copies that version's deploy files to `/opt/callcenter`, keeping the old
+   ones in `backups/deploy-<old version>-<time>/`;
+4. runs `./update.sh <version> --pull`: backup, restart, health check, rollback;
+5. if the update rolled back, puts the old deploy files back too;
+6. runs the seed if any of the versions it passed says `deploy: seed`.
+
+It skips several versions at once if the server missed some. Everything
+it did is in `/opt/callcenter/backups/auto-update.log`:
+
+```bash
+tail -30 /opt/callcenter/backups/auto-update.log
+```
+
+**What it cannot do:** tell anyone. A night that failed shows only in that log,
+and in the web app still showing the old version. Look after each release.
+
+To see what tonight's run would do, without installing anything:
+
+```bash
+cd /opt/callcenter && ./auto-update.sh --check
+```
+
+Setting the timer up, changing its hour, and switching it off are in the
+runbook, *Updating by itself at night*. It uses the server's `docker login`
+below, so **a token with an expiry date stops the nightly updates on that
+date.**
 
 ### A migration must not remove what the previous release reads
 
@@ -162,26 +241,36 @@ read -s T && echo "$T" | docker login ghcr.io -u dianawawreh35-cs --password-std
 Paste the token at the blank prompt and press Enter. It should say `Login
 Succeeded`. Docker remembers it from then on. If the token expires or is
 revoked, `./update.sh --pull` fails at the download step and the running
-version keeps serving. Make a new token and log in again.
+version keeps serving, and the nightly update logs `could not sign in to
+ghcr.io` every night. Make a new token and log in again.
+
+Log in as `smashed`, not with `sudo`: the nightly update runs as `smashed` and
+reads that user's login.
 
 ---
 
 ## What is not automated, and why
 
 **Nothing deploys on push.** A live call centre should not change because
-someone saved a file. The gap between *release* and *deploy* is the point: it is
-where you decide the moment.
+someone saved a file. Only a tagged release installs, and only at night.
+
+**Nothing installs during a shift.** The nightly update runs at 04:30 and at no
+other time. A server that was off at 04:30 does not catch up when it is switched
+on, because that would be mid-service; it waits for the next night.
 
 **GitHub cannot reach the server** — it sits behind the call centre's router on a
-private address. So even with `--pull`, the server only ever fetches when you
-tell it to; nothing can be pushed to it from outside. Daily operation needs no
-internet at all (SRS N-01); `--pull` needs it only at the moment of an update,
-which is why Option A exists.
+private address. So the server asks instead: once a night it dials out to the
+image store. Daily operation still needs no internet (SRS N-01); without it the
+nightly check fails, logs why, and the running version carries on.
 
-When a server exists and there is reason to automate further, the options are a
-self-hosted GitHub runner on the mini PC (it dials out, so no inbound access is
-needed) or a cron job that polls for a new image. Neither is worth building
-before there is a machine to test against.
+**The laptops are not updated.** The Agent App is installed from the web app's
+Agent App page (below), not by the nightly update. A release the old Agent App
+cannot work with is marked `deploy: manual`.
+
+**A failure is not reported.** It is in `backups/auto-update.log` only. A
+failed update that had already changed the database leaves the call centre down
+until someone restores the dump (runbook step 9). The 04:30 start leaves the
+hours before opening to do it.
 
 ---
 

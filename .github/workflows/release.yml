@@ -9,9 +9,9 @@
 #   ghcr.io/<owner>/callcenter-api:v1.2
 # and inherits this repository's visibility, so it is private.
 #
-# This workflow only publishes. It does not deploy — getting the image onto the
-# restaurant's server stays a deliberate, manual step (see
-# docs/DEPLOY-server-runbook.md, "Updating later").
+# This workflow only publishes; GitHub cannot reach the restaurant's server.
+# The server fetches a new release itself at 04:30 (deploy/auto-update.sh),
+# unless the tag message says "deploy: manual" (docs/RELEASING.md).
 
 name: Release
 
@@ -127,7 +127,24 @@ jobs:
           else
             echo "latest=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "Publishing $VERSION"
+          # What the tag message asks of the server's nightly auto-update
+          # (deploy/auto-update.sh): a line "deploy: manual" keeps it from
+          # installing this version, and "deploy: seed" runs the seed after
+          # it. A test build has no tag message, and neither.
+          MANUAL=false
+          SEED=false
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            # checkout can leave the tag without its message; fetch it as pushed.
+            git fetch --force --depth=1 origin "refs/tags/$VERSION:refs/tags/$VERSION"
+            if [ "$(git cat-file -t "refs/tags/$VERSION")" = "tag" ]; then
+              MESSAGE=$(git tag -l --format='%(contents)' "$VERSION")
+              if printf '%s\n' "$MESSAGE" | grep -Eiq '^[[:space:]]*deploy:.*manual'; then MANUAL=true; fi
+              if printf '%s\n' "$MESSAGE" | grep -Eiq '^[[:space:]]*deploy:.*seed'; then SEED=true; fi
+            fi
+          fi
+          echo "manual=$MANUAL" >> "$GITHUB_OUTPUT"
+          echo "seed=$SEED"     >> "$GITHUB_OUTPUT"
+          echo "Publishing $VERSION (deploy: manual=$MANUAL, seed=$SEED)"
 
       - name: Log in to the GitHub Container Registry
         uses: docker/login-action@v3
@@ -149,6 +166,8 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            callcenter.deploy.manual=${{ steps.version.outputs.manual }}
+            callcenter.deploy.seed=${{ steps.version.outputs.seed }}
 
       - name: How to use it
         run: |
@@ -156,6 +175,14 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           {
             echo "### Published \`$VERSION\`"
+            echo ""
+            if [ "${{ steps.version.outputs.latest }}" != "true" ]; then
+              echo "A test build: the server's nightly update ignores it."
+            elif [ "${{ steps.version.outputs.manual }}" = "true" ]; then
+              echo "**Marked \`deploy: manual\`:** the server will not install it by itself. Deploy it by hand, as below."
+            else
+              echo "The server installs it by itself tonight at 04:30$([ "${{ steps.version.outputs.seed }}" = "true" ] && echo ', and runs the seed after it'). To install it now instead, deploy it by hand, as below."
+            fi
             echo ""
             echo "The image is private. Log in once on the machine that pulls it:"
             echo ""

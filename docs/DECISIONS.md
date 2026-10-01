@@ -8010,7 +8010,7 @@ seen working (delete the line, `docker compose up -d`).
 
 **Tested.** `PosLookupTests` gains one: a recorded message from a number the
 POS knows becomes a contact, and the message is attached to it. The server
-suite and the web app's checks pass. **Not yet released.**
+suite and the web app's checks pass. Released as `v0.7.1`; **not yet seen** on the server.
 
 ## Where to pick up
 

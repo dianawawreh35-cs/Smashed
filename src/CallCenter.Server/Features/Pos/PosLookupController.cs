@@ -19,8 +19,8 @@ public class PosLookupController(PosCustomerSync sync) : ControllerBase
         Ok(await sync.StatusAsync(ct));
 
     /// <summary>
-    /// Asks the POS now about every number that called in the last two days and
-    /// still has no contact, then answers with what that run did.
+    /// Asks the POS now about every number that called or sent a message in the
+    /// last two days and still has no contact, then answers with what that run did.
     /// </summary>
     [HttpPost("run")]
     [ProducesResponseType<PosLookupStatusDto>(StatusCodes.Status200OK)]

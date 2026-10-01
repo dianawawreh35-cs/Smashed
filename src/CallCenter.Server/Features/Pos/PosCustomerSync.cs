@@ -16,13 +16,16 @@ namespace CallCenter.Server.Features.Pos;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Who is asked about.</b> Every number that called in the last
-/// <see cref="PosLookupOptions.Lookback"/> (two days) and either has no
+/// <b>Who is asked about.</b> Every number that called, or sent a message an
+/// agent recorded (A-70), in the last
+/// <see cref="PosLookupOptions.Lookback"/> (two days), and either has no
 /// contact, or has a contact with no name or no address (a bare number
 /// flagged by the supervisor, a customer saved in a hurry). Newest callers
 /// first, at most
 /// <see cref="PosLookupOptions.MaxPerRun"/> a run. Extensions and foreign
-/// numbers are skipped; the POS only knows local numbers.
+/// numbers are skipped; the POS only knows local numbers. Messages were left
+/// out until 1 Oct 2026, so a WhatsApp customer the POS knew was never asked
+/// about.
 /// </para>
 /// <para>
 /// <b>Every run asks again.</b> A number the POS did not know is asked about
@@ -177,7 +180,8 @@ public class PosCustomerSync(
 
         var recent = await db.Communications
             .AsNoTracking()
-            .Where(c => c.Kind == CommunicationKinds.Call && c.StartedAt >= since && c.RemoteNormalised != null)
+            // Calls and messages alike: a message carries the number the agent typed.
+            .Where(c => c.StartedAt >= since && c.RemoteNormalised != null)
             .Where(c => c.ContactId == null
                         || (c.Contact!.DeletedAt == null
                             && c.Contact.MergedIntoId == null

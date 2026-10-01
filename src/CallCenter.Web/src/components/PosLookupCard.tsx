@@ -9,8 +9,8 @@ const KEY = ['pos', 'lookup']
 
 /**
  * The POS customer lookup (A-67): what its last run did, and Check now, which
- * asks the POS straight away about every number that called in the last two
- * days and has no contact. The timer does the same every `pos.lookup.interval_minutes`; how
+ * asks the POS straight away about every number that called or sent a message
+ * in the last two days and has no contact. The timer does the same every `pos.lookup.interval_minutes`; how
  * often is in the system settings above.
  *
  * It refreshes itself every minute, so a run the timer made shows up without

@@ -28,5 +28,5 @@ const BASE = '/pos/lookup'
 
 export const getPosLookup = () => api.get<PosLookupStatus>(BASE)
 
-/** Asks the POS now about every number that called in the last two days and has no contact. */
+/** Asks the POS now about every number that called or sent a message in the last two days and has no contact. */
 export const runPosLookup = () => api.post<PosLookupStatus>(`${BASE}/run`)

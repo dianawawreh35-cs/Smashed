@@ -7984,6 +7984,34 @@ filter and keeps the supervisor's `agent.call_log_days` window.
 **Tested:** the web app's 198 tests, its typecheck and lint pass. No test
 pinned the old week default. **Not yet seen** in the browser.
 
+## 2026-10-01 (later) — The POS lookup looks at recorded messages too, not only calls (A-67)
+
+After v0.7.0 went live, Dia: ريم صالح (0522367081) is in the POS and was
+still not added. Each step was checked in turn on the live server: the
+token in the container is the same one (fingerprint `a78b05f2`), curl from
+the server and from inside the container finds her (POS customer 15484),
+her row is `970522367081` with no contact, and the server's own POS client,
+run from the development machine, finds her too. **The HTTP client's log on
+the server showed the cause:** the six numbers the lookup asked about did
+not include hers at all, and the POS rightly did not know those six.
+
+Her row is a **message an agent recorded** (A-70), not a call: it started
+at 13:58:00 exactly, as a message time typed on the Applications page does.
+The lookup's query had `kind = 'Call'`, written when only calls existed.
+Now it takes every communication with a number: a message carries the
+number the agent typed, normalised the same way (`ApplicationsService`).
+Attaching earlier rows was already kind-blind (`ContactCallLinker`).
+
+**The extra log is still on on the live server:** the line
+`Serilog__MinimumLevel__Override__System.Net.Http.HttpClient=Information`
+was added to `/opt/callcenter/.env` to see the requests. It logs every
+HTTP request the server makes, so it comes out again after this release is
+seen working (delete the line, `docker compose up -d`).
+
+**Tested.** `PosLookupTests` gains one: a recorded message from a number the
+POS knows becomes a contact, and the message is attached to it. The server
+suite and the web app's checks pass. **Not yet released.**
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

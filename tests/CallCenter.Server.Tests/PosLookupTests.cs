@@ -61,6 +61,44 @@ public class PosLookupTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
+    public async Task A_message_from_a_number_the_POS_knows_becomes_a_contact_too()
+    {
+        // 1 Oct 2026: a WhatsApp customer the POS knew was never asked about,
+        // because only calls were looked at.
+        await data.EnsurePhoneChannelAsync();
+        var agent = await data.CreateUserAsync();
+        var mobile = TestData.NewMobile();
+        var messageId = await data.QueryAsync(async db =>
+        {
+            var message = new Communication
+            {
+                Kind = CommunicationKinds.App,
+                Direction = Directions.None,
+                Status = CommunicationStatuses.Logged,
+                ChannelId = await db.Channels.Where(c => c.Name == ChannelNames.Phone).Select(c => c.Id).FirstAsync(),
+                AgentId = agent.Id,
+                RemoteNumberRaw = mobile,
+                RemoteNormalised = PhoneNormalizer.Normalize(mobile),
+                StartedAt = DateTimeOffset.UtcNow.AddMinutes(-3),
+                Source = CommunicationSources.Manual,
+                UpdatedAt = DateTimeOffset.UtcNow,
+            };
+            db.Communications.Add(message);
+            await db.SaveChangesAsync();
+            return message.Id;
+        });
+        var pos = new FakePos { [mobile] = Customer("ريم صالح", mobile) };
+
+        var result = await RunAsync(pos);
+
+        pos.Asked.Should().Contain(PhoneNormalizer.Normalize(mobile));
+        result.Created.Should().BeGreaterThanOrEqualTo(1);
+        var contact = await ContactWithAsync(mobile);
+        contact.Name.Should().Be("ريم صالح");
+        (await ContactOfAsync(messageId)).Should().Be(contact.Id, "the message is attached as a call would be");
+    }
+
+    [DatabaseFact]
     public async Task An_existing_contact_is_only_filled_in_never_overwritten_or_blocked()
     {
         await data.EnsurePhoneChannelAsync();

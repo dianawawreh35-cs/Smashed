@@ -22,7 +22,8 @@
     "callReports": "Call reports",
     "agentApp": "Agent App",
     "logs": "Logs",
-    "label": "Sections"
+    "label": "Sections",
+    "mistakes": "Mistakes"
   },
   "login": {
     "heading": "Sign in",
@@ -1118,5 +1119,81 @@
     "unfold_one": "1 more line",
     "unfold_other": "{{count}} more lines",
     "fold": "Show less"
+  },
+  "mistakes": {
+    "heading": "Mistakes",
+    "intro": "Mistakes made by a branch or an agent: where it happened, who is responsible, what it cost and which customer it happened to.",
+    "add": "Record a mistake",
+    "addHeading": "New mistake",
+    "editHeading": "Correct the mistake",
+    "filters": "Filters",
+    "filter": {
+      "q": "Customer number, name or notes",
+      "from": "From",
+      "to": "To"
+    },
+    "search": "Search",
+    "clear": "Clear",
+    "columns": {
+      "date": "Date",
+      "branch": "Branch",
+      "responsible": "Responsible",
+      "agent": "Agent",
+      "customer": "Customer",
+      "value": "Value",
+      "notes": "Notes",
+      "recordedBy": "Recorded by"
+    },
+    "responsibleIs": {
+      "Branch": "The branch",
+      "Agent": "An agent"
+    },
+    "chooseBranch": "Choose a branch",
+    "chooseAgent": "Choose the agent",
+    "agentNone": "A branch's mistake names no agent.",
+    "inactive": "(disabled)",
+    "valueHint": "In shekels. Leave it empty when the mistake had no value.",
+    "customerNumber": "Customer: phone number or name",
+    "customerHint": "Optional. A number in any format, or a saved customer's name.",
+    "customerLooking": "Looking the number up…",
+    "customerFound": "Saved customer: {{name}}",
+    "customerUnnamed": "A saved customer, with no name",
+    "customerNotFound": "Not a saved customer. The number is kept as typed.",
+    "customerLookupFailed": "The number could not be looked up. It is still kept.",
+    "notOnFile": "Not a saved customer",
+    "notesHint": "What went wrong.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "remove": "Remove",
+    "empty": "No mistakes match.",
+    "emptyHint": "The dates start on today. Widen them, or clear a filter.",
+    "failed": "The mistakes did not load.",
+    "count_one": "1 mistake",
+    "count_other": "{{count}} mistakes",
+    "totalValue": "Total value {{value}}",
+    "export": "Export all {{count}} (Excel)",
+    "exportHint": "Every mistake that matches the filters, not only this page, as a file Excel opens.",
+    "exporting": "Exporting…",
+    "exportFailed": "The export could not be made. Check the server is running.",
+    "errors": {
+      "mistake_not_found": "This mistake is no longer there. It may have been removed.",
+      "unknown_branch": "That branch no longer exists.",
+      "branch_inactive": "That branch is disabled. Choose another.",
+      "bad_responsible": "Choose who is responsible: the branch or an agent.",
+      "agent_required": "Choose the agent responsible.",
+      "agent_not_allowed": "A branch's mistake names no agent.",
+      "unknown_agent": "That agent no longer exists.",
+      "agent_inactive": "That agent's account is disabled. Choose another.",
+      "bad_number": "The customer's number has no digits.",
+      "notes_required": "Write what the mistake was in the notes.",
+      "future_date": "The date is after today.",
+      "invalid_request": "It could not be saved. Check the fields.",
+      "server_unreachable": "The server could not be reached.",
+      "server_error": "The server had an error. Try again."
+    },
+    "customerPick": "Pick the customer:",
+    "customerNoMatch": "No saved customer has this name. Type the number instead.",
+    "customerSearchFailed": "The customers could not be searched. Type the number instead."
   }
 }

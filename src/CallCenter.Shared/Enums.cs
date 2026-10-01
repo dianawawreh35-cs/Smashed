@@ -128,6 +128,18 @@ public static class TaskOrigins
     public static readonly IReadOnlyList<string> All = new[] { Complaint, Abandoned, Missed, Manual };
 }
 
+/// <summary><c>mistakes.responsible</c>: who a recorded mistake is put down to (S-65).</summary>
+public static class MistakeResponsibilities
+{
+    /// <summary>The branch as a whole: no agent is named.</summary>
+    public const string Branch = "Branch";
+
+    /// <summary>One agent, named in <c>mistakes.agent_id</c>.</summary>
+    public const string Agent = "Agent";
+
+    public static readonly IReadOnlyList<string> All = new[] { Branch, Agent };
+}
+
 /// <summary><c>pbx_events_raw.source</c>.</summary>
 public static class PbxEventSources
 {

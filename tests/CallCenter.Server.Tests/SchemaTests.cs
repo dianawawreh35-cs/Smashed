@@ -47,6 +47,7 @@ public class SchemaTests
         "follow_up_tasks",
         "delivery_areas",
         "menu_categories", "menu_items",
+        "mistakes",
         "pbx_events_raw", "pbx_blacklist", "agent_sessions", "audit_log", "outbox_sync",
     ];
 
@@ -98,6 +99,9 @@ public class SchemaTests
     [InlineData("follow_up_tasks", "ck_follow_up_tasks_created_from")]
     [InlineData("pbx_events_raw", "ck_pbx_events_raw_source")]
     [InlineData("contacts", "ck_contacts_source")]
+    [InlineData("mistakes", "ck_mistakes_responsible")]
+    [InlineData("mistakes", "ck_mistakes_agent")]
+    [InlineData("mistakes", "ck_mistakes_value")]
     public void Check_constraints_from_the_schema_are_present(string table, string constraint)
     {
         var entity = Model.GetEntityTypes().Single(e => e.GetTableName() == table);
@@ -112,6 +116,7 @@ public class SchemaTests
     [InlineData("communications", "ck_communications_direction", new[] { Directions.In, Directions.Out, Directions.None })]
     [InlineData("follow_up_tasks", "ck_follow_up_tasks_status", new[] { TaskStatuses.Open, TaskStatuses.Done, TaskStatuses.Cancelled })]
     [InlineData("contacts", "ck_contacts_source", new[] { Data.Entities.ContactSources.Seed, Data.Entities.ContactSources.Agent, Data.Entities.ContactSources.Pos })]
+    [InlineData("mistakes", "ck_mistakes_responsible", new[] { MistakeResponsibilities.Branch, MistakeResponsibilities.Agent })]
     public void Check_constraints_allow_exactly_the_documented_values(
         string table, string constraint, string[] expected)
     {
@@ -158,6 +163,7 @@ public class SchemaTests
     [InlineData("ix_pbx_events_received", "pbx_events_raw", false, null)]
     [InlineData("ix_sessions_user", "agent_sessions", false, null)]
     [InlineData("ix_audit_entity", "audit_log", false, null)]
+    [InlineData("ix_mistakes_occurred", "mistakes", false, null)]
     public void Indexes_from_the_schema_are_present(string name, string table, bool unique, string? filter)
     {
         var entity = Model.GetEntityTypes().Single(e => e.GetTableName() == table);
@@ -229,6 +235,7 @@ public class SchemaTests
     [InlineData("audit_log", "Before", "jsonb")]
     [InlineData("audit_log", "After", "jsonb")]
     [InlineData("classifications", "OrderValue", "numeric(10,2)")]
+    [InlineData("mistakes", "Value", "numeric(10,2)")]
     public void Column_types_match_the_schema(string table, string property, string expected)
     {
         var entity = Model.GetEntityTypes().Single(e => e.GetTableName() == table);

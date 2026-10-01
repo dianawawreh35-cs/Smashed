@@ -344,6 +344,14 @@ The Calls Detail report's own Status column: *Success* or *Abandoned*. Read agai
 
 **Dependency statement:** the client's PBX accepts no inbound connections, and a waiting caller is not to be answered and hung up on. Calls that never reach an agent are therefore captured from the PBX's own Calls Detail report, downloaded outbound by the server every minute. **Real-time capture is not available.** Coverage is complete — every abandoned call is seen, whenever the caller gave up — but each appears within the import interval rather than instantly. This is a documented characteristic of the solution given the client's constraints, not a defect.
 
+### 4.6 Mistakes
+
+*Added 1 Oct 2026 at Dia's request; not in the original scope.*
+
+| ID | Requirement | Priority |
+|---|---|---|
+| S-65 | **Mistakes page** (الأخطاء): the supervisor records mistakes made by a branch or by an agent. Each mistake has: the **day** it happened (today by default, never later); the **branch** where it happened, always; who is **responsible**, either *the branch*, which names no agent, or *an agent*, who must be chosen; a **value** in shekels, optional, for a mistake that cost something; the **customer**, optional, found by phone number or by name: a number is matched to a saved customer as the pop-up matches a caller (A-13), a name lists the saved customers who have it to pick from, and a number nobody has on file is kept as typed; and **notes**, required, saying what went wrong. A disabled branch or agent is not offered for a new mistake, but an old one keeps it. The page searches on the server by days (today by default), branch, responsible, agent, and the customer's number, name or words in the notes, with the count and the total value of every match, and **exports every match to Excel** (CSV, as S-05). A mistake can be corrected and removed; each record, correction and removal is written to the audit log with what it said before (N-06). Supervisors only: agents do not see mistakes in either app. | Should |
+
 ---
 
 ## 5. Non-Functional Requirements

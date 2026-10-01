@@ -544,6 +544,49 @@ log on the server (Round 2, "The log reaches the server").
 - [ ] **Arabic.** Switch the page to Arabic: the labels are Arabic and read
       from the right, and the log text stays left to right, as written.
 
+### 1.13 Mistakes: what a branch or an agent got wrong (S-65) — built 1 Oct, never run
+
+No phone needed. Restart the server first, so the `mistakes` table is made
+(the migration runs on startup).
+
+- [ ] **The page.** As a supervisor, **Mistakes** (الأخطاء) is in the sidebar
+      after Contacts. It opens on today, with "No mistakes match". Sign in as
+      an agent instead: there is no Mistakes page.
+- [ ] **An agent's mistake, with a customer found by number.** Press
+      **Record a mistake**. Pick a branch, leave **An agent** chosen, pick an
+      agent, type a value (12.5), and in the customer box type a saved
+      customer's number in another form than it was saved (+970 59… for
+      059…). Under the box: "Saved customer: <their name>". Write a note and
+      save. The row shows the branch, An agent (amber), the agent, the
+      customer's name with the number under it, 12.50 and the note; the count
+      line says 1 mistake and the total value 12.50. **Screenshot it in both
+      languages.**
+- [ ] **A customer found by name.** Record another, and in the customer box
+      type part of a saved customer's name. A short list of matching
+      customers appears, each with their number; **Save** stays greyed until
+      one is picked. Pick one: their number fills the box and "Saved
+      customer: …" shows under it.
+- [ ] **A branch's mistake.** Record another and choose **The branch**: the
+      agent box empties and greys out, with "A branch's mistake names no
+      agent". Save with no value and no customer. The row says The branch
+      (grey), with no agent, value or customer.
+- [ ] **A number nobody has.** Record one with a number that is not a saved
+      customer: under the box, "Not a saved customer. The number is kept as
+      typed." The row shows "Not a saved customer" and the number.
+- [ ] **Refusals.** The date box does not go past today. Save stays greyed
+      without a branch, without notes, or with An agent chosen and no agent.
+- [ ] **Correct and remove.** Double-click a row (or Edit): the form opens
+      under it with its values. Change the note and save. Then **Remove**:
+      the first click asks "Confirm remove", the second removes it.
+- [ ] **Search.** Set the From box a week back and Search: older mistakes
+      appear. The Branch, Responsible and Agent filters narrow it; the search
+      box finds a mistake by the customer's number, by their name, or by a
+      word in the notes. The count and the total value follow the filters.
+- [ ] **Export to Excel.** **Export all N (Excel)** saves `mistakes-<date>.csv`.
+      Open it in Excel: Arabic headings (English when the page is in English),
+      the Arabic names readable, the numbers with their leading 0, and every
+      mistake that matches the filters, not only the page on screen.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.

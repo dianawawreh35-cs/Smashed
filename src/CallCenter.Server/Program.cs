@@ -147,6 +147,7 @@ try
 
     builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Mistakes.MistakesService>();
     builder.Services.AddOptions<MenuImageOptions>()
         .Bind(builder.Configuration.GetSection(MenuImageOptions.SectionName))
         .ValidateDataAnnotations();

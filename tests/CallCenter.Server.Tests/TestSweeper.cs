@@ -97,6 +97,11 @@ public static class TestSweeper
         // history first: since 27 Sep (M-D05) it does not go with the call.
         await db.Database.ExecuteSqlRawAsync(
             """
+            DELETE FROM mistakes
+             WHERE created_by IN (SELECT id FROM sweep_users)
+                OR agent_id IN (SELECT id FROM sweep_users)
+                OR contact_id IN (SELECT id FROM sweep_contacts)
+                OR branch_id IN (SELECT id FROM branches WHERE name ~ '^Test branch [0-9a-f]{{8}}$');
             DELETE FROM classification_history WHERE communication_id IN (SELECT id FROM sweep_comms);
             DELETE FROM follow_up_tasks
              WHERE communication_id IN (SELECT id FROM sweep_comms)

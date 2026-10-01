@@ -44,6 +44,8 @@ export default function AppLayout() {
     { to: '/applications', label: t('nav.applications') },
     { to: '/application-reports', label: t('nav.applicationReports') },
     { to: '/contacts', label: t('nav.contacts') },
+    // What went wrong at a branch or with an agent, and who is responsible (S-65).
+    { to: '/mistakes', label: t('nav.mistakes') },
     { to: '/delivery', label: t('nav.delivery') },
     { to: '/menu', label: t('nav.menu') },
     { to: '/classification', label: t('nav.classification') },

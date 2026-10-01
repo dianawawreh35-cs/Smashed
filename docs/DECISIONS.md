@@ -8036,6 +8036,73 @@ page asks for today when it opens. The web app's 200 tests, typecheck and
 lint pass.
 Released as `v0.7.2`; **not yet seen** in the browser.
 
+## 2026-10-01 — A Mistakes page: what a branch or an agent got wrong (S-65)
+
+Dia: a new tab in the supervisor app to record mistakes made by agents or
+branches. Every one has the branch where it happened. Who is responsible is
+the branch, with no agent, or an agent, who is then chosen. There is a field
+for the value when it has one, and the customer it happened to, found by phone
+number. Then, while it was being built: "export as Excel", "add notes at each
+mistake", and "the customer … searchable by name also". New requirement
+**S-65** (SRS 4.6); it was not in the original scope.
+
+**Asked and answered (Dia, 1 Oct):**
+- **A number that is not a saved customer** is kept as typed, and the row says
+  "Not a saved customer". Rejected: allowing saved customers only, or adding
+  the customer from the form.
+- **The customer is optional.** Some branch mistakes (a late opening) have no
+  one customer.
+- **Correct and remove are both allowed.** Each record, correction and removal
+  goes to `audit_log` (`entity = 'mistake'`) with what the row said before, so
+  a removed mistake can still be traced. The row itself is deleted. Nothing
+  points at a mistake, so there is no history to protect by hiding it instead.
+
+**Decided here, without asking:**
+- **Notes are required.** "Notes at each mistake", and a mistake with no
+  words is a row nobody can act on. The server refuses blank notes.
+- **A day, not a time** (`occurred_on date`), today by default and never
+  after it. Nobody knows the minute, and a day cannot slip across midnight
+  in a time-zone conversion.
+- **The rule is held by the database too:** `ck_mistakes_agent` makes
+  "Agent" and an agent id go together. The server refuses an agent on a
+  branch's mistake (`agent_not_allowed`) rather than dropping it, so a wrong
+  form is told rather than quietly corrected.
+- **Only agent accounts can be responsible.** A disabled branch or agent is
+  not offered for a new mistake, but an old one keeps it when corrected, as
+  the classification form treats a branch.
+- **The customer is kept by number, always.** A number is matched by the
+  caller lookup's rule (A-13: exact, else the last nine digits) when it is
+  saved. A name typed in the same box lists the saved customers who have it;
+  picking one puts their main number in the box, and Save waits until one is
+  picked. So a mistake never holds a name with no customer behind it.
+  `contact_id` is not updated if the number is saved as a customer later.
+  The calls have `ContactCallLinker` for that; mistakes could use the same
+  if Dia wants it.
+- **The page works like Calls:** filters apply on Search; they open on today
+  (the 1 Oct rule for every date filter); the server pages, counts and
+  totals the value over every match. The export is the server's CSV of every
+  match, through `CallExport`'s rules (byte-order mark, no formula cells,
+  numbers keep their 0), as Dia chose CSV for "Excel" on 26 Sep. The search
+  box finds the customer's number or name, or words in the notes.
+- **Supervisors only**, reading included. Agents see nothing of it.
+- **Its own table**, `mistakes`, and its own feature folder
+  (`Features/Mistakes`). It is not a classification type on a call: many
+  mistakes have no call, and a branch's has no agent to classify it.
+
+**Tested.** `MistakesTests` (16, 11 of them against the database): who is
+responsible and the refusals; the customer found by another form of the
+number; an unknown number kept; disabled branch and agent; the search's
+filters, total and paging; search by number, name and notes; correct, remove
+and the audit trail; the CSV; and an agent refused every endpoint. The
+schema tests cover the table, and `TestSweeper` removes the tests' mistakes.
+Server suite: 582 passed against `callcenter_test`. Web:
+`MistakesPage.test.tsx` (4): the list, a branch's mistake sends no agent,
+finding a customer by name, the export. The web app's 204 tests, lint and
+the production build pass. **Not yet seen** in the browser.
+
+**To deploy:** server and web, with a migration (`AddMistakes`, a new empty
+table); no Agent App change.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

@@ -384,6 +384,47 @@ CREATE INDEX ix_menu_item_order ON menu_items(category_id, sort_order);
 
 ---
 
+## 4c. Mistakes
+
+The mistakes made by a branch or an agent, as the supervisor records them on
+the Mistakes page (S-65). Added by migration `AddMistakes` (1 Oct 2026).
+
+```sql
+CREATE TABLE mistakes (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  occurred_on          date NOT NULL,                 -- the restaurant's day; never after today (API)
+  branch_id            uuid NOT NULL REFERENCES branches(id),
+  responsible          text NOT NULL,                 -- 'Branch' or 'Agent'
+  agent_id             uuid REFERENCES users(id),     -- set exactly when responsible = 'Agent'
+  value                numeric(10,2),                 -- shekels; NULL is "no value", not zero
+  contact_id           uuid REFERENCES contacts(id),  -- the saved customer the number belonged to on save
+  customer_number_raw  varchar(32),                   -- as typed, kept when nobody has it on file
+  customer_normalised  varchar(32),                   -- PhoneNormalizer, for the search
+  notes                text NOT NULL,                 -- what went wrong; never blank (API)
+  created_by           uuid REFERENCES users(id),
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_by           uuid REFERENCES users(id),
+  updated_at           timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_mistakes_responsible CHECK (responsible IN ('Branch','Agent')),
+  CONSTRAINT ck_mistakes_agent CHECK ((responsible = 'Agent') = (agent_id IS NOT NULL)),
+  CONSTRAINT ck_mistakes_value CHECK (value IS NULL OR value >= 0)
+);
+CREATE INDEX ix_mistakes_occurred ON mistakes(occurred_on);
+```
+
+- **Every mistake has a branch**, whoever is responsible. `ck_mistakes_agent`
+  holds the rest: a branch's mistake names no agent, an agent's always names one.
+- **`occurred_on` is a `date`**, the one exception to "all timestamps
+  `timestamptz`": nobody knows the minute a mistake happened, and a day has no
+  time zone to shift it across midnight.
+- **The customer is kept by number.** `contact_id` is found on save by the
+  caller lookup's rule (A-13) and kept while the number is unchanged. A number
+  nobody has on file stays in `customer_number_raw` with no contact.
+- **Hard-deleted** when the supervisor removes one entered by error; the
+  `audit_log` row (`entity = 'mistake'`) keeps what it said.
+
+---
+
 ## 5. Follow-up tasks
 
 ```sql

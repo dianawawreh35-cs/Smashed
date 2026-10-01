@@ -48,6 +48,9 @@ public partial class CallCenterDbContext(DbContextOptions<CallCenterDbContext> o
     // Follow-up
     public DbSet<FollowUpTask> FollowUpTasks => Set<FollowUpTask>();
 
+    /// <summary>Mistakes made by a branch or an agent, as the supervisor records them (S-65).</summary>
+    public DbSet<Mistake> Mistakes => Set<Mistake>();
+
     // Plumbing and audit
     public DbSet<PbxEventRaw> PbxEventsRaw => Set<PbxEventRaw>();
     public DbSet<PbxBlacklistEntry> PbxBlacklist => Set<PbxBlacklistEntry>();

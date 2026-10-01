@@ -6,6 +6,7 @@ import ApplicationsPage from './pages/ApplicationsPage'
 import UsersPage from './pages/UsersPage'
 import SettingsPage from './pages/SettingsPage'
 import ContactsPage from './pages/ContactsPage'
+import MistakesPage from './pages/MistakesPage'
 import DeliveryPage from './pages/DeliveryPage'
 import MenuPage from './pages/MenuPage'
 import ClassificationPage from './pages/ClassificationPage'
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/applications" element={<ApplicationsPage />} />
             <Route path="/application-reports" element={<ApplicationReportsPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/mistakes" element={<MistakesPage />} />
             <Route path="/delivery" element={<DeliveryPage />} />
             <Route path="/menu" element={<MenuPage />} />
             <Route path="/classification" element={<ClassificationPage />} />

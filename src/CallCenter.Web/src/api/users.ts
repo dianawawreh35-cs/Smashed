@@ -16,6 +16,9 @@ export interface User {
   canTakeCalls: boolean
   createdAt: string
   lastLoginAt: string | null
+  /** The Agent App version of the latest sign-in to it, and when that was. Null if never. */
+  appVersion: string | null
+  appSignedInAt: string | null
 }
 
 export interface CreateUserRequest {

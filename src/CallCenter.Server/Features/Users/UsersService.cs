@@ -40,18 +40,22 @@ public class UsersService(
         CurrentPasswordWrong,
     }
 
-    public async Task<IReadOnlyList<UserDto>> ListAsync(CancellationToken ct = default) =>
-        await db.Users
+    public async Task<IReadOnlyList<UserDto>> ListAsync(CancellationToken ct = default)
+    {
+        var users = await db.Users
             .AsNoTracking()
             .OrderBy(u => u.Role == UserRoles.Supervisor ? 0 : 1)
             .ThenBy(u => u.DisplayName)
-            .Select(u => ToDto(u))
             .ToListAsync(ct);
+
+        var apps = await LatestAppSignInsAsync(null, ct);
+        return users.Select(u => ToDto(u, apps.GetValueOrDefault(u.Id))).ToList();
+    }
 
     public async Task<UserDto?> GetAsync(Guid id, CancellationToken ct = default)
     {
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
-        return user is null ? null : ToDto(user);
+        return user is null ? null : await ToDtoAsync(user, ct);
     }
 
     /// <summary>Creates an account (S-42).</summary>
@@ -120,7 +124,7 @@ public class UsersService(
         await db.SaveChangesAsync(ct);
         await AuditAsync(actingUserId, "update", user, before, ct);
 
-        return (ToDto(user), null);
+        return (await ToDtoAsync(user, ct), null);
     }
 
     /// <summary>
@@ -156,7 +160,7 @@ public class UsersService(
 
         logger.LogInformation("Extension {Extension} set for {Login}", user.Extension, user.Login);
 
-        return (ToDto(user), null);
+        return (await ToDtoAsync(user, ct), null);
     }
 
     /// <summary>
@@ -201,7 +205,33 @@ public class UsersService(
         db.Users.AnyAsync(
             u => u.Id != excluding && u.Role == UserRoles.Supervisor && u.IsActive, ct);
 
-    private static UserDto ToDto(User user) => new(
+    /// <summary>
+    /// The version and time of each account's latest Agent App sign-in, or of
+    /// <paramref name="userId"/>'s only. The app sends its version at every
+    /// sign-in; a web sign-in sends none and has no session.
+    /// </summary>
+    private async Task<Dictionary<Guid, AppSignIn>> LatestAppSignInsAsync(Guid? userId, CancellationToken ct)
+    {
+        var sessions = db.AgentSessions.AsNoTracking().Where(s => s.AppVersion != null);
+        if (userId is { } id)
+        {
+            sessions = sessions.Where(s => s.UserId == id);
+        }
+
+        var latest = await sessions
+            .GroupBy(s => s.UserId)
+            .Select(g => g.OrderByDescending(s => s.LoggedInAt)
+                .Select(s => new { s.UserId, s.AppVersion, s.LoggedInAt })
+                .First())
+            .ToListAsync(ct);
+
+        return latest.ToDictionary(s => s.UserId, s => new AppSignIn(s.AppVersion!, s.LoggedInAt));
+    }
+
+    private async Task<UserDto> ToDtoAsync(User user, CancellationToken ct) =>
+        ToDto(user, (await LatestAppSignInsAsync(user.Id, ct)).GetValueOrDefault(user.Id));
+
+    private static UserDto ToDto(User user, AppSignIn? app = null) => new(
         user.Id,
         user.Login,
         user.DisplayName,
@@ -210,7 +240,11 @@ public class UsersService(
         user.Extension,
         user.Extension is not null && user.SipSecret is not null,
         user.CreatedAt,
-        user.LastLoginAt);
+        user.LastLoginAt,
+        app?.Version,
+        app?.At);
+
+    private sealed record AppSignIn(string Version, DateTimeOffset At);
 
     /// <summary>
     /// What an account looked like, for the audit trail. Never includes the

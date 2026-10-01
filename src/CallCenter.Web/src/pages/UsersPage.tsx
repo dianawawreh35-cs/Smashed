@@ -11,6 +11,7 @@ import {
   updateUser,
 } from '../api/users'
 import type { CreateUserRequest, User } from '../api/users'
+import { fetchAgentAppInstaller, isOlderVersion } from '../api/agentApp'
 import type { AgentPhone } from '../api/pbxAgents'
 import { ListenBar, PhoneBadge } from '../components/AgentPhones'
 import LoadError from '../components/LoadError'
@@ -19,7 +20,9 @@ import { useAgentPhones, useListen } from '../lib/agentPhones'
 
 /**
  * Accounts and extensions (S-42), and what each agent's phone is doing now
- * (S-61), with listening in on a call (S-62).
+ * (S-61), with listening in on a call (S-62). Each agent's Agent App version
+ * is the one their latest sign-in to it sent, marked when the Agent App page
+ * offers a newer one (A-82).
  *
  * One extension per agent (SRS 2.3). Its SIP secret is write-only: the screen
  * can set one and replace one, and shows whether one is set, but never displays
@@ -37,6 +40,9 @@ export default function UsersPage() {
   const phones = phonesQuery.data
   const listen = useListen()
   const phoneOf = (user: User) => phones?.agents.find((p) => p.userId === user.id)
+  // The Agent App page's own query, so the two pages share one answer. Its
+  // failure only means no version is marked out of date.
+  const offered = useQuery({ queryKey: ['agent-app-installer'], queryFn: fetchAgentAppInstaller }).data?.version
 
   const refresh = () => {
     setError(null)
@@ -92,6 +98,7 @@ export default function UsersPage() {
                 <th>{t('users.role')}</th>
                 <th>{t('users.extension')}</th>
                 <th>{t('phones.phone')}</th>
+                <th>{t('users.appVersion')}</th>
                 <th>{t('users.status')}</th>
                 <th />
               </tr>
@@ -103,6 +110,7 @@ export default function UsersPage() {
                   isSelf={me?.id === user.id}
                   user={user}
                   phone={user.role === 'Agent' ? phoneOf(user) : undefined}
+                  offeredVersion={offered}
                   listeningHere={listen.current?.agentId === user.id && listen.current.status !== 'failed' && listen.current.status !== 'ended'}
                   onListen={(phone) => listen.start(phone)}
                   onStopListening={listen.stop}
@@ -122,6 +130,7 @@ export default function UsersPage() {
 function UserRow({
   user,
   phone,
+  offeredVersion,
   listeningHere,
   onListen,
   onStopListening,
@@ -134,6 +143,8 @@ function UserRow({
   /** The signed-in supervisor's own row: changing the password needs the current one. */
   isSelf: boolean
   phone: AgentPhone | undefined
+  /** The version on the Agent App page, or undefined before one is known. */
+  offeredVersion: string | undefined
   listeningHere: boolean
   onListen: (phone: AgentPhone) => void
   onStopListening: () => void
@@ -141,7 +152,8 @@ function UserRow({
   onChanged: () => void
   onError: (e: unknown) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const behind = !!user.appVersion && !!offeredVersion && isOlderVersion(user.appVersion, offeredVersion)
   const [panel, setPanel] = useState<'none' | 'extensions' | 'password'>('none')
 
   const close = () => {
@@ -170,6 +182,29 @@ function UserRow({
         </td>
         <td className="whitespace-nowrap">
           {user.role === 'Agent' && user.isActive && user.extension ? <PhoneBadge phone={phone} /> : null}
+        </td>
+        <td className="tabular whitespace-nowrap">
+          {user.appVersion && (
+            <>
+              <span
+                dir="ltr"
+                title={
+                  user.appSignedInAt
+                    ? t('users.appSignedIn', {
+                        date: new Date(user.appSignedInAt).toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }),
+                      })
+                    : undefined
+                }
+              >
+                {user.appVersion}
+              </span>
+              {behind && (
+                <span className="badge-warn ms-2" title={t('users.appBehindHint', { version: offeredVersion })}>
+                  {t('users.appBehind', { version: offeredVersion })}
+                </span>
+              )}
+            </>
+          )}
         </td>
         <td>
           {user.isActive ? (
@@ -220,7 +255,7 @@ function UserRow({
           (M-W02). It was a near-white band, with labels at 2.5:1. */}
       {panel !== 'none' && (
         <tr>
-          <td colSpan={7} className="row-panel">
+          <td colSpan={8} className="row-panel">
             <div className="card card-body animate-fade-in">
               {panel === 'extensions' ? (
                 <ExtensionForm user={user} onDone={close} onError={onError} />

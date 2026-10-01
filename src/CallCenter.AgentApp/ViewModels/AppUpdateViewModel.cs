@@ -23,7 +23,7 @@ namespace CallCenter.AgentApp.ViewModels;
 /// the pop-up still holds a form or notes being typed, since the new copy
 /// would start without them.
 ///
-/// <b>Asked at sign-in and every 15 minutes</b>, so a version uploaded during
+/// <b>Asked at sign-in and every minute</b>, so a version uploaded during
 /// the day reaches a laptop that stays signed in all shift.
 ///
 /// <b>Only the installed copy updates.</b> The installer always writes to

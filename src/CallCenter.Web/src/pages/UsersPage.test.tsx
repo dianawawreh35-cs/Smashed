@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import UsersPage from './UsersPage'
+import { isOlderVersion } from '../api/agentApp'
 import { setToken } from '../auth/token'
 import { AuthContext } from '../auth/context'
 import type { AuthState } from '../auth/context'
@@ -21,6 +22,8 @@ const AGENT = {
   canTakeCalls: false,
   createdAt: '2026-09-16T10:00:00Z',
   lastLoginAt: null,
+  appVersion: null,
+  appSignedInAt: null,
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -37,12 +40,23 @@ function jsonResponse(body: unknown, status = 200) {
 const NO_PHONES = { live: false, problem: 'not_configured', agents: [] }
 
 /**
- * Answers the phone-status poll (S-61) with `phones`, and hands every other
- * request to `rest`, so a test's own sequence of replies is not used up by it.
+ * Answers the phone-status poll (S-61) with `phones` and the Agent App page's
+ * installer with `installer` (none uploaded by default), and hands every
+ * other request to `rest`, so a test's own sequence of replies is not used up.
  */
-function withPhones(rest: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>, phones: unknown = NO_PHONES) {
-  return (input: RequestInfo | URL, init?: RequestInit) =>
-    String(input).endsWith('/api/pbx/agents') ? Promise.resolve(jsonResponse(phones)) : rest(input, init)
+function withPhones(
+  rest: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+  phones: unknown = NO_PHONES,
+  installer: unknown = null,
+) {
+  return (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.endsWith('/api/pbx/agents')) return Promise.resolve(jsonResponse(phones))
+    if (url.endsWith('/api/agent-app')) {
+      return Promise.resolve(installer ? jsonResponse(installer) : jsonResponse({ code: 'no_installer' }, 404))
+    }
+    return rest(input, init)
+  }
 }
 
 /** The supervisor signed in while the page is open. */
@@ -188,6 +202,47 @@ describe('users page', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }))
 
     expect(screen.getByLabelText('New password').closest('td')).toHaveClass('row-panel')
+  })
+})
+
+describe('Agent App versions', () => {
+  const OFFERED = {
+    version: '0.8.2',
+    fileName: 'SmashedAgentApp-Setup-0.8.2.exe',
+    sizeBytes: 1,
+    uploadedAt: '2026-10-01T20:00:00Z',
+    uploadedBy: 'boss',
+    zipFileName: null,
+    zipSizeBytes: null,
+  }
+  const OLD = { ...AGENT, id: 'a1', displayName: 'Sara', appVersion: '0.8.1', appSignedInAt: '2026-10-01T17:00:00Z' }
+  const CURRENT = { ...AGENT, id: 'a2', login: 'omar', displayName: 'Omar', appVersion: '0.8.2', appSignedInAt: '2026-10-01T18:00:00Z' }
+
+  it('shows each version and marks the one behind the Agent App page', async () => {
+    vi.stubGlobal('fetch', withPhones(vi.fn().mockResolvedValue(jsonResponse([OLD, CURRENT])), NO_PHONES, OFFERED))
+
+    renderPage()
+
+    expect(await screen.findByText('0.8.1')).toBeInTheDocument()
+    expect(screen.getAllByText('0.8.2')).toHaveLength(1)
+    expect(await screen.findByText('Update to 0.8.2')).toBeInTheDocument()
+    expect(screen.getAllByText(/^Update to/)).toHaveLength(1)
+  })
+
+  it('marks nobody when no version has been uploaded', async () => {
+    vi.stubGlobal('fetch', withPhones(vi.fn().mockResolvedValue(jsonResponse([OLD]))))
+
+    renderPage()
+
+    expect(await screen.findByText('0.8.1')).toBeInTheDocument()
+    expect(screen.queryByText(/^Update to/)).not.toBeInTheDocument()
+  })
+
+  it('compares number by number', () => {
+    expect(isOlderVersion('0.8.9', '0.8.10')).toBe(true)
+    expect(isOlderVersion('0.8.2', '0.8.2')).toBe(false)
+    expect(isOlderVersion('0.9.0', '0.8.10')).toBe(false)
+    expect(isOlderVersion('test', '0.8.2')).toBe(false)
   })
 })
 

@@ -8378,6 +8378,55 @@ registered`.
 
 **To deploy:** Agent App only.
 
+## 2026-10-01 — The Users page shows each agent's Agent App version (S-42)
+
+**In plain terms.** Dia: "can i check the app versions on agent app from
+supervisor app?" Now yes: the Users page has an **App version** column. It is
+the version the agent's latest sign-in to the Agent App sent, with the time on
+hover, and an amber **Update to 0.8.2** beside it when the Agent App page offers
+a newer one.
+
+**Nothing new was collected.** The app has sent its version at every sign-in
+since the start (`LoginRequest.AppVersion`), and the server kept it in
+`agent_sessions.app_version`; nothing showed it. Read from the server's
+database that evening, before this was built: every agent's latest sign-in was
+0.8.1, on four laptops.
+
+**Decided without asking:**
+- **The latest Agent App sign-in, not the open one.** A signed-out agent still
+  shows what their laptop last ran, which is the question when deciding who
+  still has to update. A web sign-in sends no version and opens no session, so
+  it changes nothing.
+- **Per agent, not per laptop.** It is the Users page, and an agent is on one
+  laptop at a time (N-05). Two agents on one laptop at different times can show
+  different versions; the hover time says which is newer.
+- **"Behind" compares number by number**, as the Agent App does (0.8.10 is
+  newer than 0.8.9). A version that cannot be read is never marked, and with no
+  installer uploaded nobody is.
+- **Only the Users page.** The dashboard was offered too; left out, since the
+  Users page answers the question and the dashboard's agent list is about the
+  phones right now.
+
+**Tested.** Server: `UserAppVersionTests` (2): the latest of two sign-ins
+counts, an agent who never signed in to the app has none, a web sign-in leaves
+it alone, and one account's endpoint carries it. With the user and sign-in
+tests, 40 of 40 against `callcenter_test`. Web: `UsersPage.test.tsx` 16 (3 new:
+the mark, no mark without an upload, the comparison); all 26 files, 214 tests,
+lint and the build pass. **Not yet seen** in the browser.
+
+**To deploy:** server and web, no migration; with the change below, an Agent
+App too (`v0.8.4`).
+
+### The app asks for a new version every minute, not every 15 (A-82)
+
+Dia, the same evening: "make it 1 min instead of 15". The 15 minutes had no
+reason written down (29 Sep). Each check is one `GET /api/agent-app`, which
+reads a small file's details on the server; five laptops once a minute is
+nothing beside the log sender's every 30 s. It still offers, never installs:
+the agent presses **Update now**. **It starts with the Agent App version that
+carries it**; a laptop on an older one keeps asking every 15 minutes until it
+updates. The label beside **Update to x** on the Users page says both.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -8406,7 +8455,7 @@ running**.
 | **The Users page: each agent's laptop, app version, and a "signed in twice" warning** | S-61, N-05 | nothing: the sessions have the laptop id and version. Worth doing next |
 | **See the 27 Sep fixes running**, in both languages, with screenshots: the Agent App (checklist, the 27 Sep sections of Round 3) and the web app (checklist 1.11) | A-03, A-11, M-A*, M-W* | nothing: v0.4.1 is on the server |
 | **Install from the web app on one laptop** (S-63): upload an installer, sign in as an agent, download, install over the zip's copy, and look for a second copy of the app on the laptop. Screenshots of the page as an agent and as a supervisor, in both languages | S-63, N-11 | a server with the new image and `docker-compose.yml`. It could not be run on Dia's laptop (policy) |
-| **See Update now work on an agent laptop** (A-82, built 29 Sep): with 0.5.3 installed by hand, upload the next version and look for the bar within 15 minutes, the button off during a call, and the app back on the new version after pressing it, with no Windows prompt. Screenshots of the bar in both languages | A-82 | 0.5.3 on the laptops, then any later version uploaded || **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
+| **See Update now work on an agent laptop** (A-82, built 29 Sep): with 0.5.3 installed by hand, upload the next version and look for the bar within a minute (15 on a version before the change), the button off during a call, and the app back on the new version after pressing it, with no Windows prompt. Screenshots of the bar in both languages | A-82 | 0.5.3 on the laptops, then any later version uploaded || **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
 | The report cards' own CSV export (`src/lib/csv.ts`) neutralises formula cells and writes numbers as `="0599…"`, as the server's call-search export has since 27 Sep | R-02, S-05 | nothing: the web half only |
 | **The web app's sign-out ends its token**, as the Agent App's has since 27 Sep (M-S01) | N-05 | a session row for web sign-ins, which changes what the dashboard's *agents online* counts. Then decide whether 12 hours is still right for the web token |
 | The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet |

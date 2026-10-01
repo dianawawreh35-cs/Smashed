@@ -39,6 +39,23 @@ export async function fetchAgentAppInstaller(): Promise<AgentAppInstaller | null
   }
 }
 
+/**
+ * True when `own` is an older version than `offered`, compared number by
+ * number as the Agent App does (A-82): 0.8.10 is newer than 0.8.9. False when
+ * either cannot be read, so nobody is called out of date on a guess.
+ */
+export function isOlderVersion(own: string, offered: string): boolean {
+  const parse = (v: string) => (/^\d+(\.\d+)*$/.test(v) ? v.split('.').map(Number) : null)
+  const a = parse(own)
+  const b = parse(offered)
+  if (!a || !b) return false
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0)
+    if (d !== 0) return d < 0
+  }
+  return false
+}
+
 /** The program itself. Fetched rather than linked, because a link cannot carry the token. */
 export const downloadAgentAppInstaller = () => requestBlob('/agent-app/installer')
 

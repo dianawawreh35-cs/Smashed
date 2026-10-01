@@ -213,7 +213,11 @@
     "extensionHint": "One extension per agent, used for every call. Internal calls are told apart by the internal numbers list in Settings.",
     "failed": "The users could not be loaded.",
     "currentPassword": "Your current password",
-    "ownPasswordHint": "At least 8 characters. You will be signed out, and sign in again with the new password."
+    "ownPasswordHint": "At least 8 characters. You will be signed out, and sign in again with the new password.",
+    "appVersion": "App version",
+    "appSignedIn": "From the sign-in on {{date}}",
+    "appBehind": "Update to {{version}}",
+    "appBehindHint": "{{version}} is on the Agent App page. The app offers it within a minute (15 on older versions), or at the next sign-in."
   },
   "phones": {
     "phone": "Phone",

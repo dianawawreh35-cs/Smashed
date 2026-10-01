@@ -233,7 +233,8 @@ public partial class App : Application
         _host.Services.GetRequiredService<AgentLogShipper>().RunEvery(TimeSpan.FromSeconds(30));
 
         // A-82: a newer version uploaded on the web app is offered in a bar.
-        _host.Services.GetRequiredService<AppUpdateViewModel>().CheckEvery(TimeSpan.FromMinutes(15));
+        // Every minute (Dia, 1 Oct; was 15): one small request to the server.
+        _host.Services.GetRequiredService<AppUpdateViewModel>().CheckEvery(TimeSpan.FromMinutes(1));
 
         var window = _host.Services.GetRequiredService<MainWindow>();
         MainWindow = window;

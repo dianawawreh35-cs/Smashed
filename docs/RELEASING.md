@@ -297,6 +297,7 @@ hours before opening to do it.
 | `v0.8.1` | 2026-10-01 | **Breaks** (A-86, S-66, R-22): **Break in / Break out** in the Agent App's rail turns do not disturb on and holds it, then off again, and counts the agent's break time for the day, adding up across breaks. A **daily allowance** on the Settings page (*Break allowance*, 60 minutes) warns past it and never stops a break. A **Breaks** page in the web app: who is on break now, live, and the break report per agent, per day and every break, with CSV. **Mistakes page** (S-65): mistakes made by a branch or an agent, with value and customer, searchable and exported; and the **Mistakes report** (R-23): per branch, per agent, over time, repeat customers. Three migrations (`AddMistakes`, `AddAgentBreaks`, `SeedBreakAllowance`), all additive; nothing new in `.env`. **Agent App: 0.8.1**, built after the tag and uploaded on the Agent App page; laptops on 0.5.3 or later offer *Update now*. The old Agent App keeps working, without the button. |
 | `v0.8.2` | 2026-10-01 | **Do not disturb no longer logs a Missed call** (A-18): a call it turns away, during a break too, is not reported, so the queue's every try at an agent on a break stops counting as a call they missed. The 144 such rows already logged were cleared on the server with `tools/clear-dnd-missed/clear.sql`, which keeps a copy; run it again once every laptop is on 0.8.2. **Agent App: 0.8.2**, built after the tag and uploaded on the Agent App page. The server is unchanged; no migration, nothing new in `.env`. |
 | `v0.8.3` | 2026-10-01 | **The phone comes back by itself when the PBX asks for its password again** (A-02): once an extension has registered on a sign-in, a later *401 Unauthorized* makes the app log in again, after 30 s, then 1, 2 and every 5 min, instead of staying off until the agent signs out and in (extension 2010, 1 Oct 20:01). A wrong password at sign-in still stops at once. **Agent App: 0.8.3**, built after the tag and uploaded on the Agent App page. The server is unchanged; no migration, nothing new in `.env`. |
+| `v0.8.4` | 2026-10-01 | **Each agent's Agent App version on the Users page** (S-42): an *App version* column, from the agent's latest sign-in to the app, with **Update to x** when the Agent App page offers a newer one. **The app asks for a new version every minute**, not every 15 (A-82), from 0.8.4 on. No migration, nothing new in `.env`. **Agent App: 0.8.4**, built after the tag and uploaded on the Agent App page; it carries 0.8.2's and 0.8.3's fixes, so it is the only one to upload. |
 
 ---
 
@@ -332,8 +333,9 @@ version before, and every agent is offered them at once. The zip is the
 fallback for a laptop the installer will not run on; it is optional, but
 without it an agent has nothing to try when the installer fails.
 
-**From 0.5.3 on, the app offers it itself (A-82).** Within 15 minutes of the
-upload, or at the next sign-in, every laptop on 0.5.3 or later shows a bar:
+**From 0.5.3 on, the app offers it itself (A-82).** Within a minute of the
+upload (15 minutes on versions before 0.8.4), or at the next sign-in, every
+laptop on 0.5.3 or later shows a bar:
 *A new version of the app is ready*, with **Update now**. The agent presses
 it between calls (it is off during one); the app downloads the installer,
 closes, installs it silently and opens again, and the agent signs in. No

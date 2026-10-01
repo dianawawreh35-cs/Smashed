@@ -373,7 +373,9 @@ public class CallLogReporter(
     private static bool IsPermanent(string? code) => code is
         "unknown_value" or "invalid_request" or "unknown_type" or "unknown_branch" or "not_your_call"
         or "not_answered" or "notes_not_taken" or "edit_window_closed"
-        or "extension_not_yours" or ApiClient.BadRequest;
+        or "extension_not_yours" or ApiClient.BadRequest
+        // A-86: a break the server will never take.
+        or "not_your_break" or "break_ends_before_start" or "bad_break_ending" or "break_too_old";
 
     private async Task FlushPassAsync(CancellationToken ct)
     {
@@ -611,6 +613,12 @@ public class CallLogReporter(
         if (item.Notes is { } notes)
         {
             var sent = await api.SaveCallNotesByCallAsync(notes, ct);
+            return (sent.IsOk, sent.Status, sent.ErrorCode);
+        }
+
+        if (item.Break is { } pendingBreak)
+        {
+            var sent = await api.SaveBreakAsync(pendingBreak.Id, pendingBreak.Request, ct);
             return (sent.IsOk, sent.Status, sent.ErrorCode);
         }
 

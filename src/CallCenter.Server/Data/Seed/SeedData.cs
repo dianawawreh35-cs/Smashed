@@ -492,6 +492,10 @@ public static class SeedData
         // How often the POS is asked about recent unknown callers (A-67).
         ("pos.lookup.interval_minutes", "5"),
 
+        // The minutes of break an agent has a day (A-86). An hour. Past it the
+        // Agent App warns and the break monitor shows by how much; nothing stops.
+        ("breaks.daily_limit_minutes", "60"),
+
         // Idle logout, so a shared laptop does not leave the previous shift signed in (A-05).
         ("agent.idle_logout_minutes", "240"),
 

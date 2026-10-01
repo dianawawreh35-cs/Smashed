@@ -131,4 +131,15 @@ public static class PendingUploadKinds
     /// lost by the laptop being closed.
     /// </remarks>
     public const string Recording = "Recording";
+
+    /// <summary>
+    /// A break the server could not be told about when it began or ended
+    /// (A-86), whole, as <see cref="Services.Calls.PendingBreak"/>.
+    /// </summary>
+    /// <remarks>
+    /// Sent straight away normally; queued only when that fails. It belongs to
+    /// no call, and the reference is <c>break|{id}</c>, so a Break out queued
+    /// behind its own Break in replaces it.
+    /// </remarks>
+    public const string Break = "Break";
 }

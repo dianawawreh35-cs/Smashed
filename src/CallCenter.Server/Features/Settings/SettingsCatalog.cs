@@ -73,6 +73,12 @@ public static class SettingsCatalog
         // S-60: the queue opens by itself at this time every day, HH:mm, 24-hour.
         // Blank turns it off.
         new(Pbx.PbxQueueSwitch.AutoOpenTimeKey, SettingKinds.Text, null, ValidateTimeOfDay),
+
+        // A-86, S-66: the minutes of break an agent has a day. Nothing stops
+        // at it: past it, the Agent App warns the agent and the break monitor
+        // and report show by how much (Dia, 1 Oct 2026). Blank means the
+        // default, an hour.
+        new(Breaks.BreaksService.DailyLimitKey, SettingKinds.Integer, null, IntegerBetween(1, 600)),
     ];
 
     private static readonly Dictionary<string, Definition> ByKey =

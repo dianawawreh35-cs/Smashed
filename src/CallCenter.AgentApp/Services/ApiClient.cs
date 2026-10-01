@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using CallCenter.Shared.Contracts.AgentApp;
 using CallCenter.Shared.Contracts.Auth;
+using CallCenter.Shared.Contracts.Breaks;
 using CallCenter.Shared.Contracts.Classifications;
 using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Contracts.Contacts;
@@ -721,6 +722,26 @@ public class ApiClient(
             return Result<object>.Failed(ApiStatus.Unreachable, LoginErrorCodes.ServerUnreachable);
         }
     }
+
+    /// <summary>
+    /// Saves a break, sent whole (A-86): at Break in with no end, at Break out
+    /// with one. Sending it again changes nothing.
+    /// </summary>
+    public Task<Result<BreakDto>> SaveBreakAsync(Guid id, SaveBreakRequest request, CancellationToken ct = default) =>
+        SendAsync<BreakDto>(
+            () => new HttpRequestMessage(HttpMethod.Put, $"api/breaks/mine/{id}")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>The agent's break time today and the daily limit, for the timer at sign-in (A-86).</summary>
+    public Task<Result<MyBreaksTodayDto>> GetMyBreaksTodayAsync(CancellationToken ct = default) =>
+        SendAsync<MyBreaksTodayDto>(
+            () => new HttpRequestMessage(HttpMethod.Get, "api/breaks/mine/today"),
+            authenticated: true,
+            ct);
 
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>

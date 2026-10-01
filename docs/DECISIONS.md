@@ -8103,6 +8103,112 @@ the production build pass. **Not yet seen** in the browser.
 **To deploy:** server and web, with a migration (`AddMistakes`, a new empty
 table); no Agent App change.
 
+## 2026-10-01 — Break in and Break out, the break monitor and the break report (A-86, S-66, R-22)
+
+Dia: a **Break in** button in the Agent App that turns into **Break out** and
+counts the agent's break time, **accumulating**, so the second break counts on
+from where the first stopped; Break in turns **do not disturb** on and Break
+out turns it off; and, in the web app, a **monitor of the agents' breaks** and
+**break reports**. New requirements **A-86** (SRS 3.9), **S-66** and **R-22**
+(SRS 4.7, new); none was in the original scope. A-18 and S-47 say how they
+touch the break.
+
+**Asked and answered (Dia, 1 Oct):**
+- **The total starts again every day**, the restaurant's day, not every
+  sign-in. Signing out and in keeps it.
+- **There is a daily allowance, and it never stops a break.** Past it the
+  Agent App warns the agent, and Break in still works. Built as the time
+  turning red with "You are over your break time by …", and a line in the
+  bar when Break in is pressed on a day already over. The monitor and the
+  report show the excess in red.
+- **One button, no reason** (prayer, food…) chosen.
+
+**Decided here, without asking:**
+- **The allowance is a setting**, `breaks.daily_limit_minutes`, 1–600,
+  **60 by default** (seeded; Dia did not give a number). The Agent App reads
+  it at sign-in, as it reads the PBX host, so a change reaches an agent at
+  their next sign-in. The report's "over" uses the setting as it is now,
+  for every day in the period.
+- **During a break the do-not-disturb switch is held on** and greyed, so the
+  break and the phone cannot disagree. **Break out turns it off even if the
+  agent had it on before the break**, as Dia put it. Auto answer stays
+  greyed while do not disturb is on (A-18).
+- **A break the app never ended ends by itself**, so none runs on for ever.
+  It takes its end from the sign-in it was taken under (`BreakClock`): when
+  that sign-in ended (*Sign-in ended*), or when the app was last heard from
+  (`agent_sessions.last_seen_at`, S-20's five minutes) if that was earlier
+  (*App stopped*). A laptop that lost power at 14:10 and is signed in to the
+  next morning is ten minutes of break, not eighteen hours. The server writes
+  that end in when the sign-in closes (`AuthService`) and when the agent next
+  starts a break. The app's own ends are *Break out* and *Signed out*:
+  signing out, or closing the app, ends the break first, while the server
+  still takes the token.
+- **Signing in starts the agent off break**, and if a break had turned do
+  not disturb on (the app stopped during one) it is turned off again. A
+  do-not-disturb turned on by hand is left alone. The laptop remembers which
+  it was (`settings.json`, `BreakTurnedOnDoNotDisturb`).
+- **Sent straight away, queued only when that fails** (A-04). A break
+  belongs to no call, so it does not wait behind one in the upload queue; it
+  goes to the buffer (`Kind = Break`) only when the server cannot be reached,
+  and the reporter sends it with everything else. It is **sent whole** each
+  time (`PUT /api/breaks/mine/{id}`, the id made on the laptop), so a resend
+  changes nothing and a Break out alone is enough. A 401 is not queued: that
+  sign-in has ended, and the server ended the break with it. A break queued
+  under one sign-in and sent under the next keeps the first, and ends with it.
+- **The server does not trust the laptop's clock blindly**: a start or end
+  in the future is taken as now, an end before its start is refused, and a
+  break more than a month old is refused, each with its own code, which the
+  upload queue sets aside rather than retrying for ever.
+- **A break over midnight counts on each day for its own part**, in the app's
+  timer and in the report alike. A break pressed in and straight out counts
+  as a break of no length on its day.
+- **The idle logout still applies** (240 minutes, A-05). An agent on a
+  four-hour break is signed out, and the break ends with the sign-in.
+- **The page** is **Breaks** (الاستراحات), after Mistakes, supervisors only.
+  The top card is the monitor: every active agent, on break first; the
+  server is asked every ten seconds and the times under way count on every
+  second from the server's own clock. Below it, the shared filter bar with
+  the period and an agent only (`agentOnly`, new in `ReportFilterBar`: a
+  break has no branch, channel or type), then break time per agent (with a
+  bar chart), per agent per day, and every break, paged by the server, with
+  the whole period as CSV. The report cards show minutes, to one decimal,
+  so a cell, its total and the CSV agree.
+- **Read whole for the period, then counted on the server.** A break's end
+  may have to be worked out from its sign-in, which SQL cannot page by, and
+  five agents taking a few breaks a day is a few thousand rows a year. The
+  browser is still given one page (20 Sep, "filtering a page lies"). A
+  report is limited to 366 days.
+- **A-83** (agent status, Available / On call / Away, a *Could*) is not
+  closed by this, but the monitor's *On break* is its Away.
+
+**Known limits.** At sign-in the timer starts from the server's total, so a
+break still waiting in this laptop's buffer from an earlier sign-in with the
+server down is missing from it until it has been sent; the report is right
+once it has. A laptop clock that is slow puts its breaks earlier than they
+were (a fast one is caught).
+
+**Tested.** Server: `BreaksTests` (15, against the database): Break in and
+out, a resend, an end that arrives first, a fast clock, the four refusals, a
+new break ending an open one, signing in again and signing out ending a break,
+a break queued under an earlier sign-in, today's total, the monitor's four
+states, the report against the allowance, a break over midnight, the list's
+paging and the CSV, a backwards period, and the doors (an agent cannot read
+the monitor, a supervisor takes no breaks). `BreakClockTests` (8) for the end
+rules alone. `SchemaTests`, `SeedTests` and `SettingsCatalogTests` know the
+table and the setting, and `TestSweeper` removes the tests' breaks. Server
+suite: **609 passed** against `callcenter_test`. Agent App:
+`BreakServiceTests` (7): do not disturb on and off, the total counting on
+from the server's, the allowance warning without stopping, the buffer with
+the server down and the send when it is back, a 401 not queued, a sign-in
+after a crash turning do not disturb off, and a hand-set one left alone.
+Agent App suite **78 passed**; label tests (Shared) **163 passed**. Web:
+`BreaksPage.test.tsx` (4); the web app's **208 tests**, lint and the
+production build pass. **Not yet seen** in either app.
+
+**To deploy:** server and web, with a migration (`AddAgentBreaks`, a new
+empty table), and **the Agent App on every laptop**: an old Agent App has
+no button, and the page then shows its agents as working.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -8140,6 +8246,7 @@ running**.
 | The upload queue's set-aside items: a way to clear one, or pass it to a supervisor. Today Try again is the only action, and a call refused as `extension_not_yours` is refused again | A-04 | Dia's call |
 | `CallService`'s state rules have no automated test (27 Sep entry, F-09) | A-12 | pulling the state machine out of `CallService` into something that can be built without SIPSorcery and a sound card |
 | Drop the SQLitePCLRaw pin in `Directory.Packages.props` and the Agent App's explicit reference to it: EF Core 10.0.12 asks for 2.1.12 itself | — | the Agent App's project file, next time it is open |
+| **Breaks: Break in / Break out, the monitor and the report** | A-86, S-66, R-22 | **built 1 Oct, not yet seen running**: checklist "Breaks", screenshots of the rail and the Breaks page in both languages. Then a release with the Agent App on every laptop |
 | Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
 | The supervisor's call search, playing and downloading a recording | S-02, S-03, S-04 | **built 24 Sep**; no entry here records a recording heard in the browser yet |
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |

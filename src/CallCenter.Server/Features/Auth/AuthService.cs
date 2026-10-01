@@ -146,6 +146,9 @@ public class AuthService(
                 "Agent {Login} signed in from {LaptopId}: closed session {SessionId} on {OtherLaptopId} ({Reason})",
                 user.Login, laptopId, other.Id, other.LaptopId, other.LogoutReason);
         }
+
+        // A-86: a break left going on those laptops ends with them.
+        await Breaks.BreakClock.CloseForSessionsAsync(db, open.Select(s => s.Id).ToList(), now, ct);
     }
 
     /// <summary>
@@ -164,6 +167,10 @@ public class AuthService(
 
         session.LoggedOutAt = DateTimeOffset.UtcNow;
         session.LogoutReason = LogoutReasons.All.Contains(reason) ? reason : LogoutReasons.Manual;
+
+        // A-86: the app ends a break before it signs out; this is for the one
+        // whose Break out could not be sent first.
+        await Breaks.BreakClock.CloseForSessionsAsync(db, [session.Id], session.LoggedOutAt.Value, ct);
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Session {SessionId} closed: {Reason}", sessionId, session.LogoutReason);

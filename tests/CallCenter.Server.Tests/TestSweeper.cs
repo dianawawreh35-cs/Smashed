@@ -160,6 +160,7 @@ public static class TestSweeper
             UPDATE classifications SET updated_by = NULL WHERE updated_by IN (SELECT id FROM sweep_users);
             UPDATE classifications SET resolved_by = NULL WHERE resolved_by IN (SELECT id FROM sweep_users);
             DELETE FROM audit_log WHERE user_id IN (SELECT id FROM sweep_users);
+            DELETE FROM agent_breaks WHERE user_id IN (SELECT id FROM sweep_users);
             DELETE FROM agent_sessions WHERE user_id IN (SELECT id FROM sweep_users);
             DELETE FROM outbox_sync WHERE user_id IN (SELECT id FROM sweep_users);
             """, ct);

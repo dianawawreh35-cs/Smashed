@@ -148,6 +148,8 @@ try
     builder.Services.AddScoped<CallEditWindow>();
     builder.Services.AddScoped<DeliveryAreasService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Mistakes.MistakesService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Mistakes.MistakeReportsService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Breaks.BreaksService>();
     builder.Services.AddOptions<MenuImageOptions>()
         .Bind(builder.Configuration.GetSection(MenuImageOptions.SectionName))
         .ValidateDataAnnotations();

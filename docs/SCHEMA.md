@@ -485,6 +485,26 @@ CREATE TABLE agent_sessions (
 );
 CREATE INDEX ix_sessions_user ON agent_sessions(user_id, logged_in_at DESC);
 
+CREATE TABLE agent_breaks (         -- A-86: each break, Break in to Break out; migration AddAgentBreaks (1 Oct 2026)
+  id          uuid PRIMARY KEY,                           -- made by the Agent App, so a resend is the same row
+  user_id     uuid NOT NULL REFERENCES users(id),
+  session_id  uuid REFERENCES agent_sessions(id) ON DELETE SET NULL,  -- the sign-in it was taken under
+  started_at  timestamptz NOT NULL,
+  ended_at    timestamptz,                                -- NULL while going, or until the server works the end out
+  ended_by    text,                                       -- BreakOut, SignedOut (sent by the app); SessionEnded, NotHeard (the server's)
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_agent_breaks_ended_by CHECK (ended_by IN ('BreakOut','SignedOut','SessionEnded','NotHeard')),
+  CONSTRAINT ck_agent_breaks_end CHECK ((ended_at IS NULL) = (ended_by IS NULL) AND (ended_at IS NULL OR ended_at >= started_at))
+);
+CREATE INDEX ix_agent_breaks_user    ON agent_breaks(user_id, started_at DESC);
+CREATE INDEX ix_agent_breaks_started ON agent_breaks(started_at);
+CREATE INDEX ix_agent_breaks_session_id ON agent_breaks(session_id);
+-- A break with no end takes it from its sign-in (BreakClock): when the sign-in ended (SessionEnded),
+-- or when the app was last heard from if that was more than five minutes earlier (NotHeard).
+-- The server writes that end in when the sign-in closes, or when the agent starts another break.
+-- A break over midnight counts on each day for its own part of it.
+
 CREATE TABLE audit_log (
   id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   at           timestamptz NOT NULL DEFAULT now(),
@@ -518,7 +538,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 - form_definitions v1: the JSON above without the `reason` field (direction `In`)
 - form_definitions, outbound: `type`, `notes`, `follow_up` (direction `Out`), numbered after whatever exists. The migration `FormPerDirection` adds it to a database that predates it.
 - form_definitions, applications: a copy of v1 (direction `None`), for messages (A-70). The migration `FormForApplications` adds it to a database that predates it.
-- settings: `recording.retention_days=90`, `agent.call_log_days=7`, `pos.lookup.interval_minutes=5`, `agent.idle_logout_minutes=240`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `queue.auto_open_time=07:00` (`SeedData.Settings`). These nine are also the whole settings catalogue (`SettingsCatalog`, S-47): the only keys the supervisor may change, and any other key is refused.
+- settings: `recording.retention_days=90`, `agent.call_log_days=7`, `pos.lookup.interval_minutes=5`, `breaks.daily_limit_minutes=60` (A-86, added 1 Oct 2026), `agent.idle_logout_minutes=240`, `agent.edit_window=SameDay`, `sla.answer_seconds=20`, `pbx.host=`, `reports.internal_numbers=`, `queue.auto_open_time=07:00` (`SeedData.Settings`). These ten are also the whole settings catalogue (`SettingsCatalog`, S-47): the only keys the supervisor may change, and any other key is refused.
   - The server also keeps its own state in `settings`, outside the catalogue and not seeded; each row is written the first time the feature saves it:
     - `pbx.calls.*` (the abandoned-call import, S-55): `url`, `username`, `password` (encrypted with the SIP-secret key), `interval_minutes`, `last_checked_at`, `last_succeeded_at`, `last_error`, `last_added`, `synced_through`.
     - `pbx.features.*` (the server's own PBX extension, which places the `*30`/`*31` and `*280` feature-code calls): `extension`, `secret` (encrypted with the SIP-secret key).
@@ -557,6 +577,7 @@ CREATE TABLE outbox_sync (          -- server-side record of Agent App offline u
 | R‑17 complaint handling | classifications.resolved_at, follow_up_tasks |
 | R‑18 data quality | communications without classification / contact; contact_phones duplicates |
 | R‑20/21 abandoned, SLA | communications(status, wait_sec) |
+| R‑22 breaks, S‑66 break monitor | agent_breaks ⨝ agent_sessions ⨝ users |
 
 Every report resolves to these tables — nothing missing.
 
@@ -573,9 +594,9 @@ through an update. See `src/CallCenter.AgentApp/Data/README.md`.
 ```sql
 CREATE TABLE pending_uploads (
   "Id"          INTEGER PRIMARY KEY AUTOINCREMENT,  -- the replay order
-  "Kind"        TEXT NOT NULL,     -- Call | Classification | Notes | Recording
+  "Kind"        TEXT NOT NULL,     -- Call | Classification | Notes | Recording | Break (A-86, 1 Oct 2026)
   "Payload"     TEXT NOT NULL,     -- the request body as JSON; a recording's is its file path
-  "Reference"   TEXT,              -- SipCallId|Extension: the call it belongs to
+  "Reference"   TEXT,              -- SipCallId|Extension: the call it belongs to; break|{id} for a break
   "CreatedAt"   TEXT NOT NULL,
   "Attempts"    INTEGER NOT NULL,  -- failures that count towards setting it aside
   "LastError"   TEXT,              -- the server's code, or why it was set aside

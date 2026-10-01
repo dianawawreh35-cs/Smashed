@@ -108,11 +108,13 @@ public class SeedDataTests
             "agent.call_log_days",
             "pos.lookup.interval_minutes",
             "queue.auto_open_time",
+            "breaks.daily_limit_minutes",
         ]);
     }
 
     [Theory]
     [InlineData("recording.retention_days", "90")]   // A-33 / S-43
+    [InlineData("breaks.daily_limit_minutes", "60")] // A-86
     [InlineData("agent.idle_logout_minutes", "240")] // A-05, raised from 30 on 2026-09-21
     [InlineData("agent.edit_window", "SameDay")]     // A-42
     [InlineData("sla.answer_seconds", "20")]         // R-21

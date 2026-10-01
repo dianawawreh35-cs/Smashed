@@ -18,7 +18,7 @@ import type { Preset, ReportDraft } from '../lib/reportFilters'
 const PRESETS: Preset[] = ['today', 'week', 'month', 'custom']
 
 export function ReportFilterBar({
-  draft, set, choosePreset, includePhone = false, channels: showChannels = true, periodOnly = false,
+  draft, set, choosePreset, includePhone = false, channels: showChannels = true, periodOnly = false, agentOnly = false,
 }: {
   draft: ReportDraft
   set: <K extends keyof ReportDraft>(key: K) => (value: ReportDraft[K]) => void
@@ -28,14 +28,18 @@ export function ReportFilterBar({
   channels?: boolean
   /** The dashboard's charts take a period and nothing else (S-20). */
   periodOnly?: boolean
+  /** The break report takes a period and an agent (R-22): breaks have no branch, channel or type. */
+  agentOnly?: boolean
 }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
 
   const agents = useQuery({ queryKey: ['users'], queryFn: listUsers, enabled: !periodOnly })
-  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches, enabled: !periodOnly })
-  const channels = useQuery({ queryKey: ['channels', 'all'], queryFn: () => listChannels(true), enabled: showChannels && !periodOnly })
-  const types = useQuery({ queryKey: ['classification', 'types'], queryFn: listClassificationTypes, enabled: !periodOnly })
+  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches, enabled: !periodOnly && !agentOnly })
+  const channels = useQuery({
+    queryKey: ['channels', 'all'], queryFn: () => listChannels(true), enabled: showChannels && !periodOnly && !agentOnly,
+  })
+  const types = useQuery({ queryKey: ['classification', 'types'], queryFn: listClassificationTypes, enabled: !periodOnly && !agentOnly })
 
   return (
     <form className="card card-body space-y-4" aria-label={t('applicationReports.filters')} onSubmit={(e) => e.preventDefault()}>
@@ -65,7 +69,7 @@ export function ReportFilterBar({
           <input type="date" className="input" value={draft.to} disabled={draft.preset !== 'custom'}
             onChange={(e) => set('to')(e.target.value)} />
         </label>
-        {!periodOnly && showChannels && (
+        {!periodOnly && !agentOnly && showChannels && (
           <Select label={t('applicationReports.columns.channel')} value={draft.channelId} onChange={set('channelId')} choices={channels}>
             {(channels.data ?? []).filter((ch) => includePhone || !ch.isSystem).map((ch) => (
               <option key={ch.id} value={ch.id}>{ch.name}</option>
@@ -79,16 +83,20 @@ export function ReportFilterBar({
                 <option key={u.id} value={u.id}>{u.displayName}</option>
               ))}
             </Select>
-            <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
-              {(branches.data ?? []).map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </Select>
-            <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
-              {(types.data ?? []).map((ty) => (
-                <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
-              ))}
-            </Select>
+            {!agentOnly && (
+              <>
+                <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
+                  {(branches.data ?? []).map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </Select>
+                <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
+                  {(types.data ?? []).map((ty) => (
+                    <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
+                  ))}
+                </Select>
+              </>
+            )}
           </>
         )}
       </div>

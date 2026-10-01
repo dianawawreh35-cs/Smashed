@@ -587,6 +587,43 @@ No phone needed. Restart the server first, so the `mistakes` table is made
       the Arabic names readable, the numbers with their leading 0, and every
       mistake that matches the filters, not only the page on screen.
 
+### 1.14 Breaks: who is on break, and the break report (S-66, R-22) — built 1 Oct, never run
+
+No phone needed, but an Agent App with the Break button (Round 2, "Break in
+and Break out"). Restart the server first, so the `agent_breaks` table is made
+(the migration runs on startup). Easiest with the web app and the Agent App
+side by side.
+
+- [ ] **The page.** As a supervisor, **Breaks** (الاستراحات) is in the sidebar
+      after Mistakes. The top card, **Now**, lists every active agent with
+      *Signed out* or *Working*, and says the daily allowance is 60 minutes.
+      Sign in to the web app as an agent instead: there is no Breaks page.
+- [ ] **Live.** Press **Break in** in the Agent App. Within ten seconds the
+      agent moves to the top with *On break* (amber), the time of this break
+      counting up every second, "since <time>", and **Break today** counting
+      with it. Press **Break out**: within ten seconds *Working*, and Break
+      today stops. **Screenshot the card during a break, in both languages.**
+      *If it never changes:* the Agent App is an old build (check the `bin`
+      date) or the break did not reach the server (its log says "queued").
+- [ ] **Over the allowance.** In **Settings**, set *Break allowance (minutes a
+      day)* to **1**, sign the agent out and in again, and take a break of
+      over a minute. Break today turns red, and **Over the allowance by**
+      shows the excess. Put the setting back to 60 afterwards.
+- [ ] **The report.** Below, the period buttons and an **Agent** box only (no
+      Branch, Channel or Type). *Break time per agent* shows today's breaks
+      in minutes with a bar chart; *per agent per day* one row per agent;
+      **Every break** each break with Break in, Break out, Length and *Break
+      out* as how it ended. Choose an agent: all three narrow to them.
+- [ ] **A break the app never ended.** Press Break in, then end the Agent App
+      from Task Manager. Within five minutes the card shows the agent as *App
+      not heard from*. Start the app and sign in: the break in **Every break**
+      now ends at about the moment the app was killed, as *App stopped* (or
+      *Sign-in ended* if you signed in again within five minutes), and the
+      agent is *Working*, not on break.
+- [ ] **Export.** **Export all N (CSV)** saves `breaks-<from>-<to>.csv`. Open it
+      in Excel: Arabic headings (English when the page is in English), the
+      names readable, the minutes as numbers, and every break in the period.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.
@@ -756,6 +793,43 @@ Paste each one into Notepad to check what was copied.
 - [ ] *(Needs the PBX.)* **The pop-up.** On a call, select the caller's
       number and name and copy them. While the text is selected, the call's
       keys still work: Ctrl+Shift+H holds, Ctrl+Shift+E hangs up.
+
+### Break in and Break out (A-86) — built 1 Oct, never run
+
+The server must be the 1 Oct build or later. A call is only needed for the
+last step.
+
+- [ ] **The button.** In the rail, between the phone's status and the Do not
+      disturb switch, a blue **Break in** (بدء الاستراحة), with *Break today:
+      0:00:00* and *Allowed: 60 minutes a day* under it. **Screenshot the rail
+      in both languages, at 1366 × 768**: nothing in the rail should be cut
+      off. *If a raw key such as `breaks.in` shows:* a label is missing.
+- [ ] **Break in.** Press it. The card turns amber, the button becomes a green
+      **Break out**, "On break since <time>" appears, Break today counts every
+      second, and **Do not disturb is ticked and greyed**: clicking it does
+      nothing. Auto answer is greyed too.
+- [ ] **Break out.** Press it. Do not disturb is unticked and can be clicked
+      again, and Break today stops where it was.
+- [ ] **It adds up.** Take a second break: Break today carries on from where
+      the first stopped, not from 0:00:00. Sign out and in again: it is still
+      there. *If it starts from zero after signing in:* the server could not
+      be asked (the log says "Today's break time could not be fetched").
+- [ ] **Over the allowance.** With the allowance set to 1 minute (Settings,
+      then sign out and in), take a break past a minute: a red line "You are
+      over your break time by 0:00:…" appears and grows. Break out, then Break
+      in again: the bar at the top says today's break time is used up, and
+      the break starts anyway.
+- [ ] **Signing out ends it.** Press Break in, then Log out: in the web app
+      the break ends as *Signed out*. Sign in again: not on break, and Do not
+      disturb is off.
+- [ ] **With the server stopped.** Stop the server, press Break in and, a
+      minute later, Break out: the app carries on as normal. Start the server:
+      within a minute the break appears on the Breaks page with the right
+      times. *If it never arrives:* the Agent App's log says why (look for
+      "Break" on the Logs page).
+- [ ] *(Needs the PBX.)* **No calls during a break.** On break, ring the
+      agent's extension: it does not ring, the call goes to the next agent,
+      and it is logged Missed, as Do not disturb always has (A-18).
 
 ### The log reaches the server (N-12) — built 27 Sep, never run
 

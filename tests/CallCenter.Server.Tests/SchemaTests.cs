@@ -48,7 +48,7 @@ public class SchemaTests
         "delivery_areas",
         "menu_categories", "menu_items",
         "mistakes",
-        "pbx_events_raw", "pbx_blacklist", "agent_sessions", "audit_log", "outbox_sync",
+        "pbx_events_raw", "pbx_blacklist", "agent_sessions", "agent_breaks", "audit_log", "outbox_sync",
     ];
 
     [Fact]
@@ -102,6 +102,8 @@ public class SchemaTests
     [InlineData("mistakes", "ck_mistakes_responsible")]
     [InlineData("mistakes", "ck_mistakes_agent")]
     [InlineData("mistakes", "ck_mistakes_value")]
+    [InlineData("agent_breaks", "ck_agent_breaks_ended_by")]
+    [InlineData("agent_breaks", "ck_agent_breaks_end")]
     public void Check_constraints_from_the_schema_are_present(string table, string constraint)
     {
         var entity = Model.GetEntityTypes().Single(e => e.GetTableName() == table);
@@ -117,6 +119,7 @@ public class SchemaTests
     [InlineData("follow_up_tasks", "ck_follow_up_tasks_status", new[] { TaskStatuses.Open, TaskStatuses.Done, TaskStatuses.Cancelled })]
     [InlineData("contacts", "ck_contacts_source", new[] { Data.Entities.ContactSources.Seed, Data.Entities.ContactSources.Agent, Data.Entities.ContactSources.Pos })]
     [InlineData("mistakes", "ck_mistakes_responsible", new[] { MistakeResponsibilities.Branch, MistakeResponsibilities.Agent })]
+    [InlineData("agent_breaks", "ck_agent_breaks_ended_by", new[] { BreakEndings.BreakOut, BreakEndings.SignedOut, BreakEndings.SessionEnded, BreakEndings.NotHeard })]
     public void Check_constraints_allow_exactly_the_documented_values(
         string table, string constraint, string[] expected)
     {
@@ -191,9 +194,9 @@ public class SchemaTests
     public void Guid_primary_keys_default_to_gen_random_uuid()
     {
         // The exceptions are keys the application supplies: a classification is
-        // keyed by its communication, and an outbox row by the id the laptop
-        // generated.
-        string[] applicationSupplied = ["classifications", "outbox_sync"];
+        // keyed by its communication, and an outbox row and a break (A-86) by
+        // the id the laptop generated.
+        string[] applicationSupplied = ["classifications", "outbox_sync", "agent_breaks"];
 
         foreach (var entity in Model.GetEntityTypes())
         {

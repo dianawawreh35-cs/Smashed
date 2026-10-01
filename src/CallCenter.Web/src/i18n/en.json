@@ -23,7 +23,8 @@
     "agentApp": "Agent App",
     "logs": "Logs",
     "label": "Sections",
-    "mistakes": "Mistakes"
+    "mistakes": "Mistakes",
+    "breaks": "Breaks"
   },
   "login": {
     "heading": "Sign in",
@@ -292,6 +293,10 @@
       "queue.auto_open_time": {
         "label": "Queue opens daily at",
         "hint": "The server opens the call queue by itself at this time every day, 24-hour, e.g. 07:00. Blank turns it off. Skipped on a day someone has already switched the queue after this time, and never more than an hour late."
+      },
+      "breaks.daily_limit_minutes": {
+        "label": "Break allowance (minutes a day)",
+        "hint": "How many minutes of break an agent has each day. Nothing stops at it: past it, the Agent App warns the agent and the Breaks page shows by how much, in red. 60 by default, 1 to 600. Agents get a new value when they next sign in."
       }
     },
     "pbx": {
@@ -1119,6 +1124,74 @@
     "unfold_one": "1 more line",
     "unfold_other": "{{count}} more lines",
     "fold": "Show less"
+  },
+  "breaks": {
+    "heading": "Breaks",
+    "intro": "Who is on break now, and how long each agent's breaks ran on any day. Agents press Break in and Break out in the Agent App; a break turns Do not disturb on until it ends.",
+    "since": "since {{time}}",
+    "now": {
+      "title": "Now",
+      "hint": "On break now: {{count}}. The daily allowance is {{minutes}} minutes, set in Settings; past it, the time turns red. Nothing stops a break.",
+      "hintLoading": "Every active agent, and their break time today.",
+      "failed": "Who is on break could not be loaded.",
+      "stale": "The latest update could not be loaded; these figures may be out of date.",
+      "empty": "There are no active agents."
+    },
+    "states": {
+      "OnBreak": "On break",
+      "Working": "Working",
+      "NotHeard": "App not heard from",
+      "SignedOut": "Signed out"
+    },
+    "columns": {
+      "agent": "Agent",
+      "state": "Now",
+      "thisBreak": "This break",
+      "today": "Break today",
+      "breaks": "Breaks",
+      "over": "Over the allowance by",
+      "minutes": "Break time (minutes)",
+      "days": "Days with a break",
+      "daysOver": "Days over the allowance",
+      "overMinutes": "Over the allowance (minutes)",
+      "day": "Day",
+      "in": "Break in",
+      "out": "Break out",
+      "length": "Length",
+      "endedBy": "Ended by"
+    },
+    "perAgent": {
+      "title": "Break time per agent",
+      "hint": "Every break in the period. A day counts as over when the agent's breaks that day add up to more than {{minutes}} minutes."
+    },
+    "perDay": {
+      "title": "Break time per agent per day",
+      "hint": "Each day's breaks added up. A break over midnight counts on each day for its own part."
+    },
+    "list": {
+      "title": "Every break",
+      "hint": "Newest first. A break the Agent App never ended takes its end from the sign-in it was taken under.",
+      "count_one": "1 break",
+      "count_other": "{{count}} breaks",
+      "export": "Export all {{count}} (CSV)",
+      "exporting": "Exporting…",
+      "exportFailed": "The export failed.",
+      "failed": "The breaks could not be loaded.",
+      "empty": "No breaks in this period."
+    },
+    "endedBy": {
+      "going": "Still on break",
+      "BreakOut": "Break out",
+      "SignedOut": "Signed out",
+      "SessionEnded": "Sign-in ended",
+      "NotHeard": "App stopped"
+    },
+    "endedByHint": {
+      "BreakOut": "The agent pressed Break out.",
+      "SignedOut": "The agent signed out, or closed the Agent App, during the break.",
+      "SessionEnded": "The agent signed in again, here or on another laptop, without ending the break; it ended then.",
+      "NotHeard": "The Agent App stopped being heard from during the break (a crash, the power, the network); it ended when it was last heard from."
+    }
   },
   "mistakes": {
     "heading": "Mistakes",

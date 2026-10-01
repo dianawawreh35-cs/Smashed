@@ -132,7 +132,8 @@
         "Call": "Call",
         "Classification": "Classification",
         "Notes": "Note",
-        "Recording": "Recording"
+        "Recording": "Recording",
+        "Break": "Break"
       },
       "reason": {
         "notYours": "Logged under another agent's extension",
@@ -252,6 +253,18 @@
     "autoAnswerHint": "Calls are picked up as soon as they arrive, without pressing Answer.",
     "extension": "Extension:",
     "noExtension": "No extension configured — ask your supervisor"
+  },
+  "breaks": {
+    "in": "Break in",
+    "out": "Break out",
+    "inHint": "Starts your break and turns on Do not disturb, so no calls reach you until you end it.",
+    "outHint": "Ends your break and turns Do not disturb off, so calls reach you again.",
+    "today": "Break today: {time}",
+    "limit": "Allowed: {minutes} minutes a day",
+    "since": "On break since {time}",
+    "overLimit": "You are over your break time by {time}",
+    "overLimitNotice": "You have used all of today's break time. This break counts as extra.",
+    "notKept": "This break could not be saved on this laptop or sent to the server. Tell your supervisor."
   },
   "login": {
     "heading": "Sign in",

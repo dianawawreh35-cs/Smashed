@@ -31,11 +31,20 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
 
         /// <summary>Pick up an incoming call without pressing Answer (A-18).</summary>
         public bool AutoAnswer { get; init; }
+
+        /// <summary>
+        /// Do not disturb was turned on by Break in (A-86) and Break out has not
+        /// turned it off yet. Set only while a break is going; found set at the
+        /// next sign-in, it means the app stopped during a break, and that
+        /// sign-in turns do not disturb off again.
+        /// </summary>
+        public bool BreakTurnedOnDoNotDisturb { get; init; }
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    private readonly string _path = Path.Combine(App.AppDataDirectory, "settings.json");
+    /// <summary>The file. A property so the tests can keep it away from the real one.</summary>
+    internal string FilePath { get; init; } = Path.Combine(App.AppDataDirectory, "settings.json");
 
     private Settings? _cached;
 
@@ -48,14 +57,14 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
 
         try
         {
-            Directory.CreateDirectory(App.AppDataDirectory);
-            File.WriteAllText(_path, JsonSerializer.Serialize(_cached, JsonOptions));
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(_cached, JsonOptions));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Not being able to remember the username is an annoyance, not a
             // reason to stop the agent from working.
-            logger.LogWarning(ex, "Could not save laptop settings to {Path}", _path);
+            logger.LogWarning(ex, "Could not save laptop settings to {Path}", FilePath);
         }
     }
 
@@ -63,13 +72,13 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
     {
         try
         {
-            return File.Exists(_path)
-                ? JsonSerializer.Deserialize<Settings>(File.ReadAllText(_path)) ?? new Settings()
+            return File.Exists(FilePath)
+                ? JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath)) ?? new Settings()
                 : new Settings();
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
-            logger.LogWarning(ex, "Laptop settings at {Path} could not be read; using defaults.", _path);
+            logger.LogWarning(ex, "Laptop settings at {Path} could not be read; using defaults.", FilePath);
             return new Settings();
         }
     }

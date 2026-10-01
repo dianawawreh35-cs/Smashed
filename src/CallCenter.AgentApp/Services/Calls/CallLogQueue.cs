@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using CallCenter.AgentApp.Data;
+using CallCenter.Shared.Contracts.Breaks;
 using CallCenter.Shared.Contracts.Classifications;
 using CallCenter.Shared.Contracts.Communications;
 using Microsoft.EntityFrameworkCore;
@@ -134,6 +135,22 @@ public class CallLogQueue(
             $"{recording.SipCallId}|{recording.Extension}",
             JsonSerializer.Serialize(recording),
             "A recording",
+            ct);
+
+    /// <summary>
+    /// Adds a break the server could not be told about (A-86). False if it
+    /// could not be written.
+    /// </summary>
+    /// <remarks>
+    /// Replaces one already queued for the same break: it is sent whole, so its
+    /// Break out holds everything its Break in did.
+    /// </remarks>
+    public Task<bool> EnqueueAsync(PendingBreak pendingBreak, CancellationToken ct = default) =>
+        UpsertAsync(
+            PendingUploadKinds.Break,
+            PendingBreak.ReferenceOf(pendingBreak.Id),
+            JsonSerializer.Serialize(pendingBreak),
+            "A break",
             ct);
 
     /// <summary>
@@ -305,17 +322,22 @@ public class CallLogQueue(
                 JsonSerializer.Deserialize<PendingRecording>(row.Payload) is { } recording
                     ? item with { Recording = recording }
                     : null,
+            PendingUploadKinds.Break =>
+                JsonSerializer.Deserialize<PendingBreak>(row.Payload) is { Request: not null } pendingBreak
+                    ? item with { Break = pendingBreak }
+                    : null,
             _ => null,
         };
     }
 
-    /// <summary>One queued thing: exactly one of the four is set.</summary>
+    /// <summary>One queued thing: exactly one of the five is set.</summary>
     public record PendingItem(
         long Id,
         LogCallRequest? Call,
         SaveClassificationByCallRequest? Classification,
         SaveCallNotesByCallRequest? Notes = null,
-        PendingRecording? Recording = null)
+        PendingRecording? Recording = null,
+        PendingBreak? Break = null)
     {
         /// <summary>The call it belongs to, as <c>SipCallId|Extension</c>.</summary>
         public string? Reference { get; init; }
@@ -629,3 +651,12 @@ public class CallLogQueue(
 /// <param name="Number">The customer's number, for a call; null for the rest.</param>
 /// <param name="Reason">The server's code, or why the app gave up.</param>
 public record SetAsideItem(long Id, string Kind, string? Number, DateTimeOffset QueuedAt, string? Reason);
+
+/// <summary>
+/// A break waiting in the buffer (A-86): its id, made on this laptop, and the
+/// request as it stood when it was last changed.
+/// </summary>
+public record PendingBreak(Guid Id, SaveBreakRequest Request)
+{
+    public static string ReferenceOf(Guid id) => $"break|{id}";
+}

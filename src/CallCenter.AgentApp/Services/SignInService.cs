@@ -19,6 +19,7 @@ public class SignInService(
     CallService calls,
     CallLogReporter callLog,
     ClassificationCatalog classification,
+    BreakService breaks,
     ILogger<SignInService> logger)
 {
     /// <summary>
@@ -94,6 +95,10 @@ public class SignInService(
         // every one of them had gone.
         await classification.LoadAsync(ct);
 
+        // A-86: today's break time so far, for the rail's timer, and the do
+        // not disturb a break left on if the app stopped during one.
+        await breaks.LoadAsync(ct);
+
         // Anything this agent's last shift could not send (A-04, A-14), in the
         // background: the agent is in, and the queue catches up behind them.
         callLog.FlushInBackground();
@@ -123,6 +128,10 @@ public class SignInService(
         // take it away, so this laptop only stops. Nor is there a session to
         // close.
         var elsewhere = reason == LogoutReasons.SignedInElsewhere;
+
+        // A-86: a break ends with the sign-in, and do not disturb with it.
+        // First, while the server still takes this sign-in's token.
+        await breaks.EndForSignOutAsync(ct);
 
         // Unregister first, so the PBX stops offering calls to this laptop
         // before the agent is told they are signed out. Then end anything still

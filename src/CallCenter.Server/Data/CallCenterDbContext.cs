@@ -51,6 +51,9 @@ public partial class CallCenterDbContext(DbContextOptions<CallCenterDbContext> o
     /// <summary>Mistakes made by a branch or an agent, as the supervisor records them (S-65).</summary>
     public DbSet<Mistake> Mistakes => Set<Mistake>();
 
+    /// <summary>Agents' breaks, Break in to Break out (A-86).</summary>
+    public DbSet<AgentBreak> AgentBreaks => Set<AgentBreak>();
+
     // Plumbing and audit
     public DbSet<PbxEventRaw> PbxEventsRaw => Set<PbxEventRaw>();
     public DbSet<PbxBlacklistEntry> PbxBlacklist => Set<PbxBlacklistEntry>();

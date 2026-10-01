@@ -140,6 +140,50 @@ public static class MistakeResponsibilities
     public static readonly IReadOnlyList<string> All = new[] { Branch, Agent };
 }
 
+/// <summary><c>agent_breaks.ended_by</c>: how an agent's break came to an end (A-86).</summary>
+public static class BreakEndings
+{
+    /// <summary>The agent pressed Break out.</summary>
+    public const string BreakOut = "BreakOut";
+
+    /// <summary>The agent signed out, or closed the app, while on break; the app ended it.</summary>
+    public const string SignedOut = "SignedOut";
+
+    /// <summary>
+    /// The sign-in it was taken under ended without the app saying so: the
+    /// agent signed in again, on this laptop or another, or a supervisor reset
+    /// the password. It ends when that sign-in did.
+    /// </summary>
+    public const string SessionEnded = "SessionEnded";
+
+    /// <summary>
+    /// The app stopped being heard from (a crash, a flat battery, the network)
+    /// and its sign-in ended later. It ends when the app was last heard from.
+    /// </summary>
+    public const string NotHeard = "NotHeard";
+
+    public static readonly IReadOnlyList<string> All = new[] { BreakOut, SignedOut, SessionEnded, NotHeard };
+
+    /// <summary>The two an Agent App may send; the other two are the server's own conclusions.</summary>
+    public static readonly IReadOnlyList<string> FromApp = new[] { BreakOut, SignedOut };
+}
+
+/// <summary>Where an agent stands on the break monitor (S-66). Not stored.</summary>
+public static class BreakStates
+{
+    /// <summary>Signed in, heard from, not on break.</summary>
+    public const string Working = "Working";
+
+    /// <summary>On break now.</summary>
+    public const string OnBreak = "OnBreak";
+
+    /// <summary>Signed in, but the app has not been heard from for five minutes (S-20).</summary>
+    public const string NotHeard = "NotHeard";
+
+    /// <summary>Not signed in to the Agent App.</summary>
+    public const string SignedOut = "SignedOut";
+}
+
 /// <summary><c>pbx_events_raw.source</c>.</summary>
 public static class PbxEventSources
 {

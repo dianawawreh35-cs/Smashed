@@ -61,6 +61,7 @@
           <CheckBox Content="{Binding Localizer[home.doNotDisturb]}"
                     Style="{StaticResource Switch}"
                     IsChecked="{Binding DoNotDisturb, Mode=TwoWay}"
+                    IsEnabled="{Binding DoNotDisturbEditable}"
                     ToolTip="{Binding Localizer[home.doNotDisturbHint]}" />
           <CheckBox Content="{Binding Localizer[home.autoAnswer]}"
                     Style="{StaticResource Switch}"
@@ -69,6 +70,60 @@
                     ToolTip="{Binding Localizer[home.autoAnswerHint]}"
                     Margin="0,10,0,0" />
         </StackPanel>
+
+        <!-- The break (A-86). Break in turns do not disturb on, below, and holds
+             it there; Break out turns it off. The time is the day's, counting
+             on from the last break. Past the day's allowance it says by how
+             much, in red, and Break in still works (Dia, 1 Oct 2026). -->
+        <Border DockPanel.Dock="Bottom"
+                Margin="14,0,14,12"
+                Padding="12,10"
+                CornerRadius="{StaticResource CornerSmall}">
+          <Border.Style>
+            <Style TargetType="Border">
+              <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding OnBreak}" Value="True">
+                  <Setter Property="Background" Value="{StaticResource WarningDim}" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
+          <StackPanel>
+            <Button Content="{Binding BreakButtonText}"
+                    Style="{StaticResource PrimaryButton}"
+                    Command="{Binding ToggleBreakCommand}"
+                    Visibility="{Binding OnBreak, Converter={StaticResource InverseBoolToVisibility}}"
+                    ToolTip="{Binding Localizer[breaks.inHint]}"
+                    HorizontalAlignment="Stretch" />
+            <Button Content="{Binding BreakButtonText}"
+                    Style="{StaticResource SuccessButton}"
+                    Command="{Binding ToggleBreakCommand}"
+                    Visibility="{Binding OnBreak, Converter={StaticResource BoolToVisibility}}"
+                    ToolTip="{Binding Localizer[breaks.outHint]}"
+                    HorizontalAlignment="Stretch" />
+            <TextBlock Text="{Binding BreakSinceText}"
+                       Foreground="{StaticResource WarningText}"
+                       FontWeight="SemiBold"
+                       FontSize="12"
+                       Margin="0,8,0,0"
+                       Visibility="{Binding OnBreak, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock Text="{Binding BreakTotalText}"
+                       FontSize="12"
+                       Margin="0,6,0,0" />
+            <TextBlock Text="{Binding BreakLimitText}"
+                       Style="{StaticResource Subtle}"
+                       FontSize="11"
+                       Margin="0,2,0,0" />
+            <TextBlock Text="{Binding OverLimitText}"
+                       Foreground="{StaticResource DangerText}"
+                       FontWeight="SemiBold"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       Margin="0,6,0,0"
+                       Visibility="{Binding IsOverLimit, Converter={StaticResource BoolToVisibility}}" />
+          </StackPanel>
+        </Border>
 
         <!-- The phone, always visible. An agent should never have to go looking
              for whether calls can reach them (A-02, N-04a). -->

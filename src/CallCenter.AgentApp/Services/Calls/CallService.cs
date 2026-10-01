@@ -1314,14 +1314,12 @@ public class CallService(
             // "not this line", which is precisely what is being said.
             Decline(request, SIPResponseStatusCodesEnum.BusyHere, "do not disturb");
 
-            // Reported as Busy, like a second call: from the caller's side the
-            // two are the same event, and the reports should not show an agent
-            // who stepped away as having rejected a customer.
-            var refusedAt = DateTimeOffset.Now;
-            Report(new FinishedCall(
-                request.Header?.CallId ?? Guid.NewGuid().ToString(),
-                caller, identity.DisplayName, queue, CallOutcome.Busy, refusedAt, null, refusedAt));
-
+            // Not reported (Dia, 1 Oct). The server has no Busy, so a report
+            // landed as Missed against an agent who had stepped away, once for
+            // every pass of the queue during a break (A-86). The queue moves
+            // on: another agent's row counts the customer if they answer, the
+            // abandoned-call import (S-55) if nobody does. The log line above
+            // is the only trace.
             return;
         }
 

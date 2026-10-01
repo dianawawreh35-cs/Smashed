@@ -8269,6 +8269,64 @@ the browser.
 
 **To deploy:** server and web; no migration, no Agent App change.
 
+## 2026-10-01 — Do not disturb no longer logs a Missed call (A-18)
+
+**In plain terms.** Dia: "why it counts missed call on dnd while it doesnt even
+show to the agent". A call turned away by Do not disturb was sent to the server
+as a call, and the server filed it **Missed** against that agent. It now sends
+nothing. The call still never rings or shows, and the PBX still moves on to the
+next agent.
+
+**Why it was wrong.** The app recorded the refusal as `Busy`, and the comment
+said that was so the reports would not blame an agent who had stepped away.
+But the server has no Busy, so `CallLogReporter` sent it as Missed, and the
+missed-call figures, the agent's figures (R-15) and the missed-call list all
+counted it (the 26 Sep note above even said so). Breaks (A-86) made it much
+worse: a break turns Do not disturb on, and the queue offers a waiting customer
+to each agent in turn every 6–7 s, so one customer could add several Missed
+rows to the agent on break, often for a call a colleague then answered.
+
+**Decided without asking (Dia asked for the fix, not the option):** not
+reported at all, rather than a new status. The customer is still counted once:
+by the agent who answers, or as an abandoned call from the PBX import (S-55)
+if nobody does. A new status ("Away") would need a shared constant, a database
+check-constraint change, the reports and both languages, for a record nobody
+acts on. The log line `turned away: do not disturb is on` is the only trace.
+A second call during a call is still reported Missed (unchanged): that agent
+is at their desk and the caller rang them directly.
+
+**Rows already logged** before this stay Missed until cleared with
+[`tools/clear-dnd-missed/clear.sql`](../tools/clear-dnd-missed/clear.sql).
+They can be told apart: a refusal was saved with its start and end at the
+same instant, and the only other row saved that way, a second call during a
+call, falls inside another of the same extension's calls (DND is only asked
+when the line is free). The shortest real missed ring in the development
+database is 2 s. Rows with a classification, a follow-up or a note are left
+alone. The script only looks unless given `-v apply=yes`, and copies every
+row it clears into `cleared_dnd_missed` first. Development database, looking
+only: 19 zero-length Missed rows, 18 DND (all extension 2001, 22–27 Sep), 1 a
+second call, none with anything attached. **The restaurant's server, looking
+only (1 Oct, evening):** 144 DND rows, from 27 Sep to 1 Oct: 2008 49, 2009 36,
+2001 36, 2010 15, 2007 8. The other 32 Missed rows are real rings (shortest
+0.4 s), and there were no second-call rows and nothing attached. **Run with
+apply on the server by Dia, 1 Oct evening: 144 cleared**, all 144 in
+`cleared_dnd_missed`, none left. Answered, Abandoned, Rejected and the 32 real
+Missed rows unchanged. Until the new Agent App is on every laptop, DND adds
+new rows; run it again after the update.
+
+**144 rows is not 144 customers.** Dia: "we received 69 calls including 5
+abandon" on 1 Oct, and the server agrees: 64 Answered + 5 Abandoned. That day
+had 67 DND rows from only 26 numbers. 64 of them belong to a customer that
+another agent answered within 3 minutes, and 2 are rings of an abandoned call.
+Each queue retry is a new INVITE with its own Call-ID, so each one became a
+row. One customer made 9 rows in 20 s across 2001 and 2009: on a 486 the queue
+tries the next member at once.
+
+**Tested.** Agent App 79 of 79. No test covered what a refusal reports; this
+one is checklist step "No calls during a break", which now expects no row.
+
+**To deploy:** Agent App only.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

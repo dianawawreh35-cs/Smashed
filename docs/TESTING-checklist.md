@@ -856,7 +856,8 @@ last step.
       "Break" on the Logs page).
 - [ ] *(Needs the PBX.)* **No calls during a break.** On break, ring the
       agent's extension: it does not ring, the call goes to the next agent,
-      and it is logged Missed, as Do not disturb always has (A-18).
+      and **nothing is logged for the agent on break**: no Missed row on the
+      Calls page or in their call log (A-18, changed 1 Oct).
 
 ### The log reaches the server (N-12) — built 27 Sep, never run
 

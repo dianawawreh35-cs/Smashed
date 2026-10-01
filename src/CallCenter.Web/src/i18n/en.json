@@ -662,12 +662,18 @@
       "orderValue": "Order value",
       "duration": "Duration",
       "recording": "Recording",
+      "classification": "Classified",
       "notes": "Notes"
     },
     "directions": {
       "In": "Incoming",
       "Out": "Outgoing",
       "None": "—"
+    },
+    "classification": {
+      "yes": "Classified",
+      "no": "Not classified",
+      "noHint": "Answered, and nobody has filled in the classification yet."
     },
     "recording": {
       "yes": "Recorded",

@@ -257,6 +257,7 @@ export default function CallsPage() {
                 <th>{t('calls.columns.orderValue')}</th>
                 <th>{t('calls.columns.duration')}</th>
                 <th>{t('calls.columns.recording')}</th>
+                <th>{t('calls.columns.classification')}</th>
                 <th>{t('calls.columns.notes')}</th>
                 <th />
               </tr>
@@ -294,7 +295,7 @@ export default function CallsPage() {
 }
 
 /** The table's columns, counting the one for the Open button. */
-const COLUMNS = 12
+const COLUMNS = 13
 
 function Row({ row, open, onToggle }: { row: CallRow; open: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation()
@@ -327,6 +328,15 @@ function Row({ row, open, onToggle }: { row: CallRow; open: boolean; onToggle: (
           <span className="badge-ok">{t('calls.recording.yes')}</span>
         ) : row.recordingExpired ? (
           <span className="badge-muted">{t('calls.recording.expiredShort')}</span>
+        ) : null}
+      </td>
+      {/* Only an answered call is classified (A-40): a missed or abandoned
+          one had no conversation, so it shows nothing rather than work owed. */}
+      <td>
+        {row.isClassified ? (
+          <span className="badge-ok">{t('calls.classification.yes')}</span>
+        ) : row.status === 'Answered' ? (
+          <span className="badge-warn" title={t('calls.classification.noHint')}>{t('calls.classification.no')}</span>
         ) : null}
       </td>
       <td className="max-w-[16rem] truncate text-slate-400" title={row.notes ?? undefined}>{row.notes}</td>

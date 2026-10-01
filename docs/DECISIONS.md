@@ -8012,6 +8012,30 @@ seen working (delete the line, `docker compose up -d`).
 POS knows becomes a contact, and the message is attached to it. The server
 suite and the web app's checks pass. Released as `v0.7.1`; **not yet seen** on the server.
 
+## 2026-10-01 — The Calls page shows whether each call is classified
+
+Dia: "can we add classified or not indicator in webapp for call records".
+The page already had a Classified yes/no filter, and every row already
+carried `isClassified`; nothing showed it. A **Classified** column now sits
+after Recording:
+
+- **Classified**, green, when the call has a classification;
+- **Not classified**, amber (`badge-warn`, new), on an answered call without
+  one, with a tooltip saying so;
+- **nothing** on any other call. Only an answered call is classified (A-40):
+  a missed, rejected or abandoned call had no conversation, and marking it
+  "Not classified" would read as work owed that nobody can do, the same
+  reasoning as the agent's call log (A-41).
+
+The Applications page is unchanged: a message cannot be recorded without
+its classification. The filter still counts any call without one as "no",
+missed ones included; the column is the stricter of the two on purpose.
+
+**Tested:** `CallsPage.test.tsx` gains two: the three cases, and that the
+page asks for today when it opens. The web app's 200 tests, typecheck and
+lint pass.
+Released as `v0.7.2`; **not yet seen** in the browser.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

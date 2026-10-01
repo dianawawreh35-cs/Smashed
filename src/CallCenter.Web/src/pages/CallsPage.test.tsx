@@ -3,8 +3,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import CallsPage from './CallsPage'
+import type { CallRow } from '../api/calls'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
+import { localDate } from '../lib/reportFilters'
 
 /** The supervisor's call search and a call opened (S-02, S-03, S-04), against a stubbed `fetch`. */
 
@@ -44,6 +46,20 @@ const DETAILS = (row: typeof ROW) => ({
   extension: '2001',
   callNotes: null,
 })
+
+const BASE: Omit<CallRow, 'id' | 'contactName' | 'status' | 'isClassified'> = {
+  kind: 'Call', startedAt: '2026-10-01T10:00:00Z', direction: 'In',
+  agentId: 'a1', agentDisplayName: 'Sara', contactId: null, remoteNumberRaw: '0599000001',
+  branchId: null, branchName: null, typeName: null, typeLabelAr: null, typeLabelEn: null,
+  orderValue: null, durationSec: 60, notes: null, hasRecording: false, recordingExpired: false,
+  channelId: null, channelName: null,
+}
+
+const MIXED: CallRow[] = [
+  { ...BASE, id: 'c1', contactName: 'Classified one', status: 'Answered', isClassified: true },
+  { ...BASE, id: 'c2', contactName: 'Owed one', status: 'Answered', isClassified: false },
+  { ...BASE, id: 'c3', contactName: 'Missed one', status: 'Missed', isClassified: false, durationSec: null },
+]
 
 function jsonResponse(body: unknown, status = 200) {
   return {
@@ -105,6 +121,16 @@ function renderPage() {
 const searches = (fetchMock: ReturnType<typeof vi.fn>) =>
   fetchMock.mock.calls.map(([url]) => String(url))
     .filter((url) => url.startsWith('/api/communications/search') && !url.startsWith('/api/communications/search/export'))
+
+/** Three calls: classified, answered and not, and missed. */
+function mixedServer() {
+  return vi.fn().mockImplementation(async (url: string) =>
+    url.startsWith('/api/communications/search')
+      ? jsonResponse({ rows: MIXED, total: MIXED.length, page: 1, pageSize: 50 })
+      : jsonResponse([]))
+}
+
+const rowOf = async (name: string) => (await screen.findByText(name)).closest('tr')!
 
 beforeEach(async () => {
   setToken('supervisor-token')
@@ -261,5 +287,28 @@ describe('calls page', () => {
     // The whole result: no page, no page size.
     expect(query.has('page')).toBe(false)
     expect(query.has('pageSize')).toBe(false)
+  })
+
+  it('shows Classified, Not classified on an answered call, and nothing on a missed one', async () => {
+    vi.stubGlobal('fetch', mixedServer())
+    renderPage()
+
+    expect(within(await rowOf('Classified one')).getByText('Classified')).toBeTruthy()
+    expect(within(await rowOf('Owed one')).getByText('Not classified')).toBeTruthy()
+    const missed = await rowOf('Missed one')
+    expect(within(missed).queryByText('Classified')).toBeNull()
+    expect(within(missed).queryByText('Not classified')).toBeNull()
+  })
+
+  it('asks for today when it opens', async () => {
+    const fetchMock = server()
+    vi.stubGlobal('fetch', fetchMock)
+    renderPage()
+    await screen.findByText('Mahmoud')
+
+    const sent = new URL(String(fetchMock.mock.calls.find(([u]) => String(u).startsWith('/api/communications/search'))![0]), 'http://x')
+    const from = new Date(sent.searchParams.get('from')!)
+    expect(localDate(from)).toBe(localDate(new Date()))
+    expect(sent.searchParams.get('to')).toBeTruthy()
   })
 })

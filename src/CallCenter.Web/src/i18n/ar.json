@@ -682,12 +682,18 @@
       "orderValue": "قيمة الطلب",
       "duration": "المدة",
       "recording": "التسجيل",
+      "classification": "التصنيف",
       "notes": "ملاحظات"
     },
     "directions": {
       "In": "واردة",
       "Out": "صادرة",
       "None": "—"
+    },
+    "classification": {
+      "yes": "مصنّفة",
+      "no": "غير مصنّفة",
+      "noHint": "تم الرد عليها، ولم يُعبّأ تصنيفها بعد."
     },
     "recording": {
       "yes": "مسجّلة",

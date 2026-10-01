@@ -26,7 +26,8 @@ namespace CallCenter.AgentApp.Services;
 /// <para>
 /// <b>The limit warns, it never stops</b> (Dia, 1 Oct 2026): past
 /// <see cref="DailyLimitMinutes"/> the rail says by how much, and Break in
-/// still works.
+/// still works. The allowance is read at sign-in and again at every Break in,
+/// so a change in Settings reaches an agent already signed in.
 /// </para>
 /// <para>
 /// <b>Sent straight away, queued when that fails</b> (A-04). A break belongs to
@@ -75,8 +76,9 @@ public class BreakService(
     }
 
     /// <summary>
-    /// The minutes of break the agent has a day, as the server said at sign-in;
-    /// null when it could not be asked, and then nothing is warned about.
+    /// The minutes of break the agent has a day, as the server said at sign-in
+    /// or at the last Break in; null when it could not be asked, and then
+    /// nothing is warned about.
     /// </summary>
     public int? DailyLimitMinutes { get; private set; }
 
@@ -187,13 +189,26 @@ public class BreakService(
 
         logger.LogInformation("Break in ({BreakId}); {Total} of break today so far", id, TodayTotal());
 
+        // Do not disturb is on and the rail shows the break before anything
+        // waits on the network.
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        // The allowance as the supervisor has it in Settings now, not as it
+        // was at sign-in (Dia, 1 Oct). Kept as it was if the server cannot say.
+        var allowance = await api.GetMyBreaksTodayAsync(ct);
+
+        if (allowance.IsOk && allowance.Value is { } value && value.DailyLimitMinutes != DailyLimitMinutes)
+        {
+            logger.LogInformation("The break allowance is now {Minutes} minutes", value.DailyLimitMinutes);
+            DailyLimitMinutes = value.DailyLimitMinutes;
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+
         if (OverLimit() > TimeSpan.Zero)
         {
             // The rail says by how much; this is the moment it matters.
             notices.Post("breaks.overLimitNotice");
         }
-
-        Changed?.Invoke(this, EventArgs.Empty);
 
         await SendAsync(id, new SaveBreakRequest(sessionId, started, null, null), ct);
     }

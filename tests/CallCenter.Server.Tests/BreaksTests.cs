@@ -316,6 +316,20 @@ public class BreaksTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
+    public async Task The_allowance_is_on_the_settings_page_with_a_value_not_an_empty_box()
+    {
+        // Written by the migration SeedBreakAllowance, as an update does not
+        // run the seed (Dia, 1 Oct).
+        var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+
+        var settings = (await supervisor.GetFromJsonAsync<List<CallCenter.Shared.Contracts.Settings.SettingDto>>("/api/settings"))!;
+        var allowance = settings.Should().ContainSingle(s => s.Key == BreaksService.DailyLimitKey).Subject;
+
+        int.TryParse(allowance.Value, out var minutes).Should().BeTrue($"the box should hold a number, not '{allowance.Value}'");
+        minutes.Should().BePositive();
+    }
+
+    [DatabaseFact]
     public async Task A_period_that_runs_backwards_is_refused()
     {
         var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));

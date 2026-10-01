@@ -117,6 +117,27 @@ public sealed class BreakServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task An_allowance_changed_in_settings_reaches_an_agent_already_signed_in_at_the_next_break_in()
+    {
+        var (breaks, _, _, _) = await BuildAsync();
+        breaks.DailyLimitMinutes.Should().Be(30);
+
+        // The supervisor lowers it to five minutes during the shift.
+        _today = new MyBreaksTodayDto(10 * 60, 5);
+        await breaks.BreakInAsync();
+
+        breaks.DailyLimitMinutes.Should().Be(5);
+        breaks.OverLimit().Should().Be(TimeSpan.FromMinutes(5));
+        _notices.Should().Equal("breaks.overLimitNotice");
+
+        // And the server out of reach keeps the last one known.
+        _today = null;
+        await breaks.BreakOutAsync();
+        await breaks.BreakInAsync();
+        breaks.DailyLimitMinutes.Should().Be(5);
+    }
+
+    [Fact]
     public async Task With_the_server_down_the_break_waits_in_the_buffer_whole_and_goes_when_it_is_back()
     {
         _breakAnswer = () => throw new HttpRequestException("down");

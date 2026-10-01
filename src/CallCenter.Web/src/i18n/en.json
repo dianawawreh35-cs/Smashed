@@ -296,7 +296,7 @@
       },
       "breaks.daily_limit_minutes": {
         "label": "Break allowance (minutes a day)",
-        "hint": "How many minutes of break an agent has each day. Nothing stops at it: past it, the Agent App warns the agent and the Breaks page shows by how much, in red. 60 by default, 1 to 600. Agents get a new value when they next sign in."
+        "hint": "How many minutes of break an agent has each day. Nothing stops at it: past it, the Agent App warns the agent and the Breaks page shows by how much, in red. 60 by default, 1 to 600. An agent already signed in gets a new value at their next Break in."
       }
     },
     "pbx": {

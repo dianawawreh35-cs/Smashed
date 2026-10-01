@@ -8124,11 +8124,16 @@ touch the break.
 - **One button, no reason** (prayer, food…) chosen.
 
 **Decided here, without asking:**
-- **The allowance is a setting**, `breaks.daily_limit_minutes`, 1–600,
-  **60 by default** (seeded; Dia did not give a number). The Agent App reads
-  it at sign-in, as it reads the PBX host, so a change reaches an agent at
-  their next sign-in. The report's "over" uses the setting as it is now,
-  for every day in the period.
+- **The allowance is set on the Settings page** (Dia, 1 Oct: "make the
+  break time set in the settings"), `breaks.daily_limit_minutes`, 1–600,
+  **60 by default** (Dia did not give a number). The default is written by
+  a migration of its own, `SeedBreakAllowance`, where the row is missing:
+  the `seed` command adds missing settings too, but an update does not run
+  it, and the box was empty on the screen while the server used 60. The
+  Agent App reads the allowance at sign-in and **again at every Break in**,
+  so a change reaches an agent already signed in; with the server out of
+  reach it keeps the last one. The report's "over" uses the setting as it
+  is now, for every day in the period.
 - **During a break the do-not-disturb switch is held on** and greyed, so the
   break and the phone cannot disagree. **Break out turns it off even if the
   agent had it on before the break**, as Dia put it. Auto answer stays
@@ -8201,12 +8206,14 @@ suite: **609 passed** against `callcenter_test`. Agent App:
 from the server's, the allowance warning without stopping, the buffer with
 the server down and the send when it is back, a 401 not queued, a sign-in
 after a crash turning do not disturb off, and a hand-set one left alone.
-Agent App suite **78 passed**; label tests (Shared) **163 passed**. Web:
+`BreakServiceTests` also has a changed allowance reaching an agent at the
+next Break in, and `BreaksTests` the allowance on the settings page with a
+value. Agent App suite **79 passed**; label tests (Shared) **163 passed**. Web:
 `BreaksPage.test.tsx` (4); the web app's **208 tests**, lint and the
 production build pass. **Not yet seen** in either app.
 
-**To deploy:** server and web, with a migration (`AddAgentBreaks`, a new
-empty table), and **the Agent App on every laptop**: an old Agent App has
+**To deploy:** server and web, with two migrations (`AddAgentBreaks`, a new
+empty table, and `SeedBreakAllowance`, the setting's row), and **the Agent App on every laptop**: an old Agent App has
 no button, and the page then shows its agents as working.
 
 ## Where to pick up

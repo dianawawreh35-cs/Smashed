@@ -605,9 +605,11 @@ side by side.
       today stops. **Screenshot the card during a break, in both languages.**
       *If it never changes:* the Agent App is an old build (check the `bin`
       date) or the break did not reach the server (its log says "queued").
-- [ ] **Over the allowance.** In **Settings**, set *Break allowance (minutes a
-      day)* to **1**, sign the agent out and in again, and take a break of
-      over a minute. Break today turns red, and **Over the allowance by**
+- [ ] **The allowance in Settings.** In **Settings**, *Break allowance
+      (minutes a day)* shows **60**, not an empty box. *If it is empty:* the
+      server is older than the `SeedBreakAllowance` migration.
+- [ ] **Over the allowance.** Set it to **1** and save. Without signing the
+      agent out, take a break of over a minute. Break today turns red, and **Over the allowance by**
       shows the excess. Put the setting back to 60 afterwards.
 - [ ] **The report.** Below, the period buttons and an **Agent** box only (no
       Branch, Channel or Type). *Break time per agent* shows today's breaks
@@ -814,8 +816,8 @@ last step.
       the first stopped, not from 0:00:00. Sign out and in again: it is still
       there. *If it starts from zero after signing in:* the server could not
       be asked (the log says "Today's break time could not be fetched").
-- [ ] **Over the allowance.** With the allowance set to 1 minute (Settings,
-      then sign out and in), take a break past a minute: a red line "You are
+- [ ] **Over the allowance.** With the allowance set to 1 minute in Settings
+      (no need to sign out: Break in reads it again), take a break past a minute: a red line "You are
       over your break time by 0:00:…" appears and grows. Break out, then Break
       in again: the bar at the top says today's break time is used up, and
       the break starts anyway.

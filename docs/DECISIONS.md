@@ -8327,6 +8327,57 @@ one is checklist step "No calls during a break", which now expects no row.
 
 **To deploy:** Agent App only.
 
+## 2026-10-01 — A phone that has registered logs in again when the PBX asks for its password again (A-02)
+
+**In plain terms.** Extension 2010 kept showing "Extension 2010 was refused:
+401 Unauthorized" partway through a shift, and stayed off until the agent signed
+out and in. The password was right: it had registered every two minutes before
+that. Now, once a sign-in has registered, the app treats a later 401 as the PBX
+asking for the password again and logs in again by itself.
+
+**What 2010's log showed (20:01, during a call).** For about 30 seconds nothing
+reached the PBX or came back: the two-minute REGISTER was resent ten times
+unanswered, the hold re-INVITEs too, and the PBX's minute OPTIONS did not
+arrive. The laptop (192.168.10.191) still reached the server (192.168.1.100)
+in the same seconds, so the break was on the way to the PBX (192.168.0.27) or
+the PBX itself. When traffic came back, the app answered the PBX's challenge,
+got no answer, resent it, and 8 s later got a second 401. SIPSorcery takes any
+401 to an answered challenge as final (`exitOnUnequivocalFailure`) and stopped.
+Issabel's log had **no** "Wrong password" for it: a 401 is how it asks for the
+password, sent to every REGISTER and not logged. Most likely the late answer
+carried a one-time code (nonce) that had expired, and the PBX asked again.
+
+**What changed.** `SipRegistrationService` keeps `exitOnUnequivocalFailure`
+and, on a 401 or 407 after this sign-in has registered, starts a new
+registration (a fresh REGISTER, answered with the password) after 30 s, then
+1 min, 2 min, and every 5 min until it registers (`ReRegistration`). The status
+reads Retrying for the first two, then Failed with the PBX's words, so the
+agent asks the supervisor, while the app keeps trying. A refusal on the
+**first** registration of a sign-in still stops at once: that is a wrong
+password, and repeating it would get the laptop blocked by fail2ban.
+Unchanged: a 403 or 404 after registering still stops until the next sign-in
+(the 27 Sep review's item, "Where to pick up").
+
+**Decided without asking:** the waits. 30 s is short enough that an agent
+misses few calls; slowing to 5 min keeps a password really changed at the PBX
+mid-shift to 12 failed logins an hour. **Open:** Dia asked why the first try
+waits 30 s. In 2010's log traffic was back before the second 401, so a try
+at once would most likely have worked, and one extra try cannot trip
+fail2ban: a first try at once, then 30 s, 1, 2 and 5 min, is offered and not
+yet decided. Released as v0.8.3 with the 30 s.
+
+**Not found:** why the path to the PBX broke for 30 s at 20:01:04. Whether
+2001, 2008 and 2009 dropped then too tells the PBX (all of them) from that
+laptop's network or VPN (only 2010).
+
+**Tested.** Agent App 89 of 89; `ReRegistrationTests` covers the waits and
+when it reads Failed. Not yet seen against the PBX: it needs a 401 after
+registering, which the checklist cannot cause on demand. The log line to look
+for is `was asked for its password again`, followed by `Extension 2010
+registered`.
+
+**To deploy:** Agent App only.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -8427,6 +8478,12 @@ merely unfinished. It was useful because it stayed short.
 - **A web user for the server (S-55)**, set to English, that can open Call
   Center → Reports → Calls Detail. The abandoned-call import logs in as it every
   minute; a person's own login stops working the day they change its password.
+- **Nothing reached 2010 for 30 s on 1 Oct at 20:01:04**, in either direction,
+  while the laptop still reached the server. Look at `/var/log/asterisk/full`
+  around then, and at whether the other extensions dropped too (1 Oct entry,
+  "logs in again when the PBX asks"). To see the PBX's password challenges,
+  which it does not log: `asterisk -rvvv`, `sip set debug peer 2010`, and
+  `sip set debug off` afterwards.
 
 ## Questions for the telephony provider
 

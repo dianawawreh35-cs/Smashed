@@ -43,7 +43,8 @@ public class SipRegistrationService(
     /// How many times to retry. High on purpose: while an agent is signed in,
     /// the app should keep trying to get the phone back rather than give up and
     /// require a re-login. A refusal the PBX is certain about — bad credentials —
-    /// stops immediately regardless, through exitOnUnequivocalFailure.
+    /// stops immediately regardless, through exitOnUnequivocalFailure, unless
+    /// this sign-in has already registered (<see cref="ReRegistration"/>).
     /// </summary>
     private const int MaxRegisterAttempts = 1000;
 
@@ -72,6 +73,12 @@ public class SipRegistrationService(
 
     /// <summary>Whether the PBX has accepted this sign-in's registration at least once.</summary>
     private bool _registered;
+
+    /// <summary>
+    /// Password challenges the PBX has refused in a row since this sign-in
+    /// last registered, for <see cref="ReRegistration"/>.
+    /// </summary>
+    private int _refusalsInARow;
 
     /// <summary>Cancels a start still waiting for the PBX to forget the old addresses.</summary>
     private CancellationTokenSource? _starting;
@@ -219,18 +226,65 @@ public class SipRegistrationService(
             lock (_gate)
             {
                 _registered = true;
+                _refusalsInARow = 0;
             }
 
             Update(s => s with { Status = RegistrationStatus.Registered, Detail = null });
         };
 
-        // The PBX answered and refused. Retrying will not help; the agent
-        // needs their supervisor to check the extension or its password.
-        agent.RegistrationFailed += (_, response, error) =>
+        // The PBX answered and refused, and the library has stopped. On the
+        // first registration of a sign-in that means the extension or its
+        // password is wrong, and the agent needs their supervisor. After this
+        // sign-in has registered, the password is known to be right, so a 401
+        // to the answered challenge is the PBX asking again, as Issabel does
+        // when the answer came too late (1 Oct 20:01, after a 30 s dropout,
+        // with no "Wrong password" in its log): the app logs in again instead
+        // (A-02).
+        agent.RegistrationFailed += (uri, response, error) =>
         {
             var detail = Describe(response, error);
-            logger.LogError("Extension {Extension} was refused: {Detail}", extension, detail);
-            Update(s => s with { Status = RegistrationStatus.Failed, Detail = detail });
+            var challenged = response?.Status is SIPResponseStatusCodesEnum.Unauthorised
+                or SIPResponseStatusCodesEnum.ProxyAuthenticationRequired;
+
+            TimeSpan? wait = null;
+            int refusals = 0;
+            var ct = CancellationToken.None;
+
+            lock (_gate)
+            {
+                if (!ReferenceEquals(_agent, agent))
+                {
+                    // A registration this sign-in has already replaced.
+                    return;
+                }
+
+                if (challenged && _registered)
+                {
+                    refusals = ++_refusalsInARow;
+                    wait = ReRegistration.Wait(refusals);
+                    ct = _starting?.Token ?? CancellationToken.None;
+                }
+            }
+
+            if (wait is not { } delay)
+            {
+                logger.LogError("Extension {Extension} was refused: {Detail}", extension, detail);
+                Update(s => s with { Status = RegistrationStatus.Failed, Detail = detail });
+                return;
+            }
+
+            logger.LogWarning(
+                "Extension {Extension} was asked for its password again ({Detail}) after registering on this sign-in; " +
+                "logging in again in {Seconds} s (refusal {Count} in a row)",
+                extension, detail, delay.TotalSeconds, refusals);
+
+            // Still refused after a few minutes, the password may have been
+            // changed at the PBX: the supervisor is the one to ask, though the
+            // app keeps trying in case it clears.
+            var status = ReRegistration.LooksWrong(refusals) ? RegistrationStatus.Failed : RegistrationStatus.Retrying;
+            Update(s => s with { Status = status, Detail = detail });
+
+            _ = RegisterAgainAsync(agent, delay, ct);
         };
 
         // Nothing came back, or something transient. Another attempt is coming.
@@ -248,6 +302,46 @@ public class SipRegistrationService(
         };
 
         return agent;
+    }
+
+    /// <summary>
+    /// Replaces a registration the library gave up on with a new one, which
+    /// starts with a fresh REGISTER and answers the PBX's challenge with the
+    /// password again. Nothing happens if the agent signed out, or signed in
+    /// again, in the meantime.
+    /// </summary>
+    private async Task RegisterAgainAsync(SIPRegistrationUserAgent refused, TimeSpan wait, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(wait, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            if (ct.IsCancellationRequested || _extensions is null || !ReferenceEquals(_agent, refused))
+            {
+                return;
+            }
+
+            logger.LogInformation("Logging extension {Extension} in again", _extensions.Extension);
+
+            _agent = CreateAgent(_extensions);
+            _agent.Start();
+        }
+
+        try
+        {
+            refused.Stop(sendZeroExpiryRegister: false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "The refused registration agent did not stop cleanly");
+        }
     }
 
     /// <summary>
@@ -347,6 +441,7 @@ public class SipRegistrationService(
             _extensions = null;
             _contact = null;
             _registered = false;
+            _refusalsInARow = 0;
             _state = null;
         }
 

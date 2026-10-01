@@ -286,7 +286,7 @@
       },
       "pos.lookup.interval_minutes": {
         "label": "POS customer lookup, every (minutes)",
-        "hint": "How often the server asks the POS about recent callers who are not in the contacts, and adds the ones it knows. 5 by default, 1 to 1440. Takes effect within half a minute."
+        "hint": "How often the server asks the POS about callers from the last two days who are not in the contacts, and adds the ones it knows. Each check asks again about every one of them, so a customer whose order is typed in after the call is found at the next check. 5 by default, 1 to 1440. Takes effect within half a minute."
       },
       "queue.auto_open_time": {
         "label": "Queue opens daily at",
@@ -317,6 +317,19 @@
       "lastOk_zero": "Last checked {{when}}: no new abandoned calls.",
       "lastOk_one": "Last checked {{when}}: 1 new abandoned call.",
       "lastOk_other": "Last checked {{when}}: {{count}} new abandoned calls."
+    },
+    "posLookup": {
+      "heading": "POS customer lookup",
+      "intro": "Every {{minutes}} minutes the server asks the restaurant's POS about each number that called in the last two days and is not in the contacts, and adds the ones the POS knows. Check now does the same straight away.",
+      "checkNow": "Check now",
+      "checking": "Checking…",
+      "none": "No check yet since the server started. The first one is about a minute after it starts.",
+      "last": "Last check at {{when}}.",
+      "counts": "Numbers asked about: {{asked}}. Contacts added: {{created}}. Filled in: {{filledIn}}. Not known to the POS: {{notFound}}. Calls attached: {{calls}}.",
+      "posDown": "The POS could not be reached, so that check stopped early. The rest are asked at the next one.",
+      "off": "Off: the server has no POS token (POS_LOOKUP_TOKEN in its .env file).",
+      "failed": "The POS lookup could not be loaded.",
+      "runFailed": "The check could not be run. Try again in a moment."
     },
     "blacklist": {
       "heading": "PBX blacklist",

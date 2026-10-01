@@ -8,17 +8,20 @@ import AbandonedImportCard from '../components/AbandonedImportCard'
 import ChannelsCard from '../components/ChannelsCard'
 import LoadError from '../components/LoadError'
 import PbxBlacklistCard from '../components/PbxBlacklistCard'
+import PosLookupCard from '../components/PosLookupCard'
 
 /**
- * Settings: the system values (S-47), the PBX login the abandoned-call import
- * uses (S-55), the extension the PBX blacklist is dialled from (S-46), and the
- * channel list (S-41), which is a setting in the same
- * sense — changed rarely, by the supervisor, read by every agent's app.
+ * Settings: the system values (S-47), the POS customer lookup's Check now
+ * (A-67), the PBX login the abandoned-call import uses (S-55), the extension
+ * the PBX blacklist is dialled from (S-46), and the channel list (S-41), which
+ * is a setting in the same sense — changed rarely, by the supervisor, read by
+ * every agent's app.
  */
 export default function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <SystemSettings />
+      <PosLookupCard />
       <AbandonedImportCard />
       <PbxBlacklistCard />
       <ChannelsCard />

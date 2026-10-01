@@ -22,16 +22,11 @@ public class PosLookupOptions
 
     // How often it runs is not here: it is the supervisor's setting
     // pos.lookup.interval_minutes (S-47), so it can change without a restart.
+    // Nor is a wait before asking again about a number the POS did not know:
+    // every run asks again (Dia, 1 Oct 2026). RetryAfter (an hour) went then.
 
-    /// <summary>How far back a call still counts as recent.</summary>
+    /// <summary>How far back a call still counts as recent. Two days (Dia, 1 Oct 2026).</summary>
     public TimeSpan Lookback { get; set; } = TimeSpan.FromDays(2);
-
-    /// <summary>
-    /// How long before a number the POS did not know is asked about again. The
-    /// order is usually typed into the POS during or after the call, so the
-    /// first answer is often "not found" and a later one is not.
-    /// </summary>
-    public TimeSpan RetryAfter { get; set; } = TimeSpan.FromHours(1);
 
     /// <summary>The most numbers one run asks about, so a backlog is spread over several runs.</summary>
     public int MaxPerRun { get; set; } = 100;

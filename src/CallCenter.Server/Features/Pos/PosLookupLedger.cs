@@ -1,37 +1,29 @@
-using System.Collections.Concurrent;
-
 namespace CallCenter.Server.Features.Pos;
 
 /// <summary>
-/// When each number was last asked about, so the POS is not asked every five
-/// minutes about a caller it did not know (A-67).
+/// What the POS lookup (A-67) remembers between runs: when the last one began,
+/// what it did, and that only one runs at a time.
 /// </summary>
 /// <remarks>
-/// Held in memory, not in a table. After a restart every recent unknown number
-/// is asked about once more, which costs a few dozen half-second requests and
-/// nothing else, and saves a table that would only ever hold this.
+/// Held in memory, not in a table. After a restart the settings screen shows
+/// no run until the first one, a minute later, and nothing else is lost.
+/// Until 1 Oct 2026 it also remembered each number it had asked about, so a
+/// number the POS did not know waited an hour; now every run asks again.
 /// </remarks>
 public class PosLookupLedger
 {
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _askedAt = new();
+    /// <summary>What one run did, and when.</summary>
+    public record Run(DateTimeOffset StartedAt, DateTimeOffset FinishedAt, PosCustomerSync.Result Result);
 
     /// <summary>When the last run began; null until the first one after startup.</summary>
     public DateTimeOffset? LastRunAt { get; set; }
 
-    public bool IsDue(string number, DateTimeOffset now, TimeSpan retryAfter) =>
-        !_askedAt.TryGetValue(number, out var at) || now - at >= retryAfter;
+    /// <summary>The last run that finished; null until one has.</summary>
+    public Run? Last { get; set; }
 
-    public void Asked(string number, DateTimeOffset now) => _askedAt[number] = now;
-
-    /// <summary>Drops numbers asked about before <paramref name="cutoff"/>; their calls are no longer recent.</summary>
-    public void Forget(DateTimeOffset cutoff)
-    {
-        foreach (var (number, at) in _askedAt)
-        {
-            if (at < cutoff)
-            {
-                _askedAt.TryRemove(number, out _);
-            }
-        }
-    }
+    /// <summary>
+    /// Held for the length of a run, so the timer and the Check now button never
+    /// ask about the same number at once.
+    /// </summary>
+    public SemaphoreSlim Gate { get; } = new(1, 1);
 }

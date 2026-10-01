@@ -5818,7 +5818,8 @@ and is dropped.
 ### Configuration
 
 Section `PosLookup` in `appsettings.json`: `BaseUrl`, `Lookback`,
-`RetryAfter`, `MaxPerRun`, and `Token`, which is **blank in git**. How often
+`RetryAfter`, `MaxPerRun`, and `Token` (`RetryAfter` went on 1 Oct 2026:
+every run asks again, below), which is **blank in git**. How often
 it runs is on the settings screen (below). Production
 sets `POS_LOOKUP_TOKEN` in `.env` (runbook step 5, `.env.example`,
 `docker-compose.yml`). This machine has it in `dotnet user-secrets`, which
@@ -7889,6 +7890,68 @@ the server: copy `deploy/auto-update.sh` and the two `callcenter-auto-update.*`
 files to `/opt/callcenter/`, and follow the runbook's *Updating by itself at
 night*. Until the timer is enabled nothing changes.
 
+## 2026-10-01 — The POS lookup asks again at every run, and has Check now (A-67)
+
+Dia, 1 Oct: a new customer was not added from the POS. **The live server's
+log showed the lookup working**: every few minutes, `asked about 1 number(s),
+1 not known`. The token is set and accepted (a refused one logs "lookup
+failed"). Asked by hand from the development machine, the POS knew
+0522367081 (POS customer 15484, ريم صالح, last order 14:01:08). The likely
+story: the server asked at about 13:57, before the order was in, was told
+"not known", and would not ask again for an hour. Dia says the customer was
+typed in before; **not settled**. Neither the log nor the POS's answer shows
+when the customer record was created, and the log does not name the numbers
+it asked about.
+
+Dia's answer, asked what "look again at all of today's unknown numbers"
+should mean: **a Check now button, and the automatic check doing the same
+every interval.** Then, shown a first version limited to today: **"keep it
+2 days not one".**
+
+**What changed.**
+
+- **Every run asks again.** Each run asks the POS about every number that
+  called in the last two days and has no contact (or one with no name or
+  address), whether or not it was asked about at the last run. Until now
+  there was **an hour** between asks. `PosLookup:RetryAfter` is gone from
+  `appsettings.json` and `PosLookupOptions`, and the ledger no longer keeps a
+  time per number. `Lookback` stays at two days. For a few hours a ten-minute "ask again after" setting
+  existed, never committed; it was taken out rather than left as a second
+  setting that changes nothing.
+- **Check now**, a card on the Settings page under the system settings
+  (`PosLookupCard`, `GET /api/pos/lookup`, `POST /api/pos/lookup/run`,
+  supervisors only). It runs straight away and shows when the last run was
+  and what it found: numbers asked about, contacts added or filled in, not
+  known to the POS, calls attached, and whether the POS could not be reached.
+  It refreshes every minute. With no token it says the lookup is off and has
+  no button; the endpoint answers 409 `pos_lookup_off`. The last run is kept
+  in memory, so after a restart the card says there has been none until the
+  first, a minute later.
+- **One run at a time.** The timer and the button share a semaphore in
+  `PosLookupLedger`. The button waits for a run already going; the timer
+  skips its turn. The timer counts its interval from the button's run.
+
+**The cost.** A number the POS never knows (a wrong number, a staff phone)
+is asked about at every run for two days: at five minutes, 12 times an hour
+instead of once, 576 requests instead of 48. The live log on 1 Oct showed one such number per
+run. `MaxPerRun` (100) still caps a run, newest callers first, so on a very
+busy day the oldest unknown callers can go unasked; raising the interval is
+the way to spread the load.
+
+**Tested.** `PosLookupTests`: a number the POS did not know is asked again
+at the next run and becomes a contact once the POS knows it; a caller from
+yesterday is asked about, one from more than two days ago is not; the timer skips its turn while Check now holds the gate; a
+POS that is down stops the run, the run is recorded as failed, and the
+number is asked at the next one; the endpoints are supervisor-only and
+answer `pos_lookup_off` with no token. The tests of the per-number wait are
+gone with it. 12 POS tests; the full server suite against `callcenter_test`
+and the web app's 198 tests, typecheck and lint pass. **Not yet seen** on
+the Settings page, nor released.
+
+**Still open.** If the record really was in the POS before the call, timing
+does not explain the 1 Oct miss. Logging the last four digits of each number
+the POS did not know would let a missed customer be traced.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -7930,7 +7993,7 @@ running**.
 | The supervisor's call search, playing and downloading a recording | S-02, S-03, S-04 | **built 24 Sep**; no entry here records a recording heard in the browser yet |
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
 | Abandoned calls from the PBX's Calls Detail report | S-55, R-20 | **built 26 Sep and seen importing on the dev server**. Still to see: the Abandoned tab and the settings card, in both languages. Production needs a PBX user of its own (runbook 8.1), not Dia's |
-| POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**. Still to see: that contact and its calls in the Contacts tab. The server needs `POS_LOOKUP_TOKEN` in `.env` |
+| POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | The PBX's view of each phone: ringing (`early`) on the Users page | S-61 | built 26 Sep; offline, free and in a call seen, ringing not yet |
 | **Click-to-call** from the call log and from a contact (dialling from the Dial tab is built and works) | A-20 | nothing |

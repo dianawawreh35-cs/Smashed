@@ -80,8 +80,10 @@ public class PosLookupTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
-    public async Task A_caller_the_POS_does_not_know_is_not_asked_about_again_straight_away()
+    public async Task A_caller_the_POS_does_not_know_is_asked_about_again_at_the_next_run()
     {
+        // Until 1 Oct 2026 it waited an hour, and missed a customer whose
+        // order went into the POS a few minutes after the first answer.
         await data.EnsurePhoneChannelAsync();
         var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
         var mobile = TestData.NewMobile();
@@ -90,9 +92,64 @@ public class PosLookupTests(CallCenterApiFactory factory)
         var ledger = new PosLookupLedger();
 
         await RunAsync(pos, ledger);
-        await RunAsync(pos, ledger);
+        pos[mobile] = Customer("Typed in after the call", mobile);
+        var second = await RunAsync(pos, ledger);
 
-        pos.Asked.Count(n => n == PhoneNormalizer.Normalize(mobile)).Should().Be(1);
+        pos.Asked.Count(n => n == PhoneNormalizer.Normalize(mobile)).Should().Be(2);
+        second.Created.Should().BeGreaterThanOrEqualTo(1);
+        (await ContactWithAsync(mobile)).Name.Should().Be("Typed in after the call");
+    }
+
+    [DatabaseFact]
+    public async Task Callers_from_the_last_two_days_are_asked_about_and_older_ones_are_not()
+    {
+        await data.EnsurePhoneChannelAsync();
+        var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var older = TestData.NewMobile();
+        var yesterday = TestData.NewMobile();
+        await LogAsync(agent, older, DateTimeOffset.UtcNow.AddDays(-2).AddMinutes(-5));
+        await LogAsync(agent, yesterday, DateTimeOffset.UtcNow.AddDays(-1));
+        var pos = new FakePos();
+
+        await RunAsync(pos);
+
+        pos.Asked.Should().NotContain(PhoneNormalizer.Normalize(older));
+        pos.Asked.Should().Contain(PhoneNormalizer.Normalize(yesterday));
+    }
+
+    [DatabaseFact]
+    public async Task The_timer_skips_its_turn_while_Check_now_is_running()
+    {
+        var ledger = new PosLookupLedger();
+        await ledger.Gate.WaitAsync();
+
+        try
+        {
+            (await RunAsync(new FakePos(), ledger, ifDue: true)).Should().BeNull();
+            ledger.LastRunAt.Should().BeNull("a skipped turn is not a run");
+        }
+        finally
+        {
+            ledger.Gate.Release();
+        }
+    }
+
+    [DatabaseFact]
+    public async Task Check_now_is_for_supervisors_and_says_when_the_server_has_no_token()
+    {
+        var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+        var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
+
+        var status = await supervisor.GetFromJsonAsync<Shared.Contracts.Pos.PosLookupStatusDto>("/api/pos/lookup");
+        status!.Enabled.Should().BeFalse("the test host has no token");
+        status.IntervalMinutes.Should().BeGreaterThan(0);
+
+        var run = await supervisor.PostAsync("/api/pos/lookup/run", null);
+        run.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await run.Content.ReadAsStringAsync()).Should().Contain("pos_lookup_off");
+
+        (await agent.GetAsync("/api/pos/lookup")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await agent.PostAsync("/api/pos/lookup/run", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [DatabaseFact]
@@ -117,28 +174,17 @@ public class PosLookupTests(CallCenterApiFactory factory)
         var (agent, _) = await data.SignInAsync(await data.CreateUserAsync());
         var mobile = TestData.NewMobile();
         await LogAsync(agent, mobile, DateTimeOffset.UtcNow.AddMinutes(-1));
-        var pos = new FakePos { Down = true };
         var ledger = new PosLookupLedger();
 
-        var result = await RunAsync(pos, ledger);
+        var result = await RunAsync(new FakePos { Down = true }, ledger);
 
         result.Failed.Should().BeTrue();
         result.Asked.Should().Be(0);
-        ledger.IsDue(PhoneNormalizer.Normalize(mobile), DateTimeOffset.UtcNow, TimeSpan.FromHours(1))
-            .Should().BeTrue("a failed request is not a \"not found\"");
-    }
+        ledger.Last!.Result.Failed.Should().BeTrue("the settings screen says the POS could not be asked");
 
-    [Fact]
-    public void A_number_is_asked_about_again_once_the_retry_period_has_passed()
-    {
-        var ledger = new PosLookupLedger();
-        var at = DateTimeOffset.UtcNow;
-
-        ledger.Asked("970599123456", at);
-
-        ledger.IsDue("970599123456", at.AddMinutes(59), TimeSpan.FromHours(1)).Should().BeFalse();
-        ledger.IsDue("970599123456", at.AddHours(1), TimeSpan.FromHours(1)).Should().BeTrue();
-        ledger.IsDue("970599000000", at, TimeSpan.FromHours(1)).Should().BeTrue();
+        var pos = new FakePos();
+        await RunAsync(pos, ledger);
+        pos.Asked.Should().Contain(PhoneNormalizer.Normalize(mobile), "a failed request is not a \"not found\"");
     }
 
     [Fact]

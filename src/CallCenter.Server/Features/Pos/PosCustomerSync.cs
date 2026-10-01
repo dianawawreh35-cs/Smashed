@@ -2,6 +2,7 @@ using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
 using CallCenter.Server.Features.Contacts;
 using CallCenter.Shared;
+using CallCenter.Shared.Contracts.Pos;
 using CallCenter.Shared.Phone;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -16,11 +17,19 @@ namespace CallCenter.Server.Features.Pos;
 /// <remarks>
 /// <para>
 /// <b>Who is asked about.</b> Every number that called in the last
-/// <see cref="PosLookupOptions.Lookback"/> and either has no contact, or has a
-/// contact with no name or no address (a bare number flagged by the
-/// supervisor, a customer saved in a hurry). Newest callers first, at most
+/// <see cref="PosLookupOptions.Lookback"/> (two days) and either has no
+/// contact, or has a contact with no name or no address (a bare number
+/// flagged by the supervisor, a customer saved in a hurry). Newest callers
+/// first, at most
 /// <see cref="PosLookupOptions.MaxPerRun"/> a run. Extensions and foreign
 /// numbers are skipped; the POS only knows local numbers.
+/// </para>
+/// <para>
+/// <b>Every run asks again.</b> A number the POS did not know is asked about
+/// at the next run too, until it has a contact or its calls are two days old:
+/// the order is often typed into the POS during or after the call, so the
+/// first answer is often "not found" and a later one is not. Until 1 Oct 2026 such a number
+/// waited an hour between asks; Dia asked for every run.
 /// </para>
 /// <para>
 /// <b>The contact wins.</b> Whatever an agent typed was typed by somebody who
@@ -40,6 +49,11 @@ namespace CallCenter.Server.Features.Pos;
 /// first failure and the numbers it had not reached wait for the next one.
 /// A failed request is never taken to mean "not a customer".
 /// </para>
+/// <para>
+/// <b>One run at a time.</b> The timer and the Check now button share
+/// <see cref="PosLookupLedger.Gate"/>, so the same number is never asked about
+/// twice at once.
+/// </para>
 /// </remarks>
 public class PosCustomerSync(
     CallCenterDbContext db,
@@ -58,7 +72,7 @@ public class PosCustomerSync(
     public const string IntervalMinutesKey = "pos.lookup.interval_minutes";
     public const int DefaultIntervalMinutes = 5;
 
-    /// <summary>What one run did, for the log and for the tests.</summary>
+    /// <summary>What one run did, for the log, the settings screen and the tests.</summary>
     public readonly record struct Result(int Asked, int NotFound, int Created, int FilledIn, int CallsLinked, bool Failed);
 
     private enum Outcome { Created, FilledIn, Unchanged }
@@ -70,19 +84,12 @@ public class PosCustomerSync(
     /// </summary>
     /// <remarks>
     /// A run that failed counts as a run, so a POS that is down is asked
-    /// once an interval, not every half minute.
+    /// once an interval, not every half minute. A run already going (the
+    /// Check now button) is left to finish, and this one is skipped.
     /// </remarks>
     public async Task<Result?> RunIfDueAsync(CancellationToken ct = default)
     {
-        var minutes = await settings.GetIntAsync(IntervalMinutesKey, DefaultIntervalMinutes, ct);
-
-        // The settings screen allows 1 to 1440, but a row edited by hand to
-        // zero would otherwise ask the POS every half minute.
-        if (minutes < 1)
-        {
-            minutes = DefaultIntervalMinutes;
-        }
-
+        var minutes = await IntervalMinutesAsync(ct);
         var now = clock.GetUtcNow();
 
         // A few seconds' grace, so a tick landing a moment early does not
@@ -92,17 +99,81 @@ public class PosCustomerSync(
             return null;
         }
 
-        ledger.LastRunAt = now;
-        return await RunOnceAsync(ct);
+        if (!await ledger.Gate.WaitAsync(0, ct))
+        {
+            return null;
+        }
+
+        try
+        {
+            ledger.LastRunAt = now;
+            return await RunOnceAsync(ct);
+        }
+        finally
+        {
+            ledger.Gate.Release();
+        }
     }
 
+    /// <summary>
+    /// The Check now button: runs straight away, after a run already going has
+    /// finished. The timer then counts its interval from this run.
+    /// </summary>
+    public async Task<Result> RunNowAsync(CancellationToken ct = default)
+    {
+        await ledger.Gate.WaitAsync(ct);
+
+        try
+        {
+            ledger.LastRunAt = clock.GetUtcNow();
+            return await RunOnceAsync(ct);
+        }
+        finally
+        {
+            ledger.Gate.Release();
+        }
+    }
+
+    /// <summary>Whether the lookup is on, and what the last run did, for the settings screen.</summary>
+    public async Task<PosLookupStatusDto> StatusAsync(CancellationToken ct = default)
+    {
+        var last = ledger.Last;
+
+        return new PosLookupStatusDto(
+            options.Value.Enabled,
+            await IntervalMinutesAsync(ct),
+            ledger.Gate.CurrentCount == 0,
+            last?.StartedAt,
+            last?.FinishedAt,
+            last?.Result.Asked ?? 0,
+            last?.Result.NotFound ?? 0,
+            last?.Result.Created ?? 0,
+            last?.Result.FilledIn ?? 0,
+            last?.Result.CallsLinked ?? 0,
+            last?.Result.Failed ?? false);
+    }
+
+    /// <summary>One run, whenever it is called. The tests call it directly; the app goes through the gate.</summary>
     public async Task<Result> RunOnceAsync(CancellationToken ct = default)
     {
-        var settings = options.Value;
-        var now = clock.GetUtcNow();
-        var since = now - settings.Lookback;
+        var started = clock.GetUtcNow();
+        var result = await AskAsync(started, ct);
+        ledger.Last = new PosLookupLedger.Run(started, clock.GetUtcNow(), result);
+        return result;
+    }
 
-        ledger.Forget(since);
+    private async Task<int> IntervalMinutesAsync(CancellationToken ct)
+    {
+        var minutes = await settings.GetIntAsync(IntervalMinutesKey, DefaultIntervalMinutes, ct);
+
+        // The settings screen allows 1 to 1440, but a row edited by hand to
+        // zero would otherwise ask the POS every half minute.
+        return minutes < 1 ? DefaultIntervalMinutes : minutes;
+    }
+
+    private async Task<Result> AskAsync(DateTimeOffset now, CancellationToken ct)
+    {
+        var since = now - options.Value.Lookback;
 
         var recent = await db.Communications
             .AsNoTracking()
@@ -117,9 +188,8 @@ public class PosCustomerSync(
 
         var due = recent
             .Where(r => PhoneNormalizer.ToNational(r.Number) is not null)
-            .Where(r => ledger.IsDue(r.Number, now, settings.RetryAfter))
             .OrderByDescending(r => r.Last)
-            .Take(settings.MaxPerRun)
+            .Take(options.Value.MaxPerRun)
             .Select(r => r.Number)
             .ToList();
 
@@ -141,7 +211,6 @@ public class PosCustomerSync(
                 return new Result(asked, notFound, created, filledIn, linked, Failed: true);
             }
 
-            ledger.Asked(number, now);
             asked++;
 
             if (customer is null)

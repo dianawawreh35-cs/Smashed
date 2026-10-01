@@ -57,8 +57,11 @@ export function toReportFilters(d: ReportDraft): ReportFilters {
   }
 }
 
-/** The draft, the filters it means, and the setters the bar needs. */
-export function useReportFilters(initial: Preset = 'week') {
+/**
+ * The draft, the filters it means, and the setters the bar needs. Every
+ * report page opens on today (Dia, 1 Oct 2026; it was this week).
+ */
+export function useReportFilters(initial: Preset = 'today') {
   const [draft, setDraft] = useState<ReportDraft>(() => ({
     preset: initial,
     ...presetRange(initial),

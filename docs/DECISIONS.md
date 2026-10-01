@@ -7952,6 +7952,38 @@ the Settings page, nor released.
 does not explain the 1 Oct miss. Logging the last four digits of each number
 the POS did not know would let a missed customer be traced.
 
+## 2026-10-01 — Every date filter in the web app opens on today
+
+Dia, 1 Oct: "default all date filter in supervisor app to the current day
+date". The web app had five:
+
+| Page | Was | Now |
+|---|---|---|
+| Dashboard, the period charts | this week | today |
+| Call reports | this week | today |
+| Application reports | this week | today |
+| Calls | no dates, every day | today in both boxes |
+| Applications | no dates, every day | today in both boxes |
+
+The Logs page already opened on today (S-64), and the dashboard's own
+"today" figures were always today.
+
+The report pages share `useReportFilters`, whose default preset is now
+`today`; the week, month and custom presets are still one click away. On
+Calls and Applications, **Clear goes back to today**, not to every day: it
+returns to what the page opened with. Emptying both date boxes and pressing
+Search still searches every day.
+
+The day is the browser's, as before, sent to the server as instants from its
+midnight to the next. Opened on a laptop set to another time zone, "today"
+would be that laptop's day; every supervisor's laptop is in Hebron.
+
+**Not changed:** the Agent App's own call log (A-50) is not a supervisor
+filter and keeps the supervisor's `agent.call_log_days` window.
+
+**Tested:** the web app's 198 tests, its typecheck and lint pass. No test
+pinned the old week default. **Not yet seen** in the browser.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

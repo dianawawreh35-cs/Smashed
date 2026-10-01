@@ -12,6 +12,7 @@ import CallDetails from '../components/CallDetails'
 import LoadError from '../components/LoadError'
 import { FilterSelect as Select, Pager } from '../components/SearchControls'
 import { searchDir } from '../lib/bidi'
+import { localDate } from '../lib/reportFilters'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
 const PAGE_SIZE = 50
@@ -31,9 +32,16 @@ interface Draft {
   classified: '' | 'yes' | 'no'
 }
 
-const EMPTY: Draft = {
-  q: '', agentId: '', branchId: '', channelId: '', typeId: '',
-  from: '', to: '', notes: '', minOrder: '', maxOrder: '', classified: '',
+/**
+ * The filters a fresh page starts from, and Clear goes back to: today in both
+ * date boxes (Dia, 1 Oct 2026; it was every day). Empty the boxes for all.
+ */
+function todayDraft(): Draft {
+  const today = localDate(new Date())
+  return {
+    q: '', agentId: '', branchId: '', channelId: '', typeId: '',
+    from: today, to: today, notes: '', minOrder: '', maxOrder: '', classified: '',
+  }
 }
 
 function toFilters(d: Draft): CallFilters {
@@ -75,8 +83,8 @@ function toFilters(d: Draft): CallFilters {
 export default function ApplicationsPage() {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
-  const [draft, setDraft] = useState<Draft>(EMPTY)
-  const [filters, setFilters] = useState<CallFilters>({ kind: 'App' })
+  const [draft, setDraft] = useState<Draft>(todayDraft)
+  const [filters, setFilters] = useState<CallFilters>(() => toFilters(todayDraft()))
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
 
@@ -101,8 +109,9 @@ export default function ApplicationsPage() {
   }
 
   function onClear() {
-    setDraft(EMPTY)
-    setFilters({ kind: 'App' })
+    const fresh = todayDraft()
+    setDraft(fresh)
+    setFilters(toFilters(fresh))
     setPage(1)
   }
 

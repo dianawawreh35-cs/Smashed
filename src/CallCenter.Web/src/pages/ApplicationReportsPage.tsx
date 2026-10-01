@@ -44,7 +44,7 @@ const TREND_GROUPINGS: TrendGrouping[] = ['day', 'week', 'month', 'hour']
 export default function ApplicationReportsPage() {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
-  const { draft, filters, set, choosePreset } = useReportFilters('week')
+  const { draft, filters, set, choosePreset } = useReportFilters()
   const [ordersBy, setOrdersBy] = useState<OrdersGrouping>('channel')
   const [trendBy, setTrendBy] = useState<TrendGrouping>('day')
 

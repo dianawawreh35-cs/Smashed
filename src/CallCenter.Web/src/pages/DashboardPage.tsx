@@ -37,7 +37,7 @@ const TODAY_REFRESH_MS = 60_000
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
-  const { draft, filters, set, choosePreset } = useReportFilters('week')
+  const { draft, filters, set, choosePreset } = useReportFilters()
 
   const today = useQuery({ queryKey: ['dashboard', 'today'], queryFn: dashboardToday, refetchInterval: TODAY_REFRESH_MS })
   const period = useQuery({

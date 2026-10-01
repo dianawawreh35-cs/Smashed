@@ -13,6 +13,7 @@ import LoadError from '../components/LoadError'
 import { searchDir } from '../lib/bidi'
 import { downloadBlob } from '../lib/csv'
 import { formatClock } from '../lib/recordingWav'
+import { localDate } from '../lib/reportFilters'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
 const PAGE_SIZE = 50
@@ -37,9 +38,16 @@ interface Draft {
   classified: '' | 'yes' | 'no'
 }
 
-const EMPTY: Draft = {
-  q: '', agentId: '', branchId: '', typeId: '', status: '', direction: '',
-  from: '', to: '', notes: '', minOrder: '', maxOrder: '', recording: '', classified: '',
+/**
+ * The filters a fresh page starts from, and Clear goes back to: today in both
+ * date boxes (Dia, 1 Oct 2026; it was every day). Empty the boxes for all.
+ */
+function todayDraft(): Draft {
+  const today = localDate(new Date())
+  return {
+    q: '', agentId: '', branchId: '', typeId: '', status: '', direction: '',
+    from: today, to: today, notes: '', minOrder: '', maxOrder: '', recording: '', classified: '',
+  }
 }
 
 function toFilters(d: Draft): CallFilters {
@@ -84,8 +92,8 @@ function toFilters(d: Draft): CallFilters {
 export default function CallsPage() {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
-  const [draft, setDraft] = useState<Draft>(EMPTY)
-  const [filters, setFilters] = useState<CallFilters>({})
+  const [draft, setDraft] = useState<Draft>(todayDraft)
+  const [filters, setFilters] = useState<CallFilters>(() => toFilters(todayDraft()))
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
   const [exporting, setExporting] = useState<'idle' | 'busy' | 'failed'>('idle')
@@ -109,8 +117,9 @@ export default function CallsPage() {
   }
 
   function onClear() {
-    setDraft(EMPTY)
-    setFilters({})
+    const fresh = todayDraft()
+    setDraft(fresh)
+    setFilters(toFilters(fresh))
     setPage(1)
   }
 

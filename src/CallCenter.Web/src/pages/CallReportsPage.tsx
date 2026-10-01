@@ -94,7 +94,7 @@ export default function CallReportsPage() {
   const { t } = useTranslation()
   const [params, setParams] = useSearchParams()
   const tab: Tab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'overview'
-  const { draft, filters, set, choosePreset } = useReportFilters('week')
+  const { draft, filters, set, choosePreset } = useReportFilters()
 
   return (
     <div className="space-y-6">

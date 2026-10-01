@@ -13,6 +13,7 @@ const TODAY = {
   byChannel: [{ key: 'ch-phone', label: 'Phone', count: 37 }, { key: 'ch-wa', label: 'WhatsApp', count: 5 }],
   orders: 20, orderValue: 1234.5, complaints: 3, unclassified: 6, agentsOnline: 2, abandoned: 5, agentsInCall: 0, fromPbx: false,
   missedRings: 4, rejectedRings: 3,
+  incoming: 30, incomingAnswered: 24, outgoing: 7, outgoingAnswered: 5, outgoingNotAnswered: 2,
 }
 const PERIOD = {
   perDay: [{ key: '2026-09-24', label: '2026-09-24', count: 30 }, { key: '2026-09-25', label: '2026-09-25', count: 42 }],
@@ -68,7 +69,19 @@ describe('dashboard', () => {
     expect(within(tile('Communications')).getByText('Calls: 37 · messages: 5')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('20')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('worth 1,234.50')).toBeInTheDocument()
-    expect(within(tile('Abandoned calls')).getByText('5')).toBeInTheDocument()
+    // Calls in and out, each split by result (Dia, 2 Oct). The one incoming
+    // call neither answered nor abandoned gets a line of its own, so the lines
+    // add up; outgoing has no remainder, so no such line.
+    const line = (block: string, label: string) =>
+      within(within(tile(block)).getByText(label).closest('tr')!)
+    expect(within(tile('Incoming calls')).getByText('30')).toBeInTheDocument()
+    expect(line('Incoming calls', 'Answered').getByText('24')).toBeInTheDocument()
+    expect(line('Incoming calls', 'Abandoned').getByText('5')).toBeInTheDocument()
+    expect(line('Incoming calls', 'Blocked or still ringing').getByText('1')).toBeInTheDocument()
+    expect(within(tile('Outgoing calls')).getByText('7')).toBeInTheDocument()
+    expect(line('Outgoing calls', 'Answered').getByText('5')).toBeInTheDocument()
+    expect(line('Outgoing calls', 'Not answered').getByText('2')).toBeInTheDocument()
+    expect(within(tile('Outgoing calls')).queryByText('Still ringing')).not.toBeInTheDocument()
     // A ring one agent missed is a call the queue passed on, not an unanswered
     // one: shown on its own, not counted in Communications (Dia, 26 Sep).
     expect(within(tile('Missed or rejected rings')).getByText('7')).toBeInTheDocument()

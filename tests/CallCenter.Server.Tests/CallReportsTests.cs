@@ -211,6 +211,13 @@ public class CallReportsTests(CallCenterApiFactory factory)
         (after.MissedRings - before.MissedRings).Should().Be(1, "shown for efficiency, though not in the totals");
         (after.RejectedRings - before.RejectedRings).Should().Be(1);
         (after.Unclassified - before.Unclassified).Should().Be(1);
+        // Calls in and out, split by result (Dia, 2 Oct): the incoming count is
+        // what the PBX's own report shows, the untaken rings left out.
+        (after.Incoming - before.Incoming).Should().Be(2, "the passed-along call counts once");
+        (after.IncomingAnswered - before.IncomingAnswered).Should().Be(2);
+        (after.Outgoing - before.Outgoing).Should().Be(1);
+        (after.OutgoingAnswered - before.OutgoingAnswered).Should().Be(0);
+        (after.OutgoingNotAnswered - before.OutgoingNotAnswered).Should().Be(1);
         (after.AgentsOnline - before.AgentsOnline).Should().Be(1);
         after.ByChannel.Single(c => c.Key == d.WhatsApp.ToString()).Count.Should().Be(1);
     }

@@ -8507,6 +8507,45 @@ measures it on an agent laptop through the recordings, as above.
   or gaps, so all of the above came from the recordings. Offered: a warning
   when the customer's audio stops arriving mid-call.
 
+## 2026-10-02 — The dashboard splits today's calls into incoming and outgoing (S-20)
+
+**In plain terms.** Dia, just after midnight: the dashboard said 112 calls for
+1 October and the PBX said 71, with 5 abandoned. Nothing was wrong. The PBX's
+call report counts incoming calls only, and the server's export of the day
+showed exactly that: 66 incoming answered + 5 abandoned = 71, plus 41 outgoing
+(32 answered, 9 not answered) = 112. The 33 missed or rejected rings were
+already left out of the total, as they should be. Dia then asked for the split
+on the dashboard: an **Incoming calls** block with Answered and Abandoned under
+it, and an **Outgoing calls** block with Answered and Not answered.
+
+**Built.** `DashboardTodayDto` gains `Incoming`, `IncomingAnswered`,
+`Outgoing`, `OutgoingAnswered` and `OutgoingNotAnswered`, counted from the same
+cells as the rest of today's figures, so the untaken rings are left out here
+too. The page shows the two blocks under the tiles, each with its total and a
+line per result.
+
+**Decided without asking:**
+- **The lines always add up to the total.** An incoming call can also be
+  Blocked, Overflowed or still Ringing, and an outgoing one still Ringing. Each
+  block gets one more line for that remainder, **Blocked or still ringing** or
+  **Still ringing**, shown only when it is above zero.
+- **Not answered** on the outgoing side is NoAnswer and Failed together: in
+  both, the agent did not reach the customer.
+- **The Abandoned calls tile is gone.** Its number is now the Abandoned line
+  of the Incoming block, and showing it twice would leave the reader wondering
+  whether they differ. Its strings were removed.
+- **Today only.** These are today's figures, like the tiles beside them. For a
+  past day, the Calls page's search and export give the same split.
+
+**Tested.** Server: the dashboard test now checks the five new counts (the
+passed-along call counts once, the NoAnswer call is outgoing not answered);
+`CallReportsTests` and `PbxAgentsTests`, 14 of 14 against `callcenter_test`.
+Web: `DashboardPage.test.tsx` checks both blocks, the remainder line when there
+is one and its absence when there is not; all 26 files, 214 tests, type check,
+lint and the build pass. **Not yet seen** in the browser.
+
+**To deploy:** server and web, no migration. The Agent App is unchanged.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

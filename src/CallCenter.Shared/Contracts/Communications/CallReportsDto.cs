@@ -222,6 +222,16 @@ public record CountDto(string Key, string Label, int Count);
 /// call too (as R-15 counts them). For efficiency; not part of any total.
 /// </param>
 /// <param name="RejectedRings">Incoming rings an agent declined, counted the same way.</param>
+/// <param name="Incoming">
+/// Incoming calls, untaken rings left out, so each call counts once (Dia,
+/// 2 Oct): the figure the PBX's own call report shows. Answered and
+/// <paramref name="Abandoned"/> make up nearly all of it; the rest were
+/// blocked or are still ringing.
+/// </param>
+/// <param name="IncomingAnswered">Incoming calls an agent answered.</param>
+/// <param name="Outgoing">Calls the agents made (Dia, 2 Oct), which the PBX's incoming count leaves out.</param>
+/// <param name="OutgoingAnswered">Outgoing calls the customer picked up.</param>
+/// <param name="OutgoingNotAnswered">Outgoing calls nobody picked up, or that could not be placed.</param>
 public record DashboardTodayDto(
     int Communications,
     int Calls,
@@ -237,7 +247,12 @@ public record DashboardTodayDto(
     int AgentsInCall = 0,
     bool FromPbx = false,
     int MissedRings = 0,
-    int RejectedRings = 0);
+    int RejectedRings = 0,
+    int Incoming = 0,
+    int IncomingAnswered = 0,
+    int Outgoing = 0,
+    int OutgoingAnswered = 0,
+    int OutgoingNotAnswered = 0);
 
 /// <summary>S-20's four charts for the chosen period: calls and messages together, untaken rings left out.</summary>
 public record DashboardPeriodDto(

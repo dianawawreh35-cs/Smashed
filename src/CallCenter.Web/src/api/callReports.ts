@@ -122,6 +122,14 @@ export interface DashboardToday {
   missedRings: number
   /** Rings an agent declined, counted the same way. */
   rejectedRings: number
+  /** Incoming calls, each once: the PBX's own count. Mostly answered and `abandoned`; the rest blocked or still ringing. */
+  incoming: number
+  incomingAnswered: number
+  /** Calls the agents made, which the PBX's incoming count leaves out. */
+  outgoing: number
+  outgoingAnswered: number
+  /** Nobody picked up, or the call could not be placed. */
+  outgoingNotAnswered: number
 }
 
 export interface DashboardPeriod {

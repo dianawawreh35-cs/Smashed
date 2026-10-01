@@ -652,7 +652,12 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
             inCall,
             fromPbx,
             Count(rings, c => IsInbound(c) && c.Status == CommunicationStatuses.Missed),
-            Count(rings, c => IsInbound(c) && c.Status == CommunicationStatuses.Rejected));
+            Count(rings, c => IsInbound(c) && c.Status == CommunicationStatuses.Rejected),
+            Count(cells, IsInbound),
+            Count(cells, c => IsInbound(c) && IsAnswered(c)),
+            Count(cells, IsOutbound),
+            Count(cells, c => IsOutbound(c) && IsAnswered(c)),
+            Count(cells, c => IsOutbound(c) && c.Status is CommunicationStatuses.NoAnswer or CommunicationStatuses.Failed));
     }
 
     /// <summary>

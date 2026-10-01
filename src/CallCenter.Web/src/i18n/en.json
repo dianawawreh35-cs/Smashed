@@ -116,8 +116,6 @@
       "agentsOnlinePbxNote": "Agents whose phone is connected to the PBX right now.",
       "agentsInCall": "In a call",
       "agentsInCallNote": "Agents talking right now, as the PBX reports it. Listen in from the Users page.",
-      "abandoned": "Abandoned calls",
-      "abandonedNote": "Callers who gave up waiting in the queue, as of the last check of the PBX. These are the calls nobody answered: a call that rang one agent and was answered by another counts once, as answered.",
       "untaken": "Missed or rejected rings",
       "untakenNote": "Missed: {{missed}} · rejected: {{rejected}}. Times an agent's phone rang and they did not take it. Not counted in Communications: the queue passed the call to the next agent."
     },
@@ -131,6 +129,17 @@
       "perType": "Per type",
       "perChannel": "Per channel",
       "perHour": "Per hour of the day"
+    },
+    "calls": {
+      "incoming": "Incoming calls",
+      "incomingNote": "Each call once, as the PBX counts it. Missed and rejected rings are not counted here: the queue passed the call to the next agent.",
+      "outgoing": "Outgoing calls",
+      "outgoingNote": "Calls the agents made to customers. The PBX’s incoming count leaves these out.",
+      "answered": "Answered",
+      "abandonedLine": "Abandoned",
+      "notAnswered": "Not answered",
+      "otherIncoming": "Blocked or still ringing",
+      "otherOutgoing": "Still ringing"
     }
   },
   "queue": {

@@ -33,6 +33,10 @@ const TODAY_REFRESH_MS = 60_000
  * The figures are stat tiles, not charts: each is one number, and a chart of
  * one number is a worse way to read it (dataviz). The communications count
  * leads, as the one hero figure.
+ *
+ * Calls in and calls out have a block each, split by result (Dia, 2 Oct):
+ * the PBX's call report counts incoming calls only, so the incoming block is
+ * the figure to set beside it, and the outgoing one is what makes up the rest.
  */
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
@@ -81,7 +85,6 @@ export default function DashboardPage() {
               <Tile label={t('dashboard.tiles.orders')} value={d ? n(d.orders) : undefined}
                 note={d ? t('dashboard.tiles.worth', { value: money(d.orderValue) }) : undefined} />
               <Tile label={t('dashboard.tiles.complaints')} value={d ? n(d.complaints) : undefined} />
-              <Tile label={t('dashboard.tiles.abandoned')} value={d ? n(d.abandoned) : undefined} note={t('dashboard.tiles.abandonedNote')} />
               <Tile label={t('dashboard.tiles.untaken')} value={d ? n(d.missedRings + d.rejectedRings) : undefined}
                 note={d ? t('dashboard.tiles.untakenNote', { missed: n(d.missedRings), rejected: n(d.rejectedRings) }) : undefined} />
               <Tile label={t('dashboard.tiles.unclassified')} value={d ? n(d.unclassified) : undefined} note={t('dashboard.tiles.unclassifiedNote')} />
@@ -91,6 +94,21 @@ export default function DashboardPage() {
               {d?.fromPbx && (
                 <Tile label={t('dashboard.tiles.agentsInCall')} value={n(d.agentsInCall)} note={t('dashboard.tiles.agentsInCallNote')} />
               )}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <CallBlock label={t('dashboard.calls.incoming')} note={t('dashboard.calls.incomingNote')}
+                total={d?.incoming} lines={d ? [
+                  { label: t('dashboard.calls.answered'), count: d.incomingAnswered },
+                  { label: t('dashboard.calls.abandonedLine'), count: d.abandoned },
+                  { label: t('dashboard.calls.otherIncoming'), count: d.incoming - d.incomingAnswered - d.abandoned, onlyIfAny: true },
+                ] : []} />
+              <CallBlock label={t('dashboard.calls.outgoing')} note={t('dashboard.calls.outgoingNote')}
+                total={d?.outgoing} lines={d ? [
+                  { label: t('dashboard.calls.answered'), count: d.outgoingAnswered },
+                  { label: t('dashboard.calls.notAnswered'), count: d.outgoingNotAnswered },
+                  { label: t('dashboard.calls.otherOutgoing'), count: d.outgoing - d.outgoingAnswered - d.outgoingNotAnswered, onlyIfAny: true },
+                ] : []} />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -139,6 +157,44 @@ function Tile({ label, value, note, hero = false }: { label: string; value?: str
         <p className={`${hero ? 'text-5xl' : 'text-3xl'} mt-1 font-semibold text-slate-100`}>{value}</p>
       )}
       {note && <p className="mt-1 text-xs text-slate-500">{note}</p>}
+    </div>
+  )
+}
+
+/**
+ * Calls in one direction: the total, and under it how many ended each way.
+ * A line marked `onlyIfAny` is the remainder (blocked, still ringing), shown
+ * only when there is one, so the lines always add up to the total.
+ */
+function CallBlock({ label, note, total, lines }: {
+  label: string
+  note: string
+  total?: number
+  lines: { label: string; count: number; onlyIfAny?: boolean }[]
+}) {
+  const { i18n } = useTranslation()
+  const n = (v: number) => v.toLocaleString(i18n.language)
+  return (
+    <div className="card card-body" role="group" aria-label={label}>
+      <p className="text-sm text-slate-400">{label}</p>
+      {total === undefined ? (
+        <div className="mt-2 h-8 w-16 animate-pulse rounded bg-ink-800/60" aria-hidden="true" />
+      ) : (
+        <>
+          <p className="mt-1 text-3xl font-semibold text-slate-100">{n(total)}</p>
+          <table className="table mt-2">
+            <tbody>
+              {lines.filter((l) => !l.onlyIfAny || l.count > 0).map((l) => (
+                <tr key={l.label}>
+                  <td>{l.label}</td>
+                  <td className="tabular text-end"><span dir="ltr">{n(l.count)}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      <p className="mt-2 text-xs text-slate-500">{note}</p>
     </div>
   )
 }

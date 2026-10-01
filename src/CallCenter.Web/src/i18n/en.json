@@ -24,7 +24,8 @@
     "logs": "Logs",
     "label": "Sections",
     "mistakes": "Mistakes",
-    "breaks": "Breaks"
+    "breaks": "Breaks",
+    "mistakeReports": "Mistakes report"
   },
   "login": {
     "heading": "Sign in",
@@ -1268,5 +1269,42 @@
     "customerPick": "Pick the customer:",
     "customerNoMatch": "No saved customer has this name. Type the number instead.",
     "customerSearchFailed": "The customers could not be searched. Type the number instead."
+  },
+  "mistakeReports": {
+    "heading": "Mistakes report",
+    "intro": "The mistakes recorded on the Mistakes page, added up: per branch, per agent, over time, and the customers it happened to more than once.",
+    "filters": "Report filters",
+    "groupBy": "Per",
+    "notOnFile": "Not a saved customer",
+    "columns": {
+      "branch": "Branch",
+      "agent": "Agent",
+      "mistakes": "Mistakes",
+      "branchOwn": "Branch's own",
+      "byAgents": "Agents'",
+      "value": "Value",
+      "period": "Period",
+      "customer": "Customer",
+      "number": "Number",
+      "last": "Latest"
+    },
+    "sections": {
+      "byBranch": {
+        "title": "Per branch",
+        "hint": "Every mistake at each branch: how many were the branch's own, how many its agents', and what they cost."
+      },
+      "byAgent": {
+        "title": "Per agent",
+        "hint": "The mistakes put down to each agent, most first. A branch's own mistakes name no agent and are not here."
+      },
+      "trend": {
+        "title": "Over time",
+        "hint": "Mistakes per day, week or month, the branch's own and the agents'."
+      },
+      "customers": {
+        "title": "Repeat customers",
+        "hint": "Customers who had more than one mistake in the period, most first."
+      }
+    }
   }
 }

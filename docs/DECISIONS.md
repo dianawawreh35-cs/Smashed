@@ -8216,6 +8216,59 @@ production build pass. **Not yet seen** in either app.
 empty table, and `SeedBreakAllowance`, the setting's row), and **the Agent App on every laptop**: an old Agent App has
 no button, and the page then shows its agents as working.
 
+## 2026-10-01 — The mistakes report (R-23)
+
+Dia, after the Mistakes page (S-65): "can we add report for it?" Asked and
+answered: **its own page**, *Mistakes report* (تقرير الأخطاء), right under
+Mistakes in the sidebar, as Call reports sits under Calls; and **all four**
+reports offered: per branch, per agent, over time, and repeat customers. New
+requirement **R-23** (SRS 4.6).
+
+**What each shows.** *Per branch*: mistakes, the branch's own, its agents', and
+the value. *Per agent*: only the mistakes put down to an agent; a branch's own
+names nobody, so it is not counted against anyone. *Over time*: per day, week
+or month, the two kinds as two lines. *Repeat customers*: two or more mistakes
+in the period. A saved customer is one row, whichever of their numbers was
+typed; a number nobody has on file is a customer of its own; most first, with
+the latest day.
+
+**Decided here, without asking:**
+- **The same rows as the Mistakes page.** The report narrows through
+  `MistakesService.Apply`, the list's own filter, so the two pages cannot
+  count differently.
+- **Totalled in C# after one query, not four GROUP BYs.** Mistakes are typed by
+  a supervisor, a few a day, so a year is a few thousand small rows. That is
+  still on the server, never a page in the browser.
+- **Its own filter row** (period, branch, agent) rather than the shared
+  `ReportFilterBar`, which also offers a channel and a call type that a mistake
+  does not have. It reuses `useReportFilters`, `Grouping`, `ReportCard` and
+  the print heading, so it looks and exports like the other reports. Opens on
+  today, the 1 Oct rule.
+
+**An ID clash, and a line that went out early.** This was first written as
+S-66. A session building agents' breaks at the same time took S-66 for the
+break monitor and committed first (`aeef27d`), so this is **R-23**, beside
+their R-22. That commit also took this work's one line in `Program.cs`, the
+`MistakeReportsService` registration, while the class was still uncommitted.
+So `aeef27d` alone does not build. This commit adds the class and fixes it.
+Neither was pushed.
+
+**Tested.** `MistakeReportsTests` (8, 4 against the database): per branch with
+the two kinds and the value; per agent within a branch filter, leaving out
+the branch's own; days and months; repeat customers joining one customer's
+two numbers and leaving out a single mistake; and an agent refused all four.
+Server suite: 616 of 617 against `callcenter_test`. The one failure,
+`CallReportsTests.A_contact_from_the_POS_is_new_and_one_from_the_old_system_is_not`,
+passed when run alone. It counts new customers in a period, and another
+session's tests were likely running against the same database at the same
+time. Neither change touches it. Agent App 79, Shared 163. Web:
+`MistakeReportsPage.test.tsx` (3). All 26 web test files, 211 tests, pass
+with one worker; with two, Vitest on this machine sometimes drops a file
+without saying so. Lint and the production build pass. **Not yet seen** in
+the browser.
+
+**To deploy:** server and web; no migration, no Agent App change.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

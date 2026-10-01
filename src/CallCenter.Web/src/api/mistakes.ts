@@ -77,3 +77,63 @@ export const updateMistake = (id: string, request: UpsertMistakeRequest) =>
   api.put<Mistake>(`/mistakes/${id}`, request)
 
 export const deleteMistake = (id: string) => api.delete<void>(`/mistakes/${id}`)
+
+// ---- the mistakes report (R-23) ------------------------------------------
+
+/** The report's filters: days, inclusive, yyyy-mm-dd, a branch and an agent. */
+export interface MistakeReportFilters {
+  from?: string
+  to?: string
+  branchId?: string
+  agentId?: string
+}
+
+export interface MistakeBranchRow {
+  branchId: string
+  branch: string
+  mistakes: number
+  /** Put down to the branch as a whole. */
+  branchOwn: number
+  /** Put down to one of its agents. */
+  byAgents: number
+  value: number
+}
+
+export interface MistakeAgentRow {
+  agentId: string
+  agent: string
+  mistakes: number
+  value: number
+}
+
+export type MistakeTrendGrouping = 'day' | 'week' | 'month'
+
+export interface MistakeTrendPoint {
+  /** yyyy-mm-dd for a day or a week's Monday, yyyy-mm for a month. */
+  bucket: string
+  mistakes: number
+  branchOwn: number
+  byAgents: number
+  value: number
+}
+
+export interface MistakeCustomerRow {
+  /** Null for a number nobody has on file. */
+  contactId: string | null
+  customer: string | null
+  /** As typed on their latest mistake. */
+  number: string
+  mistakes: number
+  value: number
+  /** The day of their latest mistake. */
+  last: string
+}
+
+const report = <T,>(name: string, filters: MistakeReportFilters, extra: Query = {}) =>
+  api.get<T[]>(`/mistakes/reports/${name}`, { query: { ...filters, ...extra } as Query })
+
+export const mistakesByBranch = (filters: MistakeReportFilters) => report<MistakeBranchRow>('by-branch', filters)
+export const mistakesByAgent = (filters: MistakeReportFilters) => report<MistakeAgentRow>('by-agent', filters)
+export const mistakesTrend = (filters: MistakeReportFilters, groupBy: MistakeTrendGrouping) =>
+  report<MistakeTrendPoint>('trend', filters, { groupBy })
+export const repeatCustomers = (filters: MistakeReportFilters) => report<MistakeCustomerRow>('repeat-customers', filters)

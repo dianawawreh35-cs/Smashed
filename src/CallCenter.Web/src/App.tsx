@@ -23,6 +23,7 @@ import RequireSupervisor from './components/RequireSupervisor'
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const CallReportsPage = lazy(() => import('./pages/CallReportsPage'))
 const ApplicationReportsPage = lazy(() => import('./pages/ApplicationReportsPage'))
+const MistakeReportsPage = lazy(() => import('./pages/MistakeReportsPage'))
 
 /**
  * Route table. Everything except the login screen sits behind RequireAuth, so
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="/application-reports" element={<ApplicationReportsPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/mistakes" element={<MistakesPage />} />
+            <Route path="/mistake-reports" element={<MistakeReportsPage />} />
             <Route path="/breaks" element={<BreaksPage />} />
             <Route path="/delivery" element={<DeliveryPage />} />
             <Route path="/menu" element={<MenuPage />} />

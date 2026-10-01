@@ -46,6 +46,8 @@ export default function AppLayout() {
     { to: '/contacts', label: t('nav.contacts') },
     // What went wrong at a branch or with an agent, and who is responsible (S-65).
     { to: '/mistakes', label: t('nav.mistakes') },
+    // Their report right under them, as the call reports sit under Calls (R-23).
+    { to: '/mistake-reports', label: t('nav.mistakeReports') },
     // Who is on break now, and the agents' breaks on any day (A-86, S-66, R-22).
     { to: '/breaks', label: t('nav.breaks') },
     { to: '/delivery', label: t('nav.delivery') },

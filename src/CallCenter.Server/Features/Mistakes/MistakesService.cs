@@ -285,7 +285,8 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
     private DateOnly Today() =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), TimeZoneInfo.Local).DateTime);
 
-    private static IQueryable<Mistake> Apply(IQueryable<Mistake> mistakes, Filter f)
+    /// <summary>The filters, as SQL. The reports (R-23) narrow by the same rules as the list.</summary>
+    internal static IQueryable<Mistake> Apply(IQueryable<Mistake> mistakes, Filter f)
     {
         if (f.From is { } from) mistakes = mistakes.Where(m => m.OccurredOn >= from);
         if (f.To is { } to) mistakes = mistakes.Where(m => m.OccurredOn <= to);

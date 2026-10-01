@@ -587,6 +587,31 @@ No phone needed. Restart the server first, so the `mistakes` table is made
       the Arabic names readable, the numbers with their leading 0, and every
       mistake that matches the filters, not only the page on screen.
 
+### 1.13b The mistakes report (R-23) — built 1 Oct, never run
+
+Record a few mistakes first (1.13): at two branches, some the branch's own
+and some an agent's, a few with a value, and two for the same customer.
+
+- [ ] **The page.** **Mistakes report** (تقرير الأخطاء) is in the sidebar right
+      under Mistakes (Breaks is now one further down). It opens on Today, with
+      four cards: Per branch, Per agent, Over time, Repeat customers.
+- [ ] **Per branch.** Each branch with its mistakes, the branch's own, its
+      agents' and the value, and a Total row; the chart has a bar for each of
+      the two kinds. The counts agree with the Mistakes page for the same day.
+      **Screenshot it in both languages.**
+- [ ] **Per agent.** Only agents, most mistakes first. A branch's own mistake
+      is not counted against anybody.
+- [ ] **Over time.** Choose This month, then **Per** → Month: one row for the
+      month. Per → Day: a row per day that had a mistake.
+- [ ] **Repeat customers.** The customer with two mistakes is listed once,
+      even if their number was typed two ways; a customer with one is not
+      listed. A repeated number nobody has on file says "Not a saved customer".
+- [ ] **Filters.** Choosing a branch, or an agent, changes all four cards at
+      once.
+- [ ] **Export and print.** Export CSV on a card saves its rows, which open in
+      Excel with the Arabic readable. Print on a card prints that card, with the
+      period at the top.
+
 ### 1.14 Breaks: who is on break, and the break report (S-66, R-22) — built 1 Oct, never run
 
 No phone needed, but an Agent App with the Break button (Round 2, "Break in

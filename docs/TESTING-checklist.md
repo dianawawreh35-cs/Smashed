@@ -1457,6 +1457,33 @@ guards. They need the new server **and** the new Agent App on both laptops.
       signed in as <B>: refused 480`. *Before this change B's screen would
       have shown A's call.*
 
+### Echo cancellation (A-87) — built 1 Oct night, needs the PBX and a mobile
+
+What went wrong on 1 Oct: customers heard their own voice back, a quarter of a
+second late, because the agent's microphone picked them up from the speaker.
+Use a laptop with its **built-in speakers and microphone** (no headset): that
+is where the echo is worst, so it shows whether the canceller works.
+
+- [ ] **It switches on.** Call the queue from a mobile and answer. The log
+      shows `Echo cancellation on: PCMU 8000 Hz, microphone #…, speaker #…`
+      just after `Call answered`. *If it shows `could not start` or `delivered
+      nothing`:* the call used the plain microphone, as before A-87; send the
+      log line, with the laptop's model.
+- [ ] **The mobile hears no echo.** On the mobile, talk for 20 seconds while
+      the agent stays quiet, with the laptop's speaker at its usual volume.
+      You hear yourself back faintly or not at all. Send me the time of the
+      call: the recording shows how much of your voice came back.
+- [ ] **Both talking at once.** Talk over each other for a few seconds. Both
+      voices still come through; the agent's may thin out for a moment, not
+      cut out.
+- [ ] **Mute and hold still work.** Mute: the mobile hears nothing, the agent
+      still hears the mobile. Unmute: the agent is heard again at once. Hold
+      and resume the same way.
+- [ ] **The switch.** In `appsettings.json` beside the program set
+      `"Audio": { "EchoCancellation": false }`, restart the app and call
+      again: no `Echo cancellation on` line, and the echo is back. Set it to
+      `true` again.
+
 ---
 
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)

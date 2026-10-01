@@ -8427,6 +8427,86 @@ the agent presses **Update now**. **It starts with the Agent App version that
 carries it**; a laptop on an older one keeps asking every 15 minutes until it
 updates. The label beside **Update to x** on the Users page says both.
 
+## 2026-10-01 — Echo cancellation on the agent's microphone (A-87), and what the day's recordings showed about the sound
+
+**In plain terms.** Dia: "there is echo in the calls on the customer side",
+then "ok just add the echo cleaner". The agent's microphone now goes through
+Windows' own echo canceller, which hears what the speaker plays and takes it
+out before the agent's voice is sent. If it cannot run, the call uses the plain
+microphone exactly as before.
+
+**What the recordings showed.** A recording's right channel is what the laptop
+sent, so echo made at the laptop shows as the customer's voice coming back on
+it. Measured on the evening's calls from 0569498581: rahem's call at 20:38 had
+it throughout, 250 ms late at −34 dB; jawad's at 22:33 now and then (−33 dB);
+alaa's five calls barely (−40 dB or quieter, in under one moment in ten). So
+the echo Dia heard on alaa's calls was probably added **after** the laptop
+(the PBX or the line), which A-87 cannot remove. **Open:** an
+extension-to-extension call tells the two apart: echo on that call is the
+laptops; echo only on calls to mobiles is the line, fixed on the PBX side.
+
+**How it is built.** `VoiceCaptureDsp` drives the voice capture DSP
+(`CLSID_CWMAudioAEC`) in source mode by COM interop, on its own MTA thread,
+polled every 5 ms; `EchoCancellingMicrophone` is the call's `IAudioSource`,
+cutting its output into 20 ms packets and raising the same events the plain
+microphone does, so `VoIPMediaSession`, mute, hold and `CallRecorder` are
+unchanged. `WindowsAudioEndPoint` is still the speaker and the fallback
+microphone. `CallService` holds the microphone as `IAudioSource` now.
+
+**Decided without asking:**
+- **Windows' canceller, not SpeexDSP or WebRTC.** An echo canceller has to
+  know what reached the speaker and when. The speaker's queue in front of it
+  (below) moves from 150 ms to seconds, so feeding a canceller the network
+  audio would lose track; the DSP listens to the device itself. Nothing to
+  ship, no licence.
+- **It only runs while the speaker is playing.** Found while testing: with no
+  render stream it delivers nothing and then fails (0x87CC000A). In a call the
+  speaker always plays, silence included, but a watchdog hands over to the
+  plain microphone after 0.5 s without sound (1.5 s at the start), so the agent
+  can never go silent because of it.
+- **On by default**, `Audio:EchoCancellation` in appsettings.json to turn it
+  off for one laptop. No screen for it.
+- **Through a mute it keeps listening** and throws the sound away, so it does
+  not have to learn the room again; the plain microphone stops, as before.
+
+**Tested.** Agent App 89 of 89. A test program on Dia's laptop, the real
+classes against the real devices: PCMU and G.722 at 50 packets/s of the right
+size, mute 0, resume 50, nothing after close; with the speaker never started
+and stopped mid-call, the watchdog handed over in 1.5 s and 0.6 s and the plain
+microphone ran at 50/s. **Not measured: how much echo it removes.** On Dia's
+laptop the microphone did not pick up the test tone even without the canceller,
+so there was no echo to remove; the checklist's "Echo cancellation" section
+measures it on an agent laptop through the recordings, as above.
+
+**To deploy:** Agent App only.
+
+### The day's other sound problems, found in the logs and recordings (not fixed by A-87)
+
+- **The agent stops hearing the customer: the laptop's Wi-Fi.** In six calls
+  after 15:00 the customer's side fell to one 20 ms packet a second for up to
+  151 s; the agent's side was whole. The packets came 1.024 s apart on average,
+  ten Wi-Fi beacons, which is what a Wi-Fi card asleep in power save gives.
+  Five of the six were on `DESKTOP-RMSFSIV-EE0351` (Intel AX201, 5 GHz Wi-Fi 6,
+  signal 90%, plugged in, Windows' Wi-Fi power setting already Maximum
+  Performance). Its power management was switched off, and 802.11ac, No SMPS
+  and packet coalescing off were set, at about 22:25; the 22:29 call still
+  broke from 65 s in, the 22:32 and 22:37 ones did not. **Open:** a day on a
+  network cable with Wi-Fi off and the app restarted (the 22:37 call, said to
+  be on the cable, still went to the Wi-Fi address 192.168.10.191); then the
+  access point's DTIM and TWT settings. All four laptops changed address at
+  about 13:10, which looks like the router restarting: reserve their addresses.
+- **Delay that grows during a call: the speaker's queue.** SIPSorcery's
+  `WindowsAudioEndPoint` plays through a `BufferedWaveProvider` of 5 s that is
+  never drained faster than real time, behind a `WaveOut` of 2 × 100 ms. A
+  burst of late audio after a Wi-Fi nap stays as delay for the rest of the
+  call. Normally the laptop adds about 170–230 ms on the way in and 40–60 ms on
+  the way out, which matches the 186–330 ms echo delays measured. **Offered,
+  not done** (Dia chose the echo canceller only): a speaker of the app's own
+  with a short queue that catches up, about 100 ms faster on every call.
+- **Logged nothing about the sound itself.** The app writes no packet counts
+  or gaps, so all of the above came from the recordings. Offered: a warning
+  when the customer's audio stops arriving mid-call.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -8464,6 +8544,9 @@ running**.
 | The upload queue's set-aside items: a way to clear one, or pass it to a supervisor. Today Try again is the only action, and a call refused as `extension_not_yours` is refused again | A-04 | Dia's call |
 | `CallService`'s state rules have no automated test (27 Sep entry, F-09) | A-12 | pulling the state machine out of `CallService` into something that can be built without SIPSorcery and a sound card |
 | Drop the SQLitePCLRaw pin in `Directory.Packages.props` and the Agent App's explicit reference to it: EF Core 10.0.12 asks for 2.1.12 itself | — | the Agent App's project file, next time it is open |
+| **Echo cancellation**: checklist "Echo cancellation" on an agent laptop's own speakers, then the recording measured; and an extension-to-extension call, to tell echo from the laptops from echo on the line | A-87 | **built 1 Oct night, not yet heard on a call.** A release with the Agent App |
+| **EE0351 drops the customer's audio** (one packet a second, Wi-Fi power save): a day on a network cable, Wi-Fi off, app restarted; then the access point's DTIM and TWT; reserve the laptops' addresses | — | Dia, at the laptop and the router (1 Oct entry) |
+| A speaker that catches up after a burst, with a short queue, and a log warning when the customer's audio stops mid-call | — | Dia's call (offered 1 Oct) |
 | **Breaks: Break in / Break out, the monitor and the report** | A-86, S-66, R-22 | **built 1 Oct, not yet seen running**: checklist "Breaks", screenshots of the rail and the Breaks page in both languages. Then a release with the Agent App on every laptop |
 | Opening a call from the log: details, recording, classify | A-51 | **built 24 Sep, not yet seen running** — needs a screenshot in both languages and one recording actually heard |
 | The supervisor's call search, playing and downloading a recording | S-02, S-03, S-04 | **built 24 Sep**; no entry here records a recording heard in the browser yet |

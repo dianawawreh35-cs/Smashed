@@ -61,6 +61,7 @@ public class CallService(
     PhonePreferences preferences,
     IOptions<DialingOptions> dialing,
     IOptions<RecordingOptions> recording,
+    IOptions<AudioOptions> audioOptions,
     RingbackTone ringback,
     RingTone ring,
     ILoggerFactory loggerFactory,
@@ -93,7 +94,7 @@ public class CallService(
     /// media session because Mute (A-12) is done here — pausing the source —
     /// and not at the SIP level, which has no notion of mute at all.
     /// </summary>
-    private WindowsAudioEndPoint? _audio;
+    private IAudioSource? _audio;
     private CallState _state = CallState.Idle;
 
     /// <summary>
@@ -673,7 +674,7 @@ public class CallService(
             // so the click has nothing to build. Built here only if the
             // preparation has not finished yet.
             VoIPMediaSession? media;
-            WindowsAudioEndPoint? audio;
+            IAudioSource? audio;
 
             lock (_gate)
             {
@@ -883,7 +884,7 @@ public class CallService(
     /// </remarks>
     public void ToggleMute()
     {
-        WindowsAudioEndPoint? audio;
+        IAudioSource? audio;
         CallState state;
         long generation;
 
@@ -1030,7 +1031,7 @@ public class CallService(
     /// </summary>
     private bool SetMicrophone(bool paused)
     {
-        WindowsAudioEndPoint? audio;
+        IAudioSource? audio;
 
         lock (_gate)
         {
@@ -1504,7 +1505,7 @@ public class CallService(
     /// recording. The events are only subscribed once a recorder exists, so a
     /// failure here costs nothing per frame afterwards.
     /// </remarks>
-    private void StartRecording(long generation, VoIPMediaSession media, WindowsAudioEndPoint audio)
+    private void StartRecording(long generation, VoIPMediaSession media, IAudioSource audio)
     {
         if (!recording.Value.Enabled)
         {
@@ -1578,7 +1579,7 @@ public class CallService(
     private RecordedCall? StopRecording()
     {
         CallRecorder? recorder;
-        WindowsAudioEndPoint? audio;
+        IAudioSource? audio;
         VoIPMediaSession? media;
 
         lock (_gate)
@@ -1596,7 +1597,7 @@ public class CallService(
     /// Finishes one call's recording, whichever line it was on (A-24).
     /// </summary>
     private RecordedCall? StopRecording(
-        CallRecorder? recorder, VoIPMediaSession? media, WindowsAudioEndPoint? audio)
+        CallRecorder? recorder, VoIPMediaSession? media, IAudioSource? audio)
     {
         if (recorder is null)
         {
@@ -1646,7 +1647,7 @@ public class CallService(
     private void PrepareMedia(long generation)
     {
         VoIPMediaSession media;
-        WindowsAudioEndPoint audio;
+        IAudioSource audio;
 
         try
         {
@@ -1684,9 +1685,17 @@ public class CallService(
         }
     }
 
-    private (VoIPMediaSession Media, WindowsAudioEndPoint Audio) CreateMedia()
+    private (VoIPMediaSession Media, IAudioSource Audio) CreateMedia()
     {
-        var audio = new WindowsAudioEndPoint(new AudioEncoder());
+        var endpoint = new WindowsAudioEndPoint(new AudioEncoder());
+
+        // A-87: the microphone goes through the echo canceller, so the customer
+        // does not hear their own voice back from the agent's speaker. It falls
+        // back to the endpoint's own microphone by itself if it cannot run.
+        IAudioSource audio = audioOptions.Value.EchoCancellation
+            ? new EchoCancellingMicrophone(
+                endpoint, new AudioEncoder(), loggerFactory.CreateLogger<EchoCancellingMicrophone>())
+            : endpoint;
 
         // The speaker goes through a wrapper that can drop the customer's
         // voice for a hold (A-12); see HoldableAudioSink for why the PBX's own
@@ -1694,7 +1703,7 @@ public class CallService(
         var media = new VoIPMediaSession(new MediaEndPoints
         {
             AudioSource = audio,
-            AudioSink = new HoldableAudioSink(audio),
+            AudioSink = new HoldableAudioSink(endpoint),
         });
 
         // The PBX and the media may come from different addresses across the
@@ -1705,7 +1714,7 @@ public class CallService(
         // M-A02: a headset unplugged, or no device at all. Until 27 Sep this
         // went nowhere, and the call connected in silence.
         audio.OnAudioSourceError += error => OnAudioError(audio, AudioFailure.Microphone, error);
-        audio.OnAudioSinkError += error => OnAudioError(audio, AudioFailure.Speaker, error);
+        endpoint.OnAudioSinkError += error => OnAudioError(audio, AudioFailure.Speaker, error);
 
         return (media, audio);
     }
@@ -1715,7 +1724,7 @@ public class CallService(
     /// call in progress: media thrown away after losing a race (F-09) can still
     /// report a device it never used.
     /// </summary>
-    private void OnAudioError(WindowsAudioEndPoint audio, AudioFailure which, string? error)
+    private void OnAudioError(IAudioSource audio, AudioFailure which, string? error)
     {
         bool current;
 
@@ -1799,7 +1808,7 @@ public class CallService(
         string? callId;
         CallRecorder? recorder;
         VoIPMediaSession? media;
-        WindowsAudioEndPoint? audio;
+        IAudioSource? audio;
         SIPUserAgent? retired = null;
 
         lock (_gate)
@@ -2064,7 +2073,7 @@ public class CallService(
     private sealed record HeldLine(
         SIPUserAgent Agent,
         VoIPMediaSession? Media,
-        WindowsAudioEndPoint? Audio,
+        IAudioSource? Audio,
         CallRecorder? Recorder,
         string? CallId,
         CallState State,

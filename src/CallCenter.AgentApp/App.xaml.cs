@@ -331,6 +331,7 @@ public partial class App : Application
         services.Configure<ServerOptions>(context.Configuration.GetSection(ServerOptions.SectionName));
         services.Configure<DialingOptions>(context.Configuration.GetSection(DialingOptions.SectionName));
         services.Configure<RecordingOptions>(context.Configuration.GetSection(RecordingOptions.SectionName));
+        services.Configure<AudioOptions>(context.Configuration.GetSection(AudioOptions.SectionName));
         services.Configure<PosCartOptions>(context.Configuration.GetSection(PosCartOptions.SectionName));
 
         // One session object for the process: every view model asks it who is

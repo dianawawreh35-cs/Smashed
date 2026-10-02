@@ -8546,6 +8546,32 @@ lint and the build pass. **Not yet seen** in the browser.
 
 **To deploy:** server and web, no migration. The Agent App is unchanged.
 
+## 2026-10-02 — A printed report shows all its columns
+
+**In plain terms.** Dia printed the Agents tab of Call reports to PDF: the
+Agent productivity table stopped at *Order value*, with *UN…* cut in half and
+a scrollbar printed under it; *Unclassified* and *Missed* were not on the
+paper. On screen a wide table scrolls sideways; paper cannot scroll, so the
+browser printed only what the scroll box showed. The legend's two swatches
+also printed as large blocks.
+
+**Built.** Print stylesheet only (`index.css`, `@media print`): the scroll box
+lets the table out (`overflow: visible`), and the table is set tighter on
+paper (8.5pt, 4pt × 5pt cell padding, no letter spacing in the headings) so
+every column fits the page's width. The rule that stretches the chart to the
+page now applies to the chart's own drawing only
+(`.recharts-wrapper > .recharts-surface`); it had also caught the legend's
+swatches, which are small recharts surfaces too.
+
+**Applies everywhere** a scrolling table is printed: both report pages, and
+the Calls, Applications, Mistakes and Breaks lists.
+
+**Tested.** The web build passes. A test page with the built stylesheet and a
+ten-column report table, printed to PDF in headless Edge, shows all ten
+columns on an A4 width. **Not yet seen** on the real report pages.
+
+**To deploy:** web only, no migration. The Agent App is unchanged.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

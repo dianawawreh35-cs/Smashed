@@ -302,6 +302,28 @@
     display: table-header-group;
   }
 
+  /* On screen a wide table scrolls sideways; paper cannot scroll, so the
+     scroll box would print only the columns it showed, scrollbar and all.
+     On paper every column is printed: the box lets the table out, and the
+     table, set tighter than on screen, fits the page's width. */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  .table {
+    width: 100% !important;
+    font-size: 8.5pt;
+  }
+
+  .table thead th,
+  .table tbody td {
+    padding: 4pt 5pt !important;
+  }
+
+  .table thead th {
+    letter-spacing: normal !important;
+  }
+
   tr {
     break-inside: avoid;
   }
@@ -316,7 +338,9 @@
     break-inside: avoid;
   }
 
-  .recharts-surface {
+  /* The chart's own drawing only: the legend's swatches are small
+     recharts-surfaces too, and at the page's width they printed as blocks. */
+  .recharts-wrapper > .recharts-surface {
     width: 100% !important;
     height: auto !important;
   }

@@ -36,8 +36,16 @@ export function PhoneBadge({ phone }: { phone: AgentPhone | undefined }) {
   }
 }
 
-/** Shown while listening in, with the one button that matters: Stop. */
-export function ListenBar({ listening, onStop }: { listening: Listening | null; onStop: () => void }) {
+/** Shown while listening in, with the one button that matters, Stop, and Mute when speaking. */
+export function ListenBar({
+  listening,
+  onStop,
+  onToggleMute,
+}: {
+  listening: Listening | null
+  onStop: () => void
+  onToggleMute: () => void
+}) {
   const { t } = useTranslation()
   const now = useClock(listening?.startedAt !== undefined && listening.status === 'listening')
 
@@ -76,14 +84,25 @@ export function ListenBar({ listening, onStop }: { listening: Listening | null; 
       <span className="font-medium text-slate-100">
         {listening.status === 'connecting'
           ? t('phones.connecting', { name: listening.name })
-          : t('phones.listening', { name: listening.name })}
+          : !listening.speak
+            ? t('phones.listening', { name: listening.name })
+            : listening.muted
+              ? t('phones.muted', { name: listening.name })
+              : t('phones.speaking', { name: listening.name })}
         {listening.startedAt !== undefined && (
           <span className="tabular ms-2 text-slate-400" dir="ltr">{elapsed(listening.startedAt, now)}</span>
         )}
       </span>
-      <button type="button" className="btn-danger" onClick={onStop}>
-        {t('phones.stop')}
-      </button>
+      <span className="flex items-center gap-2">
+        {listening.speak && listening.status === 'listening' && (
+          <button type="button" className="btn-ghost" aria-pressed={listening.muted} onClick={onToggleMute}>
+            {listening.muted ? t('phones.unmute') : t('phones.mute')}
+          </button>
+        )}
+        <button type="button" className="btn-danger" onClick={onStop}>
+          {t('phones.stop')}
+        </button>
+      </span>
     </div>
   )
 }

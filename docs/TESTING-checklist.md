@@ -382,6 +382,28 @@ The server's extension must be set up (the PBX blacklist card in Settings).
       getting back to the server. Tell me.
 - [ ] **Stop listening** ends it at once. So must leaving the Users page, and
       closing the tab. When the call itself ends, the bar says so.
+- [ ] **Listen & speak (`*223`), from a PC without the microphone setting.**
+      Open the web app at `http://192.168.1.100` and press **Listen & speak**.
+      A red bar says the browser will not use the microphone at this address,
+      and no call is placed: the agent notices nothing.
+- [ ] **The microphone setting.** On that PC, run
+      `tools\supervisor-pc\allow-microphone.ps1` as administrator (runbook,
+      *Supervisor PCs: the microphone*) and restart the browser. Press
+      **Listen & speak** again: the browser asks for the microphone. Choose
+      **Allow**.
+- [ ] **Speaking.** With a headset on, the bar says "Speaking to …". Say
+      something. **The agent hears you; the customer does not.** Ask someone on
+      each end. The agent should hear you less than half a second late.
+      *If the customer hears you too:* `*223` on this PBX is a barge, not a
+      whisper. Tell me before anyone uses it.
+      *If the agent hears nothing:* the server log's `PBX listen:` lines say
+      which code was dialled. Tell me.
+- [ ] **Mute.** Press **Mute**: the bar says your microphone is off, and the
+      agent stops hearing you, but you still hear the call. **Unmute** brings it
+      back.
+- [ ] **Refusing the microphone.** Click the icon next to the address, set the
+      microphone to Block, and press **Listen & speak**: the bar says the
+      microphone was not allowed, and no call is placed. Set it back to Allow.
 - [ ] **Everything above in Arabic.**
 
 ### 1.11 The 27 Sep review fixes: the web app (M-W01 to M-W10) — no phone needed

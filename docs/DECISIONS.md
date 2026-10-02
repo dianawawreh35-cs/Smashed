@@ -8617,6 +8617,67 @@ check, lint and the build pass. **Not yet seen** in the browser.
 repeated ids and an old server reads only the first. The Agent App is
 unchanged.
 
+## 2026-10-02 — Listen & speak with *223 (S-62)
+
+**In plain terms.** Dia asked to listen and speak with `*223`, the PBX's
+whisper: the supervisor speaks to the agent and the customer does not hear
+them. It is a **separate button**, **Listen & speak**, beside **Listen** on
+the Users page (Dia: "make it different button that listen alone"). Listen is
+unchanged. While speaking, the bar says so and has **Mute**, which turns the
+microphone off without hanging up.
+
+**The browser would not have asked for the microphone.** Chrome and Edge offer
+the microphone only to an `https://` address or to the computer itself; at
+`http://192.168.1.100` they block it without a prompt. Dia asked whether the
+browser does not ask; it does not, there. Of the two ways round it, a setting
+on each supervisor PC or HTTPS on the server, Dia chose the PC setting:
+`tools/supervisor-pc/allow-microphone.ps1` sets the browsers' own policy
+`OverrideSecurityRestrictionsOnInsecureOrigin` to that one address, for Edge
+and Chrome (runbook, *Supervisor PCs: the microphone*). HTTPS on the LAN
+(M-D06) would make it unnecessary and is still in the table below.
+
+**How it works.** `GET /api/pbx/agents/{id}/speak` is the listen-in with
+`*223` instead of `*222`: same stream to the browser, same ways of ending,
+same audit rows, with `speak: true` in both. While it lasts, the browser posts
+the supervisor's microphone to `POST /api/pbx/agents/listen/{listenId}/voice`,
+100 ms of 16-bit 8 kHz a post, one post at a time. The server puts it in a
+small buffer (`VoiceBuffer`: 120 ms held back after it runs dry, a second at
+most) and the 20 ms sender that used to send only silence sends the voice,
+encoded as the codec the PBX chose, μ-law or A-law.
+
+**Decided without asking:**
+- **Posts, not a WebSocket.** The listen-in already streams down over plain
+  HTTP with the bearer token; a post a tenth of a second carries the voice up
+  with the same token, the same Stop, and no new kind of connection or proxy
+  rule. Ten requests a second for one supervisor costs the token check about a
+  hundredth of a millisecond each (27 Sep measurement). They log at Debug.
+- **The microphone first, then the call.** A refused or missing microphone
+  places no call, so the agent's line never has a silent extra listener the
+  supervisor did not mean.
+- **Voice only to the supervisor's own `*223` session.** Another supervisor's
+  post is 404, a post to a `*222` listen-in 409, more than a second at once 413.
+- **The browser's echo cancellation, noise suppression and level** are asked
+  for. A headset is still in the runbook: speakers put the call back into the
+  microphone, and the agent would hear themselves late.
+- **Downsampling by averaging** each 8 kHz sample's share of the microphone's
+  48 kHz (or 44.1 kHz). Enough for speech on G.711; no filter library.
+
+**Tested.** Server: `*223` dialled, the voice reaching the call in order,
+refusals for another supervisor, for `*222` and for too much at once, the audit
+`speak` flag, and the posts refused once the listen-in has ended; the buffer's
+lead, running dry and dropping the oldest; G.711 there and back. The whole
+server suite, 629 of 629, against `callcenter_test`. Web: the downsampler at 48 and
+44.1 kHz, the sender's order, joining and dropping; the Users page's
+Listen & speak with a stand-in microphone (asks for it, dials `/speak`, posts
+1600 bytes per 100 ms, Mute stops the posts, Stop lets go of the microphone)
+and with no microphone at this address (says so, dials nothing). All 27
+files, 223 tests, type check, lint and the build pass. **Not yet heard** on the PBX: whether this Issabel's `*223` is
+a whisper as Dia says, and the delay the agent hears.
+
+**To deploy:** server and web together, no migration. Before the first use:
+`*223` allowed on the server's extension (runbook step 8.3) and the
+microphone setting on each supervisor PC.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -8665,6 +8726,7 @@ running**.
 | POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | The PBX's view of each phone: ringing (`early`) on the Users page | S-61 | built 26 Sep; offline, free and in a call seen, ringing not yet |
+| **Listen & speak (`*223`)**: checklist "Listen & speak"; above all, that the customer does not hear the supervisor | S-62 | **built 2 Oct, not yet heard on the PBX.** `*223` allowed on the server's extension; the microphone setting on a supervisor PC (runbook) |
 | **Click-to-call** from the call log and from a contact (dialling from the Dial tab is built and works) | A-20 | nothing |
 | Redial, call back from a missed call | A-22 | click-to-call |
 | Blind transfer | A-15 | nothing. A *Should* |
@@ -8714,7 +8776,7 @@ merely unfinished. It was useful because it stayed short.
   a tone. Confirmed on 2026-09-20 that the Agent App sends `BYE` and is answered
   `200 OK`, so its own leg ends correctly — the remaining leg is the dialplan's.
 - **The server's own extension (runbook step 8.3)** needs the feature codes
-  `*30`, `*31`, `*280` and `*222`, and leave to see the agents' extensions'
+  `*30`, `*31`, `*280`, `*222` and `*223`, and leave to see the agents' extensions'
   state. Blocking at the PBX (S-46) is done from it; it is the only way to
   stop a blocked caller entering the queue at all.
 - **A web user for the server (S-55)**, set to English, that can open Call

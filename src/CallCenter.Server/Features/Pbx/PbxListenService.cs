@@ -10,20 +10,27 @@ namespace CallCenter.Server.Features.Pbx;
 
 /// <summary>
 /// The listen-in calls in progress, so the Stop button can end one even if the
-/// browser's connection is slow to close (S-62).
+/// browser's connection is slow to close, and the supervisor's voice can reach
+/// a <c>*223</c> one (S-62).
 /// </summary>
 public sealed class ListenSessions
 {
     private readonly ConcurrentDictionary<Guid, Session> _open = new();
 
-    public sealed record Session(Guid Id, Guid SupervisorId, Guid AgentId, CancellationTokenSource Stop);
+    /// <param name="Speak">Dialled with <c>*223</c>: the supervisor's voice goes to the agent.</param>
+    public sealed record Session(
+        Guid Id, Guid SupervisorId, Guid AgentId, bool Speak, IPbxListenCall Call, CancellationTokenSource Stop);
 
-    public Session Open(Guid supervisorId, Guid agentId)
+    public Session Open(Guid supervisorId, Guid agentId, bool speak, IPbxListenCall call)
     {
-        var session = new Session(Guid.NewGuid(), supervisorId, agentId, new CancellationTokenSource());
+        var session = new Session(Guid.NewGuid(), supervisorId, agentId, speak, call, new CancellationTokenSource());
         _open[session.Id] = session;
         return session;
     }
+
+    /// <summary>A session, if it is this supervisor's.</summary>
+    public Session? Find(Guid id, Guid supervisorId) =>
+        _open.TryGetValue(id, out var session) && session.SupervisorId == supervisorId ? session : null;
 
     /// <summary>Ends a session, if it is this supervisor's. False when there is no such session.</summary>
     public bool Stop(Guid id, Guid supervisorId)
@@ -46,7 +53,8 @@ public sealed class ListenSessions
 
 /// <summary>
 /// The agents' phones as the PBX reports them (S-61), and listening in on a
-/// call through the PBX's <c>*222</c> (S-62).
+/// call through the PBX's <c>*222</c>, or listening and speaking to the agent
+/// through <c>*223</c> (S-62).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -55,6 +63,13 @@ public sealed class ListenSessions
 /// that extension's call, listen-only, and sends the call's sound, which the
 /// controller passes to the supervisor's browser as it arrives. Neither the
 /// agent nor the customer hears anything.
+/// </para>
+/// <para>
+/// <b>Speaking is the same call with <c>*223</c></b> (Dia, 2 Oct 2026). The
+/// PBX joins it as a whisper: what the server sends goes to the agent, and
+/// the customer does not hear it. The browser posts the supervisor's
+/// microphone to the session, and the server sends it in place of the
+/// silence a <c>*222</c> call carries.
 /// </para>
 /// <para>
 /// <b>It always ends.</b> Stop, the page closing, the call ending (the PBX
@@ -74,6 +89,9 @@ public class PbxListenService(
 {
     /// <summary>The PBX's listen-in code; the extension follows it.</summary>
     public const string ListenCode = "*222";
+
+    /// <summary>The PBX's whisper code: listen, and speak to the agent only. The extension follows it.</summary>
+    public const string SpeakCode = "*223";
 
     /// <summary>No listen-in outlasts this, whatever the browser does.</summary>
     public static readonly TimeSpan MaxListen = TimeSpan.FromHours(1);
@@ -109,10 +127,15 @@ public class PbxListenService(
             }).ToList());
     }
 
-    /// <summary>Dials <c>*222</c> and the agent's extension, and returns once the PBX has answered.</summary>
+    /// <summary>
+    /// Dials <c>*222</c>, or <c>*223</c> when <paramref name="speak"/>, and the
+    /// agent's extension, and returns once the PBX has answered.
+    /// </summary>
     public async Task<(Started? Started, Failure? Failure, string? Error)> StartAsync(
-        Guid agentId, Guid supervisorId, CancellationToken ct = default)
+        Guid agentId, Guid supervisorId, bool speak = false, CancellationToken ct = default)
     {
+        var code = speak ? SpeakCode : ListenCode;
+
         var agent = await db.Users.AsNoTracking()
             .Where(u => u.Id == agentId && u.Role == UserRoles.Agent)
             .Select(u => new { u.Id, u.DisplayName, u.Extension })
@@ -137,16 +160,16 @@ public class PbxListenService(
         IPbxListenCall call;
         try
         {
-            call = await listener.ListenAsync(from, ListenCode + agent.Extension, ct);
+            call = await listener.ListenAsync(from, code + agent.Extension, ct);
         }
         catch (PbxFeatureException ex)
         {
-            logger.LogWarning("PBX listen: {Code}{Extension} failed: {Error}", ListenCode, agent.Extension, ex.Message);
+            logger.LogWarning("PBX listen: {Code}{Extension} failed: {Error}", code, agent.Extension, ex.Message);
             return (null, Failure.PbxFailed, ex.Message);
         }
 
         var at = clock.GetUtcNow();
-        var session = sessions.Open(supervisorId, agentId);
+        var session = sessions.Open(supervisorId, agentId, speak, call);
 
         db.AuditLog.Add(new AuditLogEntry
         {
@@ -154,12 +177,12 @@ public class PbxListenService(
             Entity = "listen",
             EntityId = agentId.ToString(),
             Action = "start",
-            After = JsonSerializer.SerializeToDocument(new { extension = agent.Extension, agent = agent.DisplayName }),
+            After = JsonSerializer.SerializeToDocument(new { extension = agent.Extension, agent = agent.DisplayName, speak }),
         });
         await db.SaveChangesAsync(CancellationToken.None);
 
-        logger.LogInformation("PBX listen: {Supervisor} is listening to {Agent} on {Extension}",
-            supervisorId, agent.DisplayName, agent.Extension);
+        logger.LogInformation("PBX listen: {Supervisor} is {Doing} {Agent} on {Extension}",
+            supervisorId, speak ? "listening and speaking to" : "listening to", agent.DisplayName, agent.Extension);
 
         return (new Started(session, call, agent.Extension, at), null, null);
     }
@@ -187,7 +210,7 @@ public class PbxListenService(
             Entity = "listen",
             EntityId = started.Session.AgentId.ToString(),
             Action = "stop",
-            After = JsonSerializer.SerializeToDocument(new { extension = started.Extension, seconds, why }),
+            After = JsonSerializer.SerializeToDocument(new { extension = started.Extension, speak = started.Session.Speak, seconds, why }),
         });
         await db.SaveChangesAsync(CancellationToken.None);
 

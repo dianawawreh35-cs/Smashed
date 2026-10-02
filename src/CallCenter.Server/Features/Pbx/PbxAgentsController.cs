@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace CallCenter.Server.Features.Pbx;
 
 /// <summary>
-/// The agents' phones as the PBX sees them (S-61), and listening in on a call
-/// (S-62). Supervisors only.
+/// The agents' phones as the PBX sees them (S-61), and listening in on a call,
+/// or listening and speaking to the agent (S-62). Supervisors only.
 /// </summary>
 [ApiController]
 [Route("api/pbx/agents")]
@@ -35,9 +35,60 @@ public class PbxAgentsController(PbxListenService listen, ListenSessions session
     /// <see cref="PbxListenService.MaxListen"/>.
     /// </summary>
     [HttpGet("{agentId:guid}/listen")]
-    public async Task<IActionResult> Listen(Guid agentId, CancellationToken ct)
+    public Task<IActionResult> Listen(Guid agentId, CancellationToken ct) => StreamAsync(agentId, speak: false, ct);
+
+    /// <summary>
+    /// Listens in as <see cref="Listen"/> does, but through <c>*223</c>, so the
+    /// supervisor can also speak to the agent; the customer does not hear them.
+    /// The voice is posted to <see cref="Voice"/> while this reply lasts.
+    /// </summary>
+    [HttpGet("{agentId:guid}/speak")]
+    public Task<IActionResult> Speak(Guid agentId, CancellationToken ct) => StreamAsync(agentId, speak: true, ct);
+
+    /// <summary>The most one post of the supervisor's voice may carry: one second.</summary>
+    public const int MaxVoiceBytes = VoiceBuffer.MaxSamples * 2;
+
+    /// <summary>
+    /// The supervisor's voice on their own <c>*223</c> listen-in: 16-bit
+    /// little-endian mono samples at 8 kHz, about 100 ms a post, sent into the
+    /// call as it comes.
+    /// </summary>
+    [HttpPost("listen/{id:guid}/voice")]
+    public async Task<IActionResult> Voice(Guid id, CancellationToken ct)
     {
-        var (started, failure, error) = await listen.StartAsync(agentId, User.GetRequiredUserId(), ct);
+        var session = sessions.Find(id, User.GetRequiredUserId());
+        if (session is null)
+        {
+            return NotFound();
+        }
+
+        // A *222 listen-in has no voice to send: the PBX would pass it to nobody.
+        if (!session.Speak)
+        {
+            return Conflict();
+        }
+
+        // One byte past the limit is enough to know it is too much.
+        var buffer = new byte[MaxVoiceBytes + 1];
+        var length = 0;
+        int read;
+        while (length < buffer.Length && (read = await Request.Body.ReadAsync(buffer.AsMemory(length), ct)) > 0)
+        {
+            length += read;
+        }
+
+        if (length > MaxVoiceBytes)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
+
+        session.Call.Speak(buffer.AsSpan(0, length));
+        return NoContent();
+    }
+
+    private async Task<IActionResult> StreamAsync(Guid agentId, bool speak, CancellationToken ct)
+    {
+        var (started, failure, error) = await listen.StartAsync(agentId, User.GetRequiredUserId(), speak, ct);
         if (failure is not null)
         {
             return Problem(failure.Value, error);

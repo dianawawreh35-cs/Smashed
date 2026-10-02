@@ -56,14 +56,16 @@ public interface IPbxFeatureDialer
 }
 
 /// <summary>
-/// Listens in on an agent's call through the PBX's <c>*222</c> (S-62). An
-/// interface so the listening screen can be tested without a PBX.
+/// Listens in on an agent's call through the PBX's <c>*222</c>, or listens and
+/// speaks to the agent through <c>*223</c> (S-62). An interface so the
+/// listening screen can be tested without a PBX.
 /// </summary>
 public interface IPbxCallListener
 {
     /// <summary>
-    /// Dials <paramref name="code"/> (<c>*222</c> and the extension) and returns
-    /// once the PBX has answered. The caller disposes the call to hang up.
+    /// Dials <paramref name="code"/> (<c>*222</c> or <c>*223</c> and the
+    /// extension) and returns once the PBX has answered. The caller disposes
+    /// the call to hang up.
     /// </summary>
     /// <exception cref="PbxFeatureException">The PBX did not answer, or refused the call.</exception>
     Task<IPbxListenCall> ListenAsync(PbxExtension from, string code, CancellationToken ct);
@@ -80,6 +82,13 @@ public interface IPbxListenCall : IAsyncDisposable
 
     /// <summary>Completes when the PBX hangs up.</summary>
     Task Ended { get; }
+
+    /// <summary>
+    /// The supervisor's voice, 16-bit little-endian mono samples at 8 kHz, to
+    /// be sent into the call in place of silence. On <c>*223</c> the PBX
+    /// passes it to the agent only; on <c>*222</c> it passes it to nobody.
+    /// </summary>
+    void Speak(ReadOnlySpan<byte> pcm);
 }
 
 /// <summary>
@@ -297,12 +306,13 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
             }
 
             ct.ThrowIfCancellationRequested();
-            var silence = SendSilence(rtp, CancellationToken.None);
+            var voice = new VoiceBuffer();
+            var sending = SendSilence(rtp, CancellationToken.None, voice);
 
             logger.LogInformation("PBX listen: answered; the PBX sends its audio to {Destination}, codec {Codec}",
                 rtp.AudioDestinationEndPoint, rtp.AudioStream?.GetSendingFormat().Name());
 
-            return new ListenCall(agent, rtp, transport, silence, audio, hungUp.Task, heard, logger);
+            return new ListenCall(agent, rtp, transport, sending, voice, audio, hungUp.Task, heard, logger);
         }
         catch
         {
@@ -329,6 +339,15 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
         }
 
         return pcm;
+    }
+
+    /// <summary>16-bit samples as G.711, μ-law or A-law as the PBX chose: what <see cref="Pcm"/> undoes.</summary>
+    public static void G711(ReadOnlySpan<short> samples, Span<byte> payload, bool alaw)
+    {
+        for (var i = 0; i < samples.Length; i++)
+        {
+            payload[i] = alaw ? ALawEncoder.LinearToALawSample(samples[i]) : MuLawEncoder.LinearToMuLawSample(samples[i]);
+        }
     }
 
     private static void Close(SIPUserAgent agent, RTPSession rtp, SIPTransport transport, ILogger logger)
@@ -396,7 +415,8 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
         SIPUserAgent agent,
         RTPSession rtp,
         SIPTransport transport,
-        IDisposable silence,
+        IDisposable sending,
+        VoiceBuffer voice,
         Channel<byte[]> audio,
         Task hungUp,
         SoundTally heard,
@@ -408,6 +428,8 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
 
         public Task Ended => hungUp;
 
+        public void Speak(ReadOnlySpan<byte> pcm) => voice.Write(pcm);
+
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.Exchange(ref _closed, 1) == 1)
@@ -415,7 +437,7 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
                 return;
             }
 
-            silence.Dispose();
+            sending.Dispose();
             audio.Writer.TryComplete();
             Close(agent, rtp, transport, logger);
 
@@ -499,8 +521,12 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, "not a phone key"),
     };
 
-    /// <summary>Silence, every 20 ms, until disposed or the call ends.</summary>
-    private IDisposable SendSilence(RTPSession rtp, CancellationToken ct)
+    /// <summary>
+    /// Silence, every 20 ms, until disposed or the call ends; or, on a
+    /// listen-in, the supervisor's voice from <paramref name="voice"/> whenever
+    /// there is some.
+    /// </summary>
+    private IDisposable SendSilence(RTPSession rtp, CancellationToken ct, VoiceBuffer? voice = null)
     {
         var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var token = stop.Token;
@@ -508,8 +534,11 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
         // The codec the PBX chose. Silence is 0xFF in μ-law and 0xD5 in A-law;
         // the wrong one is a loud click every 20 ms.
         var alaw = rtp.AudioStream?.GetSendingFormat().ID == PromptListener.PcmaPayloadType;
-        var packet = new byte[SamplesPerPacket];
-        Array.Fill(packet, alaw ? (byte)0xD5 : (byte)0xFF);
+        var silence = new byte[SamplesPerPacket];
+        Array.Fill(silence, alaw ? (byte)0xD5 : (byte)0xFF);
+
+        var samples = new short[SamplesPerPacket];
+        var spoken = new byte[SamplesPerPacket];
 
         _ = Task.Run(async () =>
         {
@@ -518,9 +547,19 @@ public sealed class SipFeatureDialer(TimeProvider clock, ILogger<SipFeatureDiale
             {
                 while (await timer.WaitForNextTickAsync(token))
                 {
-                    if (!rtp.IsClosed)
+                    if (rtp.IsClosed)
                     {
-                        rtp.SendAudio(SamplesPerPacket, packet);
+                        continue;
+                    }
+
+                    if (voice?.Read(samples) == true)
+                    {
+                        G711(samples, spoken, alaw);
+                        rtp.SendAudio(SamplesPerPacket, spoken);
+                    }
+                    else
+                    {
+                        rtp.SendAudio(SamplesPerPacket, silence);
                     }
                 }
             }

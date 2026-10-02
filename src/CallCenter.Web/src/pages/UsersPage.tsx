@@ -20,7 +20,8 @@ import { useAgentPhones, useListen } from '../lib/agentPhones'
 
 /**
  * Accounts and extensions (S-42), and what each agent's phone is doing now
- * (S-61), with listening in on a call (S-62). Each agent's Agent App version
+ * (S-61), with listening in on a call, or listening and speaking to the
+ * agent (S-62). Each agent's Agent App version
  * is the one their latest sign-in to it sent, marked when the Agent App page
  * offers a newer one (A-82).
  *
@@ -69,7 +70,7 @@ export default function UsersPage() {
         </p>
       )}
 
-      <ListenBar listening={listen.current} onStop={listen.stop} />
+      <ListenBar listening={listen.current} onStop={listen.stop} onToggleMute={listen.toggleMute} />
 
       <CreateUserForm onSubmit={(request) => create.mutateAsync(request)} busy={create.isPending} />
 
@@ -112,7 +113,7 @@ export default function UsersPage() {
                   phone={user.role === 'Agent' ? phoneOf(user) : undefined}
                   offeredVersion={offered}
                   listeningHere={listen.current?.agentId === user.id && listen.current.status !== 'failed' && listen.current.status !== 'ended'}
-                  onListen={(phone) => listen.start(phone)}
+                  onListen={(phone, speak) => listen.start(phone, speak)}
                   onStopListening={listen.stop}
                   onToggle={() => toggle.mutate(user)}
                   onChanged={refresh}
@@ -146,7 +147,8 @@ function UserRow({
   /** The version on the Agent App page, or undefined before one is known. */
   offeredVersion: string | undefined
   listeningHere: boolean
-  onListen: (phone: AgentPhone) => void
+  /** `speak`: Listen & speak, through *223. */
+  onListen: (phone: AgentPhone, speak: boolean) => void
   onStopListening: () => void
   onToggle: () => void
   onChanged: () => void
@@ -220,9 +222,14 @@ function UserRow({
             </button>
           ) : (
             phone?.state === 'InCall' && (
-              <button type="button" className="btn-primary btn-sm me-2" onClick={() => onListen(phone)}>
-                {t('phones.listen')}
-              </button>
+              <>
+                <button type="button" className="btn-primary btn-sm me-2" onClick={() => onListen(phone, false)}>
+                  {t('phones.listen')}
+                </button>
+                <button type="button" className="btn-primary btn-sm me-2" onClick={() => onListen(phone, true)}>
+                  {t('phones.speak')}
+                </button>
+              </>
             )
           )}
           {user.role === 'Agent' && (

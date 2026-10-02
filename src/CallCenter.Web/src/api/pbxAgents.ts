@@ -39,5 +39,18 @@ export const LISTEN_ID_HEADER = 'X-Listen-Id'
 export const openListen = (agentId: string, signal: AbortSignal) =>
   requestStream(`${BASE}/${agentId}/listen`, signal)
 
+/**
+ * As `openListen`, but the server dials *223, so the supervisor can also speak
+ * to the agent (`sendVoice`). The customer does not hear them.
+ */
+export const openSpeak = (agentId: string, signal: AbortSignal) =>
+  requestStream(`${BASE}/${agentId}/speak`, signal)
+
+/** The supervisor's voice on their *223 listen-in: 16-bit little-endian mono at 8 kHz. */
+export const sendVoice = (listenId: string, pcm: Uint8Array<ArrayBuffer>) =>
+  api.post<void>(`${BASE}/listen/${listenId}/voice`, new Blob([pcm]), {
+    headers: { 'Content-Type': 'application/octet-stream' },
+  })
+
 /** Ends a listen-in. Aborting the stream ends it too; this makes sure. */
 export const stopListen = (listenId: string) => api.delete<void>(`${BASE}/listen/${listenId}`)

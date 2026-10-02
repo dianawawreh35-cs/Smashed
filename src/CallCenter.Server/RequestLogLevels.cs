@@ -32,6 +32,8 @@ public static class RequestLogLevels
     /// </summary>
     private const string AgentLogs = "/" + CallCenter.Shared.Contracts.AgentLogs.AgentLogNames.Route;
 
+    private const string ListenVoice = "/api/pbx/agents/listen";
+
     public static LogEventLevel For(HttpContext context, double elapsedMs, Exception? ex)
     {
         var status = context.Response.StatusCode;
@@ -50,6 +52,15 @@ public static class RequestLogLevels
         var path = context.Request.Path;
 
         if (path.StartsWithSegments(AgentLogs, StringComparison.OrdinalIgnoreCase))
+        {
+            return LogEventLevel.Debug;
+        }
+
+        // A supervisor speaking on a *223 listen-in (S-62) posts their voice ten
+        // times a second; the start and end are logged, and audited, anyway.
+        if (HttpMethods.IsPost(context.Request.Method)
+            && path.StartsWithSegments(ListenVoice, StringComparison.OrdinalIgnoreCase)
+            && path.Value!.EndsWith("/voice", StringComparison.OrdinalIgnoreCase))
         {
             return LogEventLevel.Debug;
         }

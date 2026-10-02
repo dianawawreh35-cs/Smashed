@@ -103,7 +103,7 @@ The softphone runs on each agent's laptop, which registers with the PBX itself.
 step 8.3). It dials the feature codes that keep the PBX's blacklist in step with
 the Blocked flag (`*30`/`*31`, S-46) and open or close the queue (`*280`, S-60).
 It asks the PBX what each agent's phone is doing (S-61), and it dials `*222` so
-a supervisor can listen in (S-62). All of that starts from the server, over the
+a supervisor can listen in, or `*223` so they can also speak to the agent (S-62). All of that starts from the server, over the
 VPN, so **no port is opened for it**: the PBX's replies and the listen-in's
 sound come back on the conversations the server started. Older copies of this
 runbook opened `5060/udp` and `10000:10100/udp` for a call-back extension. That
@@ -385,14 +385,15 @@ dials `*30`/`*31` to add a number to the PBX's blacklist or take it off,
 following the Blocked flag. It dials `*280` to open or close the queue from the
 dashboard, and opens it by itself each morning at the time in Settings. It asks
 the PBX what each agent's phone is doing, for the badges on the dashboard and
-the Users page. And it dials `*222` so a supervisor can listen in on a call.
-Without the extension none of these work, and the settings cards say so; calls
-themselves are not affected.
+the Users page. And it dials `*222` so a supervisor can listen in on a call, or
+`*223` so they can listen and speak to the agent, which the customer does not
+hear. Without the extension none of these work, and the settings cards say so;
+calls themselves are not affected.
 
 **Work**
 1. Ask the telephony provider for **one more extension, for the server**. It is
    not an agent's and nobody answers it. It needs the feature codes `*30`,
-   `*31`, `*280` and `*222` allowed, and permission to see the agents'
+   `*31`, `*280`, `*222` and `*223` allowed, and permission to see the agents'
    extensions' state (a *subscribe* / busy-lamp permission). On the dev PBX it
    is `2011`. Note the number and its SIP password.
 2. Supervisor app → **Settings** → **PBX blacklist** card: enter the extension
@@ -484,6 +485,37 @@ gunzip -c backups/db-<date>-<time>.sql.gz | docker compose exec -T db psql -U ca
 3. Windows Firewall prompt → **Allow** on private networks. If missed: Windows Security → Firewall → Allow an app → tick the Agent App.
 4. Test on each laptop: internal call between two agents (pop-up, audio both ways, recording plays back, classification form opens), then a real call from a mobile through the trunk.
 5. Log out and log in as a different agent on the same laptop; confirm the other agent's extensions register and only their calls show.
+
+### Supervisor PCs: the microphone
+
+**What it does:** lets a supervisor's browser use the microphone on the web
+app, for **Listen & speak** on the Users page (`*223`, S-62). Listen alone
+does not need it. Edge and Chrome offer the microphone only to a secure
+address (`https://`) or to the computer itself. At `http://192.168.1.100`
+they don't even ask, and the page says the browser will not use the
+microphone at this address. This step tells the browsers, through their own
+company policy (`OverrideSecurityRestrictionsOnInsecureOrigin`), to treat that
+one address as secure. Nothing else is trusted. It encrypts nothing: the
+supervisor's voice crosses the office network as unencrypted as the listen-in sound and
+the logins already do (step 11).
+
+**Work, once on each supervisor PC**
+1. Copy `tools\supervisor-pc\allow-microphone.ps1` from the repository to the PC.
+2. Start **Windows PowerShell as administrator** (right-click, *Run as
+   administrator*), go to the folder, and run
+   `powershell -ExecutionPolicy Bypass -File allow-microphone.ps1`.
+   It prints `Edge: http://192.168.1.100 allowed.` and the same for Chrome.
+   Running it again changes nothing. If the supervisors type a different
+   address, add `-Address http://<that address>`; `-Remove` undoes it.
+3. Close every Edge and Chrome window and open the browser again. To check:
+   `edge://policy` (or `chrome://policy`) lists the policy with the address.
+   The browser's menu now says *Managed by your organization*; that is this
+   policy, and expected.
+4. Plug in the headset. The browser cancels the echo, but a headset keeps the
+   call's sound out of the microphone altogether.
+5. **Check:** on the Users page, press **Listen & speak** on an agent in a
+   call. The browser asks for the microphone; choose **Allow**. It remembers
+   that for this address. The agent hears you and the customer does not.
 
 ---
 

@@ -121,6 +121,109 @@ public class PbxNotifyTests
         SipFeatureDialer.Pcm(8, [0xD5])!.Should().HaveCount(2);
         SipFeatureDialer.Pcm(101, [1, 2, 3]).Should().BeNull("a key event is not sound");
     }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 8)]
+    public void The_supervisors_voice_comes_back_out_of_G711_as_it_went_in(bool alaw, int payloadType)
+    {
+        short[] samples = [0, 1000, -1000, 12000, -12000, 32000, -32000];
+        var payload = new byte[samples.Length];
+
+        SipFeatureDialer.G711(samples, payload, alaw);
+        var back = SipFeatureDialer.Pcm(payloadType, payload)!;
+
+        for (var i = 0; i < samples.Length; i++)
+        {
+            // G.711 keeps about 3% of a loud sample and a few steps of a quiet one.
+            int heard = BitConverter.ToInt16(back, i * 2);
+            heard.Should().BeCloseTo(samples[i], (uint)Math.Max(16, Math.Abs(samples[i] / 16)));
+        }
+
+        SipFeatureDialer.G711([0], payload.AsSpan(0, 1), alaw);
+        payload[0].Should().Be(alaw ? (byte)0xD5 : (byte)0xFF, "silence encodes as the silence the dialer sends");
+    }
+}
+
+public class VoiceBufferTests
+{
+    private static byte[] Samples(int count, short value)
+    {
+        var bytes = new byte[count * 2];
+        for (var i = 0; i < count; i++)
+        {
+            BitConverter.TryWriteBytes(bytes.AsSpan(i * 2), value);
+        }
+
+        return bytes;
+    }
+
+    [Fact]
+    public void Nothing_is_said_until_the_lead_has_arrived_then_it_comes_out_in_order()
+    {
+        var voice = new VoiceBuffer();
+        var packet = new short[160];
+
+        voice.Write(Samples(VoiceBuffer.Lead - 1, 7));
+        voice.Read(packet).Should().BeFalse("a burst is held back until the lead is there");
+
+        voice.Write(Samples(1, 9));
+        voice.Read(packet).Should().BeTrue();
+        packet.Should().AllSatisfy(s => s.Should().Be(7));
+
+        // Once playing, a packet's worth is enough.
+        while (voice.Count >= packet.Length)
+        {
+            voice.Read(packet).Should().BeTrue();
+        }
+
+        packet[^1].Should().Be(9);
+    }
+
+    [Fact]
+    public void Running_dry_waits_for_the_lead_again()
+    {
+        var voice = new VoiceBuffer();
+        var packet = new short[160];
+
+        voice.Write(Samples(VoiceBuffer.Lead, 1));
+        for (var i = 0; i < VoiceBuffer.Lead / packet.Length; i++)
+        {
+            voice.Read(packet).Should().BeTrue();
+        }
+
+        voice.Read(packet).Should().BeFalse("ran dry");
+
+        voice.Write(Samples(packet.Length, 2));
+        voice.Read(packet).Should().BeFalse("one packet after a gap is not yet the lead");
+    }
+
+    [Fact]
+    public void A_backlog_past_a_second_loses_its_oldest_samples()
+    {
+        var voice = new VoiceBuffer();
+        voice.Write(Samples(VoiceBuffer.MaxSamples, 1));
+        voice.Write(Samples(160, 2));
+
+        voice.Count.Should().Be(VoiceBuffer.MaxSamples);
+
+        var packet = new short[160];
+        while (voice.Count > packet.Length)
+        {
+            voice.Read(packet);
+        }
+
+        voice.Read(packet).Should().BeTrue();
+        packet.Should().AllSatisfy(s => s.Should().Be(2), "the newest is kept");
+    }
+
+    [Fact]
+    public void An_odd_last_byte_is_left_out()
+    {
+        var voice = new VoiceBuffer();
+        voice.Write([1, 0, 2]);
+        voice.Count.Should().Be(1);
+    }
 }
 
 public class ExtensionWatchTests
@@ -374,6 +477,96 @@ public class PbxAgentsTests(CallCenterApiFactory factory)
         }
     }
 
+    [DatabaseFact]
+    public async Task Speaking_dials_223_sends_the_supervisors_voice_into_the_call_and_is_audited_as_speaking()
+    {
+        var listener = new PlayingListener(packets: 5, endAfter: false);
+        await using var host = HostWith(listener);
+        var (supervisor, login) = await SignInAsync(host, await data.CreateUserAsync(UserRoles.Supervisor));
+        var agent = await data.CreateUserAsync();
+
+        try
+        {
+            await SetLineAsync(supervisor);
+
+            using var response = await supervisor.GetAsync(
+                $"/api/pbx/agents/{agent.Id}/speak", HttpCompletionOption.ResponseHeadersRead);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var id = response.Headers.GetValues(PbxAgentsController.ListenIdHeader).Single();
+            listener.Codes.Should().Equal($"*223{agent.Extension}");
+
+            byte[] first = [1, 0, 2, 0], second = [3, 0];
+            (await supervisor.PostAsync($"/api/pbx/agents/listen/{id}/voice", new ByteArrayContent(first)))
+                .StatusCode.Should().Be(HttpStatusCode.NoContent);
+            (await supervisor.PostAsync($"/api/pbx/agents/listen/{id}/voice", new ByteArrayContent(second)))
+                .StatusCode.Should().Be(HttpStatusCode.NoContent);
+            listener.Spoken.Should().Equal(1, 0, 2, 0, 3, 0);
+
+            // Nobody else's voice goes into it.
+            var (other, _) = await SignInAsync(host, await data.CreateUserAsync(UserRoles.Supervisor));
+            (await other.PostAsync($"/api/pbx/agents/listen/{id}/voice", new ByteArrayContent(first)))
+                .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+            // More than a second at once is refused.
+            (await supervisor.PostAsync($"/api/pbx/agents/listen/{id}/voice",
+                    new ByteArrayContent(new byte[PbxAgentsController.MaxVoiceBytes + 2])))
+                .StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+            listener.Spoken.Should().HaveCount(6);
+
+            (await supervisor.DeleteAsync($"/api/pbx/agents/listen/{id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+            // The stream ends once the server has hung up and written the stop down.
+            await response.Content.ReadAsByteArrayAsync();
+            listener.HungUp.Should().BeTrue();
+
+            var speak = await data.QueryAsync(db => db.AuditLog
+                .Where(a => a.UserId == login.User.Id && a.Entity == "listen" && a.EntityId == agent.Id.ToString())
+                .OrderBy(a => a.Id)
+                .Select(a => a.After!.RootElement.GetProperty("speak").GetBoolean())
+                .ToListAsync());
+            speak.Should().Equal(true, true);
+
+            // Once it has ended, the voice has nowhere to go.
+            (await supervisor.PostAsync($"/api/pbx/agents/listen/{id}/voice", new ByteArrayContent(first)))
+                .StatusCode.Should().Be(HttpStatusCode.NotFound);
+        }
+        finally
+        {
+            await CleanUpAsync();
+        }
+    }
+
+    [DatabaseFact]
+    public async Task A_listen_only_222_call_takes_no_voice()
+    {
+        var listener = new PlayingListener(packets: 5, endAfter: false);
+        await using var host = HostWith(listener);
+        var (supervisor, login) = await SignInAsync(host, await data.CreateUserAsync(UserRoles.Supervisor));
+        var agent = await data.CreateUserAsync();
+
+        try
+        {
+            await SetLineAsync(supervisor);
+
+            using var response = await supervisor.GetAsync(
+                $"/api/pbx/agents/{agent.Id}/listen", HttpCompletionOption.ResponseHeadersRead);
+            var id = response.Headers.GetValues(PbxAgentsController.ListenIdHeader).Single();
+
+            (await supervisor.PostAsync($"/api/pbx/agents/listen/{id}/voice", new ByteArrayContent([1, 0])))
+                .StatusCode.Should().Be(HttpStatusCode.Conflict);
+            listener.Spoken.Should().BeEmpty();
+
+            (await supervisor.DeleteAsync($"/api/pbx/agents/listen/{id}")).EnsureSuccessStatusCode();
+            await response.Content.ReadAsByteArrayAsync();
+            listener.HungUp.Should().BeTrue();
+            (await AuditAsync(login.User.Id, agent.Id)).Should().Equal("start", "stop");
+        }
+        finally
+        {
+            await CleanUpAsync();
+        }
+    }
+
     // ---- helpers ----------------------------------------------------------------
 
     /// <summary>A host like the real-accounts one, listening through <paramref name="listener"/>.</summary>
@@ -446,13 +639,24 @@ public class PbxAgentsTests(CallCenterApiFactory factory)
                 ended.SetResult();
             }
 
-            return Task.FromResult<IPbxListenCall>(new Call(audio, ended, () => HungUp = true));
+            return Task.FromResult<IPbxListenCall>(new Call(audio, ended, () => HungUp = true, Spoken));
         }
 
-        private sealed class Call(Channel<byte[]> audio, TaskCompletionSource ended, Action hangUp) : IPbxListenCall
+        /// <summary>Everything the supervisor said, in order.</summary>
+        public List<byte> Spoken { get; } = [];
+
+        private sealed class Call(Channel<byte[]> audio, TaskCompletionSource ended, Action hangUp, List<byte> spoken) : IPbxListenCall
         {
             public ChannelReader<byte[]> Audio => audio.Reader;
             public Task Ended => ended.Task;
+
+            public void Speak(ReadOnlySpan<byte> pcm)
+            {
+                lock (spoken)
+                {
+                    spoken.AddRange(pcm.ToArray());
+                }
+            }
 
             public ValueTask DisposeAsync()
             {

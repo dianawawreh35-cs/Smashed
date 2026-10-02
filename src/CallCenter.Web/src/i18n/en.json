@@ -238,10 +238,15 @@
       "InCall": "In a call"
     },
     "listen": "Listen",
+    "speak": "Listen & speak",
     "stop": "Stop listening",
     "close": "Close",
     "connecting": "Connecting to {{name}}'s call…",
     "listening": "Listening to {{name}}",
+    "speaking": "Speaking to {{name}}. Only {{name}} hears you, not the customer.",
+    "muted": "Listening to {{name}}. Your microphone is off.",
+    "mute": "Mute",
+    "unmute": "Unmute",
     "ended": "{{name}}'s call has ended.",
     "problems": {
       "not_configured": "Phone status needs the server's PBX extension. Enter it on the PBX blacklist card in Settings.",
@@ -254,7 +259,10 @@
       "user_not_found": "That account no longer exists.",
       "pbx_failed": "The PBX did not connect the call: {{error}}",
       "server_unreachable": "The server could not be reached.",
-      "server_error": "Listening did not start. Please try again."
+      "server_error": "Listening did not start. Please try again.",
+      "microphone_insecure": "This browser will not use the microphone at this address. This PC needs the microphone setting from the runbook (Supervisor PCs: the microphone). Listen still works.",
+      "microphone_denied": "The microphone was not allowed. Click the icon next to the address, allow the microphone, and try again.",
+      "microphone_missing": "No microphone was found on this PC."
     },
     "failed": "The phones could not be read from the server."
   },

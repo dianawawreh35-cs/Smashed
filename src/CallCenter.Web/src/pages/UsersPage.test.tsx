@@ -322,6 +322,96 @@ describe('phones and listening in (S-61, S-62)', () => {
     expect(screen.queryByText('Listening to Sara')).not.toBeInTheDocument()
   })
 
+  /** Web Audio with a microphone in it: the test plays what the microphone "hears". */
+  let heard: ((pcm: Float32Array) => void) | null = null
+  class MicAudio extends SilentAudio {
+    sampleRate = 48_000
+    createMediaStreamSource() {
+      return { connect: () => undefined }
+    }
+    createGain() {
+      return { gain: { value: 1 }, connect: () => undefined }
+    }
+    createScriptProcessor() {
+      const processor = {
+        connect: () => undefined,
+        onaudioprocess: null as ((e: { inputBuffer: { getChannelData: () => Float32Array } }) => void) | null,
+      }
+      heard = (pcm) => processor.onaudioprocess?.({ inputBuffer: { getChannelData: () => pcm } })
+      return processor
+    }
+  }
+
+  function withMicrophone(getUserMedia: (() => Promise<unknown>) | undefined) {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: getUserMedia ? { getUserMedia } : undefined,
+      configurable: true,
+    })
+  }
+
+  it('Listen & speak asks for the microphone, dials *223 and sends the voice until Mute', async () => {
+    vi.stubGlobal('AudioContext', MicAudio)
+    const stopTrack = vi.fn()
+    const getUserMedia = vi.fn(() => Promise.resolve({ getTracks: () => [{ stop: stopTrack }] }))
+    withMicrophone(getUserMedia)
+    const rest = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>((input) => {
+      const url = String(input)
+      if (url.endsWith('/api/pbx/agents/a1/speak')) return Promise.resolve(listening())
+      if (url.endsWith('/voice')) return Promise.resolve(jsonResponse(null, 204))
+      return Promise.resolve(jsonResponse([TALKING, OFF]))
+    })
+    vi.stubGlobal('fetch', withPhones(rest, PHONES))
+
+    try {
+      renderPage()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Listen & speak' }))
+
+      expect(await screen.findByText(/Speaking to Sara/)).toBeInTheDocument()
+      expect(getUserMedia).toHaveBeenCalled()
+      expect(rest).toHaveBeenCalledWith('/api/pbx/agents/a1/speak', expect.objectContaining({ method: 'GET' }))
+      expect(rest).not.toHaveBeenCalledWith('/api/pbx/agents/a1/listen', expect.anything())
+
+      // 100 ms at 48 kHz is one post of 100 ms at 8 kHz.
+      heard!(new Float32Array(4800).fill(0.25))
+      await waitFor(() =>
+        expect(rest).toHaveBeenCalledWith('/api/pbx/agents/listen/L1/voice', expect.objectContaining({ method: 'POST' })),
+      )
+      const voice = rest.mock.calls.find(([url]) => String(url).endsWith('/voice'))![1] as RequestInit
+      expect((voice.body as Blob).size).toBe(1600)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mute' }))
+      expect(await screen.findByText(/Your microphone is off/)).toBeInTheDocument()
+      const posted = rest.mock.calls.filter(([url]) => String(url).endsWith('/voice')).length
+      heard!(new Float32Array(4800).fill(0.25))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(rest.mock.calls.filter(([url]) => String(url).endsWith('/voice'))).toHaveLength(posted)
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'Stop listening' })[0])
+      await waitFor(() =>
+        expect(rest).toHaveBeenCalledWith('/api/pbx/agents/listen/L1', expect.objectContaining({ method: 'DELETE' })),
+      )
+      expect(stopTrack).toHaveBeenCalled()
+    } finally {
+      withMicrophone(undefined)
+      heard = null
+    }
+  })
+
+  it('Listen & speak at an address the browser keeps the microphone from says so and dials nothing', async () => {
+    vi.stubGlobal('AudioContext', SilentAudio)
+    withMicrophone(undefined)
+    const rest = vi.fn(() => Promise.resolve(jsonResponse([TALKING, OFF])))
+    vi.stubGlobal('fetch', withPhones(rest, PHONES))
+
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Listen & speak' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/will not use the microphone at this address/)
+    expect(rest).not.toHaveBeenCalledWith('/api/pbx/agents/a1/speak', expect.anything())
+  })
+
   it('asks for nothing but the new password on somebody else’s account', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse([AGENT]))

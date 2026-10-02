@@ -1,6 +1,12 @@
 <Application x:Class="CallCenter.AgentApp.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+  <!-- The main window's X ends the app (A-05, N-05; Dia, 2 Oct). The default,
+       OnLastWindowClose, never fired: the ringing pop-up is built at start-up
+       and only ever hidden (A-10), so it was always a window left open, and
+       closing the main window left the app running with none, still signed
+       in and still taking calls, until Task Manager ended it. -->
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>

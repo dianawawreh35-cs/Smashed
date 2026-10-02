@@ -8748,6 +8748,33 @@ App.
 **To deploy:** server, web and Agent App; no migration. An older Agent App
 still works, it just keeps older messages fully read only.
 
+## 2026-10-02 — The Agent App's X really closes it (A-05, N-05)
+
+**In plain terms.** Dia noticed that after pressing X the Agent App was still
+in Task Manager. It was: since 18 Sep, in every version, X only hid the
+window. The app went on running with no window, still signed in, its phone
+still registered, so the PBX still sent it calls and the ringing pop-up still
+came up. It ended only from Task Manager, a Windows sign-out or a restart.
+
+**Why.** WPF ends an app when its last window closes (`OnLastWindowClose`, the
+default). The ringing pop-up is built at start-up and only ever hidden, so a
+call only has to show it (A-10), and it refuses to close while the app runs.
+So the main window was never the last one. The careful shutdown written on 27
+Sep (M-A01: sign out, un-REGISTER, stop, all within five seconds) never ran
+on X. The log shows it: starts, and no "Agent App stopped". Updates were not
+affected, since the update calls `Shutdown()` itself.
+
+**Fix.** `ShutdownMode="OnMainWindowClose"` in `App.xaml`. Checked on this
+machine with the Debug build: X sent to the window, the process gone 0.5 s
+later, and "Agent App stopped" in the log; before the fix, still running 15 s
+later with no window. Agent App tests pass.
+
+**What it changes for agents.** X now signs them out and their phone stops
+ringing, which is what X was always meant to do. An agent who wants the app
+out of the way while staying on calls minimises it.
+
+**To deploy:** Agent App only.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

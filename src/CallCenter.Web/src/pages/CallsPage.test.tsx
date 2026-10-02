@@ -6,6 +6,7 @@ import CallsPage from './CallsPage'
 import type { CallRow } from '../api/calls'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
+import { tick } from '../test/filters'
 import { localDate } from '../lib/reportFilters'
 
 /** The supervisor's call search and a call opened (S-02, S-03, S-04), against a stubbed `fetch`. */
@@ -168,7 +169,7 @@ describe('calls page', () => {
     const before = searches(fetchMock).length
 
     fireEvent.change(screen.getByLabelText('Number or name'), { target: { value: '0599' } })
-    fireEvent.change(screen.getByLabelText('Result'), { target: { value: 'Missed' } })
+    await tick('Result', 'Missed', 'Rejected')
     expect(searches(fetchMock)).toHaveLength(before)
 
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
@@ -176,7 +177,7 @@ describe('calls page', () => {
     await waitFor(() => expect(searches(fetchMock).length).toBe(before + 1))
     const sent = new URL(searches(fetchMock).at(-1)!, 'http://x')
     expect(sent.searchParams.get('q')).toBe('0599')
-    expect(sent.searchParams.get('status')).toBe('Missed')
+    expect(sent.searchParams.getAll('status')).toEqual(['Missed', 'Rejected'])
     expect(sent.searchParams.get('page')).toBe('1')
   })
 

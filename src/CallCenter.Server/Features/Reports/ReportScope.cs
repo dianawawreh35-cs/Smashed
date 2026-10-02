@@ -30,13 +30,17 @@ namespace CallCenter.Server.Features.Reports;
 /// answered or that was abandoned, and that row already counts it. The
 /// reports about missed calls and the agents (R-11, R-15) still count them.
 /// </param>
+/// <remarks>
+/// The id lists match any of their ids; empty or null is no filter (several
+/// agents, branches, channels or types at once: Dia, 2 Oct 2026).
+/// </remarks>
 public record ReportFilter(
     DateTimeOffset? From = null,
     DateTimeOffset? To = null,
-    Guid? AgentId = null,
-    Guid? BranchId = null,
-    Guid? ChannelId = null,
-    Guid? TypeId = null,
+    IReadOnlyList<Guid>? AgentIds = null,
+    IReadOnlyList<Guid>? BranchIds = null,
+    IReadOnlyList<Guid>? ChannelIds = null,
+    IReadOnlyList<Guid>? TypeIds = null,
     string? Kind = CommunicationKinds.App,
     bool WithRings = false,
     bool WithoutUntaken = false);
@@ -83,10 +87,29 @@ public static class ReportScope
             q = q.Where(c => c.StartedAt < end);
         }
 
-        if (f.AgentId is { } agent) q = q.Where(c => c.AgentId == agent);
-        if (f.BranchId is { } branch) q = q.Where(c => c.BranchId == branch);
-        if (f.ChannelId is { } channel) q = q.Where(c => c.ChannelId == channel);
-        if (f.TypeId is { } type) q = q.Where(c => c.Classification != null && c.Classification.TypeId == type);
+        if (f.AgentIds is { Count: > 0 })
+        {
+            var agents = f.AgentIds.ToArray();
+            q = q.Where(c => c.AgentId != null && agents.Contains(c.AgentId.Value));
+        }
+
+        if (f.BranchIds is { Count: > 0 })
+        {
+            var branches = f.BranchIds.ToArray();
+            q = q.Where(c => c.BranchId != null && branches.Contains(c.BranchId.Value));
+        }
+
+        if (f.ChannelIds is { Count: > 0 })
+        {
+            var channels = f.ChannelIds.ToArray();
+            q = q.Where(c => channels.Contains(c.ChannelId));
+        }
+
+        if (f.TypeIds is { Count: > 0 })
+        {
+            var types = f.TypeIds.ToArray();
+            q = q.Where(c => c.Classification != null && types.Contains(c.Classification.TypeId));
+        }
 
         // S-48: internal calls are recorded and kept, and left out of the
         // customer-facing reports. A row with no number is a customer's

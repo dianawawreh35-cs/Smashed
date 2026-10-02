@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ApplicationReportsPage from './ApplicationReportsPage'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
+import { tick } from '../test/filters'
 
 /**
  * The application reports (A-72, S-05, S-06, S-07), against a stubbed `fetch`:
@@ -131,8 +132,7 @@ describe('application reports page', () => {
     expect(first.searchParams.get('to')).not.toBeNull()
     expect(new Date(first.searchParams.get('to')!).getTime()).toBeGreaterThan(new Date(first.searchParams.get('from')!).getTime())
 
-    await waitFor(() => expect(screen.getByRole('option', { name: 'WhatsApp' })).toBeInTheDocument())
-    fireEvent.change(screen.getByLabelText('Channel'), { target: { value: 'ch-wa' } })
+    await tick('Channel', 'WhatsApp')
 
     await waitFor(() => expect(requests(fetchMock, 'issues').at(-1)).toContain('channelId=ch-wa'))
     for (const report of ['by-channel', 'orders', 'trend', 'by-agent']) {

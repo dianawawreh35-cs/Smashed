@@ -9,16 +9,19 @@
  */
 import { api } from './client'
 
-/** S-07's common filters. Blank ones are left off the query. */
+/**
+ * S-07's common filters. Blank ones are left off the query. Each list matches
+ * any of its ids, and an empty one is no filter (Dia, 2 Oct 2026).
+ */
 export interface ReportFilters {
   /** Inclusive instant, ISO 8601. */
   from?: string
   /** Exclusive instant, ISO 8601. */
   to?: string
-  agentId?: string
-  branchId?: string
-  channelId?: string
-  typeId?: string
+  agentId?: string[]
+  branchId?: string[]
+  channelId?: string[]
+  typeId?: string[]
 }
 
 export type OrdersGrouping = 'channel' | 'branch' | 'agent' | 'day'

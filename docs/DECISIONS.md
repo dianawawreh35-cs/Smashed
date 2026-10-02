@@ -8572,6 +8572,51 @@ columns on an A4 width. **Not yet seen** on the real report pages.
 
 **To deploy:** web only, no migration. The Agent App is unchanged.
 
+## 2026-10-02 — The supervisor's filters take several choices at once (S-02, S-07)
+
+**In plain terms.** Dia asked for the filters in the supervisor app to be
+multi-select. A filter like Agent or Branch used to be a drop-down with one
+choice; it is now a field that opens a list of ticks. Tick two branches and
+the page shows what happened at either. Tick nothing, or *Any* at the top of
+the list, and the filter is off, as before. The field shows the names chosen
+(cut short when they do not fit, all of them in its tooltip) and how many.
+
+**Where.** Every page with these filters: Calls (agent, branch, type,
+result), Applications (channel, agent, branch, type), the call and
+application reports' shared bar (channel, agent, branch, type), the break
+report (agent), Mistakes (branch, agent) and the mistakes report (branch,
+agent). The printed heading of a report names every choice.
+
+**Decided without asking:**
+- **Filters with two answers stay one choice:** Direction (in/out),
+  Responsible (branch/agent), Recorded and Classified (yes/no). Ticking both
+  answers is the same as *Any*, so a list of ticks would only add a click.
+- **Choices are kept in the list's order,** not the order they were ticked,
+  so the field, the printed heading and the request name them alike.
+- **One parameter, repeated** (`branchId=a&branchId=b`), under the same name
+  as before, so a request with one id is read exactly as it always was. The
+  server's query classes take arrays (`[FromQuery(Name = "branchId")] Guid[]
+  BranchIds`), the filters take lists, and every rule became "any of these":
+  `= ANY(@ids)` in the report cube's SQL, `ids.Contains(...)` in LINQ. The
+  application reports now read their filters through the same `ReportQuery`
+  as the call reports instead of four parameters on each of five actions.
+- **Our own control, not the browser's `<select multiple>`,** which needs
+  Ctrl+click and shows as a box of rows. It closes on a click outside, on
+  Escape and when focus leaves it, so Tab moves through the form as before.
+
+**Tested.** Server: a new call search test (two results, both directions, a
+second agent widens the search), and the call reports and mistakes report
+tests ask for two branches and two agents and get the sum; the call
+search, reports, applications, breaks and mistakes tests, 79 of 79, and the
+whole server suite, 621 of 621, against `callcenter_test`. Web: the tests that chose from a drop-down now tick
+(`test/filters.ts`), and the call reports test checks two branches in the
+request, the field and the printed heading; all 26 files, 214 tests, type
+check, lint and the build pass. **Not yet seen** in the browser.
+
+**To deploy:** server and web together, no migration: a new page sends
+repeated ids and an old server reads only the first. The Agent App is
+unchanged.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

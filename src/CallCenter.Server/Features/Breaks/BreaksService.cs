@@ -263,12 +263,12 @@ public class BreaksService(
          ReportScope.StartOfDay(to.AddDays(1).ToDateTime(TimeOnly.MinValue)));
 
     /// <summary>Per agent per day, and per agent over the period.</summary>
-    public async Task<BreakReportDto> ReportAsync(DateOnly from, DateOnly to, Guid? agentId, CancellationToken ct)
+    public async Task<BreakReportDto> ReportAsync(DateOnly from, DateOnly to, IReadOnlyList<Guid>? agentIds, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
         var limit = await DailyLimitMinutesAsync(ct);
         var limitSeconds = limit * 60;
-        var breaks = await InPeriodAsync(from, to, agentId, now, ct);
+        var breaks = await InPeriodAsync(from, to, agentIds, now, ct);
 
         var days = new List<BreakDayDto>();
 
@@ -316,13 +316,13 @@ public class BreaksService(
 
     /// <summary>The single breaks of the period, newest first, a page at a time.</summary>
     public async Task<BreakPageDto> ListAsync(
-        DateOnly from, DateOnly to, Guid? agentId, int page, int pageSize, CancellationToken ct)
+        DateOnly from, DateOnly to, IReadOnlyList<Guid>? agentIds, int page, int pageSize, CancellationToken ct)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
         var now = clock.GetUtcNow();
-        var breaks = await InPeriodAsync(from, to, agentId, now, ct);
+        var breaks = await InPeriodAsync(from, to, agentIds, now, ct);
 
         var rows = breaks
             .OrderByDescending(b => b.StartedAt)
@@ -335,10 +335,10 @@ public class BreaksService(
     }
 
     /// <summary>Every break of the period, newest first, for the export (S-05).</summary>
-    public async Task<IReadOnlyList<BreakDto>> ExportAsync(DateOnly from, DateOnly to, Guid? agentId, CancellationToken ct)
+    public async Task<IReadOnlyList<BreakDto>> ExportAsync(DateOnly from, DateOnly to, IReadOnlyList<Guid>? agentIds, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
-        return (await InPeriodAsync(from, to, agentId, now, ct))
+        return (await InPeriodAsync(from, to, agentIds, now, ct))
             .OrderByDescending(b => b.StartedAt)
             .Select(b => ToDto(b, now))
             .ToList();
@@ -346,13 +346,14 @@ public class BreaksService(
 
     /// <summary>Breaks with any part inside the period, once their end is worked out.</summary>
     private async Task<List<Loaded>> InPeriodAsync(
-        DateOnly from, DateOnly to, Guid? agentId, DateTimeOffset now, CancellationToken ct)
+        DateOnly from, DateOnly to, IReadOnlyList<Guid>? agentIds, DateTimeOffset now, CancellationToken ct)
     {
         var (start, end) = Period(from, to);
+        var agents = agentIds?.ToArray() ?? [];
 
         var breaks = await LoadAsync(
             b => b.StartedAt < end && (b.EndedAt == null || b.EndedAt > start)
-                 && (agentId == null || b.UserId == agentId),
+                 && (agents.Length == 0 || agents.Contains(b.UserId)),
             now, ct);
 
         // An open row is matched whatever its end; the end worked out from its

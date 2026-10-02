@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import MistakeReportsPage from './MistakeReportsPage'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
+import { tick } from '../test/filters'
 import { localDate } from '../lib/reportFilters'
 import { jsonResponse, renderWithClient, routes } from '../test/http'
 
@@ -75,7 +76,7 @@ describe('mistakes report', () => {
     const urls = () => fetchMock.mock.calls.map(([url]) => String(url))
     expect(urls().find((u) => u.includes('/by-branch'))).toContain(`from=${today}&to=${today}`)
 
-    fireEvent.change(screen.getByLabelText('Branch'), { target: { value: 'b1' } })
+    await tick('Branch', 'Ramallah')
     await waitFor(() => expect(urls().some((u) => u.includes('/by-agent') && u.includes('branchId=b1'))).toBe(true))
 
     fireEvent.change(within(card('Over time')).getByLabelText('Per'), { target: { value: 'month' } })

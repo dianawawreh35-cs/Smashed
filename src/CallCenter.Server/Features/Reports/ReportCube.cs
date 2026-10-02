@@ -340,10 +340,10 @@ public class ReportCube(CallCenterDbContext db)
                 Value = new[] { CommunicationStatuses.Missed, CommunicationStatuses.Rejected },
             });
         }
-        if (f.AgentId is { } agent) { where.Add("c.agent_id = @agent"); parameters.Add(new("agent", agent)); }
-        if (f.BranchId is { } branch) { where.Add("c.branch_id = @branch"); parameters.Add(new("branch", branch)); }
-        if (f.ChannelId is { } channel) { where.Add("c.channel_id = @channel"); parameters.Add(new("channel", channel)); }
-        if (f.TypeId is { } type) { where.Add("cl.type_id = @type"); parameters.Add(new("type", type)); }
+        AnyOf("c.agent_id", "agents", f.AgentIds);
+        AnyOf("c.branch_id", "branches", f.BranchIds);
+        AnyOf("c.channel_id", "channels", f.ChannelIds);
+        AnyOf("cl.type_id", "types", f.TypeIds);
         if (internalNumbers.Count > 0)
         {
             // S-48. A withheld number is a customer's, so NULL is let through.
@@ -352,6 +352,14 @@ public class ReportCube(CallCenterDbContext db)
         }
 
         return where;
+
+        // The column is any of the ids; no ids, no filter.
+        void AnyOf(string column, string name, IReadOnlyList<Guid>? ids)
+        {
+            if (ids is not { Count: > 0 }) return;
+            where.Add($"{column} = ANY(@{name})");
+            parameters.Add(new(name, NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = ids.ToArray() });
+        }
     }
 
     /// <summary>One stretch of the period with a single UTC offset, as .NET's time zone rules have it.</summary>

@@ -185,7 +185,7 @@ function BreakReports() {
   const filters: BreakFilters = {
     from: draft.from || undefined,
     to: draft.to || undefined,
-    agentId: draft.agentId || undefined,
+    agentId: draft.agentId.length > 0 ? draft.agentId : undefined,
   }
 
   const report = useQuery({

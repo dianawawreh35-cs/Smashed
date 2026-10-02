@@ -10,7 +10,7 @@ import type { Mistake, MistakeFilters, Responsible } from '../api/mistakes'
 import { errorCodeOf, listUsers } from '../api/users'
 import ConfirmButton from '../components/ConfirmButton'
 import LoadError from '../components/LoadError'
-import { FilterSelect as Select, Pager } from '../components/SearchControls'
+import { FilterMultiSelect, FilterSelect as Select, Pager } from '../components/SearchControls'
 import { looksLikeNumber, ltr, searchDir } from '../lib/bidi'
 import { downloadBlob } from '../lib/csv'
 import { formatMoney } from '../lib/money'
@@ -23,31 +23,32 @@ const PAGE_SIZE = 50
 /** The table's columns, counting the one for the buttons. */
 const COLUMNS = 8
 
-/** The filters as typed: every value a string, turned into filters only on Search. */
+/** The filters as typed, turned into filters only on Search. The lists are the ids ticked; none is all. */
 interface Draft {
   q: string
   from: string
   to: string
-  branchId: string
+  branchId: string[]
   responsible: '' | Responsible
-  agentId: string
+  agentId: string[]
 }
 
 /** Today in both date boxes, as every date filter in the app opens (Dia, 1 Oct 2026). */
 function todayDraft(): Draft {
   const today = localDate(new Date())
-  return { q: '', from: today, to: today, branchId: '', responsible: '', agentId: '' }
+  return { q: '', from: today, to: today, branchId: [], responsible: '', agentId: [] }
 }
 
 function toFilters(d: Draft): MistakeFilters {
   const text = (v: string) => (v.trim() ? v.trim() : undefined)
+  const list = (v: string[]) => (v.length > 0 ? v : undefined)
   return {
     q: text(d.q),
     from: text(d.from),
     to: text(d.to),
-    branchId: text(d.branchId),
+    branchId: list(d.branchId),
     responsible: d.responsible || undefined,
-    agentId: text(d.agentId),
+    agentId: list(d.agentId),
   }
 }
 
@@ -150,22 +151,19 @@ export default function MistakesPage() {
             <input type="date" className="input" value={draft.to} onChange={(e) => set('to')(e.target.value)} />
           </label>
 
-          <Select label={t('mistakes.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
-            {(branches.data ?? []).map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </Select>
+          <FilterMultiSelect label={t('mistakes.columns.branch')} values={draft.branchId} onChange={set('branchId')}
+            choices={branches}
+            options={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))} />
           <Select label={t('mistakes.columns.responsible')} value={draft.responsible} onChange={set('responsible')}>
             <option value="Branch">{t('mistakes.responsibleIs.Branch')}</option>
             <option value="Agent">{t('mistakes.responsibleIs.Agent')}</option>
           </Select>
-          <Select label={t('mistakes.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={users}>
-            {agents.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.displayName}{u.isActive ? '' : ` ${t('mistakes.inactive')}`}
-              </option>
-            ))}
-          </Select>
+          <FilterMultiSelect label={t('mistakes.columns.agent')} values={draft.agentId} onChange={set('agentId')}
+            choices={users}
+            options={agents.map((u) => ({
+              value: u.id,
+              label: `${u.displayName}${u.isActive ? '' : ` ${t('mistakes.inactive')}`}`,
+            }))} />
         </div>
 
         <div className="flex gap-2">

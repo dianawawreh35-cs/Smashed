@@ -10,20 +10,23 @@ import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
 import CallDetails from '../components/CallDetails'
 import LoadError from '../components/LoadError'
-import { FilterSelect as Select, Pager } from '../components/SearchControls'
+import { FilterMultiSelect, FilterSelect as Select, Pager } from '../components/SearchControls'
 import { searchDir } from '../lib/bidi'
 import { localDate } from '../lib/reportFilters'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
 const PAGE_SIZE = 50
 
-/** The form as typed: every value a string, turned into filters only on Search. */
+/**
+ * The form as typed, turned into filters only on Search. The lists are the
+ * choices ticked, any of which matches; none is all (Dia, 2 Oct 2026).
+ */
 interface Draft {
   q: string
-  agentId: string
-  branchId: string
-  channelId: string
-  typeId: string
+  agentId: string[]
+  branchId: string[]
+  channelId: string[]
+  typeId: string[]
   from: string
   to: string
   notes: string
@@ -39,7 +42,7 @@ interface Draft {
 function todayDraft(): Draft {
   const today = localDate(new Date())
   return {
-    q: '', agentId: '', branchId: '', channelId: '', typeId: '',
+    q: '', agentId: [], branchId: [], channelId: [], typeId: [],
     from: today, to: today, notes: '', minOrder: '', maxOrder: '', classified: '',
   }
 }
@@ -48,15 +51,16 @@ function toFilters(d: Draft): CallFilters {
   const text = (v: string) => (v.trim() ? v.trim() : undefined)
   const amount = (v: string) => (v.trim() && !Number.isNaN(Number(v)) ? Number(v) : undefined)
   const yesNo = (v: '' | 'yes' | 'no') => (v === '' ? undefined : v === 'yes')
+  const list = (v: string[]) => (v.length > 0 ? v : undefined)
 
   return {
     // Messages only (A-70): the same search as the Calls page, over the other kind.
     kind: 'App',
     q: text(d.q),
-    agentId: text(d.agentId),
-    branchId: text(d.branchId),
-    channelId: text(d.channelId),
-    typeId: text(d.typeId),
+    agentId: list(d.agentId),
+    branchId: list(d.branchId),
+    channelId: list(d.channelId),
+    typeId: list(d.typeId),
     // Days in the supervisor's own time zone, sent as instants: from the start
     // of the first day to the start of the day after the last.
     from: d.from ? startOfDay(d.from) : undefined,
@@ -140,26 +144,18 @@ export default function ApplicationsPage() {
             <input type="date" className="input" value={draft.to} onChange={(e) => set('to')(e.target.value)} />
           </label>
 
-          <Select label={t('applications.columns.channel')} value={draft.channelId} onChange={set('channelId')} choices={channels}>
-            {(channels.data ?? []).filter((c) => !c.isSystem).map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </Select>
-          <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={agents}>
-            {(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => (
-              <option key={u.id} value={u.id}>{u.displayName}</option>
-            ))}
-          </Select>
-          <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
-            {(branches.data ?? []).map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </Select>
-          <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
-            {(types.data ?? []).map((ty) => (
-              <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
-            ))}
-          </Select>
+          <FilterMultiSelect label={t('applications.columns.channel')} values={draft.channelId} onChange={set('channelId')}
+            choices={channels}
+            options={(channels.data ?? []).filter((c) => !c.isSystem).map((c) => ({ value: c.id, label: c.name }))} />
+          <FilterMultiSelect label={t('calls.columns.agent')} values={draft.agentId} onChange={set('agentId')}
+            choices={agents}
+            options={(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => ({ value: u.id, label: u.displayName }))} />
+          <FilterMultiSelect label={t('calls.columns.branch')} values={draft.branchId} onChange={set('branchId')}
+            choices={branches}
+            options={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))} />
+          <FilterMultiSelect label={t('calls.columns.type')} values={draft.typeId} onChange={set('typeId')}
+            choices={types}
+            options={(types.data ?? []).map((ty) => ({ value: ty.id, label: arabic ? ty.labelAr : ty.labelEn }))} />
 
           <label className="field lg:col-span-2">
             <span className="field-label">{t('calls.filter.notes')}</span>

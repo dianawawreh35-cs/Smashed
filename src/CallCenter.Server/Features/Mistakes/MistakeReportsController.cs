@@ -40,13 +40,14 @@ public class MistakeReportsController(MistakeReportsService reports) : Controlle
         Ok(await reports.RepeatCustomersAsync(query.ToFilter(), ct));
 }
 
-/// <summary>The report's filters: days, inclusive, a branch and an agent. Every one is optional.</summary>
+/// <summary>The report's filters: days, inclusive, branches and agents. Every one is optional.</summary>
+/// <remarks>Branch and agent can each be given several times, and match any of them (Dia, 2 Oct 2026).</remarks>
 public class MistakeReportQuery
 {
     public DateOnly? From { get; set; }
     public DateOnly? To { get; set; }
-    public Guid? BranchId { get; set; }
-    public Guid? AgentId { get; set; }
+    [FromQuery(Name = "branchId")] public Guid[] BranchIds { get; set; } = [];
+    [FromQuery(Name = "agentId")] public Guid[] AgentIds { get; set; } = [];
 
-    public MistakesService.Filter ToFilter() => new(From, To, BranchId, AgentId: AgentId);
+    public MistakesService.Filter ToFilter() => new(From, To, BranchIds, AgentIds: AgentIds);
 }

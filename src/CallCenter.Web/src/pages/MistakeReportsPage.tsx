@@ -15,7 +15,7 @@ import { listUsers } from '../api/users'
 import ReportCard, { SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportColumn } from '../components/ReportCard'
 import { Grouping, PrintPageButton, ReportPrintHeading } from '../components/ReportFilters'
-import { FilterSelect as Select } from '../components/SearchControls'
+import { FilterMultiSelect } from '../components/SearchControls'
 import { formatMoney } from '../lib/money'
 import { printPage } from '../lib/print'
 import { useReportFilters } from '../lib/reportFilters'
@@ -29,8 +29,9 @@ const CUSTOMER_LIMIT = 50
 
 /** Days, not instants: a mistake is kept by its day. */
 function toFilters(d: ReportDraft): MistakeReportFilters {
-  const id = (v: string) => (v ? v : undefined)
-  return { from: id(d.from), to: id(d.to), branchId: id(d.branchId), agentId: id(d.agentId) }
+  const day = (v: string) => (v ? v : undefined)
+  const list = (v: string[]) => (v.length > 0 ? v : undefined)
+  return { from: day(d.from), to: day(d.to), branchId: list(d.branchId), agentId: list(d.agentId) }
 }
 
 /**
@@ -216,16 +217,12 @@ function FilterBar({
           <input type="date" className="input" value={draft.to} disabled={draft.preset !== 'custom'}
             onChange={(e) => set('to')(e.target.value)} />
         </label>
-        <Select label={t('mistakeReports.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
-          {(branches.data ?? []).map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </Select>
-        <Select label={t('mistakeReports.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={users}>
-          {(users.data ?? []).filter((u) => u.role === 'Agent').map((u) => (
-            <option key={u.id} value={u.id}>{u.displayName}</option>
-          ))}
-        </Select>
+        <FilterMultiSelect label={t('mistakeReports.columns.branch')} values={draft.branchId} onChange={set('branchId')}
+          choices={branches}
+          options={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))} />
+        <FilterMultiSelect label={t('mistakeReports.columns.agent')} values={draft.agentId} onChange={set('agentId')}
+          choices={users}
+          options={(users.data ?? []).filter((u) => u.role === 'Agent').map((u) => ({ value: u.id, label: u.displayName }))} />
       </div>
     </form>
   )

@@ -4,6 +4,7 @@
  * change on the server has to be copied across.
  */
 import { api, requestBlob } from './client'
+import type { Query } from './client'
 
 /** Where an agent stands now. */
 export type BreakState = 'Working' | 'OnBreak' | 'NotHeard' | 'SignedOut'
@@ -74,14 +75,13 @@ export interface BreakPage {
   pageSize: number
 }
 
-/** The restaurant's days, both ends included, yyyy-mm-dd; and one agent or all. */
+/** The restaurant's days, both ends included, yyyy-mm-dd; and some agents, or none for all. */
 export interface BreakFilters {
   from?: string
   to?: string
-  agentId?: string
+  agentId?: string[]
 }
 
-type Query = Record<string, string | number | boolean | undefined>
 
 export const breakMonitor = () => api.get<BreakMonitor>('/breaks/monitor')
 

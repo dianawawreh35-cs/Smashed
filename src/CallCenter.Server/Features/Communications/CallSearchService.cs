@@ -43,16 +43,21 @@ public class CallSearchService(CallCenterDbContext db)
     /// rows, so this is never blank in practice. Null means both, for a
     /// combined view later.
     /// </param>
-    /// <param name="ChannelId">Which app, for messages (S-02's channel filter).</param>
+    /// <param name="ChannelIds">Which apps, for messages (S-02's channel filter).</param>
+    /// <remarks>
+    /// The lists match any of their values; empty or null is no filter. A
+    /// supervisor can pick several agents, branches, types and so on at once
+    /// (Dia, 2 Oct 2026).
+    /// </remarks>
     public record Filter(
         string? Query = null,
         string? Kind = CommunicationKinds.Call,
-        Guid? ChannelId = null,
-        Guid? AgentId = null,
-        Guid? BranchId = null,
-        Guid? TypeId = null,
-        string? Status = null,
-        string? Direction = null,
+        IReadOnlyList<Guid>? ChannelIds = null,
+        IReadOnlyList<Guid>? AgentIds = null,
+        IReadOnlyList<Guid>? BranchIds = null,
+        IReadOnlyList<Guid>? TypeIds = null,
+        IReadOnlyList<string>? Statuses = null,
+        IReadOnlyList<string>? Directions = null,
         DateTimeOffset? From = null,
         DateTimeOffset? To = null,
         string? Notes = null,
@@ -119,17 +124,41 @@ public class CallSearchService(CallCenterDbContext db)
             extra.Notes);
     }
 
+    /// <summary>The values given, less the blank ones.</summary>
+    private static string[] Words(IReadOnlyList<string>? values) =>
+        values is null ? [] : values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim()).ToArray();
+
     private static IQueryable<Communication> Apply(IQueryable<Communication> calls, Filter f)
     {
         // Calls-only screens must not start returning messages, and the
         // Applications page must not show calls (A-70).
         if (!string.IsNullOrWhiteSpace(f.Kind)) calls = calls.Where(c => c.Kind == f.Kind);
-        if (f.ChannelId is { } channel) calls = calls.Where(c => c.ChannelId == channel);
-        if (f.AgentId is { } agent) calls = calls.Where(c => c.AgentId == agent);
-        if (f.BranchId is { } branch) calls = calls.Where(c => c.BranchId == branch);
-        if (f.TypeId is { } type) calls = calls.Where(c => c.Classification != null && c.Classification.TypeId == type);
-        if (!string.IsNullOrWhiteSpace(f.Status)) calls = calls.Where(c => c.Status == f.Status);
-        if (!string.IsNullOrWhiteSpace(f.Direction)) calls = calls.Where(c => c.Direction == f.Direction);
+        if (f.ChannelIds is { Count: > 0 })
+        {
+            var channels = f.ChannelIds.ToArray();
+            calls = calls.Where(c => channels.Contains(c.ChannelId));
+        }
+
+        if (f.AgentIds is { Count: > 0 })
+        {
+            var agents = f.AgentIds.ToArray();
+            calls = calls.Where(c => c.AgentId != null && agents.Contains(c.AgentId.Value));
+        }
+
+        if (f.BranchIds is { Count: > 0 })
+        {
+            var branches = f.BranchIds.ToArray();
+            calls = calls.Where(c => c.BranchId != null && branches.Contains(c.BranchId.Value));
+        }
+
+        if (f.TypeIds is { Count: > 0 })
+        {
+            var types = f.TypeIds.ToArray();
+            calls = calls.Where(c => c.Classification != null && types.Contains(c.Classification.TypeId));
+        }
+
+        if (Words(f.Statuses) is { Length: > 0 } statuses) calls = calls.Where(c => statuses.Contains(c.Status));
+        if (Words(f.Directions) is { Length: > 0 } directions) calls = calls.Where(c => directions.Contains(c.Direction));
 
         // Instants, converted to UTC: PostgreSQL's timestamptz takes nothing
         // else from Npgsql, and a local offset here was the 20 September 500.

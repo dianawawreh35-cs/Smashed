@@ -118,6 +118,16 @@ public class CallReportsTests(CallCenterApiFactory factory)
             .Select(r => (r.TypeName, r.Count, r.Share)).Should().Equal(("Order", 1, 100.0m));
         (await d.GetAsync<List<ProblemRowDto>>("calls/complaints", d.BranchB)).Should().BeEmpty();
 
+        // ---- both branches at once: either one matches (Dia, 2 Oct 2026) ----
+
+        var both = (await d.GetAsync<List<CallSummaryRowDto>>("calls/summary", d.BranchA, $"branchId={d.BranchB}")).Single();
+        (both.Communications, both.Calls, both.Messages).Should().Be((13, 12, 1));
+        (await d.GetAsync<List<TypeShareRowDto>>("calls/by-type", d.BranchA, $"branchId={d.BranchB}"))
+            .Single(r => r.TypeName == "Order").Count.Should().Be(3);
+        var agents = await d.GetAsync<List<CallBreakdownRowDto>>(
+            "calls/breakdown", d.BranchA, $"groupBy=agent&agentId={d.AgentOne}&agentId={d.AgentTwo}");
+        agents.Sum(r => r.Calls).Should().Be(10);
+
         // The day after is not in the day.
         var twoDays = await d.GetAsync<List<CallSummaryRowDto>>("calls/summary", d.BranchA, $"to={Instant(d.Day.AddDays(2))}");
         twoDays.Should().HaveCount(2);

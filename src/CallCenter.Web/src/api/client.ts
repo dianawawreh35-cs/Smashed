@@ -69,9 +69,15 @@ export class ApiError extends Error {
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   /** Serialised as JSON unless it is already a BodyInit. */
   body?: unknown
-  /** Appended to the URL as a query string, skipping null/undefined values. */
-  query?: Record<string, string | number | boolean | null | undefined>
+  /**
+   * Appended to the URL as a query string, skipping null/undefined values. A
+   * list repeats its key once per value (`agentId=a&agentId=b`), which is how
+   * the multi-select filters reach the server.
+   */
+  query?: Query
 }
+
+export type Query = Record<string, string | number | boolean | readonly string[] | null | undefined>
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
   const url = path.startsWith('http') ? path : `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
@@ -79,7 +85,11 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
 
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) {
-    if (value !== null && value !== undefined) params.append(key, String(value))
+    if (Array.isArray(value)) {
+      for (const each of value) params.append(key, each)
+    } else if (value !== null && value !== undefined) {
+      params.append(key, String(value))
+    }
   }
   const qs = params.toString()
   return qs ? `${url}${url.includes('?') ? '&' : '?'}${qs}` : url

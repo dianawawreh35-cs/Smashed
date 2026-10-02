@@ -86,7 +86,7 @@ public class BreaksController(BreaksService breaks) : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<BreakReportDto>> Report([FromQuery] BreakQuery query, CancellationToken ct) =>
         query.Period() is { } p
-            ? Ok(await breaks.ReportAsync(p.From, p.To, query.AgentId, ct))
+            ? Ok(await breaks.ReportAsync(p.From, p.To, query.AgentIds, ct))
             : BadPeriod();
 
     /// <summary>The single breaks, newest first, a page at a time.</summary>
@@ -99,7 +99,7 @@ public class BreaksController(BreaksService breaks) : ControllerBase
         [FromQuery] int pageSize = BreaksService.DefaultPageSize,
         CancellationToken ct = default) =>
         query.Period() is { } p
-            ? Ok(await breaks.ListAsync(p.From, p.To, query.AgentId, page, pageSize, ct))
+            ? Ok(await breaks.ListAsync(p.From, p.To, query.AgentIds, page, pageSize, ct))
             : BadPeriod();
 
     /// <summary>Every break of the period as a CSV file Excel opens (S-05).</summary>
@@ -113,7 +113,7 @@ public class BreaksController(BreaksService breaks) : ControllerBase
             return BadPeriod();
         }
 
-        var rows = await breaks.ExportAsync(p.From, p.To, query.AgentId, ct);
+        var rows = await breaks.ExportAsync(p.From, p.To, query.AgentIds, ct);
 
         Response.ContentType = CallExport.ContentType;
         Response.Headers.ContentDisposition = $"attachment; filename=\"breaks-{p.From:yyyy-MM-dd}-{p.To:yyyy-MM-dd}.csv\"";
@@ -139,7 +139,9 @@ public class BreakQuery
 {
     public DateOnly? From { get; set; }
     public DateOnly? To { get; set; }
-    public Guid? AgentId { get; set; }
+
+    /// <summary>Any of these agents (the parameter repeated); none is every agent.</summary>
+    [FromQuery(Name = "agentId")] public Guid[] AgentIds { get; set; } = [];
 
     /// <summary>The period, today for a missing end; null when it is backwards or too long.</summary>
     public (DateOnly From, DateOnly To)? Period()

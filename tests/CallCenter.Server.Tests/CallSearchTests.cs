@@ -118,6 +118,17 @@ public class CallSearchTests(CallCenterApiFactory factory)
     }
 
     [DatabaseFact]
+    public async Task Several_values_of_one_filter_match_any_of_them()
+    {
+        var s = await ScenarioAsync();
+
+        (await s.SearchAsync($"&status={CommunicationStatuses.Missed}&status={CommunicationStatuses.NoAnswer}"))
+            .Rows.Select(r => r.Id).Should().Equal(s.NoAnswer, s.Missed);
+        (await s.SearchAsync($"&direction={Directions.In}&direction={Directions.Out}")).Total.Should().Be(3);
+        (await s.SearchAsync($"&agentId={Guid.NewGuid()}")).Total.Should().Be(3, "a second agent widens the search, never narrows it");
+    }
+
+    [DatabaseFact]
     public async Task A_date_range_includes_its_start_and_excludes_its_end()
     {
         var s = await ScenarioAsync();

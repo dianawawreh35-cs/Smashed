@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ApplicationsPage from './ApplicationsPage'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
+import { filterField, tick } from '../test/filters'
 
 /** The supervisor's page of messages, and one opened (A-70), against a stubbed `fetch`. */
 
@@ -143,11 +144,9 @@ describe('applications page', () => {
 
     renderPage()
     await screen.findByText('Mahmoud')
-    // The channel list has to arrive before it can be chosen.
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Instagram' })).toBeInTheDocument())
     const before = searches(fetchMock).length
 
-    fireEvent.change(screen.getByLabelText('Channel'), { target: { value: 'ch-ig' } })
+    await tick('Channel', 'Instagram')
     fireEvent.change(screen.getByLabelText('Number or name'), { target: { value: 'Lina' } })
     expect(searches(fetchMock)).toHaveLength(before)
 
@@ -165,8 +164,10 @@ describe('applications page', () => {
     vi.stubGlobal('fetch', server())
 
     renderPage()
-    await waitFor(() => expect(screen.getByRole('option', { name: 'WhatsApp' })).toBeInTheDocument())
-    expect(screen.queryByRole('option', { name: 'Phone' })).not.toBeInTheDocument()
+    await screen.findByText('Mahmoud')
+    fireEvent.click(filterField('Channel'))
+    await screen.findByRole('checkbox', { name: 'WhatsApp' })
+    expect(screen.queryByRole('checkbox', { name: 'Phone' })).not.toBeInTheDocument()
   })
 
   it('opens a message under its own row, with its channel and classification, and Edit', async () => {

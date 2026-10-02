@@ -105,14 +105,15 @@ public class MistakesController(MistakesService mistakes) : ControllerBase
 }
 
 /// <summary>The search's filters as query parameters, one class so the search and its export take the same ones.</summary>
+/// <remarks>Branch, responsible and agent can each be given several times, and match any of them (Dia, 2 Oct 2026).</remarks>
 public class MistakeQuery
 {
     public DateOnly? From { get; set; }
     public DateOnly? To { get; set; }
-    public Guid? BranchId { get; set; }
-    public string? Responsible { get; set; }
-    public Guid? AgentId { get; set; }
+    [FromQuery(Name = "branchId")] public Guid[] BranchIds { get; set; } = [];
+    [FromQuery(Name = "responsible")] public string[] Responsible { get; set; } = [];
+    [FromQuery(Name = "agentId")] public Guid[] AgentIds { get; set; } = [];
     public string? Q { get; set; }
 
-    public MistakesService.Filter ToFilter() => new(From, To, BranchId, Responsible, AgentId, Q);
+    public MistakesService.Filter ToFilter() => new(From, To, BranchIds, Responsible, AgentIds, Q);
 }

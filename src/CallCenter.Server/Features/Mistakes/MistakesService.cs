@@ -58,12 +58,13 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
     /// <param name="From">First day wanted, inclusive.</param>
     /// <param name="To">Last day wanted, inclusive.</param>
     /// <param name="Query">A customer's number (three or more digits) or name, or words in the notes.</param>
+    /// <remarks>The lists match any of their values; empty or null is no filter (Dia, 2 Oct 2026).</remarks>
     public record Filter(
         DateOnly? From = null,
         DateOnly? To = null,
-        Guid? BranchId = null,
-        string? Responsible = null,
-        Guid? AgentId = null,
+        IReadOnlyList<Guid>? BranchIds = null,
+        IReadOnlyList<string>? Responsible = null,
+        IReadOnlyList<Guid>? AgentIds = null,
         string? Query = null);
 
     public async Task<MistakePageDto> SearchAsync(
@@ -290,13 +291,25 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
     {
         if (f.From is { } from) mistakes = mistakes.Where(m => m.OccurredOn >= from);
         if (f.To is { } to) mistakes = mistakes.Where(m => m.OccurredOn <= to);
-        if (f.BranchId is { } branch) mistakes = mistakes.Where(m => m.BranchId == branch);
-        if (f.AgentId is { } agent) mistakes = mistakes.Where(m => m.AgentId == agent);
-
-        if (!string.IsNullOrWhiteSpace(f.Responsible))
+        if (f.BranchIds is { Count: > 0 })
         {
-            var responsible = f.Responsible.Trim();
-            mistakes = mistakes.Where(m => m.Responsible == responsible);
+            var branches = f.BranchIds.ToArray();
+            mistakes = mistakes.Where(m => branches.Contains(m.BranchId));
+        }
+
+        if (f.AgentIds is { Count: > 0 })
+        {
+            var agents = f.AgentIds.ToArray();
+            mistakes = mistakes.Where(m => m.AgentId != null && agents.Contains(m.AgentId.Value));
+        }
+
+        var responsible = (f.Responsible ?? [])
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => r.Trim())
+            .ToArray();
+        if (responsible.Length > 0)
+        {
+            mistakes = mistakes.Where(m => responsible.Contains(m.Responsible));
         }
 
         if (!string.IsNullOrWhiteSpace(f.Query))

@@ -71,14 +71,19 @@ public class CallSearchController(CallSearchService search) : ControllerBase
 /// The search's filters as query parameters, one class so the search and its
 /// export cannot take different ones. Every one is optional.
 /// </summary>
+/// <remarks>
+/// The drop-down filters take several values, the parameter repeated
+/// (<c>agentId=…&amp;agentId=…</c>), and match any of them (Dia, 2 Oct 2026).
+/// None given is no filter.
+/// </remarks>
 public class SearchQuery
 {
     public string? Q { get; set; }
-    public Guid? AgentId { get; set; }
-    public Guid? BranchId { get; set; }
-    public Guid? TypeId { get; set; }
-    public string? Status { get; set; }
-    public string? Direction { get; set; }
+    [FromQuery(Name = "agentId")] public Guid[] AgentIds { get; set; } = [];
+    [FromQuery(Name = "branchId")] public Guid[] BranchIds { get; set; } = [];
+    [FromQuery(Name = "typeId")] public Guid[] TypeIds { get; set; } = [];
+    [FromQuery(Name = "status")] public string[] Statuses { get; set; } = [];
+    [FromQuery(Name = "direction")] public string[] Directions { get; set; } = [];
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
     public string? Notes { get; set; }
@@ -86,12 +91,12 @@ public class SearchQuery
     public decimal? MaxOrder { get; set; }
     public bool? HasRecording { get; set; }
     public bool? Classified { get; set; }
-    public Guid? ChannelId { get; set; }
+    [FromQuery(Name = "channelId")] public Guid[] ChannelIds { get; set; } = [];
 
     /// <summary><c>Call</c> (the default, so the Calls page never shows a message) or <c>App</c>.</summary>
     public string Kind { get; set; } = CommunicationKinds.Call;
 
     public CallSearchService.Filter ToFilter() => new(
-        Q, Kind, ChannelId, AgentId, BranchId, TypeId, Status, Direction, From, To, Notes,
+        Q, Kind, ChannelIds, AgentIds, BranchIds, TypeIds, Statuses, Directions, From, To, Notes,
         MinOrder, MaxOrder, HasRecording, Classified);
 }

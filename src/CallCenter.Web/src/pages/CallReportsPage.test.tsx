@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import CallReportsPage from './CallReportsPage'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
+import { filterField, tick } from '../test/filters'
 
 /**
  * The call reports (R-01 to R-05, S-05 to S-07), against a stubbed `fetch`:
@@ -160,13 +161,17 @@ describe('call reports page', () => {
     const first = new URL(requests(fetchMock, 'summary')[0], 'http://x')
     expect(new Date(first.searchParams.get('to')!).getTime()).toBeGreaterThan(new Date(first.searchParams.get('from')!).getTime())
 
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Nablus' })).toBeInTheDocument())
-    fireEvent.change(screen.getByLabelText('Branch'), { target: { value: 'b2' } })
+    await tick('Branch', 'Nablus')
 
     await waitFor(() => expect(requests(fetchMock, 'summary').at(-1)).toContain('branchId=b2'))
     for (const report of ['by-type', 'breakdown']) {
       await waitFor(() => expect(requests(fetchMock, report).at(-1)).toContain('branchId=b2'))
     }
+
+    // A second branch widens the reports to either (Dia, 2 Oct 2026): the id goes once per branch.
+    await tick('Branch', 'Rafat')
+    await waitFor(() => expect(requests(fetchMock, 'summary').at(-1)).toContain('branchId=b1&branchId=b2'))
+    expect(filterField('Branch')).toHaveTextContent('Rafat, Nablus')
   })
 
   it('regroups on the server, and fetches only the open tab', async () => {
@@ -335,9 +340,10 @@ describe('call reports page', () => {
     expect(block).toHaveAttribute('aria-hidden', 'true')
     expect(block.querySelector('h1')!.textContent).toBe('Call reports — Overview')
     expect(block.textContent).toContain('all agents, branches, channels and types')
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Nablus' })).toBeInTheDocument())
-    fireEvent.change(screen.getByLabelText('Branch'), { target: { value: 'b2' } })
+    await tick('Branch', 'Nablus')
     await waitFor(() => expect(block.textContent).toContain('Branch: Nablus'))
+    await tick('Branch', 'Rafat')
+    await waitFor(() => expect(block.textContent).toContain('Branch: Rafat, Nablus'))
   })
 
   it('reads in Arabic', async () => {

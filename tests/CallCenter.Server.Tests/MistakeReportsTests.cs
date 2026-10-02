@@ -63,6 +63,10 @@ public class MistakeReportsTests(CallCenterApiFactory factory)
         rows[0].AgentId.Should().Be(s.Agent1);
         rows[0].Mistakes.Should().Be(2);
         rows[0].Value.Should().Be(15m);
+
+        // Both branches at once: either matches (Dia, 2 Oct 2026).
+        var both = await s.GetAsync<MistakeAgentRowDto>("by-agent", $"branchId={s.BranchA}&branchId={s.BranchB}");
+        both.Select(r => (r.AgentId, r.Mistakes)).Should().BeEquivalentTo([(s.Agent1, 2), (s.Agent2, 1)]);
     }
 
     [DatabaseFact]

@@ -4,6 +4,7 @@
  * server has to be copied across.
  */
 import { api, requestBlob } from './client'
+import type { Query } from './client'
 
 /** `mistakes.responsible`: the branch as a whole, or one agent. */
 export type Responsible = 'Branch' | 'Agent'
@@ -40,15 +41,15 @@ export interface MistakePage {
   pageSize: number
 }
 
-/** Every filter is optional; blank ones are left off the query. */
+/** Every filter is optional; blank ones are left off the query. A list matches any of its ids. */
 export interface MistakeFilters {
   /** First day, yyyy-mm-dd, inclusive. */
   from?: string
   /** Last day, yyyy-mm-dd, inclusive. */
   to?: string
-  branchId?: string
+  branchId?: string[]
   responsible?: Responsible
-  agentId?: string
+  agentId?: string[]
   q?: string
 }
 
@@ -62,7 +63,6 @@ export interface UpsertMistakeRequest {
   notes: string
 }
 
-type Query = Record<string, string | number | boolean | undefined>
 
 export const searchMistakes = (filters: MistakeFilters, page: number, pageSize = 50) =>
   api.get<MistakePage>('/mistakes', { query: { ...filters, page, pageSize } as Query })
@@ -80,12 +80,12 @@ export const deleteMistake = (id: string) => api.delete<void>(`/mistakes/${id}`)
 
 // ---- the mistakes report (R-23) ------------------------------------------
 
-/** The report's filters: days, inclusive, yyyy-mm-dd, a branch and an agent. */
+/** The report's filters: days, inclusive, yyyy-mm-dd, and any of some branches and agents. */
 export interface MistakeReportFilters {
   from?: string
   to?: string
-  branchId?: string
-  agentId?: string
+  branchId?: string[]
+  agentId?: string[]
 }
 
 export interface MistakeBranchRow {

@@ -8,7 +8,7 @@ import { listClassificationTypes } from '../api/classifications'
 import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
 import CallDetails from '../components/CallDetails'
-import { FilterSelect as Select, Pager } from '../components/SearchControls'
+import { FilterMultiSelect, FilterSelect as Select, Pager } from '../components/SearchControls'
 import LoadError from '../components/LoadError'
 import { searchDir } from '../lib/bidi'
 import { downloadBlob } from '../lib/csv'
@@ -21,13 +21,16 @@ const PAGE_SIZE = 50
 /** What the supervisor can pick a call's result from. Ringing and Logged never reach this list. */
 const STATUSES = ['Answered', 'Missed', 'Rejected', 'NoAnswer', 'Blocked', 'Failed', 'Abandoned']
 
-/** The form as typed: every value a string, turned into filters only on Search. */
+/**
+ * The form as typed, turned into filters only on Search. The lists are the
+ * choices ticked, any of which matches; none is all (Dia, 2 Oct 2026).
+ */
 interface Draft {
   q: string
-  agentId: string
-  branchId: string
-  typeId: string
-  status: string
+  agentId: string[]
+  branchId: string[]
+  typeId: string[]
+  status: string[]
   direction: string
   from: string
   to: string
@@ -45,7 +48,7 @@ interface Draft {
 function todayDraft(): Draft {
   const today = localDate(new Date())
   return {
-    q: '', agentId: '', branchId: '', typeId: '', status: '', direction: '',
+    q: '', agentId: [], branchId: [], typeId: [], status: [], direction: '',
     from: today, to: today, notes: '', minOrder: '', maxOrder: '', recording: '', classified: '',
   }
 }
@@ -54,13 +57,14 @@ function toFilters(d: Draft): CallFilters {
   const text = (v: string) => (v.trim() ? v.trim() : undefined)
   const amount = (v: string) => (v.trim() && !Number.isNaN(Number(v)) ? Number(v) : undefined)
   const yesNo = (v: '' | 'yes' | 'no') => (v === '' ? undefined : v === 'yes')
+  const list = (v: string[]) => (v.length > 0 ? v : undefined)
 
   return {
     q: text(d.q),
-    agentId: text(d.agentId),
-    branchId: text(d.branchId),
-    typeId: text(d.typeId),
-    status: text(d.status),
+    agentId: list(d.agentId),
+    branchId: list(d.branchId),
+    typeId: list(d.typeId),
+    status: list(d.status),
     direction: text(d.direction),
     // Days in the supervisor's own time zone, sent as instants: from the start
     // of the first day to the start of the day after the last.
@@ -160,26 +164,17 @@ export default function CallsPage() {
             <input type="date" className="input" value={draft.to} onChange={(e) => set('to')(e.target.value)} />
           </label>
 
-          <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={agents}>
-            {(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => (
-              <option key={u.id} value={u.id}>{u.displayName}</option>
-            ))}
-          </Select>
-          <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
-            {(branches.data ?? []).map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </Select>
-          <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
-            {(types.data ?? []).map((ty) => (
-              <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
-            ))}
-          </Select>
-          <Select label={t('calls.columns.status')} value={draft.status} onChange={set('status')}>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{t(`history.statuses.${s}`, { defaultValue: s })}</option>
-            ))}
-          </Select>
+          <FilterMultiSelect label={t('calls.columns.agent')} values={draft.agentId} onChange={set('agentId')}
+            choices={agents}
+            options={(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => ({ value: u.id, label: u.displayName }))} />
+          <FilterMultiSelect label={t('calls.columns.branch')} values={draft.branchId} onChange={set('branchId')}
+            choices={branches}
+            options={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))} />
+          <FilterMultiSelect label={t('calls.columns.type')} values={draft.typeId} onChange={set('typeId')}
+            choices={types}
+            options={(types.data ?? []).map((ty) => ({ value: ty.id, label: arabic ? ty.labelAr : ty.labelEn }))} />
+          <FilterMultiSelect label={t('calls.columns.status')} values={draft.status} onChange={set('status')}
+            options={STATUSES.map((s) => ({ value: s, label: t(`history.statuses.${s}`, { defaultValue: s }) }))} />
 
           <Select label={t('calls.columns.direction')} value={draft.direction} onChange={set('direction')}>
             <option value="In">{t('calls.directions.In')}</option>

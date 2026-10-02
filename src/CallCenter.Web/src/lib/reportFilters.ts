@@ -9,15 +9,15 @@ import { startOfDay, startOfNextDay } from '../api/calls'
 
 export type Preset = 'today' | 'week' | 'month' | 'custom'
 
-/** The filters as chosen: days, not instants, until they are sent. */
+/** The filters as chosen: days, not instants, until they are sent. Each list is the ids ticked; none is all. */
 export interface ReportDraft {
   preset: Preset
   from: string
   to: string
-  agentId: string
-  branchId: string
-  channelId: string
-  typeId: string
+  agentId: string[]
+  branchId: string[]
+  channelId: string[]
+  typeId: string[]
 }
 
 /** A date as the date input writes it, yyyy-mm-dd, in the browser's own time zone. */
@@ -44,7 +44,7 @@ export function presetRange(preset: Preset, today = new Date()): { from: string;
 }
 
 export function toReportFilters(d: ReportDraft): ReportFilters {
-  const id = (v: string) => (v ? v : undefined)
+  const id = (v: string[]) => (v.length > 0 ? v : undefined)
   return {
     // Days in the supervisor's own time zone, sent as instants: from the start
     // of the first day to the start of the day after the last.
@@ -65,7 +65,7 @@ export function useReportFilters(initial: Preset = 'today') {
   const [draft, setDraft] = useState<ReportDraft>(() => ({
     preset: initial,
     ...presetRange(initial),
-    agentId: '', branchId: '', channelId: '', typeId: '',
+    agentId: [], branchId: [], channelId: [], typeId: [],
   }))
 
   const set = <K extends keyof ReportDraft>(key: K) => (value: ReportDraft[K]) =>

@@ -4,7 +4,7 @@ import { listChannels } from '../api/channels'
 import { listClassificationTypes } from '../api/classifications'
 import { listBranches } from '../api/delivery'
 import { listUsers } from '../api/users'
-import { FilterSelect as Select } from './SearchControls'
+import { FilterMultiSelect } from './SearchControls'
 import type { Preset, ReportDraft } from '../lib/reportFilters'
 
 /**
@@ -70,31 +70,25 @@ export function ReportFilterBar({
             onChange={(e) => set('to')(e.target.value)} />
         </label>
         {!periodOnly && !agentOnly && showChannels && (
-          <Select label={t('applicationReports.columns.channel')} value={draft.channelId} onChange={set('channelId')} choices={channels}>
-            {(channels.data ?? []).filter((ch) => includePhone || !ch.isSystem).map((ch) => (
-              <option key={ch.id} value={ch.id}>{ch.name}</option>
-            ))}
-          </Select>
+          <FilterMultiSelect label={t('applicationReports.columns.channel')} values={draft.channelId}
+            onChange={set('channelId')} choices={channels}
+            options={(channels.data ?? []).filter((ch) => includePhone || !ch.isSystem)
+              .map((ch) => ({ value: ch.id, label: ch.name }))} />
         )}
         {!periodOnly && (
           <>
-            <Select label={t('calls.columns.agent')} value={draft.agentId} onChange={set('agentId')} choices={agents}>
-              {(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => (
-                <option key={u.id} value={u.id}>{u.displayName}</option>
-              ))}
-            </Select>
+            <FilterMultiSelect label={t('calls.columns.agent')} values={draft.agentId} onChange={set('agentId')}
+              choices={agents}
+              options={(agents.data ?? []).filter((u) => u.role === 'Agent')
+                .map((u) => ({ value: u.id, label: u.displayName }))} />
             {!agentOnly && (
               <>
-                <Select label={t('calls.columns.branch')} value={draft.branchId} onChange={set('branchId')} choices={branches}>
-                  {(branches.data ?? []).map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </Select>
-                <Select label={t('calls.columns.type')} value={draft.typeId} onChange={set('typeId')} choices={types}>
-                  {(types.data ?? []).map((ty) => (
-                    <option key={ty.id} value={ty.id}>{arabic ? ty.labelAr : ty.labelEn}</option>
-                  ))}
-                </Select>
+                <FilterMultiSelect label={t('calls.columns.branch')} values={draft.branchId} onChange={set('branchId')}
+                  choices={branches}
+                  options={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))} />
+                <FilterMultiSelect label={t('calls.columns.type')} values={draft.typeId} onChange={set('typeId')}
+                  choices={types}
+                  options={(types.data ?? []).map((ty) => ({ value: ty.id, label: arabic ? ty.labelAr : ty.labelEn }))} />
               </>
             )}
           </>
@@ -146,29 +140,33 @@ export function ReportPrintHeading({
 }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
-  const agents = useQuery({ queryKey: ['users'], queryFn: listUsers, enabled: !periodOnly && !!draft.agentId })
-  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches, enabled: !periodOnly && !!draft.branchId })
-  const channels = useQuery({ queryKey: ['channels', 'all'], queryFn: () => listChannels(true), enabled: !periodOnly && !!draft.channelId })
-  const types = useQuery({ queryKey: ['classification', 'types'], queryFn: listClassificationTypes, enabled: !periodOnly && !!draft.typeId })
+  const agents = useQuery({ queryKey: ['users'], queryFn: listUsers, enabled: !periodOnly && draft.agentId.length > 0 })
+  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches, enabled: !periodOnly && draft.branchId.length > 0 })
+  const channels = useQuery({
+    queryKey: ['channels', 'all'], queryFn: () => listChannels(true), enabled: !periodOnly && draft.channelId.length > 0,
+  })
+  const types = useQuery({
+    queryKey: ['classification', 'types'], queryFn: listClassificationTypes, enabled: !periodOnly && draft.typeId.length > 0,
+  })
 
   const day = (value: string) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString(i18n.language) : '…')
   const period = draft.from === draft.to ? day(draft.from) : `${day(draft.from)} – ${day(draft.to)}`
 
-  // [label, the id chosen, its name]. A filter that is on but whose name did
-  // not load still prints, as "…": leaving it out would print "all agents"
-  // over a report that covers one (M-W03).
-  const chosen: [string, string, string | undefined][] = periodOnly ? [] : [
-    [t('calls.columns.agent'), draft.agentId, agents.data?.find((u) => u.id === draft.agentId)?.displayName],
-    [t('calls.columns.branch'), draft.branchId, branches.data?.find((b) => b.id === draft.branchId)?.name],
-    [t('applicationReports.columns.channel'), draft.channelId, channels.data?.find((c) => c.id === draft.channelId)?.name],
-    [t('calls.columns.type'), draft.typeId, (() => {
-      const type = types.data?.find((ty) => ty.id === draft.typeId)
+  // [label, the ids chosen, the name of one]. A filter that is on but whose
+  // names did not load still prints, as "…": leaving it out would print "all
+  // agents" over a report that covers one (M-W03).
+  const chosen: [string, string[], (id: string) => string | undefined][] = periodOnly ? [] : [
+    [t('calls.columns.agent'), draft.agentId, (id) => agents.data?.find((u) => u.id === id)?.displayName],
+    [t('calls.columns.branch'), draft.branchId, (id) => branches.data?.find((b) => b.id === id)?.name],
+    [t('applicationReports.columns.channel'), draft.channelId, (id) => channels.data?.find((c) => c.id === id)?.name],
+    [t('calls.columns.type'), draft.typeId, (id) => {
+      const type = types.data?.find((ty) => ty.id === id)
       return type && (arabic ? type.labelAr : type.labelEn)
-    })()],
+    }],
   ]
   const filters = chosen
-    .filter(([, id]) => id)
-    .map(([label, , name]) => `${label}: ${name ?? '…'}`)
+    .filter(([, ids]) => ids.length > 0)
+    .map(([label, ids, name]) => `${label}: ${ids.map((id) => name(id) ?? '…').join(arabic ? '، ' : ', ')}`)
 
   // aria-hidden: on screen it is hidden and the page's own heading says the
   // same, and a second heading of the same name confuses a screen reader.

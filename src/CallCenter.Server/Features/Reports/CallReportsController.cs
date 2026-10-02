@@ -1,4 +1,5 @@
 using CallCenter.Server.Features.Auth;
+using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,16 +11,22 @@ namespace CallCenter.Server.Features.Reports;
 /// <c>to</c> exclusive, as instants, and the four ids. Which kinds of
 /// communication a report counts is the report's own business, not the query's.
 /// </summary>
+/// <remarks>
+/// Each id can be given several times (<c>agentId=…&amp;agentId=…</c>) and
+/// matches any of them (Dia, 2 Oct 2026).
+/// </remarks>
 public class ReportQuery
 {
     public DateTimeOffset? From { get; set; }
     public DateTimeOffset? To { get; set; }
-    public Guid? AgentId { get; set; }
-    public Guid? BranchId { get; set; }
-    public Guid? ChannelId { get; set; }
-    public Guid? TypeId { get; set; }
+    [FromQuery(Name = "agentId")] public Guid[] AgentIds { get; set; } = [];
+    [FromQuery(Name = "branchId")] public Guid[] BranchIds { get; set; } = [];
+    [FromQuery(Name = "channelId")] public Guid[] ChannelIds { get; set; } = [];
+    [FromQuery(Name = "typeId")] public Guid[] TypeIds { get; set; } = [];
 
-    public ReportFilter ToFilter() => new(From, To, AgentId, BranchId, ChannelId, TypeId);
+    /// <param name="kind">Which communications the report counts; the call reports' own methods choose.</param>
+    public ReportFilter ToFilter(string? kind = CommunicationKinds.App) =>
+        new(From, To, AgentIds, BranchIds, ChannelIds, TypeIds, kind);
 }
 
 /// <summary>

@@ -5,6 +5,7 @@
  * server has to be copied across.
  */
 import { api, requestBlob } from './client'
+import type { Query } from './client'
 
 export interface CallRow {
   id: string
@@ -82,7 +83,10 @@ export interface ClassificationChange {
   after: Record<string, unknown>
 }
 
-/** Every filter is optional; blank ones are left off the query. */
+/**
+ * Every filter is optional; blank ones are left off the query. A list matches
+ * any of its values, and an empty one is no filter (Dia, 2 Oct 2026).
+ */
 export interface CallFilters {
   /**
    * Call (the default, and what the Calls page sends) or App. Two kinds share
@@ -91,11 +95,11 @@ export interface CallFilters {
    */
   kind?: 'Call' | 'App'
   q?: string
-  channelId?: string
-  agentId?: string
-  branchId?: string
-  typeId?: string
-  status?: string
+  channelId?: string[]
+  agentId?: string[]
+  branchId?: string[]
+  typeId?: string[]
+  status?: string[]
   direction?: string
   /** Inclusive instant, ISO 8601. */
   from?: string
@@ -110,7 +114,7 @@ export interface CallFilters {
 
 export const searchCalls = (filters: CallFilters, page: number, pageSize = 50) =>
   api.get<CallPage>('/communications/search', {
-    query: { ...filters, page, pageSize } as Record<string, string | number | boolean | undefined>,
+    query: { ...filters, page, pageSize } as Query,
   })
 
 /**
@@ -120,7 +124,7 @@ export const searchCalls = (filters: CallFilters, page: number, pageSize = 50) =
  */
 export const exportCalls = (filters: CallFilters, lang: string) =>
   requestBlob('/communications/search/export', {
-    query: { ...filters, lang } as Record<string, string | number | boolean | undefined>,
+    query: { ...filters, lang } as Query,
   })
 
 export const callDetails = (id: string) => api.get<CallDetails>(`/communications/${id}`)

@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { callClassification, callDetails, classificationHistory } from '../api/calls'
+import {
+  callClassification, callDetails, changeMessageChannel, classificationHistory, deleteMessage,
+} from '../api/calls'
 import type { CallClassification, CallRow, ClassificationChange } from '../api/calls'
+import { listChannels } from '../api/channels'
 import { getClassificationForm } from '../api/classifications'
 import type { FormDirection, FormField } from '../api/classifications'
 import { formatClock } from '../lib/recordingWav'
 import ClassificationEditor from './ClassificationEditor'
+import ConfirmButton from './ConfirmButton'
 import LoadError from './LoadError'
 import RecordingPlayer from './RecordingPlayer'
 
@@ -40,6 +44,11 @@ import RecordingPlayer from './RecordingPlayer'
  * where a call has its direction and queue, and no recording, extension or
  * duration, since nobody spoke. Its classification uses the messages form
  * (direction `None`), and Edit / Classify work as they do on a call.
+ *
+ * **A message's channel is changed here, and a message is deleted here**
+ * (Dia, 2 Oct): Change beside the channel, on any message and any day, and
+ * Delete in the header for one recorded by mistake, asking twice as every
+ * Remove does (M-W07). Only a supervisor opens this panel. Calls have neither.
  */
 export default function CallDetails({ row, onClose }: { row: CallRow; onClose: () => void }) {
   const { t, i18n } = useTranslation()
@@ -75,13 +84,26 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
     enabled: classified || editing,
   })
 
+  // Every list and history that shows this message, after it moved or went.
+  function refreshLists() {
+    void queryClient.invalidateQueries({ queryKey: ['calls'] })
+    void queryClient.invalidateQueries({ queryKey: ['communications', 'by-contact'] })
+  }
+
+  const remove = useMutation({
+    mutationFn: () => deleteMessage(id),
+    onSuccess: () => {
+      refreshLists()
+      onClose()
+    },
+  })
+
   function onSaved() {
     setEditing(false)
     setClassifiedHere(true)
     // Everything that shows this call's classification: the answers, their
     // history, the search rows (type, order value) and a contact's history.
-    void queryClient.invalidateQueries({ queryKey: ['calls'] })
-    void queryClient.invalidateQueries({ queryKey: ['communications', 'by-contact'] })
+    refreshLists()
   }
 
   const summary = row
@@ -110,12 +132,22 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
             {' '}· {when(summary.startedAt)}
           </p>
         </div>
-        <button type="button" className="btn-ghost btn-sm" onClick={onClose}>
-          {t('calls.details.close')}
-        </button>
+        <div className="flex items-center gap-2">
+          {isMessage && (
+            <ConfirmButton
+              label={t('applications.details.delete')}
+              onConfirm={() => remove.mutate()}
+              disabled={remove.isPending}
+            />
+          )}
+          <button type="button" className="btn-ghost btn-sm" onClick={onClose}>
+            {t('calls.details.close')}
+          </button>
+        </div>
       </div>
 
       <div className="card-body space-y-6">
+        {remove.isError && <p role="alert" className="notice-error">{t('applications.details.deleteFailed')}</p>}
         {details.isError && (
           <LoadError message={t('calls.details.failed')} onRetry={() => void details.refetch()} busy={details.isFetching} />
         )}
@@ -124,7 +156,7 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
           // not say: who took it, on which app. The phone facts have no meaning.
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
             <Fact label={t('calls.columns.agent')} value={summary.agentDisplayName} />
-            <Fact label={t('applications.columns.channel')} value={summary.channelName} />
+            <ChannelFact row={summary} onChanged={refreshLists} />
             <Fact label={t('calls.columns.status')} value={t('applications.message')} />
           </dl>
         ) : (
@@ -227,6 +259,93 @@ export default function CallDetails({ row, onClose }: { row: CallRow; onClose: (
         {history.data && history.data.length > 0 && <History changes={history.data} />}
       </div>
     </section>
+  )
+}
+
+/**
+ * A message's channel, with Change beside it (A-71; Dia, 2 Oct). The choices
+ * are the app channels still offered, as when a message is recorded: Phone is
+ * a call's, and a hidden channel is not offered again.
+ */
+function ChannelFact({ row, onChanged }: { row: CallRow; onChanged: () => void }) {
+  const { t } = useTranslation()
+  const [editing, setEditing] = useState(false)
+  const [choice, setChoice] = useState(row.channelId ?? '')
+  // Shown at once; the list row it came from is refreshing behind it.
+  const [savedName, setSavedName] = useState<string | null>(null)
+
+  const channels = useQuery({
+    queryKey: ['channels', 'active'],
+    queryFn: () => listChannels(false),
+    enabled: editing,
+  })
+  const offered = (channels.data ?? []).filter((c) => !c.isSystem)
+
+  const save = useMutation({
+    mutationFn: (channelId: string) => changeMessageChannel(row.id, channelId),
+    onSuccess: (saved) => {
+      setSavedName(saved.channelName)
+      setEditing(false)
+      onChanged()
+    },
+  })
+
+  const label = t('applications.columns.channel')
+
+  if (!editing) {
+    return (
+      <div>
+        <dt className="field-label">{label}</dt>
+        <dd className="flex items-center gap-2 text-slate-200">
+          {savedName ?? row.channelName ?? '–'}
+          <button
+            type="button"
+            className="btn-quiet btn-sm"
+            onClick={() => {
+              save.reset()
+              setEditing(true)
+            }}
+          >
+            {t('applications.details.changeChannel')}
+          </button>
+        </dd>
+      </div>
+    )
+  }
+
+  return (
+    <div className="col-span-2">
+      <label className="field-label" htmlFor={`channel-${row.id}`}>{label}</label>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          id={`channel-${row.id}`}
+          className="input w-auto"
+          value={choice}
+          onChange={(e) => setChoice(e.target.value)}
+          disabled={channels.isLoading}
+        >
+          {/* The message's own channel stays choosable though hidden since. */}
+          {!offered.some((c) => c.id === choice) && choice && (
+            <option value={choice}>{savedName ?? row.channelName}</option>
+          )}
+          {offered.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <button
+          type="button"
+          className="btn-primary btn-sm"
+          disabled={!choice || save.isPending}
+          onClick={() => save.mutate(choice)}
+        >
+          {t('applications.details.saveChannel')}
+        </button>
+        <button type="button" className="btn-ghost btn-sm" onClick={() => setEditing(false)}>
+          {t('applications.details.cancel')}
+        </button>
+      </div>
+      {(save.isError || channels.isError) && (
+        <p role="alert" className="notice-error mt-2">{t('applications.details.channelFailed')}</p>
+      )}
+    </div>
   )
 }
 

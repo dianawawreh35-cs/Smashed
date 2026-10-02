@@ -57,6 +57,13 @@ public record EditApplicationRequest(
     DateTimeOffset? StartedAt);
 
 /// <summary>
+/// Changes only a message's channel (A-71, 2 Oct 2026): the agent who recorded
+/// it on any day, a supervisor on any message. The channel is the one thing
+/// anyone may put right later; the customer and the time keep the edit window.
+/// </summary>
+public record ChangeApplicationChannelRequest([Required] Guid? ChannelId);
+
+/// <summary>
 /// One of the ways a customer reaches the restaurant (S-41): Phone, and the
 /// apps the supervisor lists.
 /// </summary>

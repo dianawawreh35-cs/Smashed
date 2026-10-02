@@ -41,7 +41,8 @@
 
   <!-- App logs: the agent's own application conversations (A-71), its own tab
        beside Applications, where one is recorded (Dia, 25 Sep). Today's are
-       edited here, older ones read only, as the Call log does for calls. -->
+       edited here, as the Call log does for calls; on older ones only the
+       channel can be changed (Dia, 2 Oct). -->
   <!-- Scrolls sideways only when the window is narrower than the list needs:
        the columns are never cut (25 Sep). Root is given a real width in code,
        never infinity, so its star column still resolves (22 Sep). -->
@@ -262,8 +263,9 @@
                       VerticalAlignment="Top"
                       Command="{Binding CloseMessageCommand}" />
 
-              <!-- A-71: today's messages are edited here; older ones are
-                   greyed out and say why. -->
+              <!-- A-71: today's messages are edited here. On older ones only
+                   the channel is (Dia, 2 Oct): the number and the time are
+                   greyed out, and the note says why. -->
               <TextBlock Grid.Row="1"
                          Text="{Binding Localizer[applications.readOnly]}"
                          Style="{StaticResource Subtle}"
@@ -274,8 +276,7 @@
 
               <StackPanel Grid.Row="2" Grid.ColumnSpan="2"
                           Orientation="Horizontal"
-                          Margin="0,10,0,0"
-                          IsEnabled="{Binding CanEditOpened}">
+                          Margin="0,10,0,0">
                 <StackPanel>
                   <TextBlock Text="{Binding Localizer[applications.channel]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
                   <ComboBox ItemsSource="{Binding Channels}"
@@ -283,14 +284,14 @@
                             DisplayMemberPath="Name"
                             MinWidth="140" />
                 </StackPanel>
-                <StackPanel Margin="10,0,0,0">
+                <StackPanel Margin="10,0,0,0" IsEnabled="{Binding CanEditOpened}">
                   <TextBlock Text="{Binding Localizer[applications.number]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
                   <TextBox Text="{Binding EditNumber, UpdateSourceTrigger=PropertyChanged}"
                            Width="160"
                            FontFamily="{StaticResource MonoFont}"
                            FlowDirection="LeftToRight" />
                 </StackPanel>
-                <StackPanel Margin="10,0,0,0">
+                <StackPanel Margin="10,0,0,0" IsEnabled="{Binding CanEditOpened}">
                   <TextBlock Text="{Binding Localizer[applications.time]}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
                   <TextBox Text="{Binding EditTimeText, UpdateSourceTrigger=PropertyChanged}"
                            Width="80"

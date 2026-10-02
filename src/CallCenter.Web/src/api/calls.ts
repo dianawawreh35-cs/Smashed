@@ -4,6 +4,7 @@
  * and `...Classifications.ClassificationDto`. Hand-written, so a change on the
  * server has to be copied across.
  */
+import type { Communication } from './communications'
 import { api, requestBlob } from './client'
 import type { Query } from './client'
 
@@ -151,6 +152,16 @@ export interface SaveClassification {
 /** Classifies a call, or changes its classification. A supervisor may do either at any time (S-04). */
 export const saveClassification = (id: string, request: SaveClassification) =>
   api.put<CallClassification>(`/classifications/${id}`, request)
+
+/**
+ * Moves a message to another app channel (A-71). A supervisor may on any
+ * message, on any day (Dia, 2 Oct); the customer and the time are left as they are.
+ */
+export const changeMessageChannel = (id: string, channelId: string) =>
+  api.put<Communication>(`/communications/applications/${id}/channel`, { channelId })
+
+/** Deletes a message recorded by mistake (Dia, 2 Oct). What it said stays in the audit log. Never a call. */
+export const deleteMessage = (id: string) => api.delete<void>(`/communications/applications/${id}`)
 
 export const classificationHistory = (id: string) =>
   api.get<ClassificationChange[]>(`/classifications/${id}/history`)

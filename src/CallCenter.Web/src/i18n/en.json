@@ -22,6 +22,8 @@
     "callReports": "Call reports",
     "agentApp": "Agent App",
     "logs": "Logs",
+    "showMenu": "Show menu",
+    "hideMenu": "Hide menu",
     "label": "Sections",
     "mistakes": "Mistakes",
     "breaks": "Breaks",
@@ -780,7 +782,13 @@
       "channel": "Channel"
     },
     "details": {
-      "heading": "Message details"
+      "heading": "Message details",
+      "changeChannel": "Change",
+      "saveChannel": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete message",
+      "channelFailed": "The channel could not be changed. Check the server is running, and that the channel is still offered.",
+      "deleteFailed": "The message could not be deleted. Check the server is running."
     }
   },
   "applicationReports": {

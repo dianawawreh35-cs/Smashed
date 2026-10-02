@@ -36,7 +36,7 @@
     "open": "Open",
     "close": "Close",
     "save": "Save changes",
-    "readOnly": "Written on an earlier day, so it can no longer be changed. Ask a supervisor.",
+    "readOnly": "Written on an earlier day: only the channel can still be changed. Ask a supervisor for the rest.",
     "noNumber": "No number",
     "notInContacts": "Not in contacts",
     "empty": "Record a message on the left; it appears here at once.",
@@ -322,7 +322,7 @@
     "noExtension": "Signed in — no extension configured"
   },
   "appLogs": {
-    "intro": "Your own application conversations: today's can be edited, older ones are read only."
+    "intro": "Your own application conversations: today's can be edited; on older ones, only the channel."
   },
   "copy": {
     "copy": "Copy",

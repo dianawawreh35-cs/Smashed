@@ -624,9 +624,10 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
     private string _editTimeText = string.Empty;
 
     /// <summary>
-    /// Today's messages are editable, older ones read-only (A-71). The server
-    /// enforces its window with <c>edit_window_closed</c>; this greys the
-    /// fields out so the agent is told before pressing Save, not after.
+    /// Today's messages are editable; on older ones only the channel is (A-71;
+    /// Dia, 2 Oct). The server enforces its window with <c>edit_window_closed</c>;
+    /// this greys out the number and the time so the agent is told before
+    /// pressing Save, not after.
     /// </summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveEditCommand))]
@@ -665,9 +666,12 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
         await OpenedClassification.BeginForLoggedApplicationAsync(row.Id);
     }
 
-    private bool CanSaveEdit => CanEditOpened && !IsSavingEdit;
+    private bool CanSaveEdit => !IsSavingEdit;
 
-    /// <summary>Saves the channel, number and time of the opened message (A-71).</summary>
+    /// <summary>
+    /// Saves the channel, number and time of the opened message (A-71); on an
+    /// older message, the channel alone.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanSaveEdit))]
     private async Task SaveEditAsync()
     {
@@ -679,6 +683,12 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
         if (EditChannel is null)
         {
             EditMessageKey = "applications.errors.noChannel";
+            return;
+        }
+
+        if (!CanEditOpened)
+        {
+            await SaveChannelAsync(row, EditChannel);
             return;
         }
 
@@ -726,6 +736,38 @@ public partial class ApplicationsViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "A message could not be edited");
+            EditMessageKey = "classification.saveFailed";
+        }
+        finally
+        {
+            IsSavingEdit = false;
+        }
+    }
+
+    /// <summary>An older message's channel, the one thing left to change on it (Dia, 2 Oct).</summary>
+    private async Task SaveChannelAsync(MessageRow row, ChannelOption channel)
+    {
+        IsSavingEdit = true;
+        EditMessageKey = null;
+
+        try
+        {
+            var result = await _api.ChangeApplicationChannelAsync(row.Id, channel.Channel.Id);
+
+            if (!result.IsOk)
+            {
+                EditMessageKey = result.Status == ApiClient.ApiStatus.Unreachable
+                    ? "applications.errors.offline"
+                    : ErrorKey(result.ErrorCode);
+                return;
+            }
+
+            EditMessageKey = "applications.edited";
+            _ = RefreshAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "A message's channel could not be changed");
             EditMessageKey = "classification.saveFailed";
         }
         finally

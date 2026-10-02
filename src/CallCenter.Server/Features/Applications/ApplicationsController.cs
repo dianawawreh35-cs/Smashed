@@ -61,6 +61,39 @@ public class ApplicationsController(ApplicationsService applications) : Controll
     }
 
     /// <summary>
+    /// Changes only a message's channel: the agent who recorded it on any day,
+    /// a supervisor on any message (A-71; Dia, 2 Oct).
+    /// </summary>
+    [HttpPut("{id:guid}/channel")]
+    [ProducesResponseType<CommunicationDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CommunicationDto>> ChangeChannel(
+        Guid id, ChangeApplicationChannelRequest request, CancellationToken ct)
+    {
+        var outcome = await applications.ChangeChannelAsync(
+            id, request.ChannelId!.Value, User.GetRequiredUserId(), IsSupervisor, ct);
+
+        return outcome.Failure is not null ? Problem(outcome) : Ok(outcome.Message);
+    }
+
+    /// <summary>
+    /// Deletes a message recorded by mistake (Dia, 2 Oct). Supervisors only;
+    /// what it said stays in the audit log.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(AuthPolicies.SupervisorOnly)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var failure = await applications.DeleteAsync(id, User.GetRequiredUserId(), ct);
+
+        return failure is not null ? Problem(new ApplicationsService.Outcome(null, failure)) : NoContent();
+    }
+
+    /// <summary>
     /// The signed-in agent's own messages, newest first (A-71). No agent id in
     /// the route: the token decides, as for the call log (A-52).
     /// </summary>

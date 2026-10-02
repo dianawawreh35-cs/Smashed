@@ -206,6 +206,92 @@ public class ApplicationsTests(CallCenterApiFactory factory)
         (await Code(call)).Should().Be("not_an_application");
     }
 
+    [DatabaseFact]
+    public async Task The_channel_alone_is_changed_on_any_day_by_its_agent_or_a_supervisor()
+    {
+        var s = await ScenarioAsync();
+        var yesterday = await s.MessageAsync(s.WhatsApp, DateTimeOffset.UtcNow.AddDays(-3));
+        var toFacebook = new ChangeApplicationChannelRequest(s.Facebook);
+
+        // No window: three days old, and SameDay or not, the agent who recorded it may.
+        var window = await SetEditWindowAsync("SameDay");
+        try
+        {
+            var ok = await s.Agent.PutAsJsonAsync($"/api/communications/applications/{yesterday}/channel", toFacebook);
+            ok.StatusCode.Should().Be(HttpStatusCode.OK, await ok.Content.ReadAsStringAsync());
+            (await ok.Content.ReadFromJsonAsync<CommunicationDto>())!.ChannelName.Should().Be(s.FacebookName);
+        }
+        finally
+        {
+            await SetEditWindowAsync(window);
+        }
+
+        var (other, _) = await data.SignInAsync(await data.CreateUserAsync());
+        var notYours = await other.PutAsJsonAsync(
+            $"/api/communications/applications/{yesterday}/channel", new ChangeApplicationChannelRequest(s.WhatsApp));
+        notYours.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await Code(notYours)).Should().Be("not_your_call");
+
+        var supervisor = await s.Supervisor.PutAsJsonAsync(
+            $"/api/communications/applications/{yesterday}/channel", new ChangeApplicationChannelRequest(s.WhatsApp));
+        supervisor.StatusCode.Should().Be(HttpStatusCode.OK, await supervisor.Content.ReadAsStringAsync());
+
+        var phone = await s.Supervisor.PutAsJsonAsync(
+            $"/api/communications/applications/{yesterday}/channel", new ChangeApplicationChannelRequest(s.Phone));
+        phone.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Code(phone)).Should().Be("phone_channel");
+
+        var call = await s.Supervisor.PutAsJsonAsync($"/api/communications/applications/{s.AnsweredCall}/channel", toFacebook);
+        call.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // The customer and the time are untouched, and each move is in the audit log.
+        var row = await data.QueryAsync(db => db.Communications.AsNoTracking().FirstAsync(c => c.Id == yesterday));
+        row.ChannelId.Should().Be(s.WhatsApp);
+        row.ContactId.Should().Be(s.ContactId);
+
+        var audit = await data.QueryAsync(db => db.AuditLog.AsNoTracking()
+            .Where(a => a.Entity == "application" && a.EntityId == yesterday.ToString())
+            .Select(a => a.Action)
+            .ToListAsync());
+        audit.Should().Equal("change_channel", "change_channel");
+    }
+
+    [DatabaseFact]
+    public async Task A_supervisor_deletes_a_message_with_its_classification_and_the_audit_log_keeps_it()
+    {
+        var s = await ScenarioAsync();
+
+        // Recorded through the endpoint and then reclassified, so it has a
+        // classification and a history, which both have to go with it.
+        var recorded = await s.Agent.PostAsJsonAsync("/api/communications/applications", new RecordApplicationRequest(
+            s.WhatsApp, s.CustomerMobile, null, null,
+            new SaveClassificationRequest(s.OrderType, s.BranchId, 42.5m, "two burgers", FollowUp: false)));
+        recorded.StatusCode.Should().Be(HttpStatusCode.OK, await recorded.Content.ReadAsStringAsync());
+        var id = (await recorded.Content.ReadFromJsonAsync<CommunicationDto>())!.Id;
+
+        var refused = await s.Agent.DeleteAsync($"/api/communications/applications/{id}");
+        refused.StatusCode.Should().Be(HttpStatusCode.Forbidden, "deleting is the supervisor's alone");
+
+        var call = await s.Supervisor.DeleteAsync($"/api/communications/applications/{s.AnsweredCall}");
+        call.StatusCode.Should().Be(HttpStatusCode.Conflict, "calls are never deleted");
+        (await Code(call)).Should().Be("not_an_application");
+
+        var deleted = await s.Supervisor.DeleteAsync($"/api/communications/applications/{id}");
+        deleted.StatusCode.Should().Be(HttpStatusCode.NoContent, await deleted.Content.ReadAsStringAsync());
+
+        (await data.QueryAsync(db => db.Communications.AnyAsync(c => c.Id == id))).Should().BeFalse();
+        (await data.QueryAsync(db => db.Classifications.AnyAsync(c => c.CommunicationId == id))).Should().BeFalse();
+        (await data.QueryAsync(db => db.ClassificationHistory.AnyAsync(h => h.CommunicationId == id))).Should().BeFalse();
+
+        var audit = await data.QueryAsync(db => db.AuditLog.AsNoTracking()
+            .FirstAsync(a => a.Entity == "application" && a.EntityId == id.ToString() && a.Action == "delete"));
+        audit.Before!.RootElement.GetProperty("channel").GetString().Should().Be(s.WhatsAppName);
+        audit.Before.RootElement.GetProperty("classification").GetProperty("notes").GetString().Should().Be("two burgers");
+
+        var again = await s.Supervisor.DeleteAsync($"/api/communications/applications/{id}");
+        again.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // ---- classifying a message (A-70, the not_answered fix) ---------------
 
     [DatabaseFact]

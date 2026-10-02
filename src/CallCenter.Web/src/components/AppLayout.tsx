@@ -1,9 +1,21 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from './LanguageSwitcher'
 import PageBoundary from './PageBoundary'
 import { UserRoles } from '../api/auth'
 import { useAuth } from '../auth/context'
+
+/** Whether the supervisor hid the menu, remembered in this browser. */
+const MENU_HIDDEN_KEY = 'callcenter.menuHidden'
+
+function storedMenuHidden(): boolean {
+  try {
+    return localStorage.getItem(MENU_HIDDEN_KEY) === '1'
+  } catch {
+    return false // private mode / blocked storage - the menu shows
+  }
+}
 
 /**
  * The shell around the signed-in pages: all of them for a supervisor, and the
@@ -18,12 +30,27 @@ import { useAuth } from '../auth/context'
  * It collapses to a horizontal strip on a narrow screen rather than hiding
  * behind a menu button: there are few enough sections to fit, and a supervisor
  * on a laptop should not need two taps to reach reports.
+ *
+ * On a wide screen the supervisor can hide it, for a report or the dashboard
+ * that wants the whole width, with the button at the start of the header. The
+ * choice is remembered in this browser, as the language is.
  */
 export default function AppLayout() {
   const { t } = useTranslation()
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [menuHidden, setMenuHidden] = useState(storedMenuHidden)
+
+  function toggleMenu() {
+    const hidden = !menuHidden
+    setMenuHidden(hidden)
+    try {
+      localStorage.setItem(MENU_HIDDEN_KEY, hidden ? '1' : '0')
+    } catch {
+      // ignore - the choice simply will not persist
+    }
+  }
 
   async function onSignOut() {
     await signOut()
@@ -66,8 +93,9 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen lg:flex">
       <aside
-        className="border-ink-700 bg-ink-900 lg:min-h-screen lg:w-60 lg:shrink-0
-                   lg:border-e border-b lg:border-b-0"
+        id="app-menu"
+        className={`border-ink-700 bg-ink-900 lg:min-h-screen lg:w-60 lg:shrink-0
+                    lg:border-e border-b lg:border-b-0 ${menuHidden ? 'lg:hidden' : ''}`}
       >
         <div className="flex items-center gap-3 px-5 py-4">
           {/* The restaurant's mark. A letter rather than an image keeps the app
@@ -102,6 +130,23 @@ export default function AppLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-end gap-3 border-b border-ink-700 bg-ink-900 px-6 py-3">
+          {/* Wide screens only: on a narrow one the menu is a strip above the
+              page and takes no width to give back. */}
+          <button
+            type="button"
+            onClick={toggleMenu}
+            aria-controls="app-menu"
+            aria-expanded={!menuHidden}
+            title={menuHidden ? t('nav.showMenu') : t('nav.hideMenu')}
+            className="btn-quiet btn-sm me-auto hidden lg:inline-flex"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75"
+                 strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
+              <path d="M3 5h14M3 10h14M3 15h14" />
+            </svg>
+            <span className="sr-only">{menuHidden ? t('nav.showMenu') : t('nav.hideMenu')}</span>
+          </button>
+
           {/* Who is signed in, so a shared browser never leaves it in doubt. */}
           {user && (
             <span className="flex items-center gap-2 text-sm">

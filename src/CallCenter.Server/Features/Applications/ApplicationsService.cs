@@ -1,3 +1,4 @@
+using System.Text.Json;
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
 using CallCenter.Server.Features.Classifications;
@@ -28,9 +29,12 @@ namespace CallCenter.Server.Features.Applications;
 /// keeping what was typed is simpler and cannot lose or duplicate anything
 /// (Dia, 25 Sep).
 ///
-/// <b>Never deleted.</b> The same rule as calls: an agent edits their own within
-/// the window (<see cref="CallEditWindow"/>), a supervisor always, and a wrong
-/// entry becomes <i>Other</i> with a note (Dia, 25 Sep).
+/// <b>Edited, and deleted by a supervisor.</b> An agent edits their own within
+/// the window (<see cref="CallEditWindow"/>), a supervisor always. The channel
+/// alone has no window: the agent who recorded the message may change it on
+/// any day (Dia, 2 Oct). A message recorded by mistake is deleted by a
+/// supervisor, and what it said stays in the audit log (Dia, 2 Oct; until then
+/// a wrong entry became <i>Other</i> with a note). Calls are still never deleted.
 /// </remarks>
 public class ApplicationsService(
     CallCenterDbContext db,
@@ -44,6 +48,9 @@ public class ApplicationsService(
     /// "now": the agent's clock against the server's.
     /// </summary>
     private static readonly TimeSpan ClockSlack = TimeSpan.FromMinutes(5);
+
+    /// <summary>The audit log's name for a message's channel change and deletion.</summary>
+    public const string AuditEntity = "application";
 
     public enum Failure
     {
@@ -255,6 +262,147 @@ public class ApplicationsService(
         await db.SaveChangesAsync(ct);
 
         return new Outcome(await communications.ToDtoAsync(message, ct), null);
+    }
+
+    /// <summary>
+    /// Changes only a message's channel (A-71): the agent who recorded it on
+    /// any day, a supervisor on any message (Dia, 2 Oct). Written to the audit
+    /// log, since no window stands guard over it.
+    /// </summary>
+    public async Task<Outcome> ChangeChannelAsync(
+        Guid id, Guid channelId, Guid actingUserId, bool actorIsSupervisor, CancellationToken ct = default)
+    {
+        var message = await db.Communications.FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (message is null)
+        {
+            return new Outcome(null, Failure.NotFound);
+        }
+
+        if (message.Kind != CommunicationKinds.App)
+        {
+            return new Outcome(null, Failure.NotAnApplication);
+        }
+
+        if (!actorIsSupervisor && message.AgentId != actingUserId)
+        {
+            return new Outcome(null, Failure.NotYours);
+        }
+
+        var channel = await ChannelAsync(channelId, ct);
+        if (channel.Failure is not null)
+        {
+            return new Outcome(null, channel.Failure);
+        }
+
+        if (message.ChannelId != channel.Id)
+        {
+            var before = message.ChannelId;
+            var now = DateTimeOffset.UtcNow;
+
+            message.ChannelId = channel.Id;
+            message.UpdatedAt = now;
+
+            db.AuditLog.Add(new AuditLogEntry
+            {
+                UserId = actingUserId,
+                At = now,
+                Entity = AuditEntity,
+                EntityId = id.ToString(),
+                Action = "change_channel",
+                Before = JsonSerializer.SerializeToDocument(new { channelId = before }),
+                After = JsonSerializer.SerializeToDocument(new { channelId = channel.Id }),
+            });
+
+            await db.SaveChangesAsync(ct);
+
+            logger.LogInformation("Message {Id} moved to {Channel} by {UserId}", id, channel.Name, actingUserId);
+        }
+
+        return new Outcome(await communications.ToDtoAsync(message, ct), null);
+    }
+
+    /// <summary>
+    /// Deletes a message recorded by mistake (Dia, 2 Oct). Supervisors only;
+    /// the controller sees to that. Its classification and that
+    /// classification's history go with it, and what it said is kept in the
+    /// audit log, as a removed mistake's is (S-65).
+    /// </summary>
+    public async Task<Failure?> DeleteAsync(Guid id, Guid actingUserId, CancellationToken ct = default)
+    {
+        var message = await db.Communications
+            .Include(c => c.Channel)
+            .Include(c => c.Classification)
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+
+        if (message is null)
+        {
+            return Failure.NotFound;
+        }
+
+        if (message.Kind != CommunicationKinds.App)
+        {
+            return Failure.NotAnApplication;
+        }
+
+        var classification = message.Classification;
+        var before = JsonSerializer.SerializeToDocument(new
+        {
+            channelId = message.ChannelId,
+            channel = message.Channel.Name,
+            agentId = message.AgentId,
+            contactId = message.ContactId,
+            number = message.RemoteNumberRaw,
+            startedAt = message.StartedAt,
+            branchId = message.BranchId,
+            laptopId = message.LaptopId,
+            createdAt = message.CreatedAt,
+            classification = classification is null ? null : new
+            {
+                typeId = classification.TypeId,
+                orderValue = classification.OrderValue,
+                notes = classification.Notes,
+                followUp = classification.FollowUp,
+                resolved = classification.Resolved,
+                formVersion = classification.FormVersion,
+                customValues = classification.CustomValues,
+                classifiedBy = classification.ClassifiedBy,
+                classifiedAt = classification.ClassifiedAt,
+            },
+        });
+
+        await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+            // What points at the message without cascading. Follow-up tasks
+            // are not written for messages today; cleared all the same, so a
+            // later one cannot make a message impossible to delete.
+            await db.ClassificationHistory.Where(h => h.CommunicationId == id).ExecuteDeleteAsync(ct);
+            await db.FollowUpTasks.Where(t => t.CommunicationId == id).ExecuteDeleteAsync(ct);
+            await db.FollowUpTasks.Where(t => t.ClosedByCommunicationId == id)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.ClosedByCommunicationId, (Guid?)null), ct);
+
+            // The classification goes with it (cascade).
+            db.Communications.Remove(message);
+
+            db.AuditLog.Add(new AuditLogEntry
+            {
+                UserId = actingUserId,
+                At = DateTimeOffset.UtcNow,
+                Entity = AuditEntity,
+                EntityId = id.ToString(),
+                Action = "delete",
+                Before = before,
+            });
+
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        });
+
+        logger.LogInformation("Message {Id} on {Channel} deleted by {UserId}", id, message.Channel.Name, actingUserId);
+
+        return null;
     }
 
     /// <summary>

@@ -470,6 +470,20 @@ public class ApiClient(
             ct);
 
     /// <summary>
+    /// Changes only a message's channel (A-71): the agent's own, on any day
+    /// (Dia, 2 Oct). What an older message is left to edit.
+    /// </summary>
+    public Task<Result<CommunicationDto>> ChangeApplicationChannelAsync(
+        Guid id, Guid channelId, CancellationToken ct = default) =>
+        SendAsync<CommunicationDto>(
+            () => new HttpRequestMessage(HttpMethod.Put, $"api/communications/applications/{id}/channel")
+            {
+                Content = JsonContent.Create(new ChangeApplicationChannelRequest(channelId)),
+            },
+            authenticated: true,
+            ct);
+
+    /// <summary>
     /// The signed-in agent's own messages (A-71), newest first. As with the
     /// call log, no agent id is sent: the token decides whose these are (A-52).
     /// </summary>

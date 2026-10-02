@@ -206,4 +206,53 @@ describe('applications page', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/classifications/form?direction=None')).toBe(true)
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('direction=In'))).toBe(false)
   })
+
+  it('changes the channel of an opened message, offering the app channels only', async () => {
+    const base = server()
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) =>
+      url === '/api/communications/applications/m1/channel' && init?.method === 'PUT'
+        ? jsonResponse({ ...MESSAGE, channelId: 'ch-ig', channelName: 'Instagram' })
+        : base(url, init))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    fireEvent.doubleClick((await screen.findByText('Mahmoud')).closest('tr')!)
+    const details = await screen.findByRole('region', { name: 'Message details' })
+
+    fireEvent.click(within(details).getByRole('button', { name: 'Change' }))
+    const select = await within(details).findByLabelText('Channel')
+    await within(details).findByRole('option', { name: 'Instagram' })
+    expect(within(details).queryByRole('option', { name: 'Phone' })).not.toBeInTheDocument()
+
+    fireEvent.change(select, { target: { value: 'ch-ig' } })
+    fireEvent.click(within(details).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(within(details).getByRole('button', { name: 'Change' })).toBeInTheDocument())
+    const put = fetchMock.mock.calls.find(([url, init]) =>
+      url === '/api/communications/applications/m1/channel' && (init as RequestInit)?.method === 'PUT')!
+    expect(JSON.parse(String((put[1] as RequestInit).body))).toEqual({ channelId: 'ch-ig' })
+    expect(within(details).getByText('Instagram')).toBeInTheDocument()
+  })
+
+  it('deletes an opened message on the second click, and closes it', async () => {
+    const base = server()
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) =>
+      url === '/api/communications/applications/m1' && init?.method === 'DELETE'
+        ? ({ ok: true, status: 204, statusText: '204', headers: new Headers(), json: async () => null, text: async () => '' } as unknown as Response)
+        : base(url, init))
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderPage()
+    fireEvent.doubleClick((await screen.findByText('Mahmoud')).closest('tr')!)
+    const details = await screen.findByRole('region', { name: 'Message details' })
+    const deletes = () => fetchMock.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'DELETE')
+
+    // The first click only asks (M-W07).
+    fireEvent.click(within(details).getByRole('button', { name: 'Delete message' }))
+    expect(deletes()).toHaveLength(0)
+    fireEvent.click(within(details).getByRole('button', { name: 'Confirm remove' }))
+
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Message details' })).not.toBeInTheDocument())
+    expect(deletes().map(([url]) => url)).toEqual(['/api/communications/applications/m1'])
+  })
 })

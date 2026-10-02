@@ -8678,6 +8678,76 @@ a whisper as Dia says, and the delay the agent hears.
 `*223` allowed on the server's extension (runbook step 8.3) and the
 microphone setting on each supervisor PC.
 
+## 2026-10-02 — The side menu can be hidden (S-67)
+
+**In plain terms.** Dia asked for the supervisor app's side panel to collapse.
+A button with three lines, at the start of the header, hides the menu and the
+page takes its width; pressed again, the menu comes back.
+
+**Decided without asking:**
+- **Hidden altogether, not shrunk to a rail of icons.** The sections have no
+  icons, and a rail of first letters would not say where each one goes.
+- **Wide screens only.** Below the `lg` width the menu is already a strip above
+  the page, so there is no width to give back and no button.
+- **Remembered in this browser** (`callcenter.menuHidden` in `localStorage`, as
+  the language is), so it stays hidden from page to page and after a reload.
+  Blocked storage just means the menu shows.
+
+**Tested.** All 27 files, 223 tests, type check and lint pass. **Not yet
+seen** in the browser.
+
+**To deploy:** web only, no migration.
+
+## 2026-10-02 — Messages: the channel changed on any day, and deleted by a supervisor (A-71)
+
+**In plain terms.** Dia asked for two things on the application messages
+("app logs"). A supervisor can **delete** a message that was recorded by
+mistake. And the **channel** (WhatsApp, Facebook…) can be put right by anyone
+who can see the message, whenever they notice it was wrong.
+
+**What changed.**
+- **Website, a message opened on the Applications page** (or from a contact's
+  history): *Change* beside the channel, a list of the app channels still
+  offered, and *Delete message* in the header, which asks twice like every
+  Remove (M-W07) and closes the message.
+- **Agent App, App logs:** on a message from an earlier day the channel stays
+  open and Save saves it; the number and the time stay greyed out as before.
+  The note under it says only the channel can still be changed.
+- **Server:** `PUT /api/communications/applications/{id}/channel` (the agent's
+  own message on any day, a supervisor's any) and
+  `DELETE /api/communications/applications/{id}` (supervisors only, 204).
+
+**Decided without asking:**
+- **"Anyone" means anyone who sees the message:** its own agent in the Agent
+  App and every supervisor on the website. One agent cannot move another
+  agent's message (`not_your_call`); agents only ever see their own.
+- **Only the channel loses its window.** The customer and the time keep the
+  `agent.edit_window` rule, since nothing was asked about them.
+- **Deleted for real, not hidden,** so the reports, the search and the
+  contact's history all stop counting it without each needing a filter. The
+  classification goes with it (cascade), its classification history is
+  removed, and anything a follow-up task held is cleared. **What it said is
+  written to the audit log first** (`entity = application`, action `delete`:
+  channel, agent, customer, time, branch and the whole classification), as a
+  removed mistake is (S-65). A channel change is logged too
+  (`change_channel`, before and after), since no window guards it.
+- **Calls are still never deleted** (`not_an_application`, 409).
+- This reverses the 25 Sep rule "a wrong entry becomes *Other* with a note".
+
+**Tested.** Server: the channel changed three days later by its agent with the
+window at SameDay, refused for another agent and for Phone, allowed for a
+supervisor, the customer untouched, both moves in the audit log; a recorded,
+classified message deleted by a supervisor with its classification and
+history, refused for the agent and for a call, its words in the audit log,
+404 the second time. All 631 server tests against `callcenter_test`, 89 Agent
+App, 163 Shared. Web: Change sends the new channel and shows it, Phone is not
+offered; Delete asks first, then sends one DELETE and closes; all 27 files,
+225 tests, type check and lint. **Not yet seen** in the browser or the Agent
+App.
+
+**To deploy:** server, web and Agent App; no migration. An older Agent App
+still works, it just keeps older messages fully read only.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

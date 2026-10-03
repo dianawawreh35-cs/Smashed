@@ -237,6 +237,53 @@ public class BreaksTests(CallCenterApiFactory factory)
         monitor.DailyLimitMinutes.Should().BePositive();
     }
 
+    [DatabaseFact]
+    public async Task The_monitor_shows_do_not_disturb_as_the_app_last_said_it()
+    {
+        var (agent, client, login) = await AgentAsync();
+        var (quiet, _, _) = await AgentAsync();
+        var silent = await data.CreateUserAsync();
+        var (silentClient, silentLogin) = await data.SignInAsync(silent);
+        var (supervisor, _) = await data.SignInAsync(await data.CreateUserAsync(UserRoles.Supervisor));
+
+        async Task<BreakMonitorRowDto> RowAsync(Guid id) =>
+            (await supervisor.GetFromJsonAsync<BreakMonitorDto>("/api/breaks/monitor"))!.Agents.Single(r => r.AgentId == id);
+
+        var now = DateTimeOffset.UtcNow;
+        var signedIn = now.AddHours(-1);
+        await data.QueryAsync(db => db.AgentSessions.Where(s => s.Id == login.SessionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LoggedInAt, signedIn)));
+
+        // Left on from the last shift: on since this sign-in, not since then.
+        await SwitchAsync(client, new SaveDoNotDisturbRequest(true, now.AddHours(-5)));
+        var on = await RowAsync(agent.Id);
+        on.DoNotDisturb.Should().BeTrue();
+        on.DoNotDisturbSince.Should().BeCloseTo(signedIn, TimeSpan.FromMilliseconds(1));
+
+        // The same again keeps the first "since".
+        await SwitchAsync(client, new SaveDoNotDisturbRequest(true, now));
+        (await RowAsync(agent.Id)).Should().BeEquivalentTo(on);
+
+        // Off, then news older than that arriving late changes nothing.
+        var offAt = now.AddMinutes(-10);
+        await SwitchAsync(client, new SaveDoNotDisturbRequest(false, offAt));
+        await SwitchAsync(client, new SaveDoNotDisturbRequest(true, now.AddMinutes(-20)));
+        var off = await RowAsync(agent.Id);
+        off.DoNotDisturb.Should().BeFalse();
+        off.DoNotDisturbSince.Should().BeCloseTo(offAt, TimeSpan.FromMilliseconds(1));
+
+        // An app that never said, and one not heard from, show nothing.
+        (await RowAsync(quiet.Id)).DoNotDisturb.Should().BeNull();
+
+        await SwitchAsync(silentClient, new SaveDoNotDisturbRequest(true, DateTimeOffset.UtcNow));
+        await data.QueryAsync(db => db.AgentSessions.Where(s => s.Id == silentLogin.SessionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastSeenAt, DateTimeOffset.UtcNow.AddMinutes(-20))));
+        var notHeard = await RowAsync(silent.Id);
+        notHeard.State.Should().Be(BreakStates.NotHeard);
+        notHeard.DoNotDisturb.Should().BeNull();
+        notHeard.DoNotDisturbSince.Should().BeNull();
+    }
+
     // ---- the report and the list (R-22) -----------------------------------------
 
     [DatabaseFact]
@@ -364,6 +411,12 @@ public class BreaksTests(CallCenterApiFactory factory)
         var response = await client.PutAsJsonAsync($"/api/breaks/mine/{id}", request);
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<BreakDto>())!;
+    }
+
+    private static async Task SwitchAsync(HttpClient client, SaveDoNotDisturbRequest request)
+    {
+        var response = await client.PutAsJsonAsync("/api/breaks/mine/do-not-disturb", request);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
     }
 
     private Task<int> CountAsync(Guid agentId) =>

@@ -21,6 +21,10 @@ export interface BreakMonitorRow {
   /** Every break today, the one going included, to `asOf`. */
   todaySeconds: number
   todayBreaks: number
+  /** The Agent App's do-not-disturb switch (A-18); null when the app is not heard from, or too old to say. */
+  doNotDisturb: boolean | null
+  /** When it was last switched; null when `doNotDisturb` is. */
+  doNotDisturbSince: string | null
 }
 
 export interface BreakMonitor {

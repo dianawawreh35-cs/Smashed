@@ -52,18 +52,37 @@ public record BreakDto(
 /// <param name="DailyLimitMinutes"><c>breaks.daily_limit_minutes</c>.</param>
 public record MyBreaksTodayDto(int Seconds, int DailyLimitMinutes);
 
+/// <summary>
+/// The Agent App's do-not-disturb switch (A-18), sent when it changes and at
+/// sign-in, so the break monitor can show it (S-66).
+/// </summary>
+/// <param name="On">Whether do not disturb is on now.</param>
+/// <param name="At">
+/// When it was switched, by the laptop's clock. A resend carries the same time,
+/// so the server keeps the first "since", and news older than what it has is
+/// ignored.
+/// </param>
+public record SaveDoNotDisturbRequest(bool On, DateTimeOffset At);
+
 /// <summary>One agent on the break monitor (S-66).</summary>
 /// <param name="State">One of <see cref="BreakStates"/>.</param>
 /// <param name="BreakStartedAt">When the break under way began; null unless on break.</param>
 /// <param name="TodaySeconds">Every break today, the one under way included, to <see cref="BreakMonitorDto.AsOf"/>.</param>
 /// <param name="TodayBreaks">How many breaks today, the one under way included.</param>
+/// <param name="DoNotDisturb">
+/// Whether the agent's app has do not disturb on (A-18). Null when the app is
+/// not heard from, or is too old to say.
+/// </param>
+/// <param name="DoNotDisturbSince">When it was last switched; null when <paramref name="DoNotDisturb"/> is.</param>
 public record BreakMonitorRowDto(
     Guid AgentId,
     string AgentDisplayName,
     string State,
     DateTimeOffset? BreakStartedAt,
     int TodaySeconds,
-    int TodayBreaks);
+    int TodayBreaks,
+    bool? DoNotDisturb = null,
+    DateTimeOffset? DoNotDisturbSince = null);
 
 /// <summary>
 /// Every active agent's break today, as of <paramref name="AsOf"/> (S-66).

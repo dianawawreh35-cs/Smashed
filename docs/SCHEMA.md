@@ -483,7 +483,9 @@ CREATE TABLE agent_sessions (
   logged_in_at  timestamptz NOT NULL DEFAULT now(),
   logged_out_at timestamptz,
   logout_reason text,                       -- Manual, Idle, AppClosed, Forced, PasswordReset, SignedInElsewhere (N-05)
-  last_seen_at  timestamptz                 -- last request with this session's token, to the minute; online = within 5 min
+  last_seen_at  timestamptz,                -- last request with this session's token, to the minute; online = within 5 min
+  do_not_disturb       boolean,             -- A-18, S-66: the app's switch as it last said; NULL until it says (apps before 3 Oct 2026 never do)
+  do_not_disturb_since timestamptz          -- when it was switched, by the laptop's clock, no earlier than logged_in_at; migration AddSessionDoNotDisturb
 );
 CREATE INDEX ix_sessions_user ON agent_sessions(user_id, logged_in_at DESC);
 

@@ -35,6 +35,19 @@ public class AgentSession
     /// </summary>
     public DateTimeOffset? LastSeenAt { get; set; }
 
+    /// <summary>
+    /// Whether the app on this laptop has do not disturb on (A-18), as it last
+    /// said, for the break monitor (S-66). Null until it says: an app from
+    /// before 3 Oct 2026 never does.
+    /// </summary>
+    public bool? DoNotDisturb { get; set; }
+
+    /// <summary>
+    /// When <see cref="DoNotDisturb"/> was last switched, by the laptop's clock,
+    /// no earlier than the sign-in and no later than the server's now.
+    /// </summary>
+    public DateTimeOffset? DoNotDisturbSince { get; set; }
+
     /// <summary>One of <see cref="CallCenter.Shared.Contracts.Auth.LogoutReasons"/>.</summary>
     public string? LogoutReason { get; set; }
 }

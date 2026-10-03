@@ -671,6 +671,15 @@ side by side.
       today stops. **Screenshot the card during a break, in both languages.**
       *If it never changes:* the Agent App is an old build (check the `bin`
       date) or the break did not reach the server (its log says "queued").
+- [ ] **Do not disturb (A-18, added 3 Oct).** Restart the server first, so the
+      `AddSessionDoNotDisturb` migration runs, and use an Agent App built on or
+      after 3 Oct. The **Do not disturb** column shows *Off* for the signed-in
+      agent. Tick **Do not disturb** in the Agent App: within ten seconds it
+      shows *On* (amber) with "since <time>". Untick it: *Off*. Break in turns it
+      *On*, Break out *Off*. Signed-out agents show nothing. **Screenshot it with
+      one agent On, in both languages.** *If it stays empty for a working agent:*
+      the Agent App is an old build (check the `bin` date). *A dash (—):* the
+      app on that laptop is older than 3 Oct and does not say.
 - [ ] **The allowance in Settings.** In **Settings**, *Break allowance
       (minutes a day)* shows **60**, not an empty box. *If it is empty:* the
       server is older than the `SeedBreakAllowance` migration.

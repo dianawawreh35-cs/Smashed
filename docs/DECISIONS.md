@@ -8849,6 +8849,47 @@ The nightly update is off, so the server gets it only by hand
 (`./update.sh v0.10.0 --pull`). The Agent App is unchanged; 0.9.2 stays the
 one to install.
 
+## 2026-10-03 — The break monitor shows each agent's do not disturb (A-18, S-66)
+
+**In plain terms.** Dia: "i want to be able to view the user status of dnd or
+not in the web app". Until now do not disturb lived only on the laptop (in
+`settings.json`), so the server, and the web app with it, never knew. Now the
+Agent App tells the server whenever the switch changes, and the **Now** card on
+the **Breaks** page has a **Do not disturb** column: *On* (amber) with since
+when, or *Off*.
+
+- **Where it is shown: the break monitor.** It already lists every active agent
+  and where they stand, refreshed every ten seconds, and a break is the main
+  way do not disturb gets turned on. Not on the Users page or the dashboard.
+- **Kept on the sign-in**, `agent_sessions.do_not_disturb` and
+  `do_not_disturb_since` (migration `AddSessionDoNotDisturb`, two nullable
+  columns). Each agent has at most one open sign-in (N-05), and the switch
+  means nothing once that sign-in is over.
+- **The app sends it at sign-in and at every switch**, by hand or by Break in
+  and Break out (`DoNotDisturbReporter`, `PUT /api/breaks/mine/do-not-disturb`).
+  Each send carries the time of the switch, so the server keeps the first
+  "since" when the same state comes again and ignores a late one older than
+  what it has. A switch left on from the last shift reads "on since this
+  sign-in".
+- **Retried, not queued.** It is where the agent stands now, not a record, so
+  it does not go into the offline buffer (A-04): when the server cannot be
+  reached it is tried again every 30 seconds until it goes. A server too old to
+  know the endpoint (404) is not asked again.
+- **What the column shows when it cannot know.** An app not heard from for five
+  minutes (S-20's rule) or signed out shows nothing: its last word says nothing
+  about now. A working agent whose Agent App is older than this change shows a
+  dash, with a hint saying so.
+
+**Checked:** server tests 634 pass against `callcenter_test` (one new: on since
+the sign-in for a switch left on, the same state keeping its "since", late news
+ignored, off, and nothing for an app that never said or is not heard from).
+Agent App tests 93 pass (four new, `DoNotDisturbReporterTests`). Web: `npm run
+build`, and all 231 tests (one new on the column). **Not yet seen running.**
+
+**To deploy:** server, web and the Agent App all change. Not released yet. The
+migration only adds nullable columns, so rolling back still works (M-D01).
+Until the new Agent App is on a laptop, its agent shows a dash.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

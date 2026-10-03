@@ -356,6 +356,7 @@ public partial class App : Application
         services.AddSingleton<CallLogQueue>();
         services.AddSingleton<CallLogReporter>();
         services.AddSingleton<BreakService>();
+        services.AddSingleton<DoNotDisturbReporter>();
         services.AddSingleton<SignInService>();
         services.AddSingleton<SignedOutByServer>();
 

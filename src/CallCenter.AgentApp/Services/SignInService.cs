@@ -20,6 +20,7 @@ public class SignInService(
     CallLogReporter callLog,
     ClassificationCatalog classification,
     BreakService breaks,
+    DoNotDisturbReporter doNotDisturb,
     ILogger<SignInService> logger)
 {
     /// <summary>
@@ -99,6 +100,10 @@ public class SignInService(
         // not disturb a break left on if the app stopped during one.
         await breaks.LoadAsync(ct);
 
+        // A-18, S-66: the switch as it is now, after a break left on has been
+        // turned off, so the supervisor's monitor shows it.
+        doNotDisturb.Start();
+
         // Anything this agent's last shift could not send (A-04, A-14), in the
         // background: the agent is in, and the queue catches up behind them.
         callLog.FlushInBackground();
@@ -132,6 +137,7 @@ public class SignInService(
         // A-86: a break ends with the sign-in, and do not disturb with it.
         // First, while the server still takes this sign-in's token.
         await breaks.EndForSignOutAsync(ct);
+        doNotDisturb.Stop();
 
         // Unregister first, so the PBX stops offering calls to this laptop
         // before the agent is told they are signed out. Then end anything still

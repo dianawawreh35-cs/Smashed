@@ -51,6 +51,22 @@ public class MyBreaksController(BreaksService breaks) : ControllerBase
         return StatusCode(status, problem);
     }
 
+    /// <summary>
+    /// The app's do-not-disturb switch (A-18), sent when it changes and at
+    /// sign-in, for the supervisor's monitor (S-66).
+    /// </summary>
+    [HttpPut("do-not-disturb")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DoNotDisturb(SaveDoNotDisturbRequest request, CancellationToken ct)
+    {
+        if (User.GetSessionId() is { } sessionId)
+        {
+            await breaks.SaveDoNotDisturbAsync(sessionId, request, ct);
+        }
+
+        return NoContent();
+    }
+
     /// <summary>The agent's break time today and the daily limit, for the app's timer at sign-in.</summary>
     [HttpGet("today")]
     [ProducesResponseType<MyBreaksTodayDto>(StatusCodes.Status200OK)]

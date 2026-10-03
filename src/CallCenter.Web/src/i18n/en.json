@@ -1165,6 +1165,12 @@
     "heading": "Breaks",
     "intro": "Who is on break now, and how long each agent's breaks ran on any day. Agents press Break in and Break out in the Agent App; a break turns Do not disturb on until it ends.",
     "since": "since {{time}}",
+    "dnd": {
+      "on": "On",
+      "off": "Off",
+      "unknown": "—",
+      "unknownHint": "Not known: the Agent App on that laptop is older than 3 October 2026 and does not say."
+    },
     "now": {
       "title": "Now",
       "hint": "On break now: {{count}}. The daily allowance is {{minutes}} minutes, set in Settings; past it, the time turns red. Nothing stops a break.",
@@ -1182,6 +1188,7 @@
     "columns": {
       "agent": "Agent",
       "state": "Now",
+      "dnd": "Do not disturb",
       "thisBreak": "This break",
       "today": "Break today",
       "breaks": "Breaks",

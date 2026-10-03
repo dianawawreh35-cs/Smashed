@@ -116,6 +116,7 @@ function MonitorCard() {
                   <tr>
                     <th>{t('breaks.columns.agent')}</th>
                     <th>{t('breaks.columns.state')}</th>
+                    <th>{t('breaks.columns.dnd')}</th>
                     <th>{t('breaks.columns.thisBreak')}</th>
                     <th className="!text-center">{t('breaks.columns.today')}</th>
                     <th className="!text-center">{t('breaks.columns.breaks')}</th>
@@ -148,6 +149,8 @@ function MonitorRow({ row, monitor, since }: { row: BreakMonitorRow; monitor: Br
   const asOf = Date.parse(monitor.asOf)
   const today = row.todaySeconds + extra
   const over = Math.max(0, today - monitor.dailyLimitMinutes * 60)
+  const clock = (at: string) => new Date(at).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
+  const heard = row.state === 'Working' || row.state === 'OnBreak'
 
   return (
     <tr>
@@ -156,13 +159,26 @@ function MonitorRow({ row, monitor, since }: { row: BreakMonitorRow; monitor: Br
         <span className={STATE_BADGE[row.state]}>{t(`breaks.states.${row.state}`)}</span>
       </td>
       <td>
+        {row.doNotDisturb ? (
+          <span>
+            <span className="badge-warn">{t('breaks.dnd.on')}</span>
+            {row.doNotDisturbSince && (
+              <span className="ms-2 text-xs text-slate-500">{t('breaks.since', { time: clock(row.doNotDisturbSince) })}</span>
+            )}
+          </span>
+        ) : row.doNotDisturb === false ? (
+          <span className="text-slate-400">{t('breaks.dnd.off')}</span>
+        ) : heard ? (
+          // An Agent App from before 3 Oct 2026 does not say.
+          <span className="text-slate-500" title={t('breaks.dnd.unknownHint')}>{t('breaks.dnd.unknown')}</span>
+        ) : null}
+      </td>
+      <td>
         {going && (
           <span className="tabular" dir="ltr">
             {length(Math.floor((asOf - Date.parse(row.breakStartedAt!)) / 1000) + extra)}
             <span className="ms-2 text-xs text-slate-500">
-              {t('breaks.since', {
-                time: new Date(row.breakStartedAt!).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' }),
-              })}
+              {t('breaks.since', { time: clock(row.breakStartedAt!) })}
             </span>
           </span>
         )}

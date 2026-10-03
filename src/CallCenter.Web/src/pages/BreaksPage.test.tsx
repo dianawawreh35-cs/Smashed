@@ -15,9 +15,9 @@ const MONITOR: BreakMonitor = {
   asOf: AS_OF,
   dailyLimitMinutes: 60,
   agents: [
-    { agentId: 'a1', agentDisplayName: 'Ahmad', state: 'Working', breakStartedAt: null, todaySeconds: 70 * 60, todayBreaks: 3 },
-    { agentId: 'a2', agentDisplayName: 'Sara', state: 'OnBreak', breakStartedAt: '2026-10-01T11:50:00Z', todaySeconds: 25 * 60, todayBreaks: 2 },
-    { agentId: 'a3', agentDisplayName: 'Omar', state: 'SignedOut', breakStartedAt: null, todaySeconds: 0, todayBreaks: 0 },
+    { agentId: 'a1', agentDisplayName: 'Ahmad', state: 'Working', breakStartedAt: null, todaySeconds: 70 * 60, todayBreaks: 3, doNotDisturb: false, doNotDisturbSince: '2026-10-01T08:00:00Z' },
+    { agentId: 'a2', agentDisplayName: 'Sara', state: 'OnBreak', breakStartedAt: '2026-10-01T11:50:00Z', todaySeconds: 25 * 60, todayBreaks: 2, doNotDisturb: true, doNotDisturbSince: '2026-10-01T11:50:00Z' },
+    { agentId: 'a3', agentDisplayName: 'Omar', state: 'SignedOut', breakStartedAt: null, todaySeconds: 0, todayBreaks: 0, doNotDisturb: null, doNotDisturbSince: null },
   ],
 }
 
@@ -95,6 +95,22 @@ describe('breaks page', () => {
 
     expect(within(rows[2]).getByText('Signed out')).toBeInTheDocument()
     expect(within(now).getByText(/On break now: 1\. The daily allowance is 60 minutes/)).toBeInTheDocument()
+  })
+
+  it('shows do not disturb for each agent, on since when, off, or nothing when the app does not say', async () => {
+    vi.stubGlobal('fetch', server())
+    renderWithClient(<BreaksPage />)
+
+    const now = await screen.findByRole('region', { name: 'Now' })
+    const rows = (await within(now).findAllByRole('row')).slice(1)
+    expect(within(now).getByRole('columnheader', { name: 'Do not disturb' })).toBeInTheDocument()
+    const dnd = (row: HTMLElement) => within(row).getAllByRole('cell')[2]
+    const time = new Date('2026-10-01T11:50:00Z').toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })
+
+    expect(within(dnd(rows[0])).getByText('On')).toHaveClass('badge-warn')
+    expect(dnd(rows[0])).toHaveTextContent(`since ${time}`)
+    expect(dnd(rows[1])).toHaveTextContent(/^Off$/)
+    expect(dnd(rows[2])).toBeEmptyDOMElement()
   })
 
   it('opens the report on today, by agent and by day, in minutes', async () => {

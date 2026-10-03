@@ -196,6 +196,39 @@ public class BreaksService(
         }
     }
 
+    /// <summary>
+    /// Records the app's do-not-disturb switch on its sign-in (A-18), for the
+    /// monitor (S-66). A signed-out session, news older than what is kept, and
+    /// the same state again change nothing; the last keeps the first "since".
+    /// </summary>
+    public async Task SaveDoNotDisturbAsync(Guid sessionId, SaveDoNotDisturbRequest request, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var session = await db.AgentSessions.FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+
+        if (session is null || session.LoggedOutAt is not null)
+        {
+            return;
+        }
+
+        // A laptop clock a minute fast must not put it in the future, and a
+        // switch left on from the last shift is "on since this sign-in".
+        var at = request.At > now ? now : request.At;
+        at = at < session.LoggedInAt ? session.LoggedInAt : at;
+
+        if (session.DoNotDisturb == request.On || (session.DoNotDisturbSince is { } since && at < since))
+        {
+            return;
+        }
+
+        session.DoNotDisturb = request.On;
+        session.DoNotDisturbSince = at;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("Do not disturb of session {SessionId} is {State} since {At}",
+            sessionId, request.On ? "on" : "off", at);
+    }
+
     /// <summary>The agent's break time today, for the app's timer at sign-in (A-86).</summary>
     public async Task<MyBreaksTodayDto> MineTodayAsync(Guid userId, CancellationToken ct)
     {
@@ -233,6 +266,15 @@ public class BreaksService(
         var today = await LoadAsync(b => b.StartedAt < end && (b.EndedAt == null || b.EndedAt > start), now, ct);
         var byAgent = today.ToLookup(b => b.UserId);
 
+        // A-18: the switch as the app heard from last said it. An app not heard
+        // from says nothing about now, so its last word is not shown.
+        var dnd = (await db.AgentSessions.AsNoTracking()
+                .Where(s => s.LoggedOutAt == null && s.LastSeenAt >= onlineSince && s.DoNotDisturb != null)
+                .Select(s => new { s.UserId, s.DoNotDisturb, s.DoNotDisturbSince, s.LastSeenAt })
+                .ToListAsync(ct))
+            .GroupBy(s => s.UserId)
+            .ToDictionary(g => g.Key, g => g.MaxBy(s => s.LastSeenAt)!);
+
         var rows = agents.Select(a =>
         {
             var mine = byAgent[a.Id].ToList();
@@ -243,13 +285,17 @@ public class BreaksService(
                 : a.SignedIn ? BreakStates.NotHeard
                 : BreakStates.SignedOut;
 
+            var switched = dnd.GetValueOrDefault(a.Id);
+
             return new BreakMonitorRowDto(
                 a.Id,
                 a.DisplayName,
                 state,
                 going?.StartedAt,
                 mine.Sum(b => b.SecondsWithin(start, end, now)),
-                mine.Count(b => b.Touches(start, end, now)));
+                mine.Count(b => b.Touches(start, end, now)),
+                switched?.DoNotDisturb,
+                switched?.DoNotDisturbSince);
         }).ToList();
 
         return new BreakMonitorDto(now, await DailyLimitMinutesAsync(ct), rows);

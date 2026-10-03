@@ -757,6 +757,16 @@ public class ApiClient(
             authenticated: true,
             ct);
 
+    /// <summary>The do-not-disturb switch, for the supervisor's break monitor (A-18, S-66).</summary>
+    public Task<Result<object>> SaveDoNotDisturbAsync(SaveDoNotDisturbRequest request, CancellationToken ct = default) =>
+        SendAsync<object>(
+            () => new HttpRequestMessage(HttpMethod.Put, "api/breaks/mine/do-not-disturb")
+            {
+                Content = JsonContent.Create(request),
+            },
+            authenticated: true,
+            ct);
+
     /// <summary>Checks that the current token is still accepted.</summary>
     public Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct = default) =>
         SendAsync<CurrentUserDto>(

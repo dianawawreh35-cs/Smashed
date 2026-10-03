@@ -176,7 +176,7 @@ public class AbandonedCallImportTests(CallCenterApiFactory factory)
 
         // R-20: the call, its wait and its rings; nobody has rung back yet.
         var list = (await supervisor.GetFromJsonAsync<List<AbandonedCallRowDto>>($"/api/reports/calls/abandoned/list?{period}"))!;
-        var row = list.Should().ContainSingle().Subject;
+        var row = list.Where(r => IsNumber(r, number)).Should().ContainSingle().Subject;
         row.WaitSec.Should().Be(115);
         row.Rings.Should().Be(3);
         row.CalledBackAt.Should().BeNull();
@@ -204,7 +204,9 @@ public class AbandonedCallImportTests(CallCenterApiFactory factory)
         await CallAsync(agent, number, hangUp.AddMinutes(7), Directions.Out, CommunicationStatuses.NoAnswer);
 
         var period = $"from={Instant(At(day))}&to={Instant(At(day.AddDays(1)))}";
-        var row = (await supervisor.GetFromJsonAsync<List<AbandonedCallRowDto>>($"/api/reports/calls/abandoned/list?{period}"))!.Single();
+        // Another test's call can fall on the same random day: only this number's row.
+        var row = (await supervisor.GetFromJsonAsync<List<AbandonedCallRowDto>>($"/api/reports/calls/abandoned/list?{period}"))!
+            .Single(r => IsNumber(r, number));
 
         row.CalledBackAt.Should().Be(At(hangUp.AddMinutes(7)), "the first call after the hang-up, answered or not; the one before is not a call back");
         row.MinutesToCallBack.Should().Be(7);
@@ -279,6 +281,9 @@ public class AbandonedCallImportTests(CallCenterApiFactory factory)
     // ---- helpers ----------------------------------------------------------------
 
     /// <summary>A local midnight in 2010-2016, different every run.</summary>
+    private static bool IsNumber(AbandonedCallRowDto row, string number) =>
+        row.Number is not null && PhoneNormalizer.Normalize(row.Number) == PhoneNormalizer.Normalize(number);
+
     private static DateTime RandomDay() => new DateTime(2010, 1, 1).AddDays(Random.Shared.Next(0, 2500));
 
     private static DateTimeOffset At(DateTime local) => AbandonedCallImport.Utc(local);

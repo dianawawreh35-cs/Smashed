@@ -8807,8 +8807,9 @@ Each call opens on Both. The download is still the file as stored.
 the Agent App's WAV tests pass. The Agent App is built into its own bin.
 **Not yet heard on real recordings with headphones**; that is the test.
 
-**To deploy:** released as `v0.9.2`. The server installs it by itself at
-04:30; Agent App 0.9.2 is uploaded on the Agent App page.
+**To deploy:** released as `v0.9.2`. The nightly update is off, so the
+server gets it only by hand (`./update.sh v0.9.2 --pull`); Agent App 0.9.2
+is uploaded on the Agent App page.
 
 ## Where to pick up
 

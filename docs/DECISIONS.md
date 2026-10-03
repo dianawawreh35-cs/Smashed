@@ -8886,9 +8886,11 @@ ignored, off, and nothing for an app that never said or is not heard from).
 Agent App tests 93 pass (four new, `DoNotDisturbReporterTests`). Web: `npm run
 build`, and all 231 tests (one new on the column). **Not yet seen running.**
 
-**To deploy:** server, web and the Agent App all change. Not released yet. The
-migration only adds nullable columns, so rolling back still works (M-D01).
-Until the new Agent App is on a laptop, its agent shows a dash.
+**To deploy:** released as `v0.11.0`; server, web and the Agent App all change.
+The migration only adds nullable columns, so rolling back to `v0.10.0` still
+works (M-D01). The nightly update is off, so the server gets it only by hand
+(`./update.sh v0.11.0 --pull`). **Agent App 0.11.0** goes on the Agent App page
+in place of 0.9.2; until a laptop has it, its agent shows a dash.
 
 ## Where to pick up
 

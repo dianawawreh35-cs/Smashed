@@ -614,6 +614,13 @@ No phone needed. Restart the server first, so the `mistakes` table is made
       Open it in Excel: Arabic headings (English when the page is in English),
       the Arabic names readable, the numbers with their leading 0, and every
       mistake that matches the filters, not only the page on screen.
+- [ ] **Compensated (تم التعويض, added 3 Oct).** A mistake recorded before 3
+      Oct shows *Not compensated*. Edit one, tick **The customer has been
+      compensated** under the value, save: the row now says *Compensated*
+      (green). Record a new one: the tick starts empty. The **Compensated**
+      filter set to Compensated, then Search, lists only the ticked ones, and
+      the count and total value follow. The export has a Compensated column
+      with Yes / No (نعم / لا).
 
 ### 1.13b The mistakes report (R-23) — built 1 Oct, never run
 
@@ -636,6 +643,12 @@ and some an agent's, a few with a value, and two for the same customer.
       listed. A repeated number nobody has on file says "Not a saved customer".
 - [ ] **Filters.** Choosing a branch, or an agent, changes all four cards at
       once.
+- [ ] **Compensated (added 3 Oct).** Tick one or two mistakes as compensated
+      first (1.13). Per branch, per agent and over time each have
+      *Compensated* and *Compensated value* columns; repeat customers has
+      *Compensated*. The **Compensated** filter set to Not compensated changes
+      all four cards, and a printed page says "Compensated: Not compensated"
+      at the top.
 - [ ] **Export and print.** Export CSV on a card saves its rows, which open in
       Excel with the Arabic readable. Print on a card prints that card, with the
       period at the top.

@@ -11,13 +11,13 @@ import { jsonResponse, renderWithClient, routes } from '../test/http'
 
 const AGENT_MISTAKE: Mistake = {
   id: 'm1', occurredOn: '2026-10-01', branchId: 'b1', branchName: 'Ramallah', responsible: 'Agent',
-  agentId: 'a1', agentDisplayName: 'Sara', value: 35.5, contactId: 'k1', contactName: 'Mahmoud',
+  agentId: 'a1', agentDisplayName: 'Sara', value: 35.5, compensated: true, contactId: 'k1', contactName: 'Mahmoud',
   customerNumber: '0599123456', notes: 'Wrong burger sent', createdByDisplayName: 'Supervisor',
   createdAt: '2026-10-01T10:00:00Z', updatedAt: '2026-10-01T10:00:00Z',
 }
 
 const BRANCH_MISTAKE: Mistake = {
-  ...AGENT_MISTAKE, id: 'm2', responsible: 'Branch', agentId: null, agentDisplayName: null, value: null,
+  ...AGENT_MISTAKE, id: 'm2', responsible: 'Branch', agentId: null, agentDisplayName: null, value: null, compensated: false,
   contactId: null, contactName: null, customerNumber: '0598000000', notes: 'Opened late',
 }
 
@@ -75,10 +75,12 @@ describe('mistakes page', () => {
     expect(within(agentRow).getByText('Sara')).toBeInTheDocument()
     expect(within(agentRow).getByText('Mahmoud')).toBeInTheDocument()
     expect(within(agentRow).getByText('35.50')).toBeInTheDocument()
+    expect(within(agentRow).getByText('Compensated')).toBeInTheDocument()
 
     const branchRow = screen.getByText('Opened late').closest('tr')!
     expect(within(branchRow).getByText('The branch')).toBeInTheDocument()
     expect(within(branchRow).getByText('Not a saved customer')).toBeInTheDocument()
+    expect(within(branchRow).getByText('Not compensated')).toBeInTheDocument()
 
     expect(screen.getByText(/2 mistakes/)).toBeInTheDocument()
     expect(screen.getByText(/Total value/)).toHaveTextContent('35.50')
@@ -114,7 +116,31 @@ describe('mistakes page', () => {
     const [, init] = calls(fetchMock, '/api/mistakes').find(([, i]) => i?.method === 'POST')!
     expect(JSON.parse(String(init!.body))).toMatchObject({
       branchId: 'b1', responsible: 'Branch', agentId: null, value: null, customerNumber: null, notes: 'Opened late',
+      compensated: false,
     })
+  })
+
+  it('sends the compensated tick, and filters on it', async () => {
+    const fetchMock = server([['/api/mistakes', (_url, init) =>
+      init?.method === 'POST' ? jsonResponse(BRANCH_MISTAKE) : jsonResponse({ rows: [], total: 0, totalValue: 0, page: 1, pageSize: 50 })]])
+    vi.stubGlobal('fetch', fetchMock)
+    renderWithClient(<MistakesPage />)
+
+    const form = await openNewForm()
+    fireEvent.change(within(form).getByLabelText('Branch'), { target: { value: 'b1' } })
+    fireEvent.click(within(form).getByLabelText('The branch'))
+    fireEvent.change(within(form).getByLabelText(/^Notes/), { target: { value: 'Cold fries' } })
+    fireEvent.click(within(form).getByLabelText('The customer has been compensated'))
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(calls(fetchMock, '/api/mistakes').some(([, init]) => init?.method === 'POST')).toBe(true))
+    const [, init] = calls(fetchMock, '/api/mistakes').find(([, i]) => i?.method === 'POST')!
+    expect(JSON.parse(String(init!.body))).toMatchObject({ compensated: true })
+
+    const filters = screen.getByRole('form', { name: 'Filters' })
+    fireEvent.change(within(filters).getByLabelText('Compensated'), { target: { value: 'true' } })
+    fireEvent.click(within(filters).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(calls(fetchMock, '/api/mistakes?').some(([url]) => String(url).includes('compensated=true'))).toBe(true))
   })
 
   it('finds a customer by name, and picking one puts their number in the box', async () => {

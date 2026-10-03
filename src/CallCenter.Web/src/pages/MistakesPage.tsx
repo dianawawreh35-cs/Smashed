@@ -21,7 +21,7 @@ import { useDebounced } from '../lib/useDebounced'
 const PAGE_SIZE = 50
 
 /** The table's columns, counting the one for the buttons. */
-const COLUMNS = 8
+const COLUMNS = 9
 
 /** The filters as typed, turned into filters only on Search. The lists are the ids ticked; none is all. */
 interface Draft {
@@ -31,12 +31,14 @@ interface Draft {
   branchId: string[]
   responsible: '' | Responsible
   agentId: string[]
+  /** '' is both. */
+  compensated: '' | 'true' | 'false'
 }
 
 /** Today in both date boxes, as every date filter in the app opens (Dia, 1 Oct 2026). */
 function todayDraft(): Draft {
   const today = localDate(new Date())
-  return { q: '', from: today, to: today, branchId: [], responsible: '', agentId: [] }
+  return { q: '', from: today, to: today, branchId: [], responsible: '', agentId: [], compensated: '' }
 }
 
 function toFilters(d: Draft): MistakeFilters {
@@ -49,6 +51,7 @@ function toFilters(d: Draft): MistakeFilters {
     branchId: list(d.branchId),
     responsible: d.responsible || undefined,
     agentId: list(d.agentId),
+    compensated: d.compensated === '' ? undefined : d.compensated === 'true',
   }
 }
 
@@ -60,6 +63,10 @@ function formatDay(day: string, language: string): string {
 
 /**
  * The mistakes made by the branches and the agents (S-65).
+ *
+ * **Compensated or not** (تم التعويض; Dia, 3 Oct 2026) is a tick on the
+ * mistake, a column in the table and a filter: the customer has been made
+ * good for it. A new mistake starts unticked.
  *
  * **Every mistake has a branch**, the one where it happened. It is then put
  * down to the branch as a whole, naming no agent, or to one agent. The value
@@ -164,6 +171,10 @@ export default function MistakesPage() {
               value: u.id,
               label: `${u.displayName}${u.isActive ? '' : ` ${t('mistakes.inactive')}`}`,
             }))} />
+          <Select label={t('mistakes.columns.compensated')} value={draft.compensated} onChange={set('compensated')}>
+            <option value="true">{t('mistakes.compensatedIs.true')}</option>
+            <option value="false">{t('mistakes.compensatedIs.false')}</option>
+          </Select>
         </div>
 
         <div className="flex gap-2">
@@ -244,6 +255,7 @@ function MistakeTable({
             <th>{t('mistakes.columns.agent')}</th>
             <th>{t('mistakes.columns.customer')}</th>
             <th>{t('mistakes.columns.value')}</th>
+            <th>{t('mistakes.columns.compensated')}</th>
             <th>{t('mistakes.columns.notes')}</th>
             <th />
           </tr>
@@ -276,6 +288,11 @@ function MistakeTable({
                   )}
                 </td>
                 <td className="tabular" dir="ltr">{row.value === null ? '' : formatMoney(row.value, i18n.language)}</td>
+                <td className="whitespace-nowrap">
+                  <span className={row.compensated ? 'badge-ok' : 'badge-muted'}>
+                    {t(`mistakes.compensatedIs.${row.compensated}`)}
+                  </span>
+                </td>
                 <td className="max-w-[18rem] whitespace-pre-line text-slate-300">{row.notes}</td>
                 {/* The double-click stops here, so two quick clicks on Remove
                     do not also open the editor. */}
@@ -324,6 +341,7 @@ function MistakeForm({ mistake, onClose }: { mistake: Mistake | null; onClose: (
   const [value, setValue] = useState(mistake?.value === null || mistake === null ? '' : String(mistake.value))
   const [number, setNumber] = useState(mistake?.customerNumber ?? '')
   const [notes, setNotes] = useState(mistake?.notes ?? '')
+  const [compensated, setCompensated] = useState(mistake?.compensated ?? false)
   const [error, setError] = useState<string | null>(null)
 
   const branchChoices = (branches.data ?? []).map((b) => ({ id: b.id, name: b.name, active: true }))
@@ -365,6 +383,7 @@ function MistakeForm({ mistake, onClose }: { mistake: Mistake | null; onClose: (
         value: value.trim() === '' ? null : Number(value),
         customerNumber: number.trim() || null,
         notes: notes.trim(),
+        compensated,
       }
       return mistake ? updateMistake(mistake.id, request) : createMistake(request)
     },
@@ -446,12 +465,18 @@ function MistakeForm({ mistake, onClose }: { mistake: Mistake | null; onClose: (
           )}
         </label>
 
-        <label className="field">
-          <span className="field-label">{t('mistakes.columns.value')}</span>
-          <input className="input tabular" inputMode="decimal" dir="ltr" value={value}
+        {/* Compensated sits under the value it is about, in the same cell. */}
+        <div className="field">
+          <label className="field-label" htmlFor="mistake-value">{t('mistakes.columns.value')}</label>
+          <input id="mistake-value" className="input tabular" inputMode="decimal" dir="ltr" value={value}
             onChange={(e) => setValue(e.target.value)} />
           <span className="field-hint">{t('mistakes.valueHint')}</span>
-        </label>
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" className="accent-brand-500" checked={compensated}
+              onChange={(e) => setCompensated(e.target.checked)} />
+            {t('mistakes.compensatedBox')}
+          </label>
+        </div>
 
         <div className="field">
           <label className="field-label" htmlFor="mistake-customer">{t('mistakes.customerNumber')}</label>

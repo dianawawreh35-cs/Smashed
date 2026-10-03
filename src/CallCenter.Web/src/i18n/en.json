@@ -1251,12 +1251,18 @@
       "customer": "Customer",
       "value": "Value",
       "notes": "Notes",
-      "recordedBy": "Recorded by"
+      "recordedBy": "Recorded by",
+      "compensated": "Compensated"
     },
     "responsibleIs": {
       "Branch": "The branch",
       "Agent": "An agent"
     },
+    "compensatedIs": {
+      "true": "Compensated",
+      "false": "Not compensated"
+    },
+    "compensatedBox": "The customer has been compensated",
     "chooseBranch": "Choose a branch",
     "chooseAgent": "Choose the agent",
     "agentNone": "A branch's mistake names no agent.",
@@ -1321,7 +1327,9 @@
       "period": "Period",
       "customer": "Customer",
       "number": "Number",
-      "last": "Latest"
+      "last": "Latest",
+      "compensated": "Compensated",
+      "compensatedValue": "Compensated value"
     },
     "sections": {
       "byBranch": {

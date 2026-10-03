@@ -15,7 +15,7 @@ import { listUsers } from '../api/users'
 import ReportCard, { SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportColumn } from '../components/ReportCard'
 import { Grouping, PrintPageButton, ReportPrintHeading } from '../components/ReportFilters'
-import { FilterMultiSelect } from '../components/SearchControls'
+import { FilterMultiSelect, FilterSelect } from '../components/SearchControls'
 import { formatMoney } from '../lib/money'
 import { printPage } from '../lib/print'
 import { useReportFilters } from '../lib/reportFilters'
@@ -27,11 +27,17 @@ const PRESETS: Preset[] = ['today', 'week', 'month', 'custom']
 /** The most customers drawn; the export holds them all. */
 const CUSTOMER_LIMIT = 50
 
+/** Compensated or not, as the filter's drop-down holds it: '' is both. */
+type CompensatedChoice = '' | 'true' | 'false'
+
 /** Days, not instants: a mistake is kept by its day. */
-function toFilters(d: ReportDraft): MistakeReportFilters {
+function toFilters(d: ReportDraft, compensated: CompensatedChoice): MistakeReportFilters {
   const day = (v: string) => (v ? v : undefined)
   const list = (v: string[]) => (v.length > 0 ? v : undefined)
-  return { from: day(d.from), to: day(d.to), branchId: list(d.branchId), agentId: list(d.agentId) }
+  return {
+    from: day(d.from), to: day(d.to), branchId: list(d.branchId), agentId: list(d.agentId),
+    compensated: compensated === '' ? undefined : compensated === 'true',
+  }
 }
 
 /**
@@ -40,14 +46,17 @@ function toFilters(d: ReportDraft): MistakeReportFilters {
  *
  * One filter row scopes the four cards, as on the other report pages, and opens
  * on today as they do. It is its own row rather than the shared bar because a
- * mistake has a branch and an agent but no channel or call type to filter by.
+ * mistake has a branch and an agent but no channel or call type to filter by,
+ * and is compensated or not (تم التعويض; Dia, 3 Oct 2026). Every card counts
+ * the compensated beside the rest.
  * Each card is a table, a chart where the figures are counts, an Export CSV
  * and a Print, from `ReportCard`, like every other report.
  */
 export default function MistakeReportsPage() {
   const { t, i18n } = useTranslation()
   const { draft, set, choosePreset } = useReportFilters()
-  const filters = toFilters(draft)
+  const [compensated, setCompensated] = useState<CompensatedChoice>('')
+  const filters = toFilters(draft, compensated)
   const [trendBy, setTrendBy] = useState<MistakeTrendGrouping>('day')
 
   const byBranch = useQuery({ queryKey: ['reports', 'mistakes', 'by-branch', filters], queryFn: () => mistakesByBranch(filters) })
@@ -74,12 +83,22 @@ export default function MistakeReportsPage() {
     { key: 'branchOwn', label: c('branchOwn'), value: (r) => r.branchOwn, numeric: true, total: true },
     { key: 'byAgents', label: c('byAgents'), value: (r) => r.byAgents, numeric: true, total: true },
     { key: 'value', label: c('value'), value: (r) => r.value, format: (r) => money(r.value), numeric: true, total: true },
+    { key: 'compensated', label: c('compensated'), value: (r) => r.compensated, numeric: true, total: true },
+    {
+      key: 'compensatedValue', label: c('compensatedValue'), value: (r) => r.compensatedValue,
+      format: (r) => money(r.compensatedValue), numeric: true, total: true,
+    },
   ]
 
   const agentColumns: ReportColumn<MistakeAgentRow>[] = [
     { key: 'agent', label: c('agent'), value: (r) => r.agent },
     { key: 'mistakes', label: c('mistakes'), value: (r) => r.mistakes, numeric: true, total: true },
     { key: 'value', label: c('value'), value: (r) => r.value, format: (r) => money(r.value), numeric: true, total: true },
+    { key: 'compensated', label: c('compensated'), value: (r) => r.compensated, numeric: true, total: true },
+    {
+      key: 'compensatedValue', label: c('compensatedValue'), value: (r) => r.compensatedValue,
+      format: (r) => money(r.compensatedValue), numeric: true, total: true,
+    },
   ]
 
   const trendColumns: ReportColumn<MistakeTrendPoint>[] = [
@@ -88,6 +107,11 @@ export default function MistakeReportsPage() {
     { key: 'branchOwn', label: c('branchOwn'), value: (r) => r.branchOwn, numeric: true, total: true },
     { key: 'byAgents', label: c('byAgents'), value: (r) => r.byAgents, numeric: true, total: true },
     { key: 'value', label: c('value'), value: (r) => r.value, format: (r) => money(r.value), numeric: true, total: true },
+    { key: 'compensated', label: c('compensated'), value: (r) => r.compensated, numeric: true, total: true },
+    {
+      key: 'compensatedValue', label: c('compensatedValue'), value: (r) => r.compensatedValue,
+      format: (r) => money(r.compensatedValue), numeric: true, total: true,
+    },
   ]
 
   const customerColumns: ReportColumn<MistakeCustomerRow>[] = [
@@ -98,12 +122,14 @@ export default function MistakeReportsPage() {
     { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
     { key: 'mistakes', label: c('mistakes'), value: (r) => r.mistakes, numeric: true },
     { key: 'value', label: c('value'), value: (r) => r.value, format: (r) => money(r.value), numeric: true },
+    { key: 'compensated', label: c('compensated'), value: (r) => r.compensated, numeric: true },
     { key: 'last', label: c('last'), value: (r) => r.last, format: (r) => day(r.last) },
   ]
 
   return (
     <div className="space-y-6">
-      <ReportPrintHeading title={t('mistakeReports.heading')} draft={draft} />
+      <ReportPrintHeading title={t('mistakeReports.heading')} draft={draft}
+        extra={compensated ? [`${c('compensated')}: ${t(`mistakes.compensatedIs.${compensated}`)}`] : []} />
       <div className="no-print flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">{t('mistakeReports.heading')}</h1>
@@ -112,7 +138,8 @@ export default function MistakeReportsPage() {
         <PrintPageButton onPrint={printPage} />
       </div>
 
-      <FilterBar draft={draft} set={set} choosePreset={choosePreset} />
+      <FilterBar draft={draft} set={set} choosePreset={choosePreset}
+        compensated={compensated} onCompensated={setCompensated} />
 
       <ReportCard
         title={t('mistakeReports.sections.byBranch.title')}
@@ -181,13 +208,15 @@ export default function MistakeReportsPage() {
   )
 }
 
-/** The period, a branch and an agent: what a mistake can be narrowed by. */
+/** The period, a branch, an agent and compensated or not: what a mistake can be narrowed by. */
 function FilterBar({
-  draft, set, choosePreset,
+  draft, set, choosePreset, compensated, onCompensated,
 }: {
   draft: ReportDraft
   set: <K extends keyof ReportDraft>(key: K) => (value: ReportDraft[K]) => void
   choosePreset: (preset: Preset) => void
+  compensated: CompensatedChoice
+  onCompensated: (value: CompensatedChoice) => void
 }) {
   const { t } = useTranslation()
   const users = useQuery({ queryKey: ['users'], queryFn: listUsers })
@@ -223,6 +252,10 @@ function FilterBar({
         <FilterMultiSelect label={t('mistakeReports.columns.agent')} values={draft.agentId} onChange={set('agentId')}
           choices={users}
           options={(users.data ?? []).filter((u) => u.role === 'Agent').map((u) => ({ value: u.id, label: u.displayName }))} />
+        <FilterSelect label={t('mistakeReports.columns.compensated')} value={compensated} onChange={onCompensated}>
+          <option value="true">{t('mistakes.compensatedIs.true')}</option>
+          <option value="false">{t('mistakes.compensatedIs.false')}</option>
+        </FilterSelect>
       </div>
     </form>
   )

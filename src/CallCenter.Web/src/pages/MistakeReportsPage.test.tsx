@@ -10,14 +10,14 @@ import { jsonResponse, renderWithClient, routes } from '../test/http'
 /** The mistakes report (R-23), against a stubbed `fetch`. */
 
 const BY_BRANCH = [
-  { branchId: 'b1', branch: 'Ramallah', mistakes: 3, branchOwn: 1, byAgents: 2, value: 15 },
-  { branchId: 'b2', branch: 'Nablus', mistakes: 1, branchOwn: 1, byAgents: 0, value: 7 },
+  { branchId: 'b1', branch: 'Ramallah', mistakes: 3, branchOwn: 1, byAgents: 2, value: 15, compensated: 1, compensatedValue: 10 },
+  { branchId: 'b2', branch: 'Nablus', mistakes: 1, branchOwn: 1, byAgents: 0, value: 7, compensated: 0, compensatedValue: 0 },
 ]
-const BY_AGENT = [{ agentId: 'a1', agent: 'Sara', mistakes: 2, value: 15 }]
-const TREND = [{ bucket: '2026-10-01', mistakes: 4, branchOwn: 2, byAgents: 2, value: 22 }]
+const BY_AGENT = [{ agentId: 'a1', agent: 'Sara', mistakes: 2, value: 15, compensated: 1, compensatedValue: 10 }]
+const TREND = [{ bucket: '2026-10-01', mistakes: 4, branchOwn: 2, byAgents: 2, value: 22, compensated: 1, compensatedValue: 10 }]
 const CUSTOMERS = [
-  { contactId: 'k1', customer: 'Mahmoud', number: '0599123456', mistakes: 2, value: 13, last: '2026-10-01' },
-  { contactId: null, customer: null, number: '0598000000', mistakes: 2, value: 0, last: '2026-09-30' },
+  { contactId: 'k1', customer: 'Mahmoud', number: '0599123456', mistakes: 2, value: 13, compensated: 1, last: '2026-10-01' },
+  { contactId: null, customer: null, number: '0598000000', mistakes: 2, value: 0, compensated: 0, last: '2026-09-30' },
 ]
 
 function server() {
@@ -54,6 +54,23 @@ describe('mistakes report', () => {
 
     const total = within(card('Per branch')).getByText('Total').closest('tr')!
     expect(within(total).getByText('4')).toBeInTheDocument()
+  })
+
+  it('counts the compensated on each card, and narrows to them when asked', async () => {
+    const fetchMock = server()
+    vi.stubGlobal('fetch', fetchMock)
+    renderWithClient(<MistakeReportsPage />)
+
+    const row = (await within(card('Per branch')).findByText('Ramallah')).closest('tr')!
+    expect(within(card('Per branch')).getByRole('columnheader', { name: 'Compensated' })).toBeInTheDocument()
+    expect(within(row).getByText('10.00')).toBeInTheDocument()
+
+    const urls = () => fetchMock.mock.calls.map(([url]) => String(url))
+    expect(urls().some((u) => u.includes('compensated='))).toBe(false)
+
+    fireEvent.change(screen.getByLabelText('Compensated'), { target: { value: 'false' } })
+    await waitFor(() => expect(urls().some((u) => u.includes('/by-branch') && u.includes('compensated=false'))).toBe(true))
+    expect(screen.getByTestId('print-heading')).toHaveTextContent('Compensated: Not compensated')
   })
 
   it('lists the repeat customers, a number nobody has on file included', async () => {

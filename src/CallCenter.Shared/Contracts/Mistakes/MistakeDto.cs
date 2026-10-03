@@ -11,6 +11,7 @@ namespace CallCenter.Shared.Contracts.Mistakes;
 /// <c>Agent</c> always names one. The branch is there either way.
 /// </param>
 /// <param name="Value">What it cost, in shekels, when it cost something. Null when it had no value.</param>
+/// <param name="Compensated">The customer has been compensated for it (تم التعويض; Dia, 3 Oct 2026).</param>
 /// <param name="ContactId">The saved customer the number belonged to when the mistake was saved, if any.</param>
 /// <param name="ContactName">That customer's name as it is now.</param>
 /// <param name="CustomerNumber">The customer's number as the supervisor typed it. Kept when nobody has it on file.</param>
@@ -23,6 +24,7 @@ public record MistakeDto(
     Guid? AgentId,
     string? AgentDisplayName,
     decimal? Value,
+    bool Compensated,
     Guid? ContactId,
     string? ContactName,
     string? CustomerNumber,
@@ -43,6 +45,7 @@ public record MistakePageDto(
 /// <summary>Records a mistake, or corrects one (S-65).</summary>
 /// <param name="AgentId">Required when <paramref name="Responsible"/> is <c>Agent</c>; must be empty when it is <c>Branch</c>.</param>
 /// <param name="CustomerNumber">Optional. Any format: the server normalises it and finds the customer.</param>
+/// <param name="Compensated">The customer has been compensated for it. False when left out.</param>
 public record UpsertMistakeRequest(
     [Required] DateOnly OccurredOn,
     [Required] Guid BranchId,
@@ -50,4 +53,5 @@ public record UpsertMistakeRequest(
     Guid? AgentId,
     [Range(0, 1_000_000)] decimal? Value,
     [MaxLength(32)] string? CustomerNumber,
-    [Required, MaxLength(4000)] string Notes);
+    [Required, MaxLength(4000)] string Notes,
+    bool Compensated = false);

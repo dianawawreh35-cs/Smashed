@@ -115,5 +115,8 @@ public class MistakeQuery
     [FromQuery(Name = "agentId")] public Guid[] AgentIds { get; set; } = [];
     public string? Q { get; set; }
 
-    public MistakesService.Filter ToFilter() => new(From, To, BranchIds, Responsible, AgentIds, Q);
+    /// <summary><c>true</c>, <c>false</c>, or left out for both (Dia, 3 Oct 2026).</summary>
+    public bool? Compensated { get; set; }
+
+    public MistakesService.Filter ToFilter() => new(From, To, BranchIds, Responsible, AgentIds, Q, Compensated);
 }

@@ -8811,6 +8811,44 @@ the Agent App's WAV tests pass. The Agent App is built into its own bin.
 server gets it only by hand (`./update.sh v0.9.2 --pull`); Agent App 0.9.2
 is uploaded on the Agent App page.
 
+## 2026-10-03 — A mistake says whether the customer was compensated (S-65, R-23)
+
+**In plain terms.** Dia asked for a tick on each mistake saying whether the
+customer has been compensated for it (تم التعويض), a filter for it, and the
+mistakes report to show it.
+
+- **Stored as `mistakes.compensated`**, a plain yes/no, false by default
+  (migration `AddMistakeCompensated`). Every mistake recorded before today
+  starts as not compensated; a supervisor ticks the ones that were.
+- **The form:** a tick box, *The customer has been compensated*, under the
+  value, since it is the value that is made good. Unticked on a new mistake;
+  ticking it later is an ordinary correction, written to the audit log like
+  any other (N-06).
+- **The Mistakes page:** a *Compensated* column (green Compensated / grey Not
+  compensated) and a *Compensated* filter: Any, Compensated, Not compensated.
+  The count, the total value and the Excel export follow it; the export has a
+  *Compensated* column saying Yes / No (نعم / لا), since a tick does not
+  survive into a CSV.
+- **The mistakes report:** the same filter, applied to all four cards, and
+  each card counts the compensated: *Compensated* and *Compensated value* on
+  per branch, per agent and over time; *Compensated* on repeat customers. The
+  printed heading names the filter when it is on. The charts are unchanged.
+
+**Not done, on purpose.** No amount or date of the compensation, and no
+check that a compensated mistake has a value: Dia asked for a tick, and a
+mistake can be made good with a free meal that has no shekel value.
+
+**Checked:** server tests 633 pass, against `callcenter_test` (two new: the
+tick saved, corrected and filtered on; every report card counting it).
+Web: type-check, lint, and the mistakes page and report tests (two new).
+**Not yet seen running.**
+
+**To deploy:** released as `v0.10.0`, server and web. The migration only adds
+a column with a default, so rolling back to `v0.9.2` still works (M-D01).
+The nightly update is off, so the server gets it only by hand
+(`./update.sh v0.10.0 --pull`). The Agent App is unchanged; 0.9.2 stays the
+one to install.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

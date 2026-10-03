@@ -12,8 +12,11 @@ namespace CallCenter.Server.Features.Mistakes;
 /// </summary>
 /// <remarks>
 /// <b>Narrowed by the list's own rules</b> (<see cref="MistakesService.Apply"/>):
-/// the days, the branch and the agent, so the report and the Mistakes page
-/// count the same rows for the same filters.
+/// the days, the branch, the agent and compensated or not, so the report and
+/// the Mistakes page count the same rows for the same filters.
+///
+/// <b>Every card says how many were compensated</b> (تم التعويض; Dia, 3 Oct
+/// 2026), and the value of those, beside the count and value of them all.
 ///
 /// <b>Summed here, after one query</b>, rather than grouped in SQL. Mistakes are
 /// typed in by a supervisor, a few a day at most, so a year is a few thousand
@@ -31,6 +34,7 @@ public class MistakeReportsService(CallCenterDbContext db)
         Guid? AgentId,
         string? Agent,
         decimal? Value,
+        bool Compensated,
         Guid? ContactId,
         string? Customer,
         string? Normalised,
@@ -49,7 +53,9 @@ public class MistakeReportsService(CallCenterDbContext db)
                 g.Count(),
                 g.Count(r => r.Responsible == MistakeResponsibilities.Branch),
                 g.Count(r => r.Responsible == MistakeResponsibilities.Agent),
-                g.Sum(r => r.Value ?? 0)))
+                g.Sum(r => r.Value ?? 0),
+                g.Count(r => r.Compensated),
+                CompensatedValue(g)))
             .OrderByDescending(r => r.Mistakes).ThenByDescending(r => r.Value).ThenBy(r => r.Branch)
             .ToList();
     }
@@ -62,7 +68,8 @@ public class MistakeReportsService(CallCenterDbContext db)
         return rows
             .Where(r => r.AgentId is not null)
             .GroupBy(r => r.AgentId!.Value)
-            .Select(g => new MistakeAgentRowDto(g.Key, g.First().Agent ?? "", g.Count(), g.Sum(r => r.Value ?? 0)))
+            .Select(g => new MistakeAgentRowDto(
+                g.Key, g.First().Agent ?? "", g.Count(), g.Sum(r => r.Value ?? 0), g.Count(r => r.Compensated), CompensatedValue(g)))
             .OrderByDescending(r => r.Mistakes).ThenByDescending(r => r.Value).ThenBy(r => r.Agent)
             .ToList();
     }
@@ -80,7 +87,9 @@ public class MistakeReportsService(CallCenterDbContext db)
                 g.Count(),
                 g.Count(r => r.Responsible == MistakeResponsibilities.Branch),
                 g.Count(r => r.Responsible == MistakeResponsibilities.Agent),
-                g.Sum(r => r.Value ?? 0)))
+                g.Sum(r => r.Value ?? 0),
+                g.Count(r => r.Compensated),
+                CompensatedValue(g)))
             .OrderBy(p => p.Bucket)
             .ToList();
     }
@@ -103,11 +112,14 @@ public class MistakeReportsService(CallCenterDbContext db)
             {
                 var latest = g.OrderByDescending(r => r.OccurredOn).ThenByDescending(r => r.CreatedAt).First();
                 return new MistakeCustomerRowDto(
-                    latest.ContactId, latest.Customer, latest.Number ?? "", g.Count(), g.Sum(r => r.Value ?? 0), latest.OccurredOn);
+                    latest.ContactId, latest.Customer, latest.Number ?? "", g.Count(), g.Sum(r => r.Value ?? 0),
+                    g.Count(r => r.Compensated), latest.OccurredOn);
             })
             .OrderByDescending(r => r.Mistakes).ThenByDescending(r => r.Value).ThenByDescending(r => r.Last)
             .ToList();
     }
+
+    private static decimal CompensatedValue(IEnumerable<Row> rows) => rows.Where(r => r.Compensated).Sum(r => r.Value ?? 0);
 
     private async Task<List<Row>> RowsAsync(MistakesService.Filter filter, CancellationToken ct) =>
         await MistakesService.Apply(db.Mistakes.AsNoTracking(), filter)
@@ -119,6 +131,7 @@ public class MistakeReportsService(CallCenterDbContext db)
                 m.AgentId,
                 m.Agent != null ? m.Agent.DisplayName : null,
                 m.Value,
+                m.Compensated,
                 m.ContactId,
                 m.Contact != null ? m.Contact.Name : null,
                 m.CustomerNormalised,

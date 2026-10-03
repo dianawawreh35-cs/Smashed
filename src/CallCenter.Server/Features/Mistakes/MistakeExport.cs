@@ -20,8 +20,8 @@ public static class MistakeExport
 {
     private static readonly Dictionary<string, string[]> Headings = new()
     {
-        ["en"] = ["Date", "Branch", "Responsible", "Agent", "Customer", "Number", "Value", "Notes", "Recorded by"],
-        ["ar"] = ["التاريخ", "الفرع", "المسؤول", "الموظف", "الزبون", "الرقم", "القيمة", "ملاحظات", "سجّله"],
+        ["en"] = ["Date", "Branch", "Responsible", "Agent", "Customer", "Number", "Value", "Compensated", "Notes", "Recorded by"],
+        ["ar"] = ["التاريخ", "الفرع", "المسؤول", "الموظف", "الزبون", "الرقم", "القيمة", "تم التعويض", "ملاحظات", "سجّله"],
     };
 
     private static readonly Dictionary<string, Dictionary<string, string>> Words = new()
@@ -30,11 +30,19 @@ public static class MistakeExport
         ["ar"] = new() { [MistakeResponsibilities.Branch] = "الفرع", [MistakeResponsibilities.Agent] = "موظف" },
     };
 
+    /// <summary>Compensated or not, as a word: a tick does not survive into a CSV.</summary>
+    private static readonly Dictionary<string, (string Yes, string No)> YesNo = new()
+    {
+        ["en"] = ("Yes", "No"),
+        ["ar"] = ("نعم", "لا"),
+    };
+
     public static async Task WriteAsync(
         Stream output, IAsyncEnumerable<MistakeDto> rows, string? lang, CancellationToken ct)
     {
         var language = CallExport.Language(lang);
         var words = Words[language];
+        var (yes, no) = YesNo[language];
 
         // The byte-order mark, or Excel reads the Arabic as Windows-1252.
         await using var writer = new StreamWriter(output, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true), 64 * 1024, leaveOpen: true);
@@ -53,6 +61,7 @@ public static class MistakeExport
                 m.ContactName,
                 CallExport.Number(m.CustomerNumber),
                 m.Value?.ToString(CultureInfo.InvariantCulture),
+                m.Compensated ? yes : no,
                 m.Notes,
                 m.CreatedByDisplayName,
             ]));

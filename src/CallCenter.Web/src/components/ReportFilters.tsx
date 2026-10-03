@@ -130,13 +130,15 @@ export function Grouping<T extends string>({
  * question. The names come from the same lists the bar uses, already fetched.
  */
 export function ReportPrintHeading({
-  title, section, draft, periodOnly = false,
+  title, section, draft, periodOnly = false, extra = [],
 }: {
   title: string
   /** The tab, on a page that has them. */
   section?: string
   draft: ReportDraft
   periodOnly?: boolean
+  /** A page's own filters, beyond the shared bar's, each already "Label: value". */
+  extra?: string[]
 }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
@@ -167,6 +169,7 @@ export function ReportPrintHeading({
   const filters = chosen
     .filter(([, ids]) => ids.length > 0)
     .map(([label, ids, name]) => `${label}: ${ids.map((id) => name(id) ?? '…').join(arabic ? '، ' : ', ')}`)
+    .concat(extra)
 
   // aria-hidden: on screen it is hidden and the page's own heading says the
   // same, and a second heading of the same name confuses a screen reader.

@@ -21,6 +21,8 @@ export interface Mistake {
   agentDisplayName: string | null
   /** Shekels. Null when the mistake had no value. */
   value: number | null
+  /** The customer has been compensated for it (تم التعويض). */
+  compensated: boolean
   /** The saved customer the number belonged to when it was saved. */
   contactId: string | null
   contactName: string | null
@@ -51,6 +53,8 @@ export interface MistakeFilters {
   responsible?: Responsible
   agentId?: string[]
   q?: string
+  /** Only the compensated, or only those not; left out for both. */
+  compensated?: boolean
 }
 
 export interface UpsertMistakeRequest {
@@ -61,6 +65,7 @@ export interface UpsertMistakeRequest {
   value: number | null
   customerNumber: string | null
   notes: string
+  compensated: boolean
 }
 
 
@@ -80,12 +85,13 @@ export const deleteMistake = (id: string) => api.delete<void>(`/mistakes/${id}`)
 
 // ---- the mistakes report (R-23) ------------------------------------------
 
-/** The report's filters: days, inclusive, yyyy-mm-dd, and any of some branches and agents. */
+/** The report's filters: days, inclusive, yyyy-mm-dd, any of some branches and agents, and compensated or not. */
 export interface MistakeReportFilters {
   from?: string
   to?: string
   branchId?: string[]
   agentId?: string[]
+  compensated?: boolean
 }
 
 export interface MistakeBranchRow {
@@ -97,6 +103,10 @@ export interface MistakeBranchRow {
   /** Put down to one of its agents. */
   byAgents: number
   value: number
+  /** How many of them the customer was compensated for. */
+  compensated: number
+  /** The value of those compensated. */
+  compensatedValue: number
 }
 
 export interface MistakeAgentRow {
@@ -104,6 +114,8 @@ export interface MistakeAgentRow {
   agent: string
   mistakes: number
   value: number
+  compensated: number
+  compensatedValue: number
 }
 
 export type MistakeTrendGrouping = 'day' | 'week' | 'month'
@@ -115,6 +127,10 @@ export interface MistakeTrendPoint {
   branchOwn: number
   byAgents: number
   value: number
+  /** How many of them the customer was compensated for. */
+  compensated: number
+  /** The value of those compensated. */
+  compensatedValue: number
 }
 
 export interface MistakeCustomerRow {
@@ -125,6 +141,7 @@ export interface MistakeCustomerRow {
   number: string
   mistakes: number
   value: number
+  compensated: number
   /** The day of their latest mistake. */
   last: string
 }

@@ -1311,12 +1311,18 @@
       "customer": "الزبون",
       "value": "القيمة",
       "notes": "ملاحظات",
-      "recordedBy": "سجّله"
+      "recordedBy": "سجّله",
+      "compensated": "تم التعويض"
     },
     "responsibleIs": {
       "Branch": "الفرع",
       "Agent": "موظف"
     },
+    "compensatedIs": {
+      "true": "تم التعويض",
+      "false": "لم يتم التعويض"
+    },
+    "compensatedBox": "تم تعويض الزبون",
     "chooseBranch": "اختر الفرع",
     "chooseAgent": "اختر الموظف",
     "agentNone": "خطأ الفرع لا يُسجَّل على موظف.",
@@ -1385,7 +1391,9 @@
       "period": "الفترة",
       "customer": "الزبون",
       "number": "الرقم",
-      "last": "آخر خطأ"
+      "last": "آخر خطأ",
+      "compensated": "تم التعويض",
+      "compensatedValue": "قيمة التعويض"
     },
     "sections": {
       "byBranch": {

@@ -37,6 +37,9 @@ public class Mistake
     /// <summary>What it cost, when it cost something. Null is "no value", not zero.</summary>
     public decimal? Value { get; set; }
 
+    /// <summary>The customer has been compensated for it (تم التعويض). False until the supervisor ticks it (Dia, 3 Oct 2026).</summary>
+    public bool Compensated { get; set; }
+
     public Guid? ContactId { get; set; }
     public Contact? Contact { get; set; }
 

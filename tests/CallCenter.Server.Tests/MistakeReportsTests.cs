@@ -117,6 +117,34 @@ public class MistakeReportsTests(CallCenterApiFactory factory)
         unknown.Mistakes.Should().Be(2);
     }
 
+    [DatabaseFact]
+    public async Task Every_card_counts_the_compensated_and_the_filter_narrows_to_them()
+    {
+        var s = await ScenarioAsync();
+        await s.RecordAsync(s.BranchA, s.Agent1, 10m, compensated: true);
+        await s.RecordAsync(s.BranchA, s.Agent1, 5m);
+        await s.RecordAsync(s.BranchA, null, 7m, s.Mobile, compensated: true);
+        await s.RecordAsync(s.BranchA, null, null, s.Mobile);
+
+        var branch = (await s.GetAsync<MistakeBranchRowDto>("by-branch", $"branchId={s.BranchA}")).Single();
+        (branch.Mistakes, branch.Value, branch.Compensated, branch.CompensatedValue).Should().Be((4, 22m, 2, 17m));
+
+        var agent = (await s.GetAsync<MistakeAgentRowDto>("by-agent", $"branchId={s.BranchA}")).Single();
+        (agent.Mistakes, agent.Compensated, agent.CompensatedValue).Should().Be((2, 1, 10m));
+
+        var day = (await s.GetAsync<MistakeTrendPointDto>("trend", $"branchId={s.BranchA}")).Single();
+        (day.Compensated, day.CompensatedValue).Should().Be((2, 17m));
+
+        var customer = (await s.GetAsync<MistakeCustomerRowDto>("repeat-customers", $"branchId={s.BranchA}")).Single();
+        (customer.Mistakes, customer.Compensated).Should().Be((2, 1));
+
+        var onlyCompensated = (await s.GetAsync<MistakeBranchRowDto>("by-branch", $"branchId={s.BranchA}&compensated=true")).Single();
+        (onlyCompensated.Mistakes, onlyCompensated.Value).Should().Be((2, 17m));
+
+        var notCompensated = (await s.GetAsync<MistakeBranchRowDto>("by-branch", $"branchId={s.BranchA}&compensated=false")).Single();
+        (notCompensated.Mistakes, notCompensated.Compensated).Should().Be((2, 0));
+    }
+
     [Theory]
     [InlineData("by-branch")]
     [InlineData("by-agent")]
@@ -161,12 +189,13 @@ public class MistakeReportsTests(CallCenterApiFactory factory)
     private sealed record Scenario(
         HttpClient Supervisor, Guid BranchA, Guid BranchB, Guid Agent1, Guid Agent2, Guid ContactId, string Mobile)
     {
-        public async Task RecordAsync(Guid branch, Guid? agent, decimal? value, string? number = null, DateOnly? occurredOn = null)
+        public async Task RecordAsync(
+            Guid branch, Guid? agent, decimal? value, string? number = null, DateOnly? occurredOn = null, bool compensated = false)
         {
             var response = await Supervisor.PostAsJsonAsync("/api/mistakes", new UpsertMistakeRequest(
                 occurredOn ?? Today, branch,
                 agent is null ? MistakeResponsibilities.Branch : MistakeResponsibilities.Agent,
-                agent, value, number, "Something went wrong"));
+                agent, value, number, "Something went wrong", compensated));
 
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         }

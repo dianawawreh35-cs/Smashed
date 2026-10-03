@@ -387,7 +387,8 @@ CREATE INDEX ix_menu_item_order ON menu_items(category_id, sort_order);
 ## 4c. Mistakes
 
 The mistakes made by a branch or an agent, as the supervisor records them on
-the Mistakes page (S-65). Added by migration `AddMistakes` (1 Oct 2026).
+the Mistakes page (S-65). Added by migration `AddMistakes` (1 Oct 2026);
+`compensated` by `AddMistakeCompensated` (3 Oct 2026).
 
 ```sql
 CREATE TABLE mistakes (
@@ -397,6 +398,7 @@ CREATE TABLE mistakes (
   responsible          text NOT NULL,                 -- 'Branch' or 'Agent'
   agent_id             uuid REFERENCES users(id),     -- set exactly when responsible = 'Agent'
   value                numeric(10,2),                 -- shekels; NULL is "no value", not zero
+  compensated          boolean NOT NULL DEFAULT false, -- the customer has been compensated (تم التعويض)
   contact_id           uuid REFERENCES contacts(id),  -- the saved customer the number belonged to on save
   customer_number_raw  varchar(32),                   -- as typed, kept when nobody has it on file
   customer_normalised  varchar(32),                   -- PhoneNormalizer, for the search

@@ -58,6 +58,7 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
     /// <param name="From">First day wanted, inclusive.</param>
     /// <param name="To">Last day wanted, inclusive.</param>
     /// <param name="Query">A customer's number (three or more digits) or name, or words in the notes.</param>
+    /// <param name="Compensated">Only the compensated (true) or only those not (false); null is both (Dia, 3 Oct 2026).</param>
     /// <remarks>The lists match any of their values; empty or null is no filter (Dia, 2 Oct 2026).</remarks>
     public record Filter(
         DateOnly? From = null,
@@ -65,7 +66,8 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
         IReadOnlyList<Guid>? BranchIds = null,
         IReadOnlyList<string>? Responsible = null,
         IReadOnlyList<Guid>? AgentIds = null,
-        string? Query = null);
+        string? Query = null,
+        bool? Compensated = null);
 
     public async Task<MistakePageDto> SearchAsync(
         Filter filter, int page = 1, int pageSize = DefaultPageSize, CancellationToken ct = default)
@@ -250,6 +252,7 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
         mistake.Responsible = responsible;
         mistake.AgentId = responsible == MistakeResponsibilities.Agent ? request.AgentId : null;
         mistake.Value = request.Value;
+        mistake.Compensated = request.Compensated;
         mistake.CustomerNumberRaw = raw;
         mistake.CustomerNormalised = normalised;
         mistake.ContactId = contactId;
@@ -296,6 +299,8 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
             var branches = f.BranchIds.ToArray();
             mistakes = mistakes.Where(m => branches.Contains(m.BranchId));
         }
+
+        if (f.Compensated is { } compensated) mistakes = mistakes.Where(m => m.Compensated == compensated);
 
         if (f.AgentIds is { Count: > 0 })
         {
@@ -356,6 +361,7 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
             m.AgentId,
             m.Agent != null ? m.Agent.DisplayName : null,
             m.Value,
+            m.Compensated,
             m.ContactId,
             m.Contact != null ? m.Contact.Name : null,
             m.CustomerNumberRaw,
@@ -371,6 +377,7 @@ public class MistakesService(CallCenterDbContext db, TimeProvider clock, ILogger
         m.Responsible,
         m.AgentId,
         m.Value,
+        m.Compensated,
         m.CustomerNumberRaw,
         m.ContactId,
         m.Notes,

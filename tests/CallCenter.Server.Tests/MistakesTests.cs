@@ -219,6 +219,34 @@ public class MistakesTests(CallCenterApiFactory factory)
         (await s.SearchAsync($"branchId={s.BranchId}&q=late")).Total.Should().Be(1);
     }
 
+    [DatabaseFact]
+    public async Task Compensated_is_saved_corrected_and_filtered_on()
+    {
+        var s = await ScenarioAsync();
+        var madeGood = await s.CreateAsync(MistakeResponsibilities.Agent, s.AgentId, value: 20m, compensated: true);
+        var open = await s.CreateAsync(MistakeResponsibilities.Branch, null, value: 5m);
+
+        madeGood.Compensated.Should().BeTrue();
+        open.Compensated.Should().BeFalse("a mistake is not compensated until the supervisor ticks it");
+
+        var yes = await s.SearchAsync($"branchId={s.BranchId}&compensated=true");
+        yes.Rows.Select(r => r.Id).Should().Equal(madeGood.Id);
+        yes.TotalValue.Should().Be(20m);
+
+        var no = await s.SearchAsync($"branchId={s.BranchId}&compensated=false");
+        no.Rows.Select(r => r.Id).Should().Equal(open.Id);
+
+        (await s.SearchAsync($"branchId={s.BranchId}")).Total.Should().Be(2, "left out, the filter is off");
+
+        // Compensated later: the correction ticks it.
+        var corrected = await s.Supervisor.PutAsJsonAsync($"/api/mistakes/{open.Id}", new UpsertMistakeRequest(
+            open.OccurredOn, s.BranchId, MistakeResponsibilities.Branch, null, 5m, null, open.Notes, Compensated: true));
+        corrected.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await corrected.Content.ReadFromJsonAsync<MistakeDto>())!.Compensated.Should().BeTrue();
+
+        (await s.SearchAsync($"branchId={s.BranchId}&compensated=false")).Total.Should().Be(0);
+    }
+
     // ---- corrections and removal ---------------------------------------------
 
     [DatabaseFact]
@@ -256,7 +284,8 @@ public class MistakesTests(CallCenterApiFactory factory)
     public async Task The_export_has_every_match_with_Arabic_headings_and_the_number_as_typed()
     {
         var s = await ScenarioAsync();
-        await s.CreateAsync(MistakeResponsibilities.Agent, s.AgentId, value: 12m, customerNumber: s.CustomerMobile, notes: "=cmd");
+        await s.CreateAsync(MistakeResponsibilities.Agent, s.AgentId, value: 12m, customerNumber: s.CustomerMobile, notes: "=cmd",
+            compensated: true);
         await s.CreateAsync(MistakeResponsibilities.Branch, null);
 
         var response = await s.Supervisor.GetAsync($"/api/mistakes/export?branchId={s.BranchId}");
@@ -271,9 +300,12 @@ public class MistakesTests(CallCenterApiFactory factory)
         lines[0].Should().StartWith("التاريخ,الفرع,المسؤول");
         lines.Should().Contain(l => l.Contains($"\"=\"\"{s.CustomerMobile}\"\"\""), "the number keeps its leading 0");
         lines.Should().Contain(l => l.Contains("'=cmd"), "nothing runs as a formula (M-S02)");
+        lines[0].Should().Contain(",تم التعويض,");
+        lines.Should().Contain(l => l.Contains(",نعم,")).And.Contain(l => l.Contains(",لا,"), "compensated is a word, not a tick");
 
         var english = await s.Supervisor.GetStringAsync($"/api/mistakes/export?branchId={s.BranchId}&lang=en");
         english.TrimStart('﻿').Should().StartWith("Date,Branch,Responsible");
+        english.Should().Contain(",Compensated,").And.Contain(",Yes,");
     }
 
     // ---- who may -------------------------------------------------------------
@@ -348,10 +380,11 @@ public class MistakesTests(CallCenterApiFactory factory)
             string? customerNumber = null,
             string notes = "Something went wrong",
             DateOnly? occurredOn = null,
-            Guid? branchId = null)
+            Guid? branchId = null,
+            bool compensated = false)
         {
             var response = await Supervisor.PostAsJsonAsync("/api/mistakes", new UpsertMistakeRequest(
-                occurredOn ?? Today, branchId ?? BranchId, responsible, agentId, value, customerNumber, notes));
+                occurredOn ?? Today, branchId ?? BranchId, responsible, agentId, value, customerNumber, notes, compensated));
 
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
             return (await response.Content.ReadFromJsonAsync<MistakeDto>())!;

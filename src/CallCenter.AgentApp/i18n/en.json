@@ -160,7 +160,13 @@
       "noDevice": "The recording could not be played - no speaker or headset was found.",
       "onCall": "Paused while you are on a call. Play it again once the call ends.",
       "onHold": "On hold:",
-      "holdNow": "On hold"
+      "holdNow": "On hold",
+      "listen": "Listen to",
+      "sides": {
+        "both": "Both",
+        "customer": "Customer",
+        "agent": "You"
+      }
     }
   },
   "caller": {

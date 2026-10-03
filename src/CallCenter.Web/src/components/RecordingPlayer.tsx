@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { downloadRecording, fetchRecording } from '../api/calls'
 import { downloadBlob } from '../lib/csv'
 import { formatClock, readRecording } from '../lib/recordingWav'
-import type { HoldPeriod } from '../lib/recordingWav'
+import type { Listen, Recording } from '../lib/recordingWav'
 
 type State =
   | { kind: 'loading' }
-  | { kind: 'ready'; url: string; duration: number; holds: HoldPeriod[] }
+  | { kind: 'ready'; recording: Recording; url: string }
   | { kind: 'unreadable' }
   | { kind: 'failed' }
 
@@ -23,6 +23,10 @@ type State =
  *
  * The audio is fetched whole and decoded here (`readRecording`), because Chrome
  * and Edge will not play the mu-law the recorder writes.
+ *
+ * Both voices are heard in both ears, though the file keeps them on separate
+ * channels. "Customer" or "Agent" plays that side alone, for when the two
+ * talked over each other; the switch carries on from the same moment.
  */
 export default function RecordingPlayer({
   communicationId,
@@ -50,10 +54,12 @@ function Player({ communicationId }: { communicationId: string }) {
   const [position, setPosition] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [download, setDownload] = useState<'idle' | 'busy' | 'failed'>('idle')
+  const [listen, setListen] = useState<Listen>('both')
+  // Where to carry on from once the audio for another choice of side has loaded.
+  const resume = useRef<{ time: number; play: boolean } | null>(null)
 
   useEffect(() => {
     const abort = new AbortController()
-    let url: string | null = null
 
     void (async () => {
       try {
@@ -64,21 +70,22 @@ function Player({ communicationId }: { communicationId: string }) {
           setState({ kind: 'unreadable' })
           return
         }
-        url = URL.createObjectURL(parsed.playable)
-        setState({ kind: 'ready', url, duration: parsed.duration, holds: parsed.holds })
+        setState({ kind: 'ready', recording: parsed, url: URL.createObjectURL(parsed.playable('both')) })
       } catch {
         if (!abort.signal.aborted) setState({ kind: 'failed' })
       }
     })()
 
-    // A customer's call is not held in memory once the supervisor has moved
-    // on. It does not go on playing either: a media element taken out of the
-    // page is paused by the browser.
-    return () => {
-      abort.abort()
-      if (url) URL.revokeObjectURL(url)
-    }
+    return () => abort.abort()
   }, [communicationId])
+
+  // A customer's call is not held in memory once the supervisor has moved on,
+  // or once another side is chosen. Let go after the player has the new audio,
+  // never before, so it is not left reading from a revoked address. It does
+  // not go on playing either: a media element taken out of the page is paused
+  // by the browser.
+  const url = state.kind === 'ready' ? state.url : null
+  useEffect(() => (url ? () => URL.revokeObjectURL(url) : undefined), [url])
 
   // While playing, the bar follows the audio on every frame. The browser's
   // timeupdate event fires only about four times a second, so a bar driven by
@@ -88,7 +95,8 @@ function Player({ communicationId }: { communicationId: string }) {
     if (!playing) return
     let frame = 0
     const follow = () => {
-      if (audio.current) setPosition(audio.current.currentTime)
+      // Not while another side's audio loads: it starts at nought until resumed.
+      if (audio.current && !resume.current) setPosition(audio.current.currentTime)
       frame = requestAnimationFrame(follow)
     }
     frame = requestAnimationFrame(follow)
@@ -102,7 +110,8 @@ function Player({ communicationId }: { communicationId: string }) {
   if (state.kind === 'unreadable') return <p className="notice-error">{t('calls.recording.unreadable')}</p>
   if (state.kind === 'failed') return <p className="notice-error">{t('calls.recording.failed')}</p>
 
-  const { url, duration, holds } = state
+  const { recording } = state
+  const { duration, holds } = recording
   const atHold = holds.some((h) => position >= h.start && position < h.end)
 
   function toggle() {
@@ -115,6 +124,22 @@ function Player({ communicationId }: { communicationId: string }) {
   function seek(seconds: number) {
     if (audio.current) audio.current.currentTime = seconds
     setPosition(seconds)
+  }
+
+  function choose(next: Listen) {
+    const element = audio.current
+    if (next === listen || !element) return
+    resume.current = { time: element.currentTime, play: !element.paused }
+    setListen(next)
+    setState({ kind: 'ready', recording, url: URL.createObjectURL(recording.playable(next)) })
+  }
+
+  function onLoaded(element: HTMLAudioElement) {
+    const at = resume.current
+    if (!at) return
+    resume.current = null
+    element.currentTime = at.time
+    if (at.play) element.play().catch(() => setPlaying(false))
   }
 
   // A download that fails says so, beside the button, rather than doing
@@ -133,9 +158,10 @@ function Player({ communicationId }: { communicationId: string }) {
     <div className="space-y-2">
       <audio
         ref={audio}
-        src={url}
+        src={state.url}
         preload="auto"
-        onTimeUpdate={(e) => !playing && setPosition(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => onLoaded(e.currentTarget)}
+        onTimeUpdate={(e) => !playing && !resume.current && setPosition(e.currentTarget.currentTime)}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
@@ -190,6 +216,28 @@ function Player({ communicationId }: { communicationId: string }) {
           {t('calls.recording.download')}
         </button>
       </div>
+
+      {/* Who is heard. Only for two-sided recordings, which all of ours are. */}
+      {recording.channels === 2 && (
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">{t('calls.recording.listen')}</span>
+          <div role="group" aria-label={t('calls.recording.listen')} className="inline-flex rounded-md border border-ink-700">
+            {(['both', 'customer', 'agent'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => choose(value)}
+                aria-pressed={listen === value}
+                className={`px-3 py-1 text-xs ${
+                  listen === value ? 'bg-ink-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t(`calls.recording.sides.${value}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {download === 'failed' && <p role="alert" className="notice-error">{t('calls.recording.failed')}</p>}
 

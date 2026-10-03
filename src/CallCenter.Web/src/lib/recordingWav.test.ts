@@ -104,9 +104,10 @@ describe('readRecording', () => {
 
   it('turns mu-law into 16-bit PCM the browser can play, silence staying silent', async () => {
     const parsed = readRecording(recording(1))!
-    const bytes = new DataView(await readBlob(parsed.playable))
+    const playable = parsed.playable('both')
+    const bytes = new DataView(await readBlob(playable))
 
-    expect(parsed.playable.type).toBe('audio/wav')
+    expect(playable.type).toBe('audio/wav')
     expect(bytes.getUint16(20, true)).toBe(1) // PCM
     expect(bytes.getUint16(34, true)).toBe(16)
     expect(bytes.getUint32(40, true)).toBe(8000 * 2 * 2) // samples x channels x 2 bytes
@@ -117,13 +118,38 @@ describe('readRecording', () => {
   it('decodes mu-law to the standard G.711 values', async () => {
     const file = recording(1)
     const audio = new Uint8Array(file, 58, 4) // data starts at 58, as the recorder writes it
-    audio.set([0x00, 0x80, 0x7f, 0x8f])
-    const bytes = new DataView(await readBlob(readRecording(file)!.playable))
+    audio.set([0x00, 0x80, 0x7f, 0x8f]) // frame 1: customer, agent; frame 2: customer, agent
+    const customer = new DataView(await readBlob(readRecording(file)!.playable('customer')))
+    const agent = new DataView(await readBlob(readRecording(file)!.playable('agent')))
 
-    expect(bytes.getInt16(44, true)).toBe(-32124) // the loudest negative
-    expect(bytes.getInt16(46, true)).toBe(32124) // the loudest positive
-    expect(bytes.getInt16(48, true)).toBe(0) // 0x7F is the other silence
-    expect(bytes.getInt16(50, true)).toBe(16764) // exponent 7, mantissa 0
+    expect(customer.getInt16(44, true)).toBe(-32124) // the loudest negative
+    expect(agent.getInt16(44, true)).toBe(32124) // the loudest positive
+    expect(customer.getInt16(48, true)).toBe(0) // 0x7F is the other silence
+    expect(agent.getInt16(48, true)).toBe(16764) // exponent 7, mantissa 0
+  })
+
+  it('puts the chosen side in both ears, never one voice per ear', async () => {
+    const file = recording(1)
+    new Uint8Array(file, 58, 2).set([0x8f, 0xff]) // the customer speaks, the agent is silent
+
+    for (const listen of ['both', 'customer'] as const) {
+      const bytes = new DataView(await readBlob(readRecording(file)!.playable(listen)))
+      expect(bytes.getInt16(44, true)).toBe(16764) // left
+      expect(bytes.getInt16(46, true)).toBe(16764) // right
+    }
+
+    const agent = new DataView(await readBlob(readRecording(file)!.playable('agent')))
+    expect(agent.getInt16(44, true)).toBe(0)
+    expect(agent.getInt16(46, true)).toBe(0)
+  })
+
+  it('mixes both sides by adding them, clipped rather than wrapping round', async () => {
+    const file = recording(1)
+    new Uint8Array(file, 58, 4).set([0x8f, 0x8f, 0x80, 0x80]) // 16764 twice; then the loudest twice
+
+    const bytes = new DataView(await readBlob(readRecording(file)!.playable('both')))
+    expect(bytes.getInt16(44, true)).toBe(32767)
+    expect(bytes.getInt16(48, true)).toBe(32767)
   })
 
   it('refuses what is not a mu-law WAV rather than playing static', () => {

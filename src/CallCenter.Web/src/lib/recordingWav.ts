@@ -9,6 +9,11 @@
  * handed to an ordinary `<audio>` element. That keeps the native seeking and
  * timing, and needs nothing from the server but the file.
  *
+ * **Never one voice per ear.** The file keeps the two sides apart so either
+ * can be heard alone, but played as stored the customer is only in the left
+ * ear and the agent only in the right. The decoding puts the chosen side, or
+ * both mixed, in both ears (`Listen`).
+ *
  * This is the same reading as `RecordingWav` in the Agent App, written a second
  * time because the two apps share no code. The layout it relies on is in
  * `docs/SCHEMA.md`, and the tests here and there check the same cases. Change
@@ -17,6 +22,12 @@
 
 /** `WAVE_FORMAT_MULAW`: the format tag of every recording. */
 const MU_LAW = 7
+
+/**
+ * Who is heard, in both ears: the two mixed, as the call sounded, or one side
+ * alone for when they talked over each other.
+ */
+export type Listen = 'both' | 'customer' | 'agent'
 
 /** One stretch of the recording during which the call was on hold, in seconds. */
 export interface HoldPeriod {
@@ -31,8 +42,8 @@ export interface Recording {
   duration: number
   /** In order, cut to the audio there is. Empty for a call never held. */
   holds: HoldPeriod[]
-  /** The same audio as 16-bit PCM WAV, ready for an `<audio>` element. */
-  playable: Blob
+  /** The audio as 16-bit PCM WAV, ready for an `<audio>` element, with `listen` in both ears. */
+  playable: (listen: Listen) => Blob
 }
 
 function id(view: DataView, at: number): string {
@@ -114,7 +125,7 @@ export function readRecording(file: ArrayBuffer): Recording | null {
     sampleRate,
     duration: frames / sampleRate,
     holds: trimHolds(rawHolds, frames, sampleRate),
-    playable: toPcmWav(new Uint8Array(file, dataOffset, dataLength), channels, sampleRate),
+    playable: (listen) => toPcmWav(new Uint8Array(file, dataOffset, dataLength), channels, sampleRate, listen),
   }
 }
 
@@ -130,8 +141,12 @@ function trimHolds(holds: Array<[number, number]>, frames: number, sampleRate: n
     .map(([start, end]) => ({ start: start / sampleRate, end: end / sampleRate }))
 }
 
-/** Mu-law samples as a 16-bit PCM WAV file: a 44-byte header, then the samples. */
-function toPcmWav(mulaw: Uint8Array, channels: number, sampleRate: number): Blob {
+/**
+ * Mu-law samples as a 16-bit PCM WAV file: a 44-byte header, then the samples.
+ * Two channels stay two, with the same sound in each, so the length and the
+ * seeking are those of the file. A one-channel file is played as it is.
+ */
+function toPcmWav(mulaw: Uint8Array, channels: number, sampleRate: number, listen: Listen): Blob {
   const pcmBytes = mulaw.length * 2
   const buffer = new ArrayBuffer(44 + pcmBytes)
   const view = new DataView(buffer)
@@ -154,9 +169,28 @@ function toPcmWav(mulaw: Uint8Array, channels: number, sampleRate: number): Blob
   view.setUint32(40, pcmBytes, true)
 
   const samples = new Int16Array(buffer, 44)
-  for (let i = 0; i < mulaw.length; i++) samples[i] = MU_LAW_TABLE[mulaw[i]]
+  if (channels !== 2) {
+    for (let i = 0; i < mulaw.length; i++) samples[i] = MU_LAW_TABLE[mulaw[i]]
+  } else {
+    for (let i = 0; i + 1 < mulaw.length; i += 2) {
+      const sample = heard(MU_LAW_TABLE[mulaw[i]], MU_LAW_TABLE[mulaw[i + 1]], listen)
+      samples[i] = sample
+      samples[i + 1] = sample
+    }
+  }
 
   return new Blob([buffer], { type: 'audio/wav' })
+}
+
+/**
+ * One moment of the call as it is to be heard. Mixed by adding, not averaging:
+ * averaging would play each voice at half its loudness, and two people at full
+ * volume at once is rare enough that clipping the sum is the better trade.
+ */
+function heard(customer: number, agent: number, listen: Listen): number {
+  if (listen === 'customer') return customer
+  if (listen === 'agent') return agent
+  return Math.max(-32768, Math.min(32767, customer + agent))
 }
 
 /** m:ss, or h:mm:ss for a call over an hour. */

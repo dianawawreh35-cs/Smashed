@@ -8775,6 +8775,41 @@ out of the way while staying on calls minimises it.
 
 **To deploy:** Agent App only.
 
+## 2026-10-02 — Recordings play both voices in both ears, or one side alone (S-04, A-51)
+
+**In plain terms.** Dia asked why a recording plays the customer in one ear
+and the agent in the other. That is how the file is stored, on purpose (24 Sep
+entry, *Both voices, on separate channels, in one file*): customer on the
+left channel, agent on the right, so either can be heard alone in a complaint
+where they talked over each other. But neither player gave any way to do
+that. Both played the file as it is, so all the separation did was put one
+voice in each ear.
+
+**Fix, in both players.** The recordings themselves are unchanged. The
+web page and the Agent App now play **both voices in both ears**. A
+three-way switch under the player, *Listen to: Both / Customer / Agent* (the
+Agent App says *You* for the agent), plays one side alone, also in both ears.
+Each call opens on Both. The download is still the file as stored.
+
+- **Mixed by adding the two sides, clipped at full scale**, not by
+  averaging, which would play each voice at half its loudness. Both at full
+  volume at once is rare, and clipping then is the smaller harm.
+- **The output stays two channels, the same sound in each**, so lengths,
+  seeking and the hold marks are worked out exactly as before.
+- **Agent App:** the choice is applied as each piece of audio is decoded
+  (`RecordingWav.Hear`, called from `MuLawPlaybackStream`), so a switch is
+  heard within a fraction of a second, from the same moment, with no restart.
+- **Web:** the browser plays a decoded copy of the file, so a switch decodes
+  the file again for that side and carries on from the same moment, playing
+  or paused as it was. There may be a short gap.
+
+**Checked:** web tests (the decoder, and the switch on the calls page) and
+the Agent App's WAV tests pass. The Agent App is built into its own bin.
+**Not yet heard on real recordings with headphones**; that is the test.
+
+**To deploy:** released as `v0.9.2`. The server installs it by itself at
+04:30; Agent App 0.9.2 is uploaded on the Agent App page.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

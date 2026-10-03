@@ -191,6 +191,12 @@ Needs a second supervisor account; add one in Users if there is only one.
       it jumped four times a second), and it seeks when dragged.
       *If there is no sound but the bar moves:* the mu-law decoding is wrong.
       Stop and tell me.
+- [ ] **Both ears, then one side (S-04, 2 Oct).** With headphones, both voices
+      are in **both ears**, not one person per ear. Under the player,
+      *Listen to:* **Customer** carries on from the same moment with only the
+      customer, in both ears; **Agent** only the agent; **Both** back to
+      both. Pause, switch, and Play: it carries on from where it paused.
+      *If a switch goes back to 0:00:* tell me.
 - [x] **Open a call that was put on hold** *Signed off by Dia 24 September.* (put a test call on hold for ten
       seconds first). Under the bar there is an **amber mark** where the hold
       was, "On hold: 0:12–0:22" under the player, and **"On hold"** beside the
@@ -1142,12 +1148,17 @@ audio plays, the Windows default output device.*
       scroll instead of pushing the list away.
       *On the first try (24 Sep) the list shrank to a thin line.* If it does
       again, send a screenshot with the window size.
-- [ ] **Play it.** You hear the call in the headset: customer on the left, you on
-      the right. The button says **Pause** and the time counts up.
+- [ ] **Play it.** You hear the call in the headset, **both voices in both
+      ears** (before 2 Oct, the customer was in the left ear only and you in
+      the right). The button says **Pause** and the time counts up.
       *If it is static or a harsh buzz:* the file was not read as mu-law. Tell
       me, with the log line containing "not a mu-law WAV".
       *If it says no speaker or headset was found:* Windows has no default output
       device. Check the sound settings, not the app.
+- [ ] **Hear one side (2 Oct).** Under the player, *Listen to:* **Customer**
+      plays only the customer, in both ears, at once and from the same
+      moment; **You** only yourself; **Both** both again. The chosen button
+      is orange. Open another call: it starts on **Both**.
 - [ ] **Pause, then Play.** It carries on from where it stopped, not from the
       start.
 - [ ] **Seek.** Click halfway along the bar: playback jumps there and the time

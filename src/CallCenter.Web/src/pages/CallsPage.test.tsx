@@ -229,6 +229,25 @@ describe('calls page', () => {
     expect(within(details).getByRole('button', { name: 'Play' })).toBeInTheDocument()
   })
 
+  it('plays both sides in both ears, and one side alone when asked', async () => {
+    vi.stubGlobal('fetch', server())
+
+    renderPage()
+    const row = (await screen.findByText('Mahmoud')).closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: 'Open' }))
+
+    const sides = await screen.findByRole('group', { name: 'Listen to' })
+    expect(within(sides).getByRole('button', { name: 'Both' })).toHaveAttribute('aria-pressed', 'true')
+    const made = vi.mocked(URL.createObjectURL).mock.calls.length
+
+    fireEvent.click(within(sides).getByRole('button', { name: 'Customer' }))
+
+    expect(within(sides).getByRole('button', { name: 'Customer' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(sides).getByRole('button', { name: 'Both' })).toHaveAttribute('aria-pressed', 'false')
+    // The customer's side, decoded afresh for the player.
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(made + 1)
+  })
+
   it('lets the supervisor classify an answered call nobody classified (S-04)', async () => {
     const fetchMock = server()
     const base = fetchMock.getMockImplementation()!

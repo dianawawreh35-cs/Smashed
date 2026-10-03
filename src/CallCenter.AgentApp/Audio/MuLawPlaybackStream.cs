@@ -16,6 +16,11 @@ namespace CallCenter.AgentApp.Audio;
 /// Played by the Windows output device rather than handed to WPF's
 /// <c>MediaElement</c>, which cannot be given bytes, only a URL or a file (see
 /// <c>ApiClient.GetRecordingAsync</c> for why neither will do).
+///
+/// <b>Never one voice per ear.</b> The file has the customer on the left and
+/// the agent on the right; played as stored, each is heard in one ear only.
+/// Every read puts <see cref="Listen"/> in both ears instead, so a change of
+/// side is heard straight away, from the same moment.
 /// </remarks>
 public sealed class MuLawPlaybackStream(byte[] file, RecordingWav wav) : WaveStream
 {
@@ -27,6 +32,8 @@ public sealed class MuLawPlaybackStream(byte[] file, RecordingWav wav) : WaveStr
     private readonly Lock _gate = new();
 
     private long _position;
+
+    private Listen _listen = Listen.Both;
 
     public override WaveFormat WaveFormat { get; } = new(wav.SampleRate, 16, wav.Channels);
 
@@ -56,6 +63,26 @@ public sealed class MuLawPlaybackStream(byte[] file, RecordingWav wav) : WaveStr
         }
     }
 
+    /// <summary>Who is heard. Takes effect from the next read, set from any thread.</summary>
+    public Listen Listen
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _listen;
+            }
+        }
+
+        set
+        {
+            lock (_gate)
+            {
+                _listen = value;
+            }
+        }
+    }
+
     public override int Read(byte[] buffer, int offset, int count) =>
         Read(buffer.AsSpan(offset, count));
 
@@ -81,6 +108,11 @@ public sealed class MuLawPlaybackStream(byte[] file, RecordingWav wav) : WaveStr
         var target = MemoryMarshal.Cast<byte, short>(buffer[..(samples * 2)]);
 
         MuLawDecoder.Decode(source, target);
+
+        if (wav.Channels == 2)
+        {
+            RecordingWav.Hear(target, _listen);
+        }
 
         _position += samples * 2;
         return samples * 2;

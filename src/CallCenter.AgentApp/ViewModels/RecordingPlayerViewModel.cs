@@ -12,7 +12,7 @@ namespace CallCenter.AgentApp.ViewModels;
 
 /// <summary>
 /// Plays the recording of a call opened from the call log: play, pause and seek
-/// (A-51).
+/// (A-51), with both voices in both ears or one side alone.
 /// </summary>
 /// <remarks>
 /// <b>Whose recording it may be is the server's decision</b> (A-52). The call
@@ -132,6 +132,27 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
 
     public bool HasHolds => Holds.Count > 0;
 
+    /// <summary>
+    /// The recording has the customer and the agent on separate channels, as
+    /// every one the recorder writes does, so either can be heard alone.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isTwoSided;
+
+    /// <summary>
+    /// Who is heard, in both ears. Both, until the agent picks one side for a
+    /// moment they talked over each other; both again for the next call.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HearsBoth), nameof(HearsCustomer), nameof(HearsAgent))]
+    private Listen _listen = Listen.Both;
+
+    public bool HearsBoth => Listen == Listen.Both;
+
+    public bool HearsCustomer => Listen == Listen.Customer;
+
+    public bool HearsAgent => Listen == Listen.Agent;
+
     /// <summary>"On hold: 1:10–1:52, 2:30–2:45" — the silences that are holds.</summary>
     public string HoldsText => HasHolds
         ? $"{Localizer["callLog.recording.onHold"]} "
@@ -236,7 +257,8 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
                 return;
             }
 
-            _stream = new MuLawPlaybackStream(result.Value, wav);
+            _stream = new MuLawPlaybackStream(result.Value, wav) { Listen = Listen };
+            IsTwoSided = wav.Channels == 2;
             DurationSeconds = wav.Duration.TotalSeconds;
             Holds = wav.Holds;
             MoveTo(0);
@@ -307,6 +329,19 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
         _timer.Start();
     }
 
+    /// <summary>"Both", "Customer" or "Agent", from the buttons.</summary>
+    [RelayCommand]
+    private void Hear(string side) => Listen = Enum.Parse<Listen>(side);
+
+    /// <summary>Heard from the next stretch the device asks for, without a jump.</summary>
+    partial void OnListenChanged(Listen value)
+    {
+        if (_stream is not null)
+        {
+            _stream.Listen = value;
+        }
+    }
+
     /// <summary>
     /// The agent moved the seek bar. The timer moving it to follow the playback
     /// comes through here too, and is ignored.
@@ -338,6 +373,8 @@ public sealed partial class RecordingPlayerViewModel : ObservableObject, IDispos
 
         IsPlaying = false;
         IsPlayable = false;
+        IsTwoSided = false;
+        Listen = Listen.Both;
         Problem = PlaybackProblem.None;
         DurationSeconds = 0;
         Holds = [];

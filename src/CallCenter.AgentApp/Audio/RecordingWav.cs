@@ -81,6 +81,37 @@ public sealed record RecordingWav(int Channels, int SampleRate, int DataOffset, 
     }
 
     /// <summary>
+    /// Puts <paramref name="listen"/> in both ears of decoded stereo audio, in
+    /// place: the two voices mixed, or one side alone.
+    /// </summary>
+    /// <remarks>
+    /// The file keeps the customer and the agent on separate channels so either
+    /// can be heard alone, but played as stored each is in one ear only. The
+    /// output stays two channels, the same sound in each, so positions and
+    /// lengths stay those of the file. Mixed by adding, not averaging, which
+    /// would play each voice at half its loudness; the sum is clipped for the
+    /// rare moment both are at full volume.
+    /// </remarks>
+    public static void Hear(Span<short> stereo, Listen listen)
+    {
+        for (var i = 0; i + 1 < stereo.Length; i += 2)
+        {
+            var customer = stereo[i];
+            var agent = stereo[i + 1];
+
+            var heard = listen switch
+            {
+                Listen.Customer => customer,
+                Listen.Agent => agent,
+                _ => (short)Math.Clamp(customer + agent, short.MinValue, short.MaxValue),
+            };
+
+            stereo[i] = heard;
+            stereo[i + 1] = heard;
+        }
+    }
+
+    /// <summary>
     /// Finds the audio in a mu-law WAV, or returns null for anything this app
     /// cannot play — so the screen can say so rather than play static.
     /// </summary>
@@ -195,6 +226,19 @@ public sealed record RecordingWav(int Channels, int SampleRate, int DataOffset, 
 
         return trimmed;
     }
+}
+
+/// <summary>Who is heard when a recording plays, in both ears.</summary>
+public enum Listen
+{
+    /// <summary>The two mixed, as the call sounded.</summary>
+    Both,
+
+    /// <summary>The customer alone, for when the two talked over each other.</summary>
+    Customer,
+
+    /// <summary>The agent alone.</summary>
+    Agent,
 }
 
 /// <summary>One stretch of a recording during which the call was on hold.</summary>

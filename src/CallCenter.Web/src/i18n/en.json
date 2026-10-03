@@ -718,7 +718,13 @@
       "position": "Position in the recording",
       "download": "Download",
       "onHold": "On hold:",
-      "holdNow": "On hold"
+      "holdNow": "On hold",
+      "listen": "Listen to",
+      "sides": {
+        "both": "Both",
+        "customer": "Customer",
+        "agent": "Agent"
+      }
     },
     "details": {
       "heading": "Call details",

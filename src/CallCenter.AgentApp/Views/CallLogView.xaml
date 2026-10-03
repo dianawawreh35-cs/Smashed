@@ -541,6 +541,48 @@
           </StackPanel>
         </Grid>
 
+        <!-- Who is heard, in both ears. The recording keeps the two voices on
+             separate channels; played as stored, each would be in one ear. The
+             chosen side is drawn in the accent colour (Tag carries whether it
+             is the one chosen). -->
+        <StackPanel Orientation="Horizontal"
+                    Margin="0,10,0,0"
+                    Visibility="{Binding Player.IsTwoSided, Converter={StaticResource BoolToVisibility}}">
+          <StackPanel.Resources>
+            <Style x:Key="SideButton" TargetType="Button" BasedOn="{StaticResource SmallButton}">
+              <Setter Property="Margin" Value="6,0,0,0" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                  <Setter Property="Background" Value="{StaticResource Accent}" />
+                  <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                  <Setter Property="Foreground" Value="#FFFFFF" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </StackPanel.Resources>
+
+          <TextBlock Text="{Binding Localizer[callLog.recording.listen]}"
+                     Foreground="{StaticResource TextMuted}"
+                     FontSize="11"
+                     VerticalAlignment="Center"
+                     Margin="0,0,4,0" />
+          <Button Content="{Binding Localizer[callLog.recording.sides.both]}"
+                  Style="{StaticResource SideButton}"
+                  Tag="{Binding Player.HearsBoth}"
+                  Command="{Binding Player.HearCommand}"
+                  CommandParameter="Both" />
+          <Button Content="{Binding Localizer[callLog.recording.sides.customer]}"
+                  Style="{StaticResource SideButton}"
+                  Tag="{Binding Player.HearsCustomer}"
+                  Command="{Binding Player.HearCommand}"
+                  CommandParameter="Customer" />
+          <Button Content="{Binding Localizer[callLog.recording.sides.agent]}"
+                  Style="{StaticResource SideButton}"
+                  Tag="{Binding Player.HearsAgent}"
+                  Command="{Binding Player.HearCommand}"
+                  CommandParameter="Agent" />
+        </StackPanel>
+
         <!-- Every hold, as times: the marks under the bar say where, this says
              exactly when. -->
         <local:SelectableText Value="{Binding Player.HoldsText}"

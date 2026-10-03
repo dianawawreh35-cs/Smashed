@@ -123,6 +123,30 @@ public class RecordingWavTests
         RecordingWav.HoldChunk([]).Should().BeEmpty("a file without holds is byte for byte what it was before");
     }
 
+    [Theory]
+    [InlineData(Listen.Both, 1000)]
+    [InlineData(Listen.Customer, 1000)]
+    [InlineData(Listen.Agent, 0)]
+    public void Puts_the_chosen_side_in_both_ears(Listen listen, short heard)
+    {
+        // The customer speaks on the left; the agent is silent on the right.
+        short[] stereo = [1000, 0];
+
+        RecordingWav.Hear(stereo, listen);
+
+        stereo.Should().Equal([heard, heard], "played as stored, the customer would be in the left ear only");
+    }
+
+    [Fact]
+    public void Mixes_both_sides_by_adding_them_clipped_rather_than_wrapping_round()
+    {
+        short[] stereo = [1000, -400, 30_000, 30_000, -30_000, -30_000];
+
+        RecordingWav.Hear(stereo, Listen.Both);
+
+        stereo.Should().Equal([600, 600, short.MaxValue, short.MaxValue, short.MinValue, short.MinValue]);
+    }
+
     /// <summary>
     /// A mu-law WAV laid out exactly as <c>CallRecorder.WriteWavHeader</c>
     /// writes one, with the audio filled with mu-law silence.

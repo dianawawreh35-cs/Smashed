@@ -9290,6 +9290,11 @@ are white; it cannot show the old fault (only an Application's styles cross
 into templates, and the tests have none), so the checklist's "Light mode"
 lines are the real check. The Agent App's tests: 126 pass.
 
+**To deploy:** released as **`v0.14.1`**, the Agent App only (the server is
+the same as `v0.14.0`). **Nothing is live yet:** upload **Agent App 0.14.1**
+(`publish\SmashedAgentApp-Setup-0.14.1.exe` and its zip, built after the
+tag) on the Agent App page in place of 0.14.0, which should not be uploaded.
+
 **To deploy:** it went out in **`v0.14.0`**, which another session tagged on
 top of this commit for the website groups and the POS login, so no tag of its
 own; Agent App 0.14.0 (built 20:02, after this commit) carries it: its program

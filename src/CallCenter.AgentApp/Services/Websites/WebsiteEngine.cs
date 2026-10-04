@@ -50,6 +50,25 @@ public sealed class WebsiteEngine(ILogger<WebsiteEngine> logger)
     public static string ProfileName(Guid agentId, Guid websiteId) =>
         $"a{agentId:N}-{websiteId.ToString("N")[..12]}";
 
+    /// <summary>
+    /// A tab's id: the website's own for the original (<paramref name="number"/>
+    /// 1), and for the agent's copy number 2, 3 or 4 an id worked out from the
+    /// website's, the same every time, so the layout and the groups saved by id
+    /// find the copy again at the next sign-in.
+    /// </summary>
+    public static Guid TabId(Guid websiteId, int number)
+    {
+        if (number <= 1)
+        {
+            return websiteId;
+        }
+
+        var bytes = websiteId.ToByteArray();
+        bytes[15] ^= (byte)number;
+        bytes[14] ^= 0xC0;
+        return new Guid(bytes);
+    }
+
     private async Task<CoreWebView2Environment?> CreateAsync()
     {
         try

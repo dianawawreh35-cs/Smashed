@@ -64,8 +64,10 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
     /// <param name="Tabs">The tab in each place, by website id; four entries, null for none.</param>
     /// <param name="Zoom">Each tab's zoom, by website id, 1.0 being 100 %.</param>
     /// <param name="Groups">The agent's own groups of tabs, opened together (A-88).</param>
+    /// <param name="Copies">The agent's copies of a tab, by website id: the numbers, 2 to 4 ("POS 2").</param>
     public record WebsiteLayout(
-        int Places, Guid?[] Tabs, Dictionary<string, double> Zoom, WebsiteGroup[]? Groups = null);
+        int Places, Guid?[] Tabs, Dictionary<string, double> Zoom, WebsiteGroup[]? Groups = null,
+        Dictionary<string, int[]>? Copies = null);
 
     /// <summary>A group of up to four tabs an agent opens together (A-88), named by them.</summary>
     public record WebsiteGroup(string Name, Guid[] Tabs);

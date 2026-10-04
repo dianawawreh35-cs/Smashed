@@ -9305,6 +9305,44 @@ start dark, so nobody sees a change until they press the button. Worth
 opening the Agent App here once, and pressing the sun, before the upload:
 it has not been seen running.
 
+## 2026-10-04 (night) — A website tab can be duplicated: two POS tabs at once (A-88)
+
+**In plain terms.** Dia asked to be able to duplicate a tab, for example to
+have two POS tabs open. Each place's bar now has a **Duplicate** button (two
+overlapping pages, after Start page). It adds **"POS 2"** next to the POS on
+the tab bar, already signed in as the POS is, on the page the POS was showing,
+and shows it in that place. A copy has a **×** to close it; the supervisor's
+own tabs have none. Up to four tabs of one site.
+
+Choices made here, Dia not asked, each easy to change:
+
+- **Signed in the same way.** A copy uses the original's WebView2 profile, as a
+  browser's Duplicate does, so it needs no second login and its receipts open
+  signed in too. A copy is not a second account: logging out in one logs out
+  the other. A second account on a site is still a second tab on the Websites
+  page (S-68).
+- **Remembered**, as the layout is: the copies an agent leaves open are there
+  at the next sign-in (on the start page), with their zoom, and can go in a
+  group. `Copies` in the agent's `WebsiteLayout` in `settings.json`: the
+  numbers, by website id. A copy's id is worked out from the site's and its
+  number (`WebsiteEngine.TabId`), so the place and group it was saved in find
+  it again; closing "POS 2" with "POS 3" open leaves "POS 3" as it is, and the
+  next copy is "POS 2" again.
+- **The original keeps the caller's cart** (A-85): only the original opens it,
+  so it always lands in the same tab.
+- **A copy is not started at sign-in for its sound**, and saves memory while
+  hidden; the original of a site that alerts does neither. Two copies both
+  running would ding twice for one order.
+- **No question before closing.** A copy with a half-typed order closes at
+  once, as a browser tab does.
+- Closing a copy that is on screen puts the original in its place if the
+  original is not shown already, otherwise another tab that is not.
+
+**Checked:** the Agent App builds and its 127 tests pass, one new
+(`TabId`: the original keeps the site's id; copies get ids of their own, the
+same each time). **Not seen running.** Checklist "Websites inside the Agent
+App", the Duplicate line.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -9328,6 +9366,7 @@ running**.
 |---|---|---|
 | **The call banner**: checklist "The call banner" on a laptop with the PBX, in both languages, with screenshots of the banner ringing, connected and with the form waiting | A-19 | **released as `v0.12.0`, not yet seen on a call.** Agent App 0.12.0 on the laptops |
 | **Websites inside the Agent App**: checklist "Websites inside the Agent App" and "The Websites page", on a laptop with the PBX, in both languages: the four accounts signed in at once, the cart in the POS tab on answer, silence during a call, the shortcuts while typing in a site, a site's ding while the section is hidden, the groups. Then correct the POS start address on the Websites page | A-88, S-68, A-85, A-12 | **released as `v0.12.0`, not deployed; seen without a phone only.** The server's `update.sh v0.12.0`, then Agent App 0.12.0 uploaded on the Agent App page; the three sites' addresses and logins |
+| **Duplicate a website tab**: checklist "Websites inside the Agent App", the Duplicate line: two POS tabs, both signed in, the cart in the first, the copy closed and kept across a sign-out | A-88 | **built 4 Oct, not released, not yet seen running** |
 | **The rail and Save as PDF**: checklist "The rail" at 1366 × 768 and 125 %, folded and open, in both languages; and a page saved as PDF from the POS tab | A-89, A-88 | **released as `v0.13.0`, not deployed, not yet seen running.** The same deploy as the websites above, with Agent App 0.13.0 in place of 0.12.0 |
 | **The Agent App's own fonts (N-10)**: 0.11.1 is on the Agent App page (uploaded 4 Oct, 10:32 UTC); once the laptops have updated, the checklist's "The fonts inside the app" on a laptop: every screen and the pop-up in both languages for anything cut off by Cairo's taller lines, at 1366 × 768 and 125 %, and a shift with no `FileNotFoundException` | N-10 | **released as `v0.11.1`, seen only on the sign-in screen.** Each laptop's agent pressing Update now (A-82) |
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |

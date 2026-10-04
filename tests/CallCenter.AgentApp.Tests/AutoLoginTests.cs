@@ -104,6 +104,21 @@ public class AutoLoginTests
         name.Should().Be(WebsiteEngine.ProfileName(agent, site), "the same agent finds their logins again");
     }
 
+    [Fact]
+    public void A_copy_of_a_tab_has_an_id_of_its_own_the_same_at_every_sign_in()
+    {
+        var site = Guid.NewGuid();
+
+        WebsiteEngine.TabId(site, 1).Should().Be(site, "the original is the website itself");
+
+        var copies = Enumerable.Range(2, 3).Select(n => WebsiteEngine.TabId(site, n)).ToList();
+
+        copies.Should().OnlyHaveUniqueItems().And.NotContain(site);
+        copies.Should().Equal(Enumerable.Range(2, 3).Select(n => WebsiteEngine.TabId(site, n)),
+            "the layout and the groups find the copy again by its id");
+        WebsiteEngine.TabId(Guid.NewGuid(), 2).Should().NotBe(copies[0], "another site's copy is another tab");
+    }
+
     private sealed class Clock : TimeProvider
     {
         private DateTimeOffset _now = new(2026, 10, 4, 9, 0, 0, TimeSpan.Zero);

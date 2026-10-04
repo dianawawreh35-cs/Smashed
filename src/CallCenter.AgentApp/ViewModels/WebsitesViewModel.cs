@@ -31,6 +31,11 @@ namespace CallCenter.AgentApp.ViewModels;
 /// button is marked, and a tab button then replaces the whole group with that
 /// one tab, rather than one quarter of it.
 ///
+/// <b>Copies are the agent's own too</b> (Dia, 4 Oct 2026: two POS tabs at
+/// once): a place's Duplicate button adds "POS 2", up to four of one site,
+/// signed in as the original. Remembered with the layout, and closed by the
+/// agent; the supervisor's own tabs cannot be closed.
+///
 /// <b>Silent during a call</b>, from the ring to the hang-up, whether or not
 /// the agent muted a tab. The customer never hears the sites either way: only
 /// the microphone goes down the line.
@@ -84,6 +89,9 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
 
     /// <summary>At most this many tabs in a group: what fits on the screen at once.</summary>
     public const int MaxGroupSize = PlaceCount;
+
+    /// <summary>At most this many tabs of one site, the original among them: what fits on the screen at once.</summary>
+    public const int MaxCopies = PlaceCount;
 
     /// <summary>Raised when what is shown where has changed, for the view to lay the browsers out.</summary>
     public event EventHandler? ArrangementChanged;
@@ -162,15 +170,21 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
                 ? listed with { Username = user.Login, Password = _session.Password }
                 : listed;
 
-            var tab = new WebsiteTab(site, user.Id, _engine, Localizer, _logger);
+            // The original, then the copies the agent left open.
+            var copies = layout?.Copies?.GetValueOrDefault(site.Id.ToString()) ?? [];
 
-            if (layout?.Zoom.TryGetValue(site.Id.ToString(), out var zoom) is true)
+            foreach (var number in copies.Where(n => n is > 1 and <= MaxCopies).Prepend(1).Distinct().Order())
             {
-                tab.Zoom = zoom;
-            }
+                var tab = new WebsiteTab(site, user.Id, _engine, Localizer, _logger, number);
 
-            tab.PropertyChanged += OnTabChanged;
-            Tabs.Add(tab);
+                if (layout?.Zoom.TryGetValue(tab.Id.ToString(), out var zoom) is true)
+                {
+                    tab.Zoom = zoom;
+                }
+
+                tab.PropertyChanged += OnTabChanged;
+                Tabs.Add(tab);
+            }
         }
 
         MessageKey = Tabs.Count == 0 ? "websites.none" : null;
@@ -179,7 +193,7 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
         SetGroups(layout?.Groups ?? []);
 
         // A site that alerts has to be running to be heard.
-        foreach (var tab in Tabs.Where(t => t.Site.AlertsWithSound))
+        foreach (var tab in Tabs.Where(t => t.AlertsWithSound))
         {
             _ = tab.StartAsync();
         }
@@ -336,6 +350,78 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
         Arrange();
     }
 
+    /// <summary>
+    /// The place's Duplicate button: another tab on the same site, "POS 2",
+    /// on the page the original is showing and signed in as it is (the same
+    /// profile). It goes in the original's place, as a browser shows the
+    /// copy it has just made; the original keeps its button.
+    /// </summary>
+    public void Duplicate(int index)
+    {
+        if (Places[index].Tab is not { } from || _session.User is not { } user)
+        {
+            return;
+        }
+
+        var taken = Tabs.Where(t => t.Site.Id == from.Site.Id).Select(t => t.Number).ToHashSet();
+        var number = Enumerable.Range(2, MaxCopies - 1).FirstOrDefault(n => !taken.Contains(n));
+
+        if (number == 0)
+        {
+            from.Say("websites.copyMax");
+            return;
+        }
+
+        var copy = new WebsiteTab(from.Site, user.Id, _engine, Localizer, _logger, number, from.CurrentUrl)
+        {
+            Zoom = from.Zoom,
+        };
+        copy.SetCallSilence(_call.State.IsActive);
+        copy.PropertyChanged += OnTabChanged;
+
+        // Beside the original, in number order: POS, POS 2, POS 3.
+        var before = Tabs.Last(t => t.Site.Id == from.Site.Id && t.Number < number);
+        Tabs.Insert(Tabs.IndexOf(before) + 1, copy);
+
+        _logger.LogInformation("Website tab {Name}: copy {Number} opened", from.Site.NameEn, number);
+        Put(index, copy);
+    }
+
+    /// <summary>
+    /// A copy's Close button. Where it was shown, the original comes back if
+    /// it is not on screen already, or another tab that is not; and it leaves
+    /// the groups it was in.
+    /// </summary>
+    public void CloseCopy(WebsiteTab? tab)
+    {
+        if (tab is not { IsCopy: true } || !Tabs.Contains(tab))
+        {
+            return;
+        }
+
+        var original = Tabs.First(t => t.Site.Id == tab.Site.Id && !t.IsCopy);
+
+        foreach (var place in Places.Where(p => p.Tab == tab))
+        {
+            place.SetTab(Places.Any(p => p.Tab == original) ? null : original);
+        }
+
+        tab.PropertyChanged -= OnTabChanged;
+        Tabs.Remove(tab);
+
+        foreach (var place in Places.Take(ShownPlaces).Where(p => p.Tab is null))
+        {
+            place.SetTab(Tabs.FirstOrDefault(t => !Places.Any(p => p.Tab == t)));
+        }
+
+        // Saves too, with the copy gone from the groups and the list.
+        SetGroups([.. Groups.Select(g => new AgentSettingsStore.WebsiteGroup(g.Name, [.. g.Tabs]))]);
+        Arrange();
+
+        _logger.LogInformation("Website tab {Name}: copy {Number} closed", tab.Site.NameEn, tab.Number);
+        tab.Dispose();
+    }
+
     /// <summary>The place a tab is shown in, or -1.</summary>
     public int PlaceOf(WebsiteTab tab)
     {
@@ -431,7 +517,9 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
             ShownPlaces,
             [.. Places.Select(p => p.Tab?.Id)],
             Tabs.ToDictionary(t => t.Id.ToString(), t => t.Zoom),
-            [.. Groups.Select(g => new AgentSettingsStore.WebsiteGroup(g.Name, [.. g.Tabs]))]);
+            [.. Groups.Select(g => new AgentSettingsStore.WebsiteGroup(g.Name, [.. g.Tabs]))],
+            Tabs.Where(t => t.IsCopy).GroupBy(t => t.Site.Id)
+                .ToDictionary(g => g.Key.ToString(), g => g.Select(t => t.Number).ToArray()));
 
         _settings.Update(s => s with
         {
@@ -551,6 +639,12 @@ public sealed partial class WebsitePlace(WebsitesViewModel screen, int index) : 
         Tab = tab;
         OnPropertyChanged(nameof(Chosen));
     }
+
+    [RelayCommand]
+    private void Duplicate() => Screen.Duplicate(Index);
+
+    [RelayCommand]
+    private void CloseCopy() => Screen.CloseCopy(Tab);
 
     /// <summary>A click anywhere in the place's bar makes it the one the tab bar fills.</summary>
     [RelayCommand]

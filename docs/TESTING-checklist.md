@@ -1639,6 +1639,14 @@ Sign out and in once the Websites page is filled, so the app fetches the tabs.
 - [ ] **The cart with a group shown.** With a group of four that does not
       include the POS tab on screen, answer a call from a mobile: the POS tab
       is shown alone with the cart; the group's button brings the group back.
+- [ ] **Duplicate a tab** (4 Oct night). On the POS, open a cart or any
+      page past the first, press Duplicate (two pages, after Start page):
+      **POS 2** appears beside POS on the tab bar, on the same page, signed
+      in, nobody typing. Side by side, POS and POS 2: work in both. Press
+      Duplicate until a fifth is refused with a message. Close POS 2 with its
+      ×: POS comes back in its place. Sign out and in with POS 2 open: it is
+      still there, on the start page. Answer a call from a mobile: the cart
+      opens in **POS**, not in a copy. POS itself has no ×.
 - [ ] **Sounds while hidden.** Leave the Websites section for the call log for
       ten minutes; an order on a site that dings is heard at once, not a minute
       later. The speaker mark is on its tab button.

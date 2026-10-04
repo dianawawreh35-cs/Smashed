@@ -94,6 +94,16 @@
               <Button Style="{StaticResource IconButton}" Content="&#xE80F;"
                       Command="{Binding Tab.HomeCommand}"
                       ToolTip="{Binding Screen.Localizer[websites.home]}" />
+              <!-- Another tab on the same site, "POS 2"; a copy can be closed,
+                   the supervisor's own tabs cannot. -->
+              <Button Style="{StaticResource IconButton}" Content="&#xE8C8;"
+                      Margin="8,0,0,0"
+                      Command="{Binding DuplicateCommand}"
+                      ToolTip="{Binding Screen.Localizer[websites.duplicate]}" />
+              <Button Style="{StaticResource IconButton}" Content="&#xE711;"
+                      Command="{Binding CloseCopyCommand}"
+                      Visibility="{Binding Tab.IsCopy, Converter={StaticResource BoolToVisibility}}"
+                      ToolTip="{Binding Screen.Localizer[websites.closeCopy]}" />
               <TextBlock Text="{Binding Tab.Status}"
                          Foreground="{DynamicResource Warning}"
                          FontSize="11"

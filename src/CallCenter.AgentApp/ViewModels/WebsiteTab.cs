@@ -29,6 +29,12 @@ namespace CallCenter.AgentApp.ViewModels;
 /// <b>Started when needed.</b> A tab that alerts with sound starts at sign-in,
 /// so its dings are heard before anyone opens it; the others the first time
 /// they are shown, or the cart is opened in them.
+///
+/// <b>A copy</b> (Dia, 4 Oct 2026: two POS tabs at once) is the agent's own
+/// second, third or fourth tab on a site, named "POS 2" and so on. It shares
+/// the original's profile, so it is signed in as the original is, and its
+/// popups too. It never takes the caller's cart, and is not started at
+/// sign-in for its sound: the original is.
 /// </remarks>
 public sealed partial class WebsiteTab : ObservableObject, IDisposable
 {
@@ -45,12 +51,19 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
     private bool _callSilence;
     private bool _disposed;
 
-    public WebsiteTab(AgentWebsiteDto site, Guid agentId, WebsiteEngine engine, Localizer localizer, ILogger logger)
+    /// <param name="number">1 for the supervisor's tab itself, 2 to 4 for the agent's copies of it.</param>
+    /// <param name="startUrl">Where a new copy opens: the page the original was on. Null for the start page.</param>
+    public WebsiteTab(
+        AgentWebsiteDto site, Guid agentId, WebsiteEngine engine, Localizer localizer, ILogger logger,
+        int number = 1, string? startUrl = null)
     {
         Site = site;
+        Number = number;
+        Id = WebsiteEngine.TabId(site.Id, number);
         _agentId = agentId;
         _engine = engine;
         _logger = logger;
+        _pendingUrl = startUrl;
         Localizer = localizer;
 
         Browser = new WebView2
@@ -62,15 +75,28 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
 
     public AgentWebsiteDto Site { get; }
 
-    public Guid Id => Site.Id;
+    /// <summary>The site's own id for the original; an id of its own for a copy, so the layout and groups can name it.</summary>
+    public Guid Id { get; }
+
+    /// <summary>1 for the original, 2 to 4 for a copy.</summary>
+    public int Number { get; }
+
+    /// <summary>The agent made this tab as a copy of the supervisor's, and can close it.</summary>
+    public bool IsCopy => Number > 1;
 
     public Localizer Localizer { get; }
 
     /// <summary>The browser. Placed by the Websites screen, never re-parented.</summary>
     public WebView2 Browser { get; }
 
-    /// <summary>The tab's name in the agent's language.</summary>
-    public string Name => Localizer.IsArabic ? Site.NameAr : Site.NameEn;
+    /// <summary>The tab's name in the agent's language, with its number for a copy.</summary>
+    public string Name => (Localizer.IsArabic ? Site.NameAr : Site.NameEn) + (IsCopy ? $" {Number}" : string.Empty);
+
+    /// <summary>The page shown now, for a copy to open on. Null before the tab has started.</summary>
+    public string? CurrentUrl => Browser.CoreWebView2?.Source ?? _pendingUrl;
+
+    /// <summary>Started at sign-in and never asked to save memory, so its sound is heard while hidden. The original only.</summary>
+    public bool AlertsWithSound => Site.AlertsWithSound && !IsCopy;
 
     /// <summary>The site makes its logins itself, with the supervisor's username and password.</summary>
     public bool IsShared => Site.Login == WebsiteLogins.Shared;
@@ -82,7 +108,8 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
     /// </summary>
     private bool SignsIn => !string.IsNullOrEmpty(Site.Password);
 
-    public bool OpensCart => !string.IsNullOrWhiteSpace(Site.CartUrl);
+    /// <summary>The caller's cart opens here (A-85): the original only, so it always lands in the same tab.</summary>
+    public bool OpensCart => !IsCopy && !string.IsNullOrWhiteSpace(Site.CartUrl);
 
     /// <summary>The page is playing sound: the speaker mark on the tab.</summary>
     [ObservableProperty]
@@ -155,7 +182,7 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
     {
         Browser.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
 
-        if (Browser.CoreWebView2 is { } core && !Site.AlertsWithSound)
+        if (Browser.CoreWebView2 is { } core && !AlertsWithSound)
         {
             core.MemoryUsageTargetLevel = shown
                 ? CoreWebView2MemoryUsageTargetLevel.Normal
@@ -220,6 +247,13 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
 
         // Not awaited: the button is free again as soon as the file is written.
         _ = ClearStatusLaterAsync(StatusKey);
+    }
+
+    /// <summary>A message on the bar for a few seconds, as a label key.</summary>
+    public void Say(string key)
+    {
+        StatusKey = key;
+        _ = ClearStatusLaterAsync(key);
     }
 
     /// <summary>Takes a message off the bar after a while, unless another has replaced it.</summary>

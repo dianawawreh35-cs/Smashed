@@ -9161,6 +9161,8 @@ goes; the Groups window now has the order, with up and down.
 tests for this screen: it needs the WebView2 engine. **Not seen running.**
 Checklist "Websites inside the Agent App", the Groups lines.
 
+**To deploy:** released as `v0.14.0` with the POS login below; Agent App 0.14.0.
+
 ## 2026-10-04 (night) — The POS tab logs in with the agent's Call Center account (A-88)
 
 **In plain terms.** Each agent's POS username and password are the same as
@@ -9195,6 +9197,13 @@ sign-in the agent has just made, so the POS is ready without typing.
 **Checked:** the Agent App builds; its 116 tests and Shared's 167 pass; the
 web app's Websites page tests pass and `npm run build` succeeds. **Not seen
 running.** Checklist "Websites inside the Agent App", the POS line.
+
+**To deploy:** released as `v0.14.0`. **Nothing is live yet**: the laptops get
+it when **Agent App 0.14.0** (`publish\SmashedAgentApp-Setup-0.14.0.exe` and
+its zip, built after the tag) is uploaded on the Agent App page in place of
+0.13.0; it needs the server at `v0.12.0` or later, as 0.12.0 did. The server
+image changes only in the Websites page's hint text, so `update.sh v0.14.0`
+can wait for the next server visit. No migration, nothing new in `.env`.
 
 ## 2026-10-04 (night) — Light mode in both apps (A-90, S-69)
 

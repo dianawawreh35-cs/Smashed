@@ -9343,6 +9343,12 @@ Choices made here, Dia not asked, each easy to change:
 same each time). **Not seen running.** Checklist "Websites inside the Agent
 App", the Duplicate line.
 
+**To deploy:** released as **`v0.15.0`**, the Agent App only (the server is
+the same as `v0.14.1`). **Nothing is live yet:** upload **Agent App 0.15.0**
+(`publish\SmashedAgentApp-Setup-0.15.0.exe` and its zip, built after the
+tag) on the Agent App page in place of 0.14.1. It carries 0.14.1's light
+mode fix too.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -9366,7 +9372,7 @@ running**.
 |---|---|---|
 | **The call banner**: checklist "The call banner" on a laptop with the PBX, in both languages, with screenshots of the banner ringing, connected and with the form waiting | A-19 | **released as `v0.12.0`, not yet seen on a call.** Agent App 0.12.0 on the laptops |
 | **Websites inside the Agent App**: checklist "Websites inside the Agent App" and "The Websites page", on a laptop with the PBX, in both languages: the four accounts signed in at once, the cart in the POS tab on answer, silence during a call, the shortcuts while typing in a site, a site's ding while the section is hidden, the groups. Then correct the POS start address on the Websites page | A-88, S-68, A-85, A-12 | **released as `v0.12.0`, not deployed; seen without a phone only.** The server's `update.sh v0.12.0`, then Agent App 0.12.0 uploaded on the Agent App page; the three sites' addresses and logins |
-| **Duplicate a website tab**: checklist "Websites inside the Agent App", the Duplicate line: two POS tabs, both signed in, the cart in the first, the copy closed and kept across a sign-out | A-88 | **built 4 Oct, not released, not yet seen running** |
+| **Duplicate a website tab**: checklist "Websites inside the Agent App", the Duplicate line: two POS tabs, both signed in, the cart in the first, the copy closed and kept across a sign-out | A-88 | **released as `v0.15.0`, not uploaded, not yet seen running.** Upload Agent App 0.15.0 on the Agent App page |
 | **The rail and Save as PDF**: checklist "The rail" at 1366 × 768 and 125 %, folded and open, in both languages; and a page saved as PDF from the POS tab | A-89, A-88 | **released as `v0.13.0`, not deployed, not yet seen running.** The same deploy as the websites above, with Agent App 0.13.0 in place of 0.12.0 |
 | **The Agent App's own fonts (N-10)**: 0.11.1 is on the Agent App page (uploaded 4 Oct, 10:32 UTC); once the laptops have updated, the checklist's "The fonts inside the app" on a laptop: every screen and the pop-up in both languages for anything cut off by Cairo's taller lines, at 1366 × 768 and 125 %, and a shift with no `FileNotFoundException` | N-10 | **released as `v0.11.1`, seen only on the sign-in screen.** Each laptop's agent pressing Update now (A-82) |
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |

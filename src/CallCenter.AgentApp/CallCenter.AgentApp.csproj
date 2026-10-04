@@ -56,6 +56,14 @@
          A window left without one borrows the icon of the process, and in
          development that process is dotnet.exe, so it showed .NET's. -->
     <Resource Include="Assets\app.ico" />
+    <!-- The interface fonts, inside the program rather than looked up on the
+         laptop (N-10). On 3 and 4 Oct two laptops' apps closed when Windows
+         offered a font whose file was gone. -->
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <!-- The SIL Open Font License travels with the fonts it covers. -->
+    <None Update="Assets\Fonts\*-OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

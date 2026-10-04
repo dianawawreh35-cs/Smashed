@@ -8892,6 +8892,56 @@ works (M-D01). The nightly update is off, so the server gets it only by hand
 (`./update.sh v0.11.0 --pull`). **Agent App 0.11.0** goes on the Agent App page
 in place of 0.9.2; until a laptop has it, its agent shows a dash.
 
+## 2026-10-04 — The Agent App brings its own fonts (N-10)
+
+**In plain terms.** Two laptops' Agent Apps closed by themselves just as a call
+ended: lelian's (`DESKTOP-RMSFSIV-B5B431`) at 22:31 on 3 Oct, the supervisor's
+(`DESKTOP-RMSFSIV-6B7832`) at 00:25 on 4 Oct. Read from App logs on the live
+server. Each log shows 20 × `Unhandled exception on the UI thread; the app
+carries on`, then the same as `has to close`, all within a tenth of a second
+of `Call finished`: `FileNotFoundException: Unable to find the specified file`
+in `GlyphTypeface.GetGlyphMetricsOptimized`, under a TextBox's layout after
+text went into it. Windows listed a font whose file was not there, the layout
+pass that drew in it threw every time it ran, and F-02's handler counted the
+storm and let the app close. Both apps were back within seconds, and the calls
+were already saved. Dia chose to fix it in the app rather than on the laptops.
+
+- **The fonts are inside the program now**: Cairo Regular, SemiBold and Bold,
+  and Cascadia Mono in the same three weights, as WPF resources from
+  `Assets\Fonts\` (about 1.4 MB). `UiFont` and `MonoFont` in `Theme.xaml`
+  name them by pack URI, so WPF never asks the laptop for them. Segoe UI and
+  Consolas stay after them for a character the bundled font lacks; both ship
+  with Windows. **Tajawal is gone from the list**: it sat between Cairo and
+  Segoe UI and was only ever a laptop font.
+- **Which font was missing is not known.** The log names no file. Both laptops
+  are copies of the same Windows (`DESKTOP-RMSFSIV`, user `HP`), so the same
+  broken entry on both fits. Whatever it was, ordinary Arabic and Latin text
+  no longer goes near the laptop's fonts. A character Cairo lacks (an emoji,
+  say) still falls back to Windows' own, so a broken *system* font could in
+  theory still do this. The checklist's last item watches for it.
+- **The app looks different.** This PC has no Cairo, and most laptops likely
+  had none either, so the app has been showing Segoe UI all along, against
+  `Theme.xaml`'s intent and unlike the web app. Now it really is Cairo, whose
+  lines are about 40 % taller (1.88 em against 1.33). The sign-in card grew
+  from about 430 to 495 px, and Cairo's semi-bold is lighter than Segoe
+  UI's. **No screen past sign-in has been looked at**: signing in on this PC
+  would register a real extension. Checklist "The fonts inside the app".
+- The static `.ttf` weights come from Google Fonts (Cairo 3.130, the Cairo
+  project's own release, every character included; Cascadia Mono 2407.024).
+  The OFL text of each goes next to the program. THIRD-PARTY-LICENSES has
+  where to fetch them again.
+
+**Checked:** Agent App tests 100 pass (seven new, `BundledFontsTests`: each
+weight of both fonts resolves to a `pack:` file inside the app with its own
+weight, not a faked one, and Cairo has the Arabic letters, the Arabic-Indic
+digits and the Latin of a phone number). A themed primary button was checked
+to draw with `cairo-semibold.ttf` from inside the app. The sign-in screen was
+seen running, before and after.
+
+**To deploy:** released as `v0.11.1`; only the Agent App changes. **Agent App
+0.11.1** goes on the Agent App page in place of 0.11.0, and the laptops offer
+Update now (A-82). The server stays on what it runs.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -8913,6 +8963,7 @@ running**.
 
 | Next | Requirement | Depends on |
 |---|---|---|
+| **The Agent App's own fonts (N-10)**: release it, upload the Agent App, then the checklist's "The fonts inside the app" on a laptop: every screen and the pop-up in both languages for anything cut off by Cairo's taller lines, at 1366 × 768 and 125 %, and a shift with no `FileNotFoundException` | N-10 | **built 4 Oct, seen only on the sign-in screen.** A version and a release; the laptops then update themselves (A-82) |
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |
 | **Switch on the nightly update** on the server: copy `auto-update.sh` and the two `callcenter-auto-update.*` files, run `./auto-update.sh --check`, enable the timer (runbook, *Updating by itself at night*). The one-phone release above needs the laptops the same day, so tag it `deploy: manual` | — | the first release built after 29 Sep (its image carries the deploy files); the server's `docker login` done as `smashed` |
 | **The crispy burgers on the live server**: after that update, run `seed` once and look for `menu 4 created`, then find ناشوز in the Agent App's menu | A-66 | the server on `v0.5.1`, which carries everything in `v0.5.0` too (27 Sep night entry) |

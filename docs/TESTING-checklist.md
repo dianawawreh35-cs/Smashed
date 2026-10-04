@@ -1539,6 +1539,33 @@ is where the echo is worst, so it shows whether the canceller works.
       again: no `Echo cancellation on` line, and the echo is back. Set it to
       `true` again.
 
+### The fonts inside the app (N-10) — built 4 Oct, no phone needed for most
+
+What went wrong on 3 and 4 Oct: on two laptops the app closed by itself just as
+a call ended. Windows listed a font whose file was gone, and the app could not
+draw its text. Since 4 Oct the app brings its own fonts, Cairo and Cascadia
+Mono. Most laptops had no Cairo before, so the app was really showing Segoe
+UI: **the letters change shape, and Cairo's lines are taller.**
+
+- [ ] **The font is Cairo.** Sign-in screen: the letters are rounder and
+      narrower than before, like the web app's. *If they look the same as
+      before:* the laptop has the old version; check the version on the Users
+      page.
+- [ ] **Nothing is cut off, in both languages.** Cairo's lines are about 40 %
+      taller than Segoe UI's. Go through the rail, Dial, Call log, Contacts,
+      Menu, Delivery, Applications, App logs and the pop-up on a call: no word
+      cut at the top or bottom, no button whose text does not fit, no list
+      row overlapping the next. **Screenshot each, in Arabic and in English.**
+- [ ] **At 1366 × 768 and 125 %** (the agents' laptops), as in the 27 Sep
+      section above: the whole window and the pop-up still fit on the screen.
+- [ ] **Fixed-width text stays fixed-width.** What was in the fixed-width
+      font before (a number field in the classification form, the numbers in
+      the call log and App logs) still is: every digit the same width, so
+      the columns line up.
+- [ ] **On a laptop that crashed** (lelian, or the supervisor's laptop), a
+      full shift: no `Unhandled exception on the UI thread` with
+      `FileNotFoundException` in App logs.
+
 ---
 
 ## Round 3a — the recording endpoints, from Swagger (A-33, S-04, S-43)

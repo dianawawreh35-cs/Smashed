@@ -75,12 +75,17 @@
 
   <!-- ===== Typography ============================================== -->
   <!--
-    Cairo carries Arabic and Latin in one family. It is a Google font and may
-    not be installed, so Segoe UI is named after it - it has proper Arabic
-    coverage on Windows 10 and 11.
+    Cairo carries Arabic and Latin in one family, the supervisor app's font
+    too. Both fonts are inside the program (Assets\Fonts, N-10), not looked up
+    on the laptop: until 4 Oct they were, and when a laptop's Windows listed a
+    font whose file was gone, the next text drawn in it threw on every layout
+    pass and the app closed, mid-shift, on two laptops. Segoe UI and Consolas
+    stay named after them for a character the bundled font has no shape for.
+    Tajawal, named between Cairo and Segoe UI until then, is not: it was only
+    ever the laptop's.
   -->
-  <FontFamily x:Key="UiFont">Cairo, Tajawal, Segoe UI</FontFamily>
-  <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
+  <FontFamily x:Key="UiFont">pack://application:,,,/CallCenter.AgentApp;component/Assets/Fonts/#Cairo, Segoe UI</FontFamily>
+  <FontFamily x:Key="MonoFont">pack://application:,,,/CallCenter.AgentApp;component/Assets/Fonts/#Cascadia Mono, Consolas</FontFamily>
 
   <sys:Double x:Key="FontSizeSmall">11</sys:Double>
   <sys:Double x:Key="FontSizeBody">13</sys:Double>

@@ -98,6 +98,26 @@ npm versions are the resolved versions in `src/CallCenter.Web/package-lock.json`
 | vite | 8.3.1 | MIT |
 | vitest | 5.0.2 | MIT |
 
+## Fonts inside the Agent App
+
+| Font | Version | Licence |
+| --- | --- | --- |
+| Cairo (Regular, SemiBold, Bold) | 3.130 | OFL-1.1 |
+| Cascadia Mono (Regular, SemiBold, Bold) | 2407.024 | OFL-1.1 |
+
+> **Note.** Since 4 Oct 2026 the Agent App draws its text with these fonts,
+> built into the program from `src/CallCenter.AgentApp/Assets/Fonts/`, rather
+> than with fonts installed on the laptop (N-10). The `.ttf` files are the
+> static weights Google Fonts serves (`fonts.googleapis.com/css2`, no browser
+> named, so it answers with whole TrueType files); Cairo's are the Cairo
+> project's own 3.130 release, with every character it has. Same three conditions as the
+> web app's Cairo above: the licence travels with the fonts (each one's OFL
+> text is copied next to the program, `Assets\Fonts\*-OFL.txt`), they are
+> not sold on their own, and they are unmodified. Cascadia's licence reserves
+> the name *Cascadia Code*; Cascadia Mono is shipped unmodified under its own
+> name. Copyright 2009 The Cairo Project Authors; copyright 2019 - present,
+> Microsoft Corporation. Fetch them again from the same place when bumping.
+
 ## Container base images
 
 | Image | Tag | Licence |

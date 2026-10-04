@@ -9201,9 +9201,10 @@ running.** Checklist "Websites inside the Agent App", the POS line.
 **To deploy:** released as `v0.14.0`. **Nothing is live yet**: the laptops get
 it when **Agent App 0.14.0** (`publish\SmashedAgentApp-Setup-0.14.0.exe` and
 its zip, built after the tag) is uploaded on the Agent App page in place of
-0.13.0; it needs the server at `v0.12.0` or later, as 0.12.0 did. The server
-image changes only in the Websites page's hint text, so `update.sh v0.14.0`
-can wait for the next server visit. No migration, nothing new in `.env`.
+0.13.0; it needs the server at `v0.12.0` or later, as 0.12.0 did. No
+migration, nothing new in `.env`. *Corrected the same night:* the tag also
+carries light mode (the entry below), so the server image changes in the web
+app too, not only in the Websites page's hint text; see there.
 
 ## 2026-10-04 (night) — Light mode in both apps (A-90, S-69)
 
@@ -9258,6 +9259,16 @@ the sign-in screen would still need a default).
 clean, its 240 tests pass and `npm run build` succeeds. **Not seen running:**
 the Agent App could not be started from this session (Windows refused it),
 so the first run is Dia's. Checklist "Light mode".
+
+**To deploy:** it went out in **`v0.14.0`**, which another session tagged on
+top of this commit for the website groups and the POS login, so no tag of its
+own; Agent App 0.14.0 (built 20:02, after this commit) carries it: its program
+holds the light palette and its labels the button's words. **Nothing is live
+yet.** The laptops get it when Agent App 0.14.0 is uploaded on the Agent App
+page; the supervisor app gets it with `update.sh v0.14.0` on the server. Both
+start dark, so nobody sees a change until they press the button. Worth
+opening the Agent App here once, and pressing the sun, before the upload:
+it has not been seen running.
 
 ## Where to pick up
 

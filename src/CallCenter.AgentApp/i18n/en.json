@@ -373,6 +373,10 @@
     "groupsSave": "Save",
     "groupsCancel": "Cancel",
     "groupMax": "At most four tabs in a group: that is what fits on the screen.",
-    "groupNeedsName": "Give each group a name."
+    "groupNeedsName": "Give each group a name.",
+    "groupOrder": "Order on screen",
+    "groupOrderHint": "1 and 2 on the top row, 3 and 4 below, in reading order.",
+    "moveEarlier": "Move earlier",
+    "moveLater": "Move later"
   }
 }

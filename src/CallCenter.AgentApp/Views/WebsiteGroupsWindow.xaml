@@ -89,6 +89,60 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- The order on screen, for two tabs or more: 1 and 2 on the
+                     top row, 3 and 4 below, in reading order. -->
+                <StackPanel Visibility="{Binding HasOrder, Converter={StaticResource BoolToVisibility}}">
+                  <TextBlock Text="{Binding Editor.Localizer[websites.groupOrder]}"
+                             Style="{StaticResource FieldLabel}"
+                             Margin="0,10,0,2" />
+                  <TextBlock Text="{Binding Editor.Localizer[websites.groupOrderHint]}"
+                             Style="{StaticResource Subtle}"
+                             FontSize="11"
+                             TextWrapping="Wrap"
+                             Margin="0,0,0,6" />
+                  <ItemsControl ItemsSource="{Binding Order}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Background="{StaticResource SurfaceAlt}"
+                                BorderBrush="{StaticResource BorderSoft}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8,3"
+                                Margin="0,0,0,4">
+                          <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                              <Button Style="{StaticResource GhostButton}"
+                                      Padding="7,3"
+                                      MinWidth="0"
+                                      Command="{Binding MoveUpCommand}"
+                                      ToolTip="{Binding Localizer[websites.moveEarlier]}">
+                                <TextBlock Text="&#xE70E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12" />
+                              </Button>
+                              <Button Style="{StaticResource GhostButton}"
+                                      Padding="7,3"
+                                      MinWidth="0"
+                                      Margin="2,0,0,0"
+                                      Command="{Binding MoveDownCommand}"
+                                      ToolTip="{Binding Localizer[websites.moveLater]}">
+                                <TextBlock Text="&#xE70D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12" />
+                              </Button>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Position}"
+                                       Foreground="{StaticResource Accent}"
+                                       FontWeight="SemiBold"
+                                       MinWidth="20"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Tab.Name}"
+                                       Foreground="{StaticResource Text}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                          </DockPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
               </StackPanel>
             </Border>
           </DataTemplate>

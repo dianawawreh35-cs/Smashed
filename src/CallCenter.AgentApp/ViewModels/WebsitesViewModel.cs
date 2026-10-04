@@ -24,8 +24,11 @@ namespace CallCenter.AgentApp.ViewModels;
 /// and each tab's zoom are remembered for the agent on this laptop.
 ///
 /// <b>Groups are the agent's own</b> (Dia, 4 Oct): up to four tabs under a
-/// name, which open together, two side by side and three or four in quarters.
-/// Remembered with the layout, for that agent on that laptop.
+/// name, which open together, two side by side and three or four in quarters,
+/// in the order the agent arranged them. Remembered with the layout, for that
+/// agent on that laptop. <b>A group on screen is a tab of its own</b>: its
+/// button is marked, and a tab button then replaces the whole group with that
+/// one tab, rather than one quarter of it.
 ///
 /// <b>Silent during a call</b>, from the ring to the hang-up, whether or not
 /// the agent muted a tab. The customer never hears the sites either way: only
@@ -176,11 +179,31 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
         Arrange();
     }
 
-    /// <summary>The tab-bar button: the tab goes into the active place.</summary>
+    /// <summary>
+    /// The group whose tabs are exactly what is on screen, in the layout that
+    /// fits them, or null. Worked out from the places, never stored, so it
+    /// cannot disagree with what the agent sees.
+    /// </summary>
+    public WebsiteGroupItem? ShownGroup { get; private set; }
+
+    /// <summary>
+    /// The tab-bar button: the tab goes into the active place. With a group
+    /// on screen it takes the whole group's place instead, alone (A-88).
+    /// </summary>
     [RelayCommand]
     private void Show(WebsiteTab? tab)
     {
-        if (tab is not null)
+        if (tab is null)
+        {
+            return;
+        }
+
+        if (ShownGroup is not null)
+        {
+            ShownPlaces = 1;
+            Put(0, tab);
+        }
+        else
         {
             Put(ActivePlace, tab);
         }
@@ -206,7 +229,7 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
             return;
         }
 
-        ShownPlaces = tabs.Count switch { 1 => 1, 2 => 2, _ => 4 };
+        ShownPlaces = PlacesFor(tabs.Count);
 
         for (var i = 0; i < PlaceCount; i++)
         {
@@ -237,7 +260,23 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
             }
         }
 
+        MarkShownGroup();
         Save();
+    }
+
+    /// <summary>The layout a group of <paramref name="count"/> tabs opens in.</summary>
+    private static int PlacesFor(int count) => count switch { 1 => 1, 2 => 2, _ => 4 };
+
+    /// <summary>Finds the group on screen, if any, and marks its button.</summary>
+    private void MarkShownGroup()
+    {
+        var onScreen = Places.Take(ShownPlaces).Select(p => p.Tab?.Id).OfType<Guid>().ToHashSet();
+        ShownGroup = Groups.FirstOrDefault(g => PlacesFor(g.Tabs.Count) == ShownPlaces && onScreen.SetEquals(g.Tabs));
+
+        foreach (var group in Groups)
+        {
+            group.IsShown = group == ShownGroup;
+        }
     }
 
     /// <summary>Raised by the Groups button; the view opens the window.</summary>
@@ -317,11 +356,12 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
 
         tab.Navigate(url);
 
-        // Ready where the agent will look for it: in a place on screen, if it
-        // is not in one already. The agent stays on the pop-up meanwhile.
+        // Ready where the agent will look for it: on screen, if it is not
+        // already, as if its tab button were pressed. The agent stays on the
+        // pop-up meanwhile.
         if (!IsOnScreen(tab))
         {
-            Put(ActivePlace, tab);
+            Show(tab);
         }
 
         _logger.LogInformation("Opened the caller's cart in the {Name} tab", tab.Site.NameEn);
@@ -348,6 +388,7 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
             Places[i].IsActive = i == ActivePlace && ShownPlaces > 1;
         }
 
+        MarkShownGroup();
         ArrangementChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -444,9 +485,18 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
 }
 
 /// <summary>One of the agent's groups, as its button shows it: the name and how many tabs.</summary>
-public sealed record WebsiteGroupItem(string Name, IReadOnlyList<Guid> Tabs)
+public sealed partial class WebsiteGroupItem(string name, IReadOnlyList<Guid> tabs) : ObservableObject
 {
+    public string Name { get; } = name;
+
+    /// <summary>In the order the agent arranged them: the first place, then the next.</summary>
+    public IReadOnlyList<Guid> Tabs { get; } = tabs;
+
     public string Label => $"{Name} ▸ {Tabs.Count}";
+
+    /// <summary>Its tabs are what is on screen: the button is marked, as the tab being shown.</summary>
+    [ObservableProperty]
+    private bool _isShown;
 }
 
 /// <summary>One of the four places on the Websites screen, and the tab in it.</summary>

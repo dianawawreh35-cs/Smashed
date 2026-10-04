@@ -9126,6 +9126,41 @@ same as `v0.12.0`. **Nothing is live yet**: the server needs
 **Agent App 0.13.0** (`publish\SmashedAgentApp-Setup-0.13.0.exe` and its zip,
 built after the tag) uploaded on the Agent App page in place of 0.12.0.
 
+## 2026-10-04 (night) — A group of websites is a tab of its own, in the order the agent sets (A-88)
+
+**In plain terms.** With a group on screen (say four accounts in quarters),
+pressing another tab put that tab into one quarter and left the other three
+there. Dia asked for a group to behave like a tab: pressing another tab now
+replaces the whole group with that one tab, full size, and the group's button
+brings the group back. Dia also asked to choose where each site in a group
+goes; the Groups window now has the order, with up and down.
+
+- **Which group is on screen is worked out, not stored.** A group counts as
+  shown when the places on screen hold exactly its tabs, in the layout that
+  fits its size (any order). Its button is filled while that is true. So a
+  layout button, a place's own list, or arranging the same tabs by hand all
+  keep the mark truthful, and nothing new goes into `settings.json`.
+- **A tab button with a group shown** sets the layout to one place and puts
+  the tab there. With no group shown it fills the place last used, as before:
+  Side by side and Quarters chosen by hand still work as they did.
+- **The POS cart (A-85)** goes the same way as a tab button: it used to take
+  the place last used, which with a group on screen meant one quarter of the
+  group. Now, if the POS tab is not on screen, it is shown alone in place of the
+  group. Choice made here: the agent gets the whole cart rather than a quarter,
+  and one click on the group's button brings the group back.
+- **The order.** A new tick goes last; the up and down buttons move a tab.
+  The saved group's list of tabs was already in order, so existing groups keep
+  theirs (the order the tabs were listed in, as they opened before). Position
+  1 is the first place in reading order: the right in Arabic, where the screen
+  runs right to left.
+- **Arranging on the screen itself** (choosing a group's tab in another
+  place's list, which swaps them) is not saved into the group; the group's
+  button puts back its saved order. The Groups window is where the order lives.
+
+**Checked:** the Agent App builds, and its 116 tests pass. There are no unit
+tests for this screen: it needs the WebView2 engine. **Not seen running.**
+Checklist "Websites inside the Agent App", the Groups lines.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

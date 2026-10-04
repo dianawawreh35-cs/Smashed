@@ -142,7 +142,9 @@
         </StackPanel>
 
         <!-- A group's button shows its tabs together (A-88). Before the tabs:
-             a group is what an agent with four accounts reaches for. -->
+             a group is what an agent with four accounts reaches for. While its
+             tabs are what is on screen it is marked, as the tab being shown,
+             and a tab button replaces the whole group. -->
         <ItemsControl DockPanel.Dock="Left" ItemsSource="{Binding Groups}" VerticalAlignment="Center">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -151,12 +153,22 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="{x:Type vm:WebsiteGroupItem}">
-              <Button Style="{StaticResource SmallButton}"
-                      Margin="0,0,6,4"
-                      BorderBrush="{StaticResource Accent}"
+              <Button Margin="0,0,6,4"
                       Content="{Binding Label}"
                       Command="{Binding DataContext.ShowGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                      CommandParameter="{Binding}" />
+                      CommandParameter="{Binding}">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource SmallButton}">
+                    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsShown}" Value="True">
+                        <Setter Property="Background" Value="{StaticResource AccentDim}" />
+                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
+              </Button>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>

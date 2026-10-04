@@ -7,8 +7,9 @@ using CommunityToolkit.Mvvm.Input;
 namespace CallCenter.AgentApp.ViewModels;
 
 /// <summary>
-/// The window where an agent makes their groups of tabs (A-88): a name, and
-/// up to four tabs ticked. Nothing changes until Save.
+/// The window where an agent makes their groups of tabs (A-88): a name, up
+/// to four tabs ticked, and the order they go on screen in. Nothing changes
+/// until Save.
 /// </summary>
 public sealed partial class WebsiteGroupsEditor : ObservableObject
 {
@@ -89,6 +90,16 @@ public sealed partial class WebsiteGroupsEditor : ObservableObject
             draft.Choices.Add(new TabChoice(draft, tab, chosen.Contains(tab.Id)));
         }
 
+        // The saved order, not the order the tabs are listed in.
+        foreach (var id in chosen)
+        {
+            if (draft.Choices.FirstOrDefault(c => c.Tab.Id == id && c.IsChosen) is { } choice)
+            {
+                draft.Order.Add(choice);
+            }
+        }
+
+        draft.Renumber();
         return draft;
     }
 
@@ -106,8 +117,40 @@ public sealed partial class WebsiteGroupsEditor : ObservableObject
 
         public ObservableCollection<TabChoice> Choices { get; } = [];
 
-        /// <summary>The ticked tabs, in the order they are listed.</summary>
-        public IEnumerable<Guid> Chosen => Choices.Where(c => c.IsChosen).Select(c => c.Tab.Id);
+        /// <summary>
+        /// The ticked tabs in the order they go on screen: 1 and 2 on the top
+        /// row, 3 and 4 below, in reading order (so 1 is on the right in Arabic).
+        /// A new tick goes last.
+        /// </summary>
+        public ObservableCollection<TabChoice> Order { get; } = [];
+
+        /// <summary>The ticked tabs, in their order on screen.</summary>
+        public IEnumerable<Guid> Chosen => Order.Select(c => c.Tab.Id);
+
+        /// <summary>An order is only worth showing for two tabs or more.</summary>
+        public bool HasOrder => Order.Count > 1;
+
+        internal void Move(TabChoice choice, int by)
+        {
+            var from = Order.IndexOf(choice);
+            var to = from + by;
+
+            if (from >= 0 && to >= 0 && to < Order.Count)
+            {
+                Order.Move(from, to);
+                Renumber();
+            }
+        }
+
+        internal void Renumber()
+        {
+            for (var i = 0; i < Order.Count; i++)
+            {
+                Order[i].SetPosition(i + 1, Order.Count);
+            }
+
+            OnPropertyChanged(nameof(HasOrder));
+        }
     }
 
     /// <summary>One tab's tick in a group. A fifth is refused: four is what fits on the screen.</summary>
@@ -125,6 +168,37 @@ public sealed partial class WebsiteGroupsEditor : ObservableObject
 
         public WebsiteTab Tab { get; }
 
+        public Localizer Localizer => _group.Editor.Localizer;
+
+        /// <summary>Where it goes on screen, from 1, while it is ticked.</summary>
+        [ObservableProperty]
+        private int _position;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(MoveUpCommand))]
+        private bool _isFirst;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(MoveDownCommand))]
+        private bool _isLast;
+
+        internal void SetPosition(int position, int count)
+        {
+            Position = position;
+            IsFirst = position == 1;
+            IsLast = position == count;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanMoveUp))]
+        private void MoveUp() => _group.Move(this, -1);
+
+        private bool CanMoveUp() => !IsFirst;
+
+        [RelayCommand(CanExecute = nameof(CanMoveDown))]
+        private void MoveDown() => _group.Move(this, 1);
+
+        private bool CanMoveDown() => !IsLast;
+
         public bool IsChosen
         {
             get => _isChosen;
@@ -138,7 +212,20 @@ public sealed partial class WebsiteGroupsEditor : ObservableObject
                 }
 
                 _group.Editor.Cleared();
-                SetProperty(ref _isChosen, value);
+
+                if (SetProperty(ref _isChosen, value))
+                {
+                    if (value)
+                    {
+                        _group.Order.Add(this);
+                    }
+                    else
+                    {
+                        _group.Order.Remove(this);
+                    }
+
+                    _group.Renumber();
+                }
             }
         }
     }

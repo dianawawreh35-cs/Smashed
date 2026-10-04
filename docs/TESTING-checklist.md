@@ -1616,6 +1616,21 @@ Sign out and in once the Websites page is filled, so the app fetches the tabs.
       shows them in quarters; a group of two shows side by side. A fifth tick
       is refused. A call that rings while the Groups window is open can still
       be answered.
+- [ ] **A group is a tab of its own** (4 Oct night). Open a group of four:
+      its button is filled. Press any single tab: the whole group goes and
+      that tab fills the screen (layout One); the group's button is no longer
+      filled. Press the group's button: the four are back. With Side by side
+      chosen by hand and no group shown, a tab button still fills the place
+      last clicked. *If a tab replaces only one quarter of the group:* the
+      group was not recognised as shown; screenshot the buttons.
+- [ ] **The order in a group.** Groups → in a group of four, under *Order on
+      screen*, move the last tab to 1 with the up arrow; Save; open the
+      group: that tab is now first (top right in Arabic, top left in English).
+      Ticking a new tab puts it last; unticking renumbers. Sign out and in:
+      the order is kept.
+- [ ] **The cart with a group shown.** With a group of four that does not
+      include the POS tab on screen, answer a call from a mobile: the POS tab
+      is shown alone with the cart; the group's button brings the group back.
 - [ ] **Sounds while hidden.** Leave the Websites section for the call log for
       ten minutes; an order on a site that dings is heard at once, not a minute
       later. The speaker mark is on its tab button.

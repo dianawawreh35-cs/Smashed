@@ -8939,8 +8939,8 @@ to draw with `cairo-semibold.ttf` from inside the app. The sign-in screen was
 seen running, before and after.
 
 **To deploy:** released as `v0.11.1`; only the Agent App changes. **Agent App
-0.11.1** goes on the Agent App page in place of 0.11.0, and the laptops offer
-Update now (A-82). The server stays on what it runs.
+0.11.1** is on the Agent App page in place of 0.11.0 (uploaded 4 Oct), and
+the laptops offer Update now (A-82). The server stays on what it runs.
 
 ## Where to pick up
 
@@ -8963,7 +8963,7 @@ running**.
 
 | Next | Requirement | Depends on |
 |---|---|---|
-| **The Agent App's own fonts (N-10)**: release it, upload the Agent App, then the checklist's "The fonts inside the app" on a laptop: every screen and the pop-up in both languages for anything cut off by Cairo's taller lines, at 1366 × 768 and 125 %, and a shift with no `FileNotFoundException` | N-10 | **built 4 Oct, seen only on the sign-in screen.** A version and a release; the laptops then update themselves (A-82) |
+| **The Agent App's own fonts (N-10)**: 0.11.1 is on the Agent App page (uploaded 4 Oct, 10:32 UTC); once the laptops have updated, the checklist's "The fonts inside the app" on a laptop: every screen and the pop-up in both languages for anything cut off by Cairo's taller lines, at 1366 × 768 and 125 %, and a shift with no `FileNotFoundException` | N-10 | **released as `v0.11.1`, seen only on the sign-in screen.** Each laptop's agent pressing Update now (A-82) |
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |
 | **Switch on the nightly update** on the server: copy `auto-update.sh` and the two `callcenter-auto-update.*` files, run `./auto-update.sh --check`, enable the timer (runbook, *Updating by itself at night*). The one-phone release above needs the laptops the same day, so tag it `deploy: manual` | — | the first release built after 29 Sep (its image carries the deploy files); the server's `docker login` done as `smashed` |
 | **The crispy burgers on the live server**: after that update, run `seed` once and look for `menu 4 created`, then find ناشوز in the Agent App's menu | A-66 | the server on `v0.5.1`, which carries everything in `v0.5.0` too (27 Sep night entry) |

@@ -9161,6 +9161,41 @@ goes; the Groups window now has the order, with up and down.
 tests for this screen: it needs the WebView2 engine. **Not seen running.**
 Checklist "Websites inside the Agent App", the Groups lines.
 
+## 2026-10-04 (night) — The POS tab logs in with the agent's Call Center account (A-88)
+
+**In plain terms.** Each agent's POS username and password are the same as
+their Call Center ones. Until now the agent typed them into the POS tab once
+and Edge remembered them. Now the Agent App types them in itself, from the
+sign-in the agent has just made, so the POS is ready without typing.
+
+- **Agent App only; no new login choice.** The tabs set to *each agent's own
+  login* on the Websites page (S-68) get it, and today that is only the POS.
+  Dia was offered a third choice on the Websites page instead (server,
+  database check and web app); the answer was simply "the same one he used
+  for the app", so the smaller change was built. A future site where agents
+  have a different login would be tried once with the Call Center one, then
+  left to the agent; if such a site comes, that is when the third choice is
+  worth adding.
+- **The password** is the one typed at the Agent App's sign-in, kept in
+  `AgentSession` in memory for the session and cleared at sign-out; the app
+  never writes it anywhere. The app never had it before: sign-in always asks
+  for it. It goes into the page by the same route as a shared login
+  (`AutoLogin`: only on the site's own domain, after checking there is a
+  password box, once a minute at most). The username is the account's login
+  as the server returns it.
+- **When the POS refuses them** (the agent changed one of the two passwords),
+  the tab stops after one try and says *the site did not accept your Call
+  Center username and password: log in here yourself*. Edge still offers to
+  save what the agent then types, as before. At the next sign-in the app
+  tries the Call Center ones once more, then stops again.
+- The Websites page's hint under *each agent's own login* now says so. That
+  text reaches the server with the next server release; nothing else on the
+  server changed (a comment in Shared).
+
+**Checked:** the Agent App builds; its 116 tests and Shared's 167 pass; the
+web app's Websites page tests pass and `npm run build` succeeds. **Not seen
+running.** Checklist "Websites inside the Agent App", the POS line.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.AgentApp.Services.Websites;
+using CallCenter.Shared.Contracts.Websites;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -151,8 +152,16 @@ public sealed partial class WebsitesViewModel : ObservableObject, IDisposable, C
 
         var layout = _settings.Current.WebsiteLayouts.GetValueOrDefault(user.Id.ToString());
 
-        foreach (var site in result.Value)
+        foreach (var listed in result.Value)
         {
+            // A-88: a site on the agent's own login (the POS) takes the same
+            // username and password as the Call Center, so the app types them
+            // in, as it does a shared login. A site that refuses them is left
+            // for the agent to log in to by hand.
+            var site = listed.Login == WebsiteLogins.Own && !string.IsNullOrEmpty(_session.Password)
+                ? listed with { Username = user.Login, Password = _session.Password }
+                : listed;
+
             var tab = new WebsiteTab(site, user.Id, _engine, Localizer, _logger);
 
             if (layout?.Zoom.TryGetValue(site.Id.ToString(), out var zoom) is true)

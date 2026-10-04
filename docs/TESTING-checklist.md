@@ -1609,6 +1609,14 @@ Sign out and in once the Websites page is filled, so the app fetches the tabs.
 - [ ] **The POS remembers each agent.** Sign in to the POS tab, let Edge save
       the password. Sign out, sign in as a different agent: their POS tab is
       not signed in. Back as the first agent: still signed in.
+- [ ] **The POS logs in by itself** (4 Oct night). For an agent whose POS
+      username and password are the same as their Call Center ones, with the
+      POS logged out (or a new agent on the laptop): sign in to the Agent App,
+      open the POS tab: it logs in by itself, nobody typing. *If it stays on
+      the login page with no message:* the POS's login boxes need the
+      selectors under Advanced on the Websites page. For an agent whose POS
+      password is different: the tab says it did not accept the Call Center
+      login, once, and the agent can log in by hand.
 - [ ] **Layouts:** One, Side by side, Quarters; a tab button fills the place
       last clicked; choosing a tab already shown elsewhere swaps the two;
       zoom and mute per place. Sign out and in: the same layout and zooms.

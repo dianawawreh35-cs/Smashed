@@ -1373,7 +1373,7 @@
     "loginShared": "The app logs in with this username and password",
     "loginSharedHint": "Agents never see the password, and nor does this page once it is saved.",
     "loginOwn": "Each agent's own login",
-    "loginOwnHint": "Each agent logs in themselves the first time; the app remembers it for that agent on that laptop.",
+    "loginOwnHint": "The Agent App logs each agent in with their Call Center username and password, as for the POS. If the site refuses them, the agent logs in themselves and the app remembers it on that laptop.",
     "username": "Username",
     "password": "Password",
     "passwordKeep": "Stored. Type here only to change it",

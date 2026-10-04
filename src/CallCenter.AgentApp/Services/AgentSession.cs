@@ -60,15 +60,24 @@ public class AgentSession
     /// </summary>
     public AgentExtensionsDto? Extensions { get; private set; }
 
+    /// <summary>
+    /// The password the agent signed in with, for the website tabs on their
+    /// own login (the POS), which uses the same username and password (A-88).
+    /// Held in memory for the session only: never written anywhere, and
+    /// cleared at sign-out.
+    /// </summary>
+    public string? Password { get; private set; }
+
     public bool IsSignedIn => User is not null && AccessToken is not null;
 
     /// <summary>True when signed in but with no phone to register (A-02).</summary>
     public bool HasPhone => Extensions is not null;
 
     /// <summary>Records a successful login.</summary>
-    public void SignIn(LoginResponse response)
+    public void SignIn(LoginResponse response, string? password = null)
     {
         User = response.User;
+        Password = password;
         AccessToken = response.AccessToken;
         ExpiresAt = response.ExpiresAt;
         SessionId = response.SessionId;
@@ -81,6 +90,7 @@ public class AgentSession
     public void SignOut()
     {
         User = null;
+        Password = null;
         AccessToken = null;
         ExpiresAt = null;
         SessionId = null;

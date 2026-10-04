@@ -61,7 +61,8 @@ public class SignInService(
             return SignInResult.Failed(LoginErrorCodes.NotAnAgent);
         }
 
-        session.SignIn(result.Value);
+        // The password too, for the POS tab, which takes the same login (A-88).
+        session.SignIn(result.Value, password);
 
         // Remembered so the next shift on this laptop only types a password.
         settings.Update(s => s with { LastLogin = login.Trim() });

@@ -8,8 +8,10 @@ namespace CallCenter.Shared.Contracts.Websites;
 public static class WebsiteLogins
 {
     /// <summary>
-    /// Each agent signs in themselves, and the app remembers it for that agent
-    /// on that laptop. The POS.
+    /// Each agent's own account. The POS, which takes the same username and
+    /// password as the Call Center: the Agent App types in the ones the agent
+    /// signed in with, and if the site refuses them the agent signs in
+    /// themselves and the app remembers it for that agent on that laptop.
     /// </summary>
     public const string Own = "own";
 

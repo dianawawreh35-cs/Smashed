@@ -348,6 +348,7 @@
     "none": "No websites yet. Your supervisor adds them on the Websites page of the web app.",
     "noPassword": "No password set for this site yet: log in by hand, or ask your supervisor.",
     "loginFailed": "The site refused the saved login. Check it with your supervisor, then press Reload.",
+    "ownLoginFailed": "The site did not accept your Call Center username and password: log in here yourself.",
     "couldNotStart": "This website could not open. Press Reload, or sign out and in again.",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",

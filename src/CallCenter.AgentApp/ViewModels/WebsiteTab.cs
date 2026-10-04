@@ -75,6 +75,13 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
     /// <summary>The site makes its logins itself, with the supervisor's username and password.</summary>
     public bool IsShared => Site.Login == WebsiteLogins.Shared;
 
+    /// <summary>
+    /// The app types a login in: the supervisor's shared one, or, for a site
+    /// on the agent's own login (the POS), the agent's Call Center username
+    /// and password (A-88).
+    /// </summary>
+    private bool SignsIn => !string.IsNullOrEmpty(Site.Password);
+
     public bool OpensCart => !string.IsNullOrWhiteSpace(Site.CartUrl);
 
     /// <summary>The page is playing sound: the speaker mark on the tab.</summary>
@@ -281,7 +288,8 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
 
-            // The agent's own login is remembered for them, as Edge would.
+            // The agent's own login is remembered for them, as Edge would, for
+            // when the site refuses their Call Center one and they type it.
             // A shared one is typed by the app every time and not saved, so
             // it is in the profile nowhere but the site's cookie.
             core.Settings.IsPasswordAutosaveEnabled = !IsShared;
@@ -328,13 +336,13 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// A shared login is typed in when the site shows its login page. Tried a
-    /// few times over three seconds, because a page built by script draws its
+    /// The login is typed in when the site shows its login page. Tried a few
+    /// times over three seconds, because a page built by script draws its
     /// boxes after it has loaded.
     /// </summary>
     private void TryLoginSoon()
     {
-        if (!IsShared || string.IsNullOrEmpty(Site.Password) || _disposed)
+        if (!SignsIn || _disposed)
         {
             return;
         }
@@ -371,7 +379,7 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
 
                 if (!_gate.MayTry())
                 {
-                    StatusKey = "websites.loginFailed";
+                    StatusKey = IsShared ? "websites.loginFailed" : "websites.ownLoginFailed";
                     _logger.LogWarning("Website tab {Name}: the login page came back after signing in; not trying again", Site.NameEn);
                     return;
                 }
@@ -382,7 +390,7 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
                 {
                     _gate.Submitted();
                     StatusKey = null;
-                    _logger.LogInformation("Website tab {Name}: signed in with the shared login", Site.NameEn);
+                    _logger.LogInformation("Website tab {Name}: signed in with the {Login} login", Site.NameEn, Site.Login);
                     return;
                 }
             }

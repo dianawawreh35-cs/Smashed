@@ -636,7 +636,7 @@
             <Border x:Name="Chrome"
                     CornerRadius="{StaticResource CornerSmall}"
                     Background="Transparent"
-                    Padding="14,10">
+                    Padding="14,8">
               <ContentPresenter ContentSource="Header" VerticalAlignment="Center" />
             </Border>
             <!-- The marker sits on the start edge, so it moves to the right in

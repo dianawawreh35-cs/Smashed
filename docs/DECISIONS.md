@@ -9086,6 +9086,44 @@ uploaded on the Agent App page, server first: on the old server the new app's
 Websites section cannot load. Then the supervisor corrects the POS address and
 adds the three sites and their logins on the Websites page.
 
+## 2026-10-04 (evening) — The rail folds and scrolls, and a website page saves as PDF (A-89, A-88)
+
+**In plain terms.** On the laptop's screen the Agent App's rail did not fit:
+the cards at its foot (the phone, the break, the switches, sign-out) are docked
+to the bottom and took their room first, and the last section, Menu, was drawn
+under the break card. Dia asked for it to be put right, for the break button
+to be smaller, for the rail to fold away, and for a website's page to be saved
+as a PDF in Downloads, as a browser's print does.
+
+- **The rail scrolls** when the window is too short for it (a `ScrollViewer`
+  round the whole rail). When it all fits, the content is stretched to the full
+  height, so the cards stay at the foot as before. The spacing was tightened a
+  little (the section buttons' padding 10 → 8 px, the header's margins, the
+  phone card's padding), about 50 px in all, so at the default window size
+  nothing needs to scroll. The section button style is the rail's only user.
+- **The break button** is no longer full width: it sits on the start edge of
+  its card, 4 px padding and 12 px text, the size of the break times under it.
+- **The rail folds** (A-89, new) with ☰ beside the agent's name, to a 52 px
+  strip with ☰ to open it, the phone's dot (A-02: whether calls can reach the
+  agent stays on screen) and a pause mark on a break. The sections have no
+  icons, so the strip has none of them; an agent opens the rail to change
+  section. Remembered on the laptop as `RailCollapsed` in `settings.json`.
+- **Save as PDF** (A-88): a printer button on each place's bar, beside zoom.
+  WebView2's `PrintToPdfAsync`, backgrounds on, to the Downloads folder
+  Windows reports (`SHGetKnownFolderPath`, so a Downloads moved to OneDrive is
+  followed), named after the page's title and the time, never overwriting.
+  `PagePdf` in `Services/Websites`. The pop-up windows a site opens have no
+  button; Ctrl+P in them is the engine's own print, which can save a PDF.
+
+**Checked:** the Agent App builds, and its 116 tests pass. **Not seen
+running**: no screen past sign-in can be opened on this PC without registering
+a real extension. Checklist "The rail" and the Save as PDF line under
+"Websites inside the Agent App".
+
+**To deploy:** an Agent App release only; the server is unchanged. It carries
+everything in 0.12.0, so, as for 0.12.0, **the server goes to `v0.12.0` or
+later first**, then the Agent App is uploaded.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -9109,6 +9147,7 @@ running**.
 |---|---|---|
 | **The call banner**: checklist "The call banner" on a laptop with the PBX, in both languages, with screenshots of the banner ringing, connected and with the form waiting | A-19 | **released as `v0.12.0`, not yet seen on a call.** Agent App 0.12.0 on the laptops |
 | **Websites inside the Agent App**: checklist "Websites inside the Agent App" and "The Websites page", on a laptop with the PBX, in both languages: the four accounts signed in at once, the cart in the POS tab on answer, silence during a call, the shortcuts while typing in a site, a site's ding while the section is hidden, the groups. Then correct the POS start address on the Websites page | A-88, S-68, A-85, A-12 | **released as `v0.12.0`, not deployed; seen without a phone only.** The server's `update.sh v0.12.0`, then Agent App 0.12.0 uploaded on the Agent App page; the three sites' addresses and logins |
+| **The rail and Save as PDF**: checklist "The rail" at 1366 × 768 and 125 %, folded and open, in both languages; and a page saved as PDF from the POS tab | A-89, A-88 | **built 4 Oct evening, not yet seen running.** The same deploy as the websites above, with Agent App 0.13.0 in place of 0.12.0 |
 | **The Agent App's own fonts (N-10)**: 0.11.1 is on the Agent App page (uploaded 4 Oct, 10:32 UTC); once the laptops have updated, the checklist's "The fonts inside the app" on a laptop: every screen and the pop-up in both languages for anything cut off by Cairo's taller lines, at 1366 × 768 and 125 %, and a shift with no `FileNotFoundException` | N-10 | **released as `v0.11.1`, seen only on the sign-in screen.** Each laptop's agent pressing Update now (A-82) |
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |
 | **Switch on the nightly update** on the server: copy `auto-update.sh` and the two `callcenter-auto-update.*` files, run `./auto-update.sh --check`, enable the timer (runbook, *Updating by itself at night*). The one-phone release above needs the laptops the same day, so tag it `deploy: manual` | — | the first release built after 29 Sep (its image carries the deploy files); the server's `docker login` done as `smashed` |

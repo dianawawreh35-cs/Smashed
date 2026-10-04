@@ -8,7 +8,7 @@
 
   <Grid>
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="230" />
+      <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
@@ -19,25 +19,90 @@
             Background="{StaticResource Surface}"
             BorderBrush="{StaticResource BorderSoft}"
             BorderThickness="0,0,1,0">
+      <!-- Folds down to a strip (Dia, 4 Oct 2026), remembered on the laptop. -->
+      <Border.Style>
+        <Style TargetType="Border">
+          <Setter Property="Width" Value="230" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding RailCollapsed}" Value="True">
+              <Setter Property="Width" Value="52" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </Border.Style>
+      <Grid>
+
+      <!-- Folded: the button to open it again, and what an agent must still
+           see at a glance: whether calls can reach them (A-02), and whether
+           they are on break. The details are in the tooltips. -->
+      <StackPanel Visibility="{Binding RailCollapsed, Converter={StaticResource BoolToVisibility}}"
+                  Margin="0,18,0,0">
+        <Button Style="{StaticResource GhostButton}"
+                Padding="8,6"
+                HorizontalAlignment="Center"
+                Command="{Binding ToggleRailCommand}"
+                ToolTip="{Binding Localizer[home.expandRail]}">
+          <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" />
+        </Button>
+        <Ellipse Width="10" Height="10"
+                 Fill="{Binding StatusBrush}"
+                 HorizontalAlignment="Center"
+                 Margin="0,18,0,0">
+          <Ellipse.ToolTip>
+            <StackPanel>
+              <TextBlock Text="{Binding StatusTitle}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding PhoneSummary}" />
+            </StackPanel>
+          </Ellipse.ToolTip>
+        </Ellipse>
+        <TextBlock Text="&#xE769;"
+                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                   FontSize="14"
+                   Foreground="{StaticResource WarningText}"
+                   HorizontalAlignment="Center"
+                   Margin="0,14,0,0"
+                   ToolTip="{Binding BreakSinceText}"
+                   Visibility="{Binding OnBreak, Converter={StaticResource BoolToVisibility}}" />
+      </StackPanel>
+
+      <!-- Scrolls when the window is too short for all of it. Without this the
+           cards docked below sat over the last sections, and Menu could not be
+           reached on a laptop screen. When it all fits, the content is
+           stretched to the full height, so the cards still sit at the bottom. -->
+      <ScrollViewer VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled"
+                    Focusable="False"
+                    Visibility="{Binding RailCollapsed, Converter={StaticResource InverseBoolToVisibility}}">
       <DockPanel>
 
-        <!-- Who is signed in. The first thing to check on a shared laptop (A-05). -->
-        <StackPanel DockPanel.Dock="Top" Margin="20,22,20,16" Orientation="Horizontal">
-          <Border Width="34" Height="34"
-                  CornerRadius="17"
-                  Background="{StaticResource AccentDim}">
-            <TextBlock Text="{Binding Initial}"
-                       FontSize="15"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource Accent}"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center" />
-          </Border>
-          <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-            <local:SelectableText Value="{Binding DisplayName}" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding Localizer[app.subtitle]}" Style="{StaticResource Subtle}" />
+        <!-- Who is signed in. The first thing to check on a shared laptop (A-05).
+             The fold button on the end edge. -->
+        <DockPanel DockPanel.Dock="Top" Margin="20,18,10,10">
+          <Button DockPanel.Dock="Right"
+                  Style="{StaticResource GhostButton}"
+                  Padding="8,6"
+                  VerticalAlignment="Center"
+                  Command="{Binding ToggleRailCommand}"
+                  ToolTip="{Binding Localizer[home.collapseRail]}">
+            <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" />
+          </Button>
+          <StackPanel Orientation="Horizontal">
+            <Border Width="34" Height="34"
+                    CornerRadius="17"
+                    Background="{StaticResource AccentDim}">
+              <TextBlock Text="{Binding Initial}"
+                         FontSize="15"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource Accent}"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+              <local:SelectableText Value="{Binding DisplayName}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Localizer[app.subtitle]}" Style="{StaticResource Subtle}" />
+            </StackPanel>
           </StackPanel>
-        </StackPanel>
+        </DockPanel>
 
         <!-- Sign out and language, under the status card. -->
         <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,16" Orientation="Horizontal">
@@ -77,7 +142,7 @@
              much, in red, and Break in still works (Dia, 1 Oct 2026). -->
         <Border DockPanel.Dock="Bottom"
                 Margin="14,0,14,12"
-                Padding="12,10"
+                Padding="10,8"
                 CornerRadius="{StaticResource CornerSmall}">
           <Border.Style>
             <Style TargetType="Border">
@@ -89,19 +154,25 @@
               </Style.Triggers>
             </Style>
           </Border.Style>
+          <!-- The buttons are compact and sit on the start edge: full width, they
+               were the biggest thing in the rail (Dia, 4 Oct 2026). -->
           <StackPanel>
             <Button Content="{Binding BreakButtonText}"
                     Style="{StaticResource PrimaryButton}"
+                    Padding="14,4"
+                    FontSize="12"
                     Command="{Binding ToggleBreakCommand}"
                     Visibility="{Binding OnBreak, Converter={StaticResource InverseBoolToVisibility}}"
                     ToolTip="{Binding Localizer[breaks.inHint]}"
-                    HorizontalAlignment="Stretch" />
+                    HorizontalAlignment="Left" />
             <Button Content="{Binding BreakButtonText}"
                     Style="{StaticResource SuccessButton}"
+                    Padding="14,4"
+                    FontSize="12"
                     Command="{Binding ToggleBreakCommand}"
                     Visibility="{Binding OnBreak, Converter={StaticResource BoolToVisibility}}"
                     ToolTip="{Binding Localizer[breaks.outHint]}"
-                    HorizontalAlignment="Stretch" />
+                    HorizontalAlignment="Left" />
             <TextBlock Text="{Binding BreakSinceText}"
                        Foreground="{StaticResource WarningText}"
                        FontWeight="SemiBold"
@@ -129,7 +200,7 @@
              for whether calls can reach them (A-02, N-04a). -->
         <Border DockPanel.Dock="Bottom"
                 Margin="14,10,14,10"
-                Padding="14,12"
+                Padding="14,10"
                 Background="{StaticResource SurfaceAlt}"
                 CornerRadius="{StaticResource CornerSmall}">
           <StackPanel>
@@ -167,6 +238,8 @@
         </TabControl>
 
       </DockPanel>
+      </ScrollViewer>
+      </Grid>
     </Border>
 
     <!-- ===== Content ================================================== -->

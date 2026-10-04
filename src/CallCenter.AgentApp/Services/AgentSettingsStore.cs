@@ -41,6 +41,12 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
         public bool BreakTurnedOnDoNotDisturb { get; init; }
 
         /// <summary>
+        /// The side panel was folded down to a strip, to give the section
+        /// beside it the room (Dia, 4 Oct 2026). Kept as it was left.
+        /// </summary>
+        public bool RailCollapsed { get; init; }
+
+        /// <summary>
         /// A-88: each agent's Websites layout on this laptop, by the agent's
         /// id. Per agent, not per laptop, as their logins are.
         /// </summary>

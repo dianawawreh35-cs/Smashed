@@ -182,6 +182,50 @@ public sealed partial class WebsiteTab : ObservableObject, IDisposable
         Navigate(Site.Url);
     }
 
+    /// <summary>
+    /// The page as a PDF in Downloads (Dia, 4 Oct 2026). Says so on the bar
+    /// for a few seconds, then gets out of the way.
+    /// </summary>
+    [RelayCommand]
+    private async Task SavePdfAsync()
+    {
+        if (Browser.CoreWebView2 is not { } core)
+        {
+            return;
+        }
+
+        try
+        {
+            var path = await PagePdf.SaveAsync(core, Name);
+            StatusKey = path is null ? "websites.pdfFailed" : "websites.pdfSaved";
+
+            if (path is not null)
+            {
+                _logger.LogInformation("Website tab {Name}: page saved as PDF to {Path}", Site.NameEn, path);
+            }
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException
+                                       or InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            _logger.LogWarning(ex, "Website tab {Name}: the page could not be saved as PDF", Site.NameEn);
+            StatusKey = "websites.pdfFailed";
+        }
+
+        // Not awaited: the button is free again as soon as the file is written.
+        _ = ClearStatusLaterAsync(StatusKey);
+    }
+
+    /// <summary>Takes a message off the bar after a while, unless another has replaced it.</summary>
+    private async Task ClearStatusLaterAsync(string? shown)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(6));
+
+        if (StatusKey == shown)
+        {
+            StatusKey = null;
+        }
+    }
+
     [RelayCommand]
     private void ZoomIn() => Zoom = Math.Min(3.0, Math.Round(Zoom + 0.1, 1));
 

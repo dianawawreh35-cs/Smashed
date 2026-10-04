@@ -1632,7 +1632,24 @@ Sign out and in once the Websites page is filled, so the app fetches the tabs.
       of the app, signed in.
 - [ ] **Memory.** Task Manager with all tabs loaded: note the app's and the
       `msedgewebview2.exe` processes' total, on a 1366 × 768 laptop.
+- [ ] **Save as PDF** (the printer mark on a place's bar): the page lands in
+      Downloads as `<page title> <date> <time>.pdf`, colours and all, and the
+      bar says *Saved as PDF in Downloads* for a few seconds. Twice on the same
+      page gives two files. With Downloads moved to OneDrive, it goes there.
 - [ ] **Both languages**, with screenshots of the section in each layout.
+
+### The rail: folding, scrolling, the break button (A-89) — built 4 Oct, no phone needed
+
+- [ ] **Nothing hidden.** At 1366 × 768 and 125 %, every section down to
+      Menu shows above the phone card; make the window shorter and the rail
+      scrolls, with nothing drawn over the sections.
+- [ ] **The break button** is compact, on the start edge of its card, in
+      both its Break in and Break out colours.
+- [ ] **Fold** with ☰ beside the name: a narrow strip with ☰, the phone's
+      dot (tooltip: its state and the extension) and, on a break, the pause
+      mark. ☰ opens it again. Close and reopen the app: as it was left.
+- [ ] **Both languages**: in Arabic the strip and the button are on the
+      right. Screenshots of the rail open and folded in each.
 
 ### The fonts inside the app (N-10) — built 4 Oct, no phone needed for most
 

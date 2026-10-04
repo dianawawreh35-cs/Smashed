@@ -55,6 +55,10 @@
             <Button Style="{StaticResource IconButton}" Content="&#xE8A3;"
                     Command="{Binding Tab.ZoomInCommand}"
                     ToolTip="{Binding Screen.Localizer[websites.zoomIn]}" />
+            <Button Style="{StaticResource IconButton}" Content="&#xE749;"
+                    Margin="8,0,0,0"
+                    Command="{Binding Tab.SavePdfCommand}"
+                    ToolTip="{Binding Screen.Localizer[websites.savePdf]}" />
             <Button Style="{StaticResource IconButton}" Content="{Binding Tab.SoundGlyph}"
                     Margin="8,0,0,0"
                     Command="{Binding Tab.ToggleMuteCommand}"

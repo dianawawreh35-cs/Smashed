@@ -256,6 +256,8 @@
   },
   "home": {
     "signOut": "Log out",
+    "collapseRail": "Hide the side panel",
+    "expandRail": "Show the side panel",
     "doNotDisturb": "Do not disturb",
     "doNotDisturbHint": "Calls are turned away without ringing, and offered to another agent.",
     "autoAnswer": "Auto answer",
@@ -353,6 +355,9 @@
     "unmute": "Unmute this website",
     "back": "Back",
     "reload": "Reload",
+    "savePdf": "Save this page as PDF in Downloads",
+    "pdfSaved": "Saved as PDF in Downloads.",
+    "pdfFailed": "The page could not be saved as PDF. Try again.",
     "home": "Start page",
     "layoutOne": "One",
     "layoutTwo": "Side by side",

@@ -21,6 +21,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     private readonly SipRegistrationService _sip;
     private readonly PhonePreferences _preferences;
     private readonly BreakService _breaks;
+    private readonly AgentSettingsStore _settings;
 
     /// <summary>Moves the break timer on once a second (A-86).</summary>
     private readonly DispatcherTimer _tick;
@@ -31,6 +32,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         SipRegistrationService sip,
         PhonePreferences preferences,
         BreakService breaks,
+        AgentSettingsStore settings,
         Localizer localizer)
     {
         _signIn = signIn;
@@ -38,7 +40,9 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         _sip = sip;
         _preferences = preferences;
         _breaks = breaks;
+        _settings = settings;
         Localizer = localizer;
+        _railCollapsed = settings.Current.RailCollapsed;
 
         _breaks.Changed += OnBreakChanged;
         _tick = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
@@ -270,6 +274,20 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(StatusTitle));
         OnPropertyChanged(nameof(StatusBrush));
     }
+
+    /// <summary>
+    /// The side panel folded down to a strip that keeps only the phone's state
+    /// and the break, so the section beside it gets the room. Remembered on
+    /// this laptop.
+    /// </summary>
+    [ObservableProperty]
+    private bool _railCollapsed;
+
+    partial void OnRailCollapsedChanged(bool value) =>
+        _settings.Update(current => current with { RailCollapsed = value });
+
+    [RelayCommand]
+    private void ToggleRail() => RailCollapsed = !RailCollapsed;
 
     [RelayCommand]
     private void ToggleLanguage() => Localizer.Toggle();

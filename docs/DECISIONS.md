@@ -9196,6 +9196,60 @@ sign-in the agent has just made, so the POS is ready without typing.
 web app's Websites page tests pass and `npm run build` succeeds. **Not seen
 running.** Checklist "Websites inside the Agent App", the POS line.
 
+## 2026-10-04 (night) — Light mode in both apps (A-90, S-69)
+
+**In plain terms.** Dia asked for a light mode in the Agent App and the web
+app. Both now have a button beside the language one (a sun in dark, a moon in
+light) that switches at once, without a restart. **Everyone starts in dark**,
+as today, and the choice is remembered on that laptop or in that browser, the
+way the language is. Dia chose this over following the Windows setting (which
+would have turned some laptops light on the next update without anyone
+asking) and over saving it per person on the server (a database change, and
+the sign-in screen would still need a default).
+
+- **The light palette.** White cards on a pale grey canvas (#F4F5F7), the
+  same layout, the same one accent. The accent is the brand blue a shade
+  darker, **#2462D6**, in both apps: #4F8CFF is 3.2:1 on white, and the
+  accent is text (links, the selected section, the avatar's initial) as often
+  as it is a fill. Success, warning and danger are darker for the same
+  reason. Every text colour is at least 4.5:1 on each surface it sits on,
+  computed, not judged by eye; the one exception is the faint grey for what is
+  switched off, as quiet as its dark counterpart. Dark is unchanged.
+- **Agent App.** The colours moved out of `Theme.xaml` into
+  `Themes/Dark.xaml` and `Themes/Light.xaml`, with the same keys;
+  `ThemeService` swaps one for the other in the application's resources at
+  start-up (before the ringing pop-up is built) and on the button. For a
+  swap to reach screens already open, every colour lookup had to change from
+  `StaticResource` (read once, when a screen is built) to `DynamicResource`:
+  278 of them, mechanically, plus three places in code (the call log's count
+  badge, a keypad key's flash, and the status dot, which is re-read when the
+  theme changes). The Answer button's dark text on green became a palette
+  colour, `OnSuccess`: white in light. Saved as `Theme` in `settings.json`.
+- **Web app.** The shades Tailwind names (ink, slate 100–500, brand, and the
+  pale reds, ambers and greens used as text on tints) are CSS variables, set
+  once for dark and once for light in `index.css`; `data-theme` on the page
+  picks. No component's classes changed. The charts draw their colours in
+  script, so they read the theme (`useTheme`): light grid and tooltip, and
+  the dataviz palette's light-surface versions of the same four series
+  colours, validated on white (worst adjacent pair ΔE 9.1 for colour
+  blindness); two of them are under 3:1 on white, allowed because every chart
+  has a legend and its table beside it. A downloaded chart picture keeps the
+  background it had on screen. `index.html` sets the theme before the page is
+  drawn, so a light page never flashes dark. Printing is unchanged.
+- **Left alone.** The websites inside the Agent App (A-88) are other people's
+  pages. The Windows title bar follows Windows. The page a printed report
+  makes is dark on white either way.
+- **New tests.** The Agent App checks that both palettes have the same keys,
+  that no screen looks up a palette colour with `StaticResource` (it would
+  stay in the old colours after a switch), that text clears 4.5:1 in both
+  palettes, and that the choice survives a restart. The web app checks the
+  button switches, remembers, and follows a change made elsewhere.
+
+**Checked:** the Agent App builds; its 123 tests pass. The web app's lint is
+clean, its 240 tests pass and `npm run build` succeeds. **Not seen running:**
+the Agent App could not be started from this session (Windows refused it),
+so the first run is Dia's. Checklist "Light mode".
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as

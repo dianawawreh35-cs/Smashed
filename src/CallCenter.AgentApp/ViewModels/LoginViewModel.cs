@@ -10,10 +10,11 @@ public partial class LoginViewModel : ObservableObject, IDisposable
 {
     private readonly SignInService _signIn;
 
-    public LoginViewModel(SignInService signIn, Localizer localizer)
+    public LoginViewModel(SignInService signIn, Localizer localizer, ThemeService theme)
     {
         _signIn = signIn;
         Localizer = localizer;
+        Theme = theme;
 
         Login = signIn.LastLogin ?? string.Empty;
 
@@ -29,6 +30,9 @@ public partial class LoginViewModel : ObservableObject, IDisposable
 
     /// <summary>Bound by the view for its labels and the language toggle.</summary>
     public Localizer Localizer { get; }
+
+    /// <summary>Light or dark, switchable before signing in as the language is (A-90).</summary>
+    public ThemeService Theme { get; }
 
     /// <summary>Raised once the agent is signed in, so the shell can show the main view.</summary>
     public event EventHandler? SignedIn;
@@ -70,6 +74,9 @@ public partial class LoginViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ToggleLanguage() => Localizer.Toggle();
+
+    [RelayCommand]
+    private void ToggleTheme() => Theme.Toggle();
 
     [RelayCommand(CanExecute = nameof(CanSignIn))]
     private async Task SignInAsync(CancellationToken ct)

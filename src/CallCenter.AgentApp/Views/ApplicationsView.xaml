@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Bg}">
+             Background="{DynamicResource Bg}">
 
   <!-- Applications: recording one conversation that came on an app (A-70).
        The agent's own list is its own tab, App logs (AppLogsView), as the
@@ -50,7 +50,7 @@
 
           <TextBlock Grid.ColumnSpan="3"
                      Text="{Binding Localizer[applications.recordHeading]}"
-                     Foreground="{StaticResource Text}"
+                     Foreground="{DynamicResource Text}"
                      FontWeight="SemiBold"
                      Margin="0,0,0,12" />
 
@@ -75,7 +75,7 @@
           <!-- Who it is (A-10 rules, reused): found, looking, nobody on file,
                or could not check. Never blank once a number is typed. -->
           <local:SelectableText Value="{Binding Customer.Name}"
-                                Foreground="{StaticResource Text}"
+                                Foreground="{DynamicResource Text}"
                                 FontWeight="SemiBold"
                                 TextWrapping="Wrap"
                                 Margin="0,6,0,0"
@@ -85,13 +85,13 @@
                                 TextWrapping="Wrap"
                                 Margin="0,2,0,0"
                                 Visibility="{Binding Customer.HasAddress, Converter={StaticResource BoolToVisibility}}" />
-          <Border Background="{StaticResource Warning}"
+          <Border Background="{DynamicResource Warning}"
                   CornerRadius="{StaticResource CornerSmall}"
                   Padding="8,2"
                   Margin="0,6,0,0"
                   HorizontalAlignment="Left"
                   Visibility="{Binding Customer.IsVip, Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="{Binding Localizer[caller.vip]}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource OnWarning}" />
+            <TextBlock Text="{Binding Localizer[caller.vip]}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource OnWarning}" />
           </Border>
           <TextBlock Text="{Binding Customer.StatusText}"
                      Style="{StaticResource Subtle}"
@@ -118,18 +118,18 @@
             <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
             <Border Margin="0,8,0,0"
                     Padding="10,8"
-                    Background="{StaticResource WarningDim}"
-                    BorderBrush="{StaticResource Warning}"
+                    Background="{DynamicResource WarningDim}"
+                    BorderBrush="{DynamicResource Warning}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource CornerSmall}"
                     Visibility="{Binding Customer.SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
               <StackPanel>
-                <TextBlock Text="{Binding Customer.SameNameMessage}" FontSize="11" Foreground="{StaticResource WarningText}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Customer.SameNameMessage}" FontSize="11" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{Binding Customer.SameName}" Margin="0,6,0,0">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <StackPanel Margin="0,0,0,6">
-                        <local:SelectableText FontSize="11" Value="{Binding Name}" Foreground="{StaticResource Text}" />
+                        <local:SelectableText FontSize="11" Value="{Binding Name}" Foreground="{DynamicResource Text}" />
                         <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
                                           RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                 Style="{StaticResource SmallButton}"
@@ -167,7 +167,7 @@
             </StackPanel>
 
             <local:SelectableText Value="{Binding Customer.FormMessage}"
-                                  Foreground="{StaticResource Warning}"
+                                  Foreground="{DynamicResource Warning}"
                                   FontSize="11"
                                   Margin="0,6,0,0"
                                   TextWrapping="Wrap"
@@ -189,7 +189,7 @@
           <Border Grid.Row="1" Grid.Column="1"
                   Width="1"
                   Margin="24,0"
-                  Background="{StaticResource BorderSoft}" />
+                  Background="{DynamicResource BorderSoft}" />
 
           <!-- ===== What it was about ===== -->
           <StackPanel Grid.Row="1" Grid.Column="2">
@@ -198,12 +198,12 @@
                designed on their own by the supervisor. Read when Record is
                pressed and sent with the message. -->
           <TextBlock Text="{Binding Localizer[applications.classifyHeading]}"
-                     Foreground="{StaticResource Text}"
+                     Foreground="{DynamicResource Text}"
                      FontWeight="SemiBold"
                      Margin="0,0,0,10" />
 
           <local:SelectableText Value="{Binding FormUnavailable}"
-                                Foreground="{StaticResource Warning}"
+                                Foreground="{DynamicResource Warning}"
                                 FontSize="11"
                                 TextWrapping="Wrap"
                                 Margin="0,0,0,8"
@@ -222,7 +222,7 @@
                refusal: the next message's empty type, right after the last
                one was recorded (28 Sep). -->
           <TextBlock Text="{Binding Classification.Missing}"
-                     Foreground="{StaticResource Warning}"
+                     Foreground="{DynamicResource Warning}"
                      FontSize="11"
                      TextWrapping="Wrap"
                      Visibility="{Binding RecordFailed, Converter={StaticResource BoolToVisibility}}" />
@@ -244,13 +244,13 @@
 
           <!-- Recorded, or why not. A refusal keeps what was typed on screen. -->
           <local:SelectableText Value="{Binding RecordMessage}"
-                                Foreground="{StaticResource Warning}"
+                                Foreground="{DynamicResource Warning}"
                                 FontSize="11"
                                 Margin="0,8,0,0"
                                 TextWrapping="Wrap"
                                 Visibility="{Binding RecordFailed, Converter={StaticResource BoolToVisibility}}" />
           <local:SelectableText Value="{Binding RecordMessage}"
-                                Foreground="{StaticResource Success}"
+                                Foreground="{DynamicResource Success}"
                                 FontSize="11"
                                 Margin="0,8,0,0"
                                 TextWrapping="Wrap"

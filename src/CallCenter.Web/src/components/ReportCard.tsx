@@ -15,6 +15,7 @@ import {
 import { chartToPng } from '../lib/chartImage'
 import { downloadBlob, downloadCsv, toCsv } from '../lib/csv'
 import { printOnly } from '../lib/print'
+import { useTheme, type Theme } from '../lib/theme'
 import type { CsvCell } from '../lib/csv'
 import LoadError from './LoadError'
 
@@ -53,16 +54,19 @@ export interface ReportColumn<T> {
 /**
  * A heat cell's shade: the first series colour, the brand blue, from nearly
  * the card's own surface for "almost none" to strong for the most (dataviz:
- * sequential is one hue, light to dark — on this dark card, faint to bright).
+ * sequential is one hue, light to dark — on a dark card, faint to bright).
  * Zero is left unshaded, so an empty hour reads as empty. The number is
- * always printed, in the brightest ink: the shade adds, it never carries the
+ * always printed, in the strongest ink: the shade adds, it never carries the
  * value alone. Capped at 60% so that ink keeps 5.7:1 on the strongest shade
- * (at 75% it fell to 3.9:1, under the 4.5 small text needs).
+ * in dark (at 75% it fell to 3.9:1, under the 4.5 small text needs), and
+ * 6.4:1 in light (S-69).
  */
-function heatStyle(value: number, max: number): React.CSSProperties | undefined {
+function heatStyle(value: number, max: number, theme: Theme): React.CSSProperties | undefined {
   if (value <= 0 || max <= 0) return undefined
-  const alpha = 0.1 + 0.5 * (value / max)
-  return { backgroundColor: `rgba(79, 140, 255, ${alpha.toFixed(3)})`, color: '#f1f5f9' }
+  const alpha = (0.1 + 0.5 * (value / max)).toFixed(3)
+  return theme === 'light'
+    ? { backgroundColor: `rgba(36, 98, 214, ${alpha})`, color: '#1B1F27' }
+    : { backgroundColor: `rgba(79, 140, 255, ${alpha})`, color: '#f1f5f9' }
 }
 
 export interface ReportSeries<T> {
@@ -89,6 +93,22 @@ export interface ReportChartSpec<T> {
  * re-validating.
  */
 export const SERIES_COLOURS = ['#4F8CFF', '#d95926', '#199e70', '#c98500'] as const
+
+/**
+ * The same four in light (S-69): the light brand blue, then the dataviz
+ * palette's light-surface orange, aqua and yellow. Validated on the white card
+ * with the same checker (4 Oct): worst adjacent pair ΔE 9.1 for colour
+ * blindness, 22.9 for everyone. The aqua and the yellow are under 3:1 on
+ * white, which the checker allows because every chart has a legend and its
+ * table beside it.
+ */
+const LIGHT_SERIES_COLOURS = ['#2462D6', '#eb6834', '#1baf7a', '#eda100'] as const
+
+/** A series' colour in the theme on screen: pages name the dark one. */
+function seriesColour(colour: string, theme: Theme): string {
+  const slot = (SERIES_COLOURS as readonly string[]).indexOf(colour)
+  return theme === 'light' && slot >= 0 ? LIGHT_SERIES_COLOURS[slot] : colour
+}
 
 export default function ReportCard<T>({
   title,
@@ -121,6 +141,7 @@ export default function ReportCard<T>({
   children?: React.ReactNode
 }) {
   const { t, i18n } = useTranslation()
+  const theme = useTheme()
   const section = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
 
@@ -197,7 +218,7 @@ export default function ReportCard<T>({
                         // held left-to-right, so 1,587.74 reads the same in both.
                         <td key={c.key}
                           className={[c.numeric ? 'tabular text-center' : '', c.heat ? 'heat-cell' : ''].join(' ').trim() || undefined}
-                          style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax) : undefined}>
+                          style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax, theme) : undefined}>
                           {c.numeric || c.ltr
                             ? <span dir="ltr">{c.format ? c.format(row) : number(c.value(row))}</span>
                             : c.format ? c.format(row) : number(c.value(row))}
@@ -227,7 +248,7 @@ export default function ReportCard<T>({
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-400" aria-hidden="true">
                 <span>{t('callReports.fewer')}</span>
                 {[0.25, 0.5, 0.75, 1].map((f) => (
-                  <span key={f} className="heat-cell inline-block h-3 w-6 rounded-sm" style={heatStyle(f, 1)} />
+                  <span key={f} className="heat-cell inline-block h-3 w-6 rounded-sm" style={heatStyle(f, 1, theme)} />
                 ))}
                 <span>{t('callReports.more')}</span>
               </div>
@@ -244,14 +265,29 @@ export default function ReportCard<T>({
   )
 }
 
-/** The chart chrome, in the app's own dark palette (index.css, tailwind.config). */
-const CHROME = {
-  surface: '#171A21', // ink-900, the card
-  raised: '#1E222B', // ink-800
-  grid: '#2A2F3A', // ink-700
-  ink: '#e2e8f0', // slate-200
-  muted: '#94a3b8', // slate-400
-}
+/**
+ * The chart chrome, in the app's own palette (index.css, tailwind.config), one
+ * set per theme (S-69). Recharts writes these onto the SVG, so they are
+ * values here rather than CSS variables, and the picture download keeps them.
+ */
+const CHROMES = {
+  dark: {
+    surface: '#171A21', // ink-900, the card
+    raised: '#1E222B', // ink-800
+    grid: '#2A2F3A', // ink-700
+    ink: '#e2e8f0', // slate-200
+    muted: '#94a3b8', // slate-400
+    cursor: 'rgba(255,255,255,0.04)',
+  },
+  light: {
+    surface: '#FFFFFF', // ink-900, the card
+    raised: '#FFFFFF', // the tooltip: a white card with a border
+    grid: '#D5D9E0', // ink-700
+    ink: '#262C38', // slate-200
+    muted: '#555E70', // slate-400
+    cursor: 'rgba(16,24,40,0.05)',
+  },
+} as const
 
 const CHART_HEIGHT = 240
 
@@ -275,14 +311,17 @@ export function ReportChart<T>({ rows, spec, imageName }: {
   const ref = useRef<HTMLDivElement>(null)
   const width = useWidth(ref)
   const [saving, setSaving] = useState<'idle' | 'busy' | 'failed'>('idle')
+  const theme = useTheme()
+  const CHROME = CHROMES[theme]
+  const colour = (s: ReportSeries<T>) => seriesColour(s.colour, theme)
 
   async function onDownload() {
     const svg = ref.current?.querySelector('svg.recharts-surface') as SVGSVGElement | null
     if (!svg) return
     setSaving('busy')
     try {
-      const legend = spec.series.map((s) => ({ label: s.label, colour: s.colour }))
-      downloadBlob(`${imageName}.png`, await chartToPng(svg, legend, rtl))
+      const legend = spec.series.map((s) => ({ label: s.label, colour: colour(s) }))
+      downloadBlob(`${imageName}.png`, await chartToPng(svg, legend, rtl, { background: CHROME.surface, ink: CHROME.ink }))
       setSaving('idle')
     } catch {
       setSaving('failed')
@@ -298,7 +337,7 @@ export function ReportChart<T>({ rows, spec, imageName }: {
   const format = (v: unknown) => (typeof v === 'number' ? v.toLocaleString(i18n.language) : String(v ?? ''))
   const legend = spec.series.length > 1
 
-  // Shared by both chart kinds: hairline grid, recessive axes, dark tooltip.
+  // Shared by both chart kinds: hairline grid, recessive axes, a tooltip in the card's own colours.
   const axes = (
     <>
       <CartesianGrid vertical={false} stroke={CHROME.grid} />
@@ -320,7 +359,7 @@ export function ReportChart<T>({ rows, spec, imageName }: {
         tickFormatter={format}
       />
       <Tooltip
-        cursor={{ fill: 'rgba(255,255,255,0.04)', stroke: CHROME.grid }}
+        cursor={{ fill: CHROME.cursor, stroke: CHROME.grid }}
         contentStyle={{ background: CHROME.raised, border: `1px solid ${CHROME.grid}`, borderRadius: 8 }}
         labelStyle={{ color: CHROME.ink }}
         itemStyle={{ color: CHROME.ink }}
@@ -338,7 +377,7 @@ export function ReportChart<T>({ rows, spec, imageName }: {
         <BarChart width={width} height={CHART_HEIGHT} data={data} barGap={2} barCategoryGap="30%">
           {axes}
           {spec.series.map((s) => (
-            <Bar key={s.key} dataKey={s.key} name={s.label} fill={s.colour} maxBarSize={24} radius={[4, 4, 0, 0]} />
+            <Bar key={s.key} dataKey={s.key} name={s.label} fill={colour(s)} maxBarSize={24} radius={[4, 4, 0, 0]} />
           ))}
         </BarChart>
       )}
@@ -351,10 +390,10 @@ export function ReportChart<T>({ rows, spec, imageName }: {
               type="monotone"
               dataKey={s.key}
               name={s.label}
-              stroke={s.colour}
+              stroke={colour(s)}
               strokeWidth={2}
               // A surface ring on every marker, so dots stay legible where lines cross.
-              dot={{ r: 4, fill: s.colour, stroke: CHROME.surface, strokeWidth: 2 }}
+              dot={{ r: 4, fill: colour(s), stroke: CHROME.surface, strokeWidth: 2 }}
               activeDot={{ r: 6, stroke: CHROME.surface, strokeWidth: 2 }}
             />
           ))}

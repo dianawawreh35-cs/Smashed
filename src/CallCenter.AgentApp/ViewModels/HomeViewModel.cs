@@ -33,7 +33,8 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         PhonePreferences preferences,
         BreakService breaks,
         AgentSettingsStore settings,
-        Localizer localizer)
+        Localizer localizer,
+        ThemeService theme)
     {
         _signIn = signIn;
         _session = session;
@@ -42,6 +43,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
         _breaks = breaks;
         _settings = settings;
         Localizer = localizer;
+        Theme = theme;
         _railCollapsed = settings.Current.RailCollapsed;
 
         _breaks.Changed += OnBreakChanged;
@@ -51,6 +53,10 @@ public partial class HomeViewModel : ObservableObject, IDisposable
 
         localizer.LanguageChanged += OnPhoneChanged;
         _sip.Changed += OnPhoneChanged;
+
+        // The status dot's brush is read from the palette, so a new palette
+        // means reading it again (A-90).
+        theme.ThemeChanged += OnPhoneChanged;
 
         // The switches are also read from a SIP thread and could be set from
         // elsewhere later; the rail follows whatever the preferences say rather
@@ -87,6 +93,7 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         Localizer.LanguageChanged -= OnPhoneChanged;
+        Theme.ThemeChanged -= OnPhoneChanged;
         _sip.Changed -= OnPhoneChanged;
         _preferences.Changed -= OnPreferencesChanged;
         _breaks.Changed -= OnBreakChanged;
@@ -94,6 +101,9 @@ public partial class HomeViewModel : ObservableObject, IDisposable
     }
 
     public Localizer Localizer { get; }
+
+    /// <summary>Light or dark, for the button beside the language one (A-90).</summary>
+    public ThemeService Theme { get; }
 
     /// <summary>Raised after signing out, so the shell goes back to the login screen.</summary>
     public event EventHandler? SignedOut;
@@ -291,6 +301,9 @@ public partial class HomeViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ToggleLanguage() => Localizer.Toggle();
+
+    [RelayCommand]
+    private void ToggleTheme() => Theme.Toggle();
 
     [RelayCommand]
     private async Task SignOutAsync(CancellationToken ct)

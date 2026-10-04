@@ -10,6 +10,19 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>مركز الاتصال | Call Center</title>
 
+    <!-- Light or dark (S-69), on the page before it is drawn, so a light page
+         does not flash dark while the app loads. The same key and values as
+         src/lib/theme.ts. -->
+    <script>
+      try {
+        if (localStorage.getItem('callcenter.theme') === 'light') {
+          document.documentElement.dataset.theme = 'light'
+          document.documentElement.style.colorScheme = 'light'
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F4F5F7')
+        }
+      } catch (e) {}
+    </script>
+
     <!--
       Cairo carries Arabic and Latin in one family, so a customer name and a
       phone number on the same line do not change typeface. It is bundled with
@@ -18,7 +31,7 @@
       and every screen fell back to Segoe UI.
     -->
   </head>
-  <body class="bg-[#0F1115]">
+  <body class="bg-ink-950">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

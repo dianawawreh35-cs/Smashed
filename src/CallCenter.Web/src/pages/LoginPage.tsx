@@ -6,6 +6,7 @@ import { LoginError, LoginErrorCodes } from '../api/auth'
 import type { LoginErrorCode } from '../api/auth'
 import { useAuth } from '../auth/context'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import ThemeSwitcher from '../components/ThemeSwitcher'
 
 /**
  * Sign-in (S-01), browser on the LAN. Supervisors go on to the dashboard;
@@ -66,7 +67,10 @@ export default function LoginPage() {
             <span className="text-sm font-semibold text-slate-100">{t('app.title')}</span>
           </span>
 
-          <LanguageSwitcher />
+          <span className="flex items-center gap-1">
+            <LanguageSwitcher />
+            <ThemeSwitcher />
+          </span>
         </div>
 
         <form onSubmit={onSubmit} className="card card-body space-y-5">

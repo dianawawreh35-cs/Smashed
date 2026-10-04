@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from './LanguageSwitcher'
+import ThemeSwitcher from './ThemeSwitcher'
 import PageBoundary from './PageBoundary'
 import { UserRoles } from '../api/auth'
 import { useAuth } from '../auth/context'
@@ -164,6 +165,7 @@ export default function AppLayout() {
           )}
 
           <LanguageSwitcher />
+          <ThemeSwitcher />
 
           <button type="button" onClick={onSignOut} className="btn-quiet btn-sm">
             {t('nav.logout')}

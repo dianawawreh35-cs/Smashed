@@ -8,7 +8,7 @@
         MinHeight="560" MinWidth="1024"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
-        Background="{StaticResource Bg}"
+        Background="{DynamicResource Bg}"
         TextOptions.TextFormattingMode="Ideal"
         WindowStartupLocation="CenterScreen">
 
@@ -27,8 +27,8 @@
          the stack: a call outranks an update and a notice. -->
     <Border DockPanel.Dock="Top"
             Visibility="{Binding Call.IsOnScreen, Converter={StaticResource BoolToVisibility}}"
-            Background="{StaticResource SuccessDim}"
-            BorderBrush="{StaticResource Success}"
+            Background="{DynamicResource SuccessDim}"
+            BorderBrush="{DynamicResource Success}"
             BorderThickness="0,0,0,2"
             Padding="16,6"
             Cursor="Hand"
@@ -93,17 +93,17 @@
 
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
           <TextBlock Text="{Binding Call.BannerStatus}"
-                     Foreground="{StaticResource Text}"
+                     Foreground="{DynamicResource Text}"
                      FontWeight="SemiBold"
                      VerticalAlignment="Center" />
           <TextBlock Text="{Binding Call.Number}"
                      FontFamily="{StaticResource MonoFont}"
-                     Foreground="{StaticResource Text}"
+                     Foreground="{DynamicResource Text}"
                      FlowDirection="LeftToRight"
                      Margin="12,0,0,0"
                      VerticalAlignment="Center" />
           <TextBlock Text="{Binding Call.Caller.Name}"
-                     Foreground="{StaticResource Text}"
+                     Foreground="{DynamicResource Text}"
                      Margin="12,0,0,0"
                      VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis"
@@ -111,12 +111,12 @@
                      Visibility="{Binding Call.Caller.HasName, Converter={StaticResource BoolToVisibility}}" />
           <TextBlock Text="{Binding Call.Duration}"
                      FontFamily="{StaticResource MonoFont}"
-                     Foreground="{StaticResource TextMuted}"
+                     Foreground="{DynamicResource TextMuted}"
                      Margin="12,0,0,0"
                      VerticalAlignment="Center"
                      Visibility="{Binding Call.IsConnected, Converter={StaticResource BoolToVisibility}}" />
           <!-- A-24: a customer still waiting on hold behind this call. -->
-          <TextBlock Foreground="{StaticResource Warning}"
+          <TextBlock Foreground="{DynamicResource Warning}"
                      FontWeight="SemiBold"
                      Margin="12,0,0,0"
                      VerticalAlignment="Center"
@@ -132,8 +132,8 @@
          off during a call, since updating closes the app and the phone. -->
     <Border DockPanel.Dock="Top"
             Visibility="{Binding Updater.IsOffered, Converter={StaticResource BoolToVisibility}}"
-            Background="{StaticResource AccentDim}"
-            BorderBrush="{StaticResource Accent}"
+            Background="{DynamicResource AccentDim}"
+            BorderBrush="{DynamicResource Accent}"
             BorderThickness="0,0,0,2"
             Padding="16,8">
       <DockPanel>
@@ -145,7 +145,7 @@
                 Command="{Binding Updater.UpdateNowCommand}" />
         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
           <TextBlock Text="{Binding Updater.Headline}"
-                     Foreground="{StaticResource Text}"
+                     Foreground="{DynamicResource Text}"
                      FontWeight="SemiBold"
                      TextWrapping="Wrap" />
           <TextBlock Text="{Binding Updater.Status}"
@@ -162,8 +162,8 @@
     <Border x:Name="NoticeBar"
             DockPanel.Dock="Top"
             Visibility="Collapsed"
-            Background="{StaticResource Surface}"
-            BorderBrush="{StaticResource Warning}"
+            Background="{DynamicResource Surface}"
+            BorderBrush="{DynamicResource Warning}"
             BorderThickness="0,0,0,2"
             Padding="16,8">
       <DockPanel>
@@ -173,7 +173,7 @@
                 Content="{Binding Localizer[app.dismiss]}"
                 Click="OnDismissNotice" />
         <local:SelectableText x:Name="NoticeText"
-                              Foreground="{StaticResource Warning}"
+                              Foreground="{DynamicResource Warning}"
                               TextWrapping="Wrap"
                               VerticalAlignment="Center"
                               Margin="0,0,12,0" />

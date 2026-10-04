@@ -1674,6 +1674,49 @@ Sign out and in once the Websites page is filled, so the app fetches the tabs.
 - [ ] **Both languages**: in Arabic the strip and the button are on the
       right. Screenshots of the rail open and folded in each.
 
+### Light mode (A-90, S-69) — built 4 Oct, no phone needed for most
+
+Both apps start dark as before; the button beside the language one switches.
+**The Agent App could not be started by the session that built it**, so the
+first item is the first time it has run.
+
+- [ ] **The Agent App starts** and shows the sign-in screen in dark, as
+      before. *If it closes or shows an error at start:* a colour is looked
+      up somewhere it cannot be; send App logs or the log file.
+- [ ] **Sign-in screen, Agent App:** beside the language button a sun. Press
+      it: the whole screen turns light at once, and the button becomes a
+      moon. Its tooltip reads *Light mode* / *Dark mode* (Arabic: الوضع
+      الفاتح / الوضع الداكن). Close and reopen the app: still light.
+- [ ] **Every Agent App screen in light, in both languages:** the rail (open
+      and folded), Dial, Call log (with a recording playing: the hold band
+      and the side buttons), Contacts (the VIP and Blocked chips), Menu,
+      Delivery, Applications, App logs, Websites (the bars only: the sites
+      themselves keep their own colours), the Groups window. Look for text
+      you cannot read, white on white or a dark block left over. **Screenshot
+      each.** *A dark patch on a light screen* means a control that still has
+      Windows' or a fixed colour; say which.
+- [ ] **Menus and pickers in light:** a combo box's list, a date picker's
+      calendar, a right-click Copy menu, a tooltip. All light.
+- [ ] **Switch while things are open** (in the rail, with the call log shown
+      and a classification form open): everything changes at once, nothing
+      stays in the old colours. The call log's count badge in the rail too.
+- [ ] **The ringing pop-up in light** (needs the PBX): the caller badges, the
+      green Answer button with white text, the red Reject; then the call
+      banner (A-19).
+- [ ] **Web app, sign-in page:** beside the language choice a sun; press it
+      and the page turns light. Reload: still light, and no dark flash while
+      it loads. The header has the same button after signing in.
+- [ ] **Every web page in light, in both languages**, the ones with notices
+      and badges especially: Communications (a row's panel open), Contacts
+      (VIP, Blocked), Classification, Delivery, Menu, Users, Websites, Logs
+      (a warning row), Mistakes, Breaks. Text readable everywhere, no dark
+      block left over. **Screenshot each.**
+- [ ] **Reports and Dashboard in light:** the charts have a light grid and
+      tooltip, and their series colours are the same four hues as in dark,
+      a little brighter. The heat table's shading is blue with dark numbers.
+      Download a chart's picture: it has a white background. Print a report:
+      dark on white, as before.
+
 ### The fonts inside the app (N-10) — built 4 Oct, no phone needed for most
 
 What went wrong on 3 and 4 Oct: on two laptops the app closed by itself just as

@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Bg}">
+             Background="{DynamicResource Bg}">
 
   <Grid Margin="28,24">
     <Grid.RowDefinitions>
@@ -40,11 +40,11 @@
                     VerticalAlignment="Center"
                     Visibility="{Binding HasResults, Converter={StaticResource InverseBoolToVisibility}}">
           <TextBlock Text="{Binding Localizer[menu.emptyTitle]}"
-                     Foreground="{StaticResource TextMuted}"
+                     Foreground="{DynamicResource TextMuted}"
                      HorizontalAlignment="Center" />
           <TextBlock Text="{Binding Localizer[menu.emptyHint]}"
                      Style="{StaticResource Subtle}"
-                     Foreground="{StaticResource TextFaint}"
+                     Foreground="{DynamicResource TextFaint}"
                      Margin="0,6,0,0"
                      HorizontalAlignment="Center" />
         </StackPanel>
@@ -57,7 +57,7 @@
               <DataTemplate>
                 <Border Padding="12"
                         Margin="0,0,0,6"
-                        Background="{StaticResource SurfaceAlt}"
+                        Background="{DynamicResource SurfaceAlt}"
                         CornerRadius="{StaticResource CornerSmall}">
                   <Grid>
                     <Grid.ColumnDefinitions>
@@ -72,7 +72,7 @@
                             Width="86"
                             Height="64"
                             CornerRadius="{StaticResource CornerSmall}"
-                            Background="{StaticResource Surface}"
+                            Background="{DynamicResource Surface}"
                             Margin="0,0,12,0">
                       <Grid>
                         <Image Source="{Binding Image}" Stretch="UniformToFill" />
@@ -114,12 +114,12 @@
                       <local:SelectableText Value="{Binding PriceText}"
                                             FontFamily="{StaticResource MonoFont}"
                                             FontSize="19"
-                                            Foreground="{StaticResource Accent}"
+                                            Foreground="{DynamicResource Accent}"
                                             HorizontalAlignment="Right" />
                       <local:SelectableText Value="{Binding MealPriceText}"
                                             FontFamily="{StaticResource MonoFont}"
                                             FontSize="12"
-                                            Foreground="{StaticResource TextMuted}"
+                                            Foreground="{DynamicResource TextMuted}"
                                             HorizontalAlignment="Right"
                                             Margin="0,3,0,0"
                                             Visibility="{Binding HasMealPrice, Converter={StaticResource BoolToVisibility}}" />

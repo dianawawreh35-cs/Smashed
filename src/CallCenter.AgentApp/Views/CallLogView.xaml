@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Bg}">
+             Background="{DynamicResource Bg}">
 
   <UserControl.Resources>
     <!-- The seek bar for a recording (A-51). Styled here because the theme has
@@ -16,7 +16,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="RepeatButton">
-            <Border Height="4" CornerRadius="2" Background="{StaticResource Accent}" />
+            <Border Height="4" CornerRadius="2" Background="{DynamicResource Accent}" />
           </ControlTemplate>
         </Setter.Value>
       </Setter>
@@ -42,7 +42,7 @@
             <Grid Background="Transparent" MinHeight="20">
               <Border Height="4"
                       CornerRadius="2"
-                      Background="{StaticResource SurfaceAlt}"
+                      Background="{DynamicResource SurfaceAlt}"
                       VerticalAlignment="Center" />
               <Track x:Name="PART_Track" VerticalAlignment="Center">
                 <Track.DecreaseRepeatButton>
@@ -55,7 +55,7 @@
                   <Thumb Width="12" Height="12">
                     <Thumb.Template>
                       <ControlTemplate TargetType="Thumb">
-                        <Ellipse Fill="{StaticResource Text}" />
+                        <Ellipse Fill="{DynamicResource Text}" />
                       </ControlTemplate>
                     </Thumb.Template>
                   </Thumb>
@@ -101,8 +101,8 @@
            line until asked, so it never pushes the list down for long. -->
       <Border Margin="0,12,0,0"
               Padding="12,10"
-              Background="{StaticResource WarningDim}"
-              BorderBrush="{StaticResource Warning}"
+              Background="{DynamicResource WarningDim}"
+              BorderBrush="{DynamicResource Warning}"
               BorderThickness="1"
               CornerRadius="{StaticResource CornerSmall}"
               Visibility="{Binding HasSetAside, Converter={StaticResource BoolToVisibility}}">
@@ -118,7 +118,7 @@
                       Command="{Binding RetrySetAsideCommand}" />
             </StackPanel>
             <TextBlock Text="{Binding SetAsideTitle}"
-                       Foreground="{StaticResource Warning}"
+                       Foreground="{DynamicResource Warning}"
                        FontWeight="SemiBold"
                        VerticalAlignment="Center"
                        TextWrapping="Wrap" />
@@ -139,13 +139,13 @@
                       <ColumnDefinition Width="130" />
                       <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding When}" Foreground="{StaticResource Text}" />
-                    <TextBlock Grid.Column="1" Text="{Binding Kind}" Foreground="{StaticResource Text}" />
+                    <TextBlock Grid.Column="0" Text="{Binding When}" Foreground="{DynamicResource Text}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Kind}" Foreground="{DynamicResource Text}" />
                     <!-- A number reads left to right in Arabic too. -->
                     <local:SelectableText Grid.Column="2"
                                           Value="{Binding Number}"
                                           FontFamily="{StaticResource MonoFont}"
-                                          Foreground="{StaticResource Text}"
+                                          Foreground="{DynamicResource Text}"
                                           FlowDirection="LeftToRight"
                                           HorizontalAlignment="Left" />
                     <local:SelectableText Grid.Column="3"
@@ -223,11 +223,11 @@
                     VerticalAlignment="Center"
                     Visibility="{Binding HasCalls, Converter={StaticResource InverseBoolToVisibility}}">
           <TextBlock Text="{Binding Localizer[callLog.emptyTitle]}"
-                     Foreground="{StaticResource TextMuted}"
+                     Foreground="{DynamicResource TextMuted}"
                      HorizontalAlignment="Center" />
           <TextBlock Text="{Binding Localizer[callLog.emptyHint]}"
                      Style="{StaticResource Subtle}"
-                     Foreground="{StaticResource TextFaint}"
+                     Foreground="{DynamicResource TextFaint}"
                      Margin="0,6,0,0"
                      HorizontalAlignment="Center" />
         </StackPanel>
@@ -329,14 +329,14 @@
                     <TextBlock Text="&#xE8D5;"
                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                FontSize="13"
-                               Foreground="{StaticResource TextMuted}"
+                               Foreground="{DynamicResource TextMuted}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Visibility="{Binding IsOutbound, Converter={StaticResource InverseBoolToVisibility}}" />
                     <TextBlock Text="&#xE8D4;"
                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                FontSize="13"
-                               Foreground="{StaticResource Accent}"
+                               Foreground="{DynamicResource Accent}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Visibility="{Binding IsOutbound, Converter={StaticResource BoolToVisibility}}" />
@@ -373,14 +373,14 @@
                     <TextBlock Text="&#xE767;"
                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                FontSize="13"
-                               Foreground="{StaticResource TextMuted}"
+                               Foreground="{DynamicResource TextMuted}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Visibility="{Binding HasRecording, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock Text="&#xE74F;"
                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                FontSize="13"
-                               Foreground="{StaticResource TextFaint}"
+                               Foreground="{DynamicResource TextFaint}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Visibility="{Binding RecordingExpired, Converter={StaticResource BoolToVisibility}}" />
@@ -400,12 +400,12 @@
                   <Grid>
                     <Border Padding="7,2"
                             CornerRadius="{StaticResource CornerSmall}"
-                            Background="{StaticResource WarningDim}"
+                            Background="{DynamicResource WarningDim}"
                             Visibility="{Binding IsUnclassified, Converter={StaticResource BoolToVisibility}}">
                       <TextBlock Text="{Binding DataContext.Localizer[callLog.unclassified],
                                         RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                  FontSize="11"
-                                 Foreground="{StaticResource Warning}" />
+                                 Foreground="{DynamicResource Warning}" />
                     </Border>
 
                     <!-- A missed, rejected or unanswered call's note, trimmed to fit; the
@@ -414,7 +414,7 @@
                                ToolTip="{Binding Notes}"
                                MaxWidth="176"
                                FontSize="11"
-                               Foreground="{StaticResource TextMuted}"
+                               Foreground="{DynamicResource TextMuted}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
@@ -452,11 +452,11 @@
 
         <StackPanel Orientation="Horizontal">
           <local:SelectableText Value="{Binding Opened.Who}"
-                                Foreground="{StaticResource Text}"
+                                Foreground="{DynamicResource Text}"
                                 FontWeight="SemiBold" />
           <local:SelectableText Value="{Binding Opened.Number}"
                                 FontFamily="{StaticResource MonoFont}"
-                                Foreground="{StaticResource TextMuted}"
+                                Foreground="{DynamicResource TextMuted}"
                                 FlowDirection="LeftToRight"
                                 Margin="10,0,0,0" />
         </StackPanel>
@@ -518,7 +518,7 @@
                             Margin="6,2,6,0"
                             Holds="{Binding Player.Holds}"
                             DurationSeconds="{Binding Player.DurationSeconds}"
-                            Fill="{StaticResource Warning}"
+                            Fill="{DynamicResource Warning}"
                             Visibility="{Binding Player.HasHolds, Converter={StaticResource BoolToVisibility}}" />
           </Grid>
 
@@ -526,7 +526,7 @@
             <!-- Said while playback is inside a hold, so the silence is not
                  mistaken for a dead line. -->
             <TextBlock Text="{Binding Localizer[callLog.recording.holdNow]}"
-                       Foreground="{StaticResource Warning}"
+                       Foreground="{DynamicResource Warning}"
                        FontSize="11"
                        VerticalAlignment="Center"
                        Margin="0,0,10,0"
@@ -535,7 +535,7 @@
             <!-- Digits read left to right in both languages. -->
             <TextBlock Text="{Binding Player.PositionText}"
                        FontFamily="{StaticResource MonoFont}"
-                       Foreground="{StaticResource TextMuted}"
+                       Foreground="{DynamicResource TextMuted}"
                        FlowDirection="LeftToRight"
                        VerticalAlignment="Center" />
           </StackPanel>
@@ -553,8 +553,8 @@
               <Setter Property="Margin" Value="6,0,0,0" />
               <Style.Triggers>
                 <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
-                  <Setter Property="Background" Value="{StaticResource Accent}" />
-                  <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                  <Setter Property="Background" Value="{DynamicResource Accent}" />
+                  <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
                   <Setter Property="Foreground" Value="#FFFFFF" />
                 </DataTrigger>
               </Style.Triggers>
@@ -562,7 +562,7 @@
           </StackPanel.Resources>
 
           <TextBlock Text="{Binding Localizer[callLog.recording.listen]}"
-                     Foreground="{StaticResource TextMuted}"
+                     Foreground="{DynamicResource TextMuted}"
                      FontSize="11"
                      VerticalAlignment="Center"
                      Margin="0,0,4,0" />
@@ -587,7 +587,7 @@
              exactly when. -->
         <local:SelectableText Value="{Binding Player.HoldsText}"
                               Style="{StaticResource SelectableSubtle}"
-                              Foreground="{StaticResource Warning}"
+                              Foreground="{DynamicResource Warning}"
                               TextWrapping="Wrap"
                               Margin="0,8,0,0"
                               Visibility="{Binding Player.HasHolds, Converter={StaticResource BoolToVisibility}}" />
@@ -610,7 +610,7 @@
             Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
       <StackPanel>
         <TextBlock Text="{Binding Localizer[classification.classifyHeading]}"
-                   Foreground="{StaticResource Text}"
+                   Foreground="{DynamicResource Text}"
                    FontWeight="SemiBold"
                    Margin="0,0,0,12" />
 
@@ -636,7 +636,7 @@
         </StackPanel>
 
         <TextBlock Text="{Binding Classification.Missing}"
-                   Foreground="{StaticResource Warning}"
+                   Foreground="{DynamicResource Warning}"
                    FontSize="11"
                    Margin="0,8,0,0"
                    TextWrapping="Wrap" />
@@ -655,7 +655,7 @@
             Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">
       <StackPanel>
         <TextBlock Text="{Binding NotesHeading}"
-                   Foreground="{StaticResource Text}"
+                   Foreground="{DynamicResource Text}"
                    FontWeight="SemiBold"
                    Margin="0,0,0,12" />
 

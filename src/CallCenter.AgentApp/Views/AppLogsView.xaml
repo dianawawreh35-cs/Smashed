@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Bg}">
+             Background="{DynamicResource Bg}">
 
   <UserControl.Resources>
     <!-- Every text cell trims with an ellipsis and carries its full value in
@@ -25,7 +25,7 @@
     <Style x:Key="WhoCell" TargetType="TextBlock" BasedOn="{StaticResource TrimmedCell}">
       <Style.Triggers>
         <DataTrigger Binding="{Binding IsUnknown}" Value="True">
-          <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+          <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
         </DataTrigger>
       </Style.Triggers>
     </Style>
@@ -117,11 +117,11 @@
                       VerticalAlignment="Center"
                       Visibility="{Binding HasMessages, Converter={StaticResource InverseBoolToVisibility}}">
             <TextBlock Text="{Binding Localizer[applications.emptyTitle]}"
-                       Foreground="{StaticResource TextMuted}"
+                       Foreground="{DynamicResource TextMuted}"
                        HorizontalAlignment="Center" />
             <local:SelectableText Value="{Binding StatusMessage}"
                                   Style="{StaticResource SelectableSubtle}"
-                                  Foreground="{StaticResource TextFaint}"
+                                  Foreground="{DynamicResource TextFaint}"
                                   Margin="0,6,0,0"
                                   TextWrapping="Wrap"
                                   TextAlignment="Center"
@@ -176,23 +176,23 @@
                     <StackPanel Orientation="Horizontal">
                       <Border Padding="7,2"
                               CornerRadius="{StaticResource CornerSmall}"
-                              Background="{StaticResource WarningDim}"
+                              Background="{DynamicResource WarningDim}"
                               VerticalAlignment="Center"
                               Visibility="{Binding IsUnclassified, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding DataContext.Localizer[callLog.unclassified],
                                           RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                    FontSize="11"
-                                   Foreground="{StaticResource Warning}" />
+                                   Foreground="{DynamicResource Warning}" />
                       </Border>
                       <Border Padding="7,2"
                               CornerRadius="{StaticResource CornerSmall}"
-                              Background="{StaticResource SuccessDim}"
+                              Background="{DynamicResource SuccessDim}"
                               VerticalAlignment="Center"
                               Visibility="{Binding IsClassified, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="{Binding DataContext.Localizer[applications.classified],
                                           RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                    FontSize="11"
-                                   Foreground="{StaticResource Success}" />
+                                   Foreground="{DynamicResource Success}" />
                       </Border>
                     </StackPanel>
                   </DataTemplate>
@@ -245,7 +245,7 @@
 
               <StackPanel Orientation="Horizontal">
                 <local:SelectableText Value="{Binding Opened.Who}"
-                                      Foreground="{StaticResource Text}"
+                                      Foreground="{DynamicResource Text}"
                                       FontWeight="SemiBold" />
                 <local:SelectableText Value="{Binding Opened.Channel}"
                                       Style="{StaticResource SelectableSubtle}"
@@ -269,7 +269,7 @@
               <TextBlock Grid.Row="1"
                          Text="{Binding Localizer[applications.readOnly]}"
                          Style="{StaticResource Subtle}"
-                         Foreground="{StaticResource Warning}"
+                         Foreground="{DynamicResource Warning}"
                          TextWrapping="Wrap"
                          Margin="0,6,0,0"
                          Visibility="{Binding CanEditOpened, Converter={StaticResource InverseBoolToVisibility}}" />
@@ -322,7 +322,7 @@
                   Visibility="{Binding OpenedClassification.IsOpen, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
               <TextBlock Text="{Binding Localizer[applications.classifyHeading]}"
-                         Foreground="{StaticResource Text}"
+                         Foreground="{DynamicResource Text}"
                          FontWeight="SemiBold"
                          Margin="0,0,0,12" />
 
@@ -348,7 +348,7 @@
               </StackPanel>
 
               <TextBlock Text="{Binding OpenedClassification.Missing}"
-                         Foreground="{StaticResource Warning}"
+                         Foreground="{DynamicResource Warning}"
                          FontSize="11"
                          Margin="0,8,0,0"
                          TextWrapping="Wrap" />

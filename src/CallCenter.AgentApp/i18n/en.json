@@ -3,6 +3,8 @@
     "title": "Call Center",
     "subtitle": "Smashed Burger",
     "language": "Language",
+    "lightTheme": "Light mode",
+    "darkTheme": "Dark mode",
     "problem": "Something went wrong, and the app carried on. The phone is still working. If it keeps happening, tell your supervisor.",
     "dismiss": "Dismiss"
   },

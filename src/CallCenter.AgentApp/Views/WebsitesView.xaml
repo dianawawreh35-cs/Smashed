@@ -33,8 +33,8 @@
          or four). -->
     <DataTemplate x:Key="PlaceBar" DataType="{x:Type vm:WebsitePlace}">
       <Border x:Name="Bar"
-              Background="{StaticResource Surface}"
-              BorderBrush="{StaticResource BorderSoft}"
+              Background="{DynamicResource Surface}"
+              BorderBrush="{DynamicResource BorderSoft}"
               BorderThickness="0,0,0,1"
               Padding="6,4">
         <Border.InputBindings>
@@ -95,7 +95,7 @@
                       Command="{Binding Tab.HomeCommand}"
                       ToolTip="{Binding Screen.Localizer[websites.home]}" />
               <TextBlock Text="{Binding Tab.Status}"
-                         Foreground="{StaticResource Warning}"
+                         Foreground="{DynamicResource Warning}"
                          FontSize="11"
                          Margin="8,0,0,0"
                          VerticalAlignment="Center"
@@ -107,8 +107,8 @@
       </Border>
       <DataTemplate.Triggers>
         <DataTrigger Binding="{Binding IsActive}" Value="True">
-          <Setter TargetName="Bar" Property="Background" Value="{StaticResource AccentDim}" />
-          <Setter TargetName="Bar" Property="BorderBrush" Value="{StaticResource Accent}" />
+          <Setter TargetName="Bar" Property="Background" Value="{DynamicResource AccentDim}" />
+          <Setter TargetName="Bar" Property="BorderBrush" Value="{DynamicResource Accent}" />
         </DataTrigger>
       </DataTemplate.Triggers>
     </DataTemplate>
@@ -119,8 +119,8 @@
     <!-- The tabs, and the layout. A tab button puts the tab in the place
          last used; a speaker on it says it is playing sound. -->
     <Border DockPanel.Dock="Top"
-            Background="{StaticResource Surface}"
-            BorderBrush="{StaticResource BorderSoft}"
+            Background="{DynamicResource Surface}"
+            BorderBrush="{DynamicResource BorderSoft}"
             BorderThickness="0,0,0,1"
             Padding="12,8">
       <DockPanel>
@@ -159,11 +159,11 @@
                       CommandParameter="{Binding}">
                 <Button.Style>
                   <Style TargetType="Button" BasedOn="{StaticResource SmallButton}">
-                    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding IsShown}" Value="True">
-                        <Setter Property="Background" Value="{StaticResource AccentDim}" />
-                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                        <Setter Property="Background" Value="{DynamicResource AccentDim}" />
+                        <Setter Property="Foreground" Value="{DynamicResource Text}" />
                       </DataTrigger>
                     </Style.Triggers>
                   </Style>
@@ -192,7 +192,7 @@
                              FontSize="11"
                              Margin="6,0,0,0"
                              VerticalAlignment="Center"
-                             Foreground="{StaticResource Accent}">
+                             Foreground="{DynamicResource Accent}">
                     <TextBlock.Style>
                       <Style TargetType="TextBlock">
                         <Setter Property="Visibility" Value="Collapsed" />
@@ -226,7 +226,7 @@
     <!-- The four places: a bar row and a page row each, two by two. The
          browsers are put here in code, by row and column, and never moved
          out of this grid (see WebsiteTab). -->
-    <Grid x:Name="Board" Background="{StaticResource Bg}">
+    <Grid x:Name="Board" Background="{DynamicResource Bg}">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />

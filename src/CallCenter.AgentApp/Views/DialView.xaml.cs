@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Threading;
 using CallCenter.AgentApp.ViewModels;
 
@@ -113,7 +112,8 @@ public partial class DialView : UserControl
     /// </summary>
     private static void Flash(Button button)
     {
-        button.Background = (Brush)button.FindResource("Accent");
+        // A reference, not the brush itself, so it is the palette in use (A-90).
+        button.SetResourceReference(BackgroundProperty, "Accent");
 
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
         timer.Tick += (_, _) =>

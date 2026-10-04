@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { AuthProvider } from './auth/AuthProvider'
 import { createQueryClient } from './lib/queryClient'
+import { storedTheme, syncTheme } from './lib/theme'
 import './i18n'
 // The app's typeface, served by the app itself (the LAN server has no
 // internet). Each weight holds Arabic and Latin; a browser fetches only the
@@ -14,6 +15,9 @@ import '@fontsource/cairo/500.css'
 import '@fontsource/cairo/600.css'
 import '@fontsource/cairo/700.css'
 import './index.css'
+
+// index.html has done this already; done again so the page and the app agree (S-69).
+syncTheme(storedTheme())
 
 const queryClient = createQueryClient()
 

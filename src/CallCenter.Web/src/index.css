@@ -3,9 +3,100 @@
 @tailwind utilities;
 
 @layer base {
+  /* --- Light and dark (S-69) --------------------------------------------
+     The colours tailwind.config.js names, as "R G B" so Tailwind can add an
+     opacity. Dark is the default and the look since the start: a screen open
+     all shift, where the one accent carries meaning rather than competing
+     with a bright background. Light is the supervisor's choice (lib/theme.ts,
+     set before the first paint by index.html). Each text shade in light is
+     at least 4.5:1 on every surface it sits on, notices' tints included; the
+     brand blue is a shade darker there (#2462D6), because #4F8CFF on white
+     is 3.2:1. The Agent App's Themes\Light.xaml has the same values. */
+  :root {
+    color-scheme: dark;
+
+    --ink-950: 15 17 21; /* #0F1115 canvas */
+    --ink-900: 23 26 33; /* #171A21 surface */
+    --ink-800: 30 34 43; /* #1E222B raised */
+    --ink-700: 42 47 58; /* #2A2F3A border */
+
+    --brand-50: 37 53 90; /* #25355A */
+    --brand-100: 37 53 90;
+    --brand-200: 52 80 121; /* #345079 */
+    --brand-300: 63 107 174; /* #3F6BAE */
+    --brand-400: 79 140 255; /* #4F8CFF */
+    --brand-500: 79 140 255;
+    --brand-600: 79 140 255;
+    --brand-700: 107 160 255; /* #6BA0FF */
+    --brand-800: 138 180 255; /* #8AB4FF */
+    --brand-900: 185 208 255; /* #B9D0FF */
+    /* White on #4F8CFF is 3.2:1, under AA; on this it is 4.7:1 (M-W08). */
+    --brand-button: 47 111 224; /* #2F6FE0 */
+
+    --slate-100: 241 245 249; /* Tailwind's own */
+    --slate-200: 226 232 240;
+    --slate-300: 203 213 225;
+    --slate-400: 148 163 184;
+    /* Tailwind's slate-500 is 3.4:1 on the raised surface; this is 4.7:1 on
+       ink-800, 5.2 on ink-900 and 5.6 on ink-950 (M-W08). */
+    --slate-500: 128 141 161; /* #808DA1 */
+
+    --red-200: 254 202 202; /* Tailwind's own */
+    --red-300: 252 165 165;
+    --red-400: 248 113 113;
+    --amber-100: 254 243 199;
+    --amber-200: 253 230 138;
+    --amber-300: 252 211 77;
+    --amber-400: 251 191 36;
+    --emerald-300: 110 231 183;
+    --emerald-400: 52 211 153;
+
+    --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-raised: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+
+    --ink-950: 244 245 247; /* #F4F5F7 canvas */
+    --ink-900: 255 255 255; /* #FFFFFF surface */
+    --ink-800: 237 239 243; /* #EDEFF3 raised */
+    --ink-700: 213 217 224; /* #D5D9E0 border */
+
+    --brand-50: 232 240 255; /* #E8F0FF */
+    --brand-100: 232 240 255;
+    --brand-200: 201 218 251; /* #C9DAFB */
+    --brand-300: 143 177 240; /* #8FB1F0 */
+    --brand-400: 36 98 214; /* #2462D6 */
+    --brand-500: 36 98 214;
+    --brand-600: 36 98 214;
+    --brand-700: 29 82 184; /* #1D52B8 */
+    --brand-800: 26 71 159; /* #1A479F */
+    --brand-900: 22 60 134; /* #163C86 */
+    --brand-button: 36 98 214; /* white on it 5.5:1 */
+
+    --slate-100: 27 31 39; /* #1B1F27 */
+    --slate-200: 38 44 56; /* #262C38 */
+    --slate-300: 58 66 82; /* #3A4252 */
+    --slate-400: 85 94 112; /* #555E70 */
+    --slate-500: 100 108 126; /* #646C7E, 4.6:1 on ink-800 */
+
+    --red-200: 142 27 27; /* #8E1B1B */
+    --red-300: 166 27 27; /* #A61B1B */
+    --red-400: 180 35 24; /* #B42318 */
+    --amber-100: 92 61 0; /* #5C3D00 */
+    --amber-200: 107 71 0; /* #6B4700 */
+    --amber-300: 122 82 0; /* #7A5200 */
+    --amber-400: 138 92 0; /* #8A5C00 */
+    --emerald-300: 19 108 46; /* #136C2E */
+    --emerald-400: 23 116 47; /* #17742F */
+
+    --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.06);
+    --shadow-raised: 0 8px 24px -8px rgb(16 24 40 / 0.18);
+  }
+
   html {
     font-family: theme('fontFamily.sans');
-    color-scheme: dark;
   }
 
   body {
@@ -235,7 +326,7 @@
 
 /* --- Printing a report (26 Sep) -------------------------------------------
    What the browser prints, to paper or to "Save as PDF" (lib/print.ts). The
-   screen is dark; paper is white, so everything prints dark on white except
+   screen may be dark (S-69); paper is white, so everything prints dark on white except
    what carries meaning in its colour: the charts' series and the heat
    table's shading. Nothing to operate is printed — the sidebar, the header,
    the filter bar, the tabs, the buttons — and the printed heading

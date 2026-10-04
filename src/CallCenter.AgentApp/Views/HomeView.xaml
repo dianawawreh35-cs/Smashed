@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Bg}">
+             Background="{DynamicResource Bg}">
 
   <Grid>
     <Grid.ColumnDefinitions>
@@ -16,8 +16,8 @@
          Navigation, who is signed in, and the phone's state. It sits on the
          start edge, so it moves to the right in Arabic with everything else. -->
     <Border Grid.Column="0"
-            Background="{StaticResource Surface}"
-            BorderBrush="{StaticResource BorderSoft}"
+            Background="{DynamicResource Surface}"
+            BorderBrush="{DynamicResource BorderSoft}"
             BorderThickness="0,0,1,0">
       <!-- Folds down to a strip (Dia, 4 Oct 2026), remembered on the laptop. -->
       <Border.Style>
@@ -58,7 +58,7 @@
         <TextBlock Text="&#xE769;"
                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                    FontSize="14"
-                   Foreground="{StaticResource WarningText}"
+                   Foreground="{DynamicResource WarningText}"
                    HorizontalAlignment="Center"
                    Margin="0,14,0,0"
                    ToolTip="{Binding BreakSinceText}"
@@ -89,11 +89,11 @@
           <StackPanel Orientation="Horizontal">
             <Border Width="34" Height="34"
                     CornerRadius="17"
-                    Background="{StaticResource AccentDim}">
+                    Background="{DynamicResource AccentDim}">
               <TextBlock Text="{Binding Initial}"
                          FontSize="15"
                          FontWeight="SemiBold"
-                         Foreground="{StaticResource Accent}"
+                         Foreground="{DynamicResource Accent}"
                          HorizontalAlignment="Center"
                          VerticalAlignment="Center" />
             </Border>
@@ -104,7 +104,7 @@
           </StackPanel>
         </DockPanel>
 
-        <!-- Sign out and language, under the status card. -->
+        <!-- Sign out, language, and light or dark (A-90), under the status card. -->
         <StackPanel DockPanel.Dock="Bottom" Margin="14,0,14,16" Orientation="Horizontal">
           <Button Content="{Binding Localizer[home.signOut]}"
                   Style="{StaticResource GhostButton}"
@@ -114,6 +114,7 @@
                   Style="{StaticResource GhostButton}"
                   Margin="6,0,0,0"
                   Command="{Binding ToggleLanguageCommand}" />
+          <Button Style="{StaticResource ThemeToggleButton}" Margin="6,0,0,0" />
         </StackPanel>
 
         <!-- How this phone should treat an arriving call (A-18). Beside the
@@ -146,10 +147,10 @@
                 CornerRadius="{StaticResource CornerSmall}">
           <Border.Style>
             <Style TargetType="Border">
-              <Setter Property="Background" Value="{StaticResource SurfaceAlt}" />
+              <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
               <Style.Triggers>
                 <DataTrigger Binding="{Binding OnBreak}" Value="True">
-                  <Setter Property="Background" Value="{StaticResource WarningDim}" />
+                  <Setter Property="Background" Value="{DynamicResource WarningDim}" />
                 </DataTrigger>
               </Style.Triggers>
             </Style>
@@ -174,7 +175,7 @@
                     ToolTip="{Binding Localizer[breaks.outHint]}"
                     HorizontalAlignment="Left" />
             <TextBlock Text="{Binding BreakSinceText}"
-                       Foreground="{StaticResource WarningText}"
+                       Foreground="{DynamicResource WarningText}"
                        FontWeight="SemiBold"
                        FontSize="12"
                        Margin="0,8,0,0"
@@ -187,7 +188,7 @@
                        FontSize="11"
                        Margin="0,2,0,0" />
             <TextBlock Text="{Binding OverLimitText}"
-                       Foreground="{StaticResource DangerText}"
+                       Foreground="{DynamicResource DangerText}"
                        FontWeight="SemiBold"
                        FontSize="12"
                        TextWrapping="Wrap"
@@ -201,7 +202,7 @@
         <Border DockPanel.Dock="Bottom"
                 Margin="14,10,14,10"
                 Padding="14,10"
-                Background="{StaticResource SurfaceAlt}"
+                Background="{DynamicResource SurfaceAlt}"
                 CornerRadius="{StaticResource CornerSmall}">
           <StackPanel>
             <StackPanel Orientation="Horizontal">

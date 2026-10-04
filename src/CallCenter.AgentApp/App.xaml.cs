@@ -210,6 +210,9 @@ public partial class App : Application
         // starts with no network must still reject blocked callers (A-17).
         _host.Services.GetRequiredService<BlockListCache>().LoadFromDisk();
 
+        // The agent's light or dark, before the first window is built (A-90).
+        _host.Services.GetRequiredService<ThemeService>().Apply();
+
         // Built now, hidden, so a call only has to show it (A-10).
         _host.Services.GetRequiredService<CallPopupWindow>();
 
@@ -341,6 +344,7 @@ public partial class App : Application
         services.AddSingleton<AgentNotices>();
         services.AddSingleton<AgentSettingsStore>();
         services.AddSingleton<Localizer>();
+        services.AddSingleton<ThemeService>();
         services.AddSingleton<SipTransportHost>();
         services.AddSingleton<SipRegistrationService>();
         services.AddSingleton<BlockListCache>();

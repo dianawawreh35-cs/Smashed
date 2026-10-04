@@ -5,7 +5,7 @@
         Icon="/Assets/app.ico"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
-        Background="{StaticResource Bg}"
+        Background="{DynamicResource Bg}"
         Width="560"
         Height="560"
         MinHeight="360"
@@ -17,7 +17,7 @@
   <DockPanel Margin="20">
     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
       <TextBlock Text="{Binding Localizer[websites.groupsTitle]}"
-                 Foreground="{StaticResource Text}"
+                 Foreground="{DynamicResource Text}"
                  FontSize="16"
                  FontWeight="SemiBold" />
       <TextBlock Text="{Binding Localizer[websites.groupsIntro]}"
@@ -28,7 +28,7 @@
 
     <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
       <TextBlock Text="{Binding Message}"
-                 Foreground="{StaticResource Warning}"
+                 Foreground="{DynamicResource Warning}"
                  FontSize="12"
                  TextWrapping="Wrap"
                  Margin="0,0,0,8"
@@ -104,8 +104,8 @@
                   <ItemsControl ItemsSource="{Binding Order}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
-                        <Border Background="{StaticResource SurfaceAlt}"
-                                BorderBrush="{StaticResource BorderSoft}"
+                        <Border Background="{DynamicResource SurfaceAlt}"
+                                BorderBrush="{DynamicResource BorderSoft}"
                                 BorderThickness="1"
                                 CornerRadius="4"
                                 Padding="8,3"
@@ -129,12 +129,12 @@
                               </Button>
                             </StackPanel>
                             <TextBlock Text="{Binding Position}"
-                                       Foreground="{StaticResource Accent}"
+                                       Foreground="{DynamicResource Accent}"
                                        FontWeight="SemiBold"
                                        MinWidth="20"
                                        VerticalAlignment="Center" />
                             <TextBlock Text="{Binding Tab.Name}"
-                                       Foreground="{StaticResource Text}"
+                                       Foreground="{DynamicResource Text}"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" />
                           </DockPanel>

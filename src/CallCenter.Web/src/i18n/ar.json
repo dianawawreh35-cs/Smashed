@@ -3,7 +3,9 @@
     "title": "مركز الاتصال",
     "subtitle": "سماشد برجر",
     "loading": "جارٍ التحميل…",
-    "language": "اللغة"
+    "language": "اللغة",
+    "lightTheme": "الوضع الفاتح",
+    "darkTheme": "الوضع الداكن"
   },
   "nav": {
     "dashboard": "لوحة المتابعة",

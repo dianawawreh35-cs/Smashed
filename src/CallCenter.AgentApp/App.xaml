@@ -10,7 +10,11 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <!-- Colours, typography and the control styles. Keyless styles in there
+        <!-- The colours: dark here, and ThemeService puts the agent's choice in
+             this place at start-up and when they switch (A-90). First, so
+             everything after it can find them. -->
+        <ResourceDictionary Source="Themes/Dark.xaml" />
+        <!-- Typography and the control styles. Keyless styles in there
              apply by type, so views pick them up without being rewritten. -->
         <ResourceDictionary Source="Theme.xaml" />
         <!-- The converters live in there too, above the styles that use

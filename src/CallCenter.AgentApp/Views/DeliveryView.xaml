@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Bg}">
+             Background="{DynamicResource Bg}">
 
   <Grid Margin="28,24">
     <Grid.RowDefinitions>
@@ -42,11 +42,11 @@
                     VerticalAlignment="Center"
                     Visibility="{Binding HasResults, Converter={StaticResource InverseBoolToVisibility}}">
           <TextBlock Text="{Binding Localizer[delivery.emptyTitle]}"
-                     Foreground="{StaticResource TextMuted}"
+                     Foreground="{DynamicResource TextMuted}"
                      HorizontalAlignment="Center" />
           <TextBlock Text="{Binding Localizer[delivery.emptyHint]}"
                      Style="{StaticResource Subtle}"
-                     Foreground="{StaticResource TextFaint}"
+                     Foreground="{DynamicResource TextFaint}"
                      Margin="0,6,0,0"
                      HorizontalAlignment="Center" />
         </StackPanel>
@@ -61,7 +61,7 @@
               <DataTemplate>
                 <Border Padding="14,11"
                         Margin="0,0,0,6"
-                        Background="{StaticResource SurfaceAlt}"
+                        Background="{DynamicResource SurfaceAlt}"
                         CornerRadius="{StaticResource CornerSmall}">
                   <Grid>
                     <Grid.ColumnDefinitions>
@@ -80,7 +80,7 @@
                                           Value="{Binding Price, StringFormat={}{0:0.##}}"
                                           FontFamily="{StaticResource MonoFont}"
                                           FontSize="20"
-                                          Foreground="{StaticResource Accent}"
+                                          Foreground="{DynamicResource Accent}"
                                           VerticalAlignment="Center"
                                           Margin="12,0,0,0" />
                   </Grid>

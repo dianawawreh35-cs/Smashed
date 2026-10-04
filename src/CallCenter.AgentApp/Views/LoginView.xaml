@@ -4,18 +4,22 @@
              xmlns:local="clr-namespace:CallCenter.AgentApp.Views"
              FlowDirection="{Binding Localizer.FlowDirection}"
              FontFamily="{StaticResource UiFont}"
-             Background="{StaticResource Bg}">
+             Background="{DynamicResource Bg}">
 
   <Grid>
 
     <!-- Language toggle, reachable before signing in: an agent who cannot read
-         the screen has to be able to change it (A-80). -->
-    <Button Content="{Binding Localizer[app.language]}"
-            Style="{StaticResource GhostButton}"
-            HorizontalAlignment="Left"
-            VerticalAlignment="Top"
-            Margin="18"
-            Command="{Binding ToggleLanguageCommand}" />
+         the screen has to be able to change it (A-80). Light or dark beside
+         it (A-90). -->
+    <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="18">
+      <Button Content="{Binding Localizer[app.language]}"
+              Style="{StaticResource GhostButton}"
+              Command="{Binding ToggleLanguageCommand}" />
+      <Button Style="{StaticResource ThemeToggleButton}" Margin="6,0,0,0" />
+    </StackPanel>
 
     <Border Width="400"
             HorizontalAlignment="Center"
@@ -51,13 +55,13 @@
              place, so the agent always looks in the same spot. -->
         <Border Margin="0,18,0,0"
                 Padding="12,10"
-                Background="{StaticResource DangerDim}"
-                BorderBrush="{StaticResource Danger}"
+                Background="{DynamicResource DangerDim}"
+                BorderBrush="{DynamicResource Danger}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource CornerSmall}"
                 Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
           <local:SelectableText Value="{Binding ErrorMessage}"
-                                Foreground="{StaticResource DangerText}"
+                                Foreground="{DynamicResource DangerText}"
                                 TextWrapping="Wrap" />
         </Border>
 

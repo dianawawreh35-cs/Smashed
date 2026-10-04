@@ -7,7 +7,7 @@
         Icon="/Assets/app.ico"
         FlowDirection="{Binding Localizer.FlowDirection}"
         FontFamily="{StaticResource UiFont}"
-        Background="{StaticResource Bg}"
+        Background="{DynamicResource Bg}"
         Width="420"
         SizeToContent="Height"
         MaxHeight="760"
@@ -35,7 +35,7 @@
              First, above the call itself, in the warning colour: they are
              waiting, and they come back to the front, still on hold, when this
              call ends. The contact details further down are still theirs. -->
-        <Border BorderBrush="{StaticResource Warning}"
+        <Border BorderBrush="{DynamicResource Warning}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource CornerSmall}"
                 Padding="10,6"
@@ -44,11 +44,11 @@
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
             <TextBlock Text="{Binding Localizer[call.heldCall]}"
                        FontWeight="SemiBold"
-                       Foreground="{StaticResource Warning}"
+                       Foreground="{DynamicResource Warning}"
                        VerticalAlignment="Center" />
             <local:SelectableText Value="{Binding HeldNumber}"
                                   FontFamily="{StaticResource MonoFont}"
-                                  Foreground="{StaticResource Text}"
+                                  Foreground="{DynamicResource Text}"
                                   FlowDirection="LeftToRight"
                                   Margin="8,0,0,0"
                                   VerticalAlignment="Center" />
@@ -64,8 +64,8 @@
         <!-- A-20, A-21: a call the agent placed is marked as such. Without it an
              outgoing call looks exactly like an incoming one once connected, and
              the agent's opening line depends on which it was. -->
-        <Border Background="{StaticResource BadgeBg}"
-                BorderBrush="{StaticResource Accent}"
+        <Border Background="{DynamicResource BadgeBg}"
+                BorderBrush="{DynamicResource Accent}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource CornerSmall}"
                 Padding="10,3"
@@ -75,12 +75,12 @@
           <TextBlock Text="{Binding DirectionBadge}"
                      FontSize="12"
                      FontWeight="SemiBold"
-                     Foreground="{StaticResource Accent}" />
+                     Foreground="{DynamicResource Accent}" />
         </Border>
 
         <!-- A-16: the VIP badge, above everything else, because its whole job is
              to change how the agent speaks before they have spoken. -->
-        <Border Background="{StaticResource Warning}"
+        <Border Background="{DynamicResource Warning}"
                 CornerRadius="{StaticResource CornerSmall}"
                 Padding="12,4"
                 Margin="0,10,0,0"
@@ -89,7 +89,7 @@
           <TextBlock Text="{Binding Localizer[caller.vip]}"
                      FontSize="13"
                      FontWeight="Bold"
-                     Foreground="{StaticResource OnWarning}" />
+                     Foreground="{DynamicResource OnWarning}" />
         </Border>
 
         <local:SelectableText Value="{Binding Caller.FlagReason}"
@@ -102,7 +102,7 @@
 
         <!-- Which queue rang, above the number: it changes how the agent answers,
              and they read it before they have said anything. -->
-        <Border Background="{StaticResource BadgeBg}"
+        <Border Background="{DynamicResource BadgeBg}"
                 CornerRadius="{StaticResource CornerSmall}"
                 Padding="10,3"
                 Margin="0,10,0,0"
@@ -111,7 +111,7 @@
           <local:SelectableText Value="{Binding Queue}"
                                 FontSize="12"
                                 FontWeight="SemiBold"
-                                Foreground="{StaticResource Text}" />
+                                Foreground="{DynamicResource Text}" />
         </Border>
 
         <!-- The number, large: it is the only thing identifying the caller until
@@ -119,7 +119,7 @@
         <local:SelectableText Value="{Binding Number}"
                               FontFamily="{StaticResource MonoFont}"
                               FontSize="26"
-                              Foreground="{StaticResource Text}"
+                              Foreground="{DynamicResource Text}"
                               HorizontalAlignment="Center"
                               FlowDirection="LeftToRight"
                               Margin="0,8,0,0" />
@@ -129,7 +129,7 @@
         <local:SelectableText Value="{Binding Caller.Name}"
                               FontSize="18"
                               FontWeight="SemiBold"
-                              Foreground="{StaticResource Text}"
+                              Foreground="{DynamicResource Text}"
                               HorizontalAlignment="Center"
                               TextAlignment="Center"
                               TextWrapping="Wrap"
@@ -147,13 +147,13 @@
         <!-- A-16 asks for the notes at the top, so the agent adjusts immediately.
              Boxed rather than another grey line: it is the one thing here that
              somebody wrote on purpose about this customer. -->
-        <Border Background="{StaticResource SurfaceAlt}"
+        <Border Background="{DynamicResource SurfaceAlt}"
                 CornerRadius="{StaticResource CornerSmall}"
                 Padding="10,6"
                 Margin="0,8,0,0"
                 Visibility="{Binding Caller.HasNotes, Converter={StaticResource BoolToVisibility}}">
           <local:SelectableText Value="{Binding Caller.Notes}"
-                                Foreground="{StaticResource Text}"
+                                Foreground="{DynamicResource Text}"
                                 FontSize="12"
                                 TextWrapping="Wrap" />
         </Border>
@@ -169,21 +169,21 @@
 
           <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="{Binding Caller.Orders}" FontWeight="Bold" Foreground="{StaticResource Success}" />
+              <TextBlock Text="{Binding Caller.Orders}" FontWeight="Bold" Foreground="{DynamicResource Success}" />
               <TextBlock Text="{Binding Localizer[caller.orders]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
             </StackPanel>
           </Border>
 
           <Border Style="{StaticResource Pill}" Margin="0,0,6,0">
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="{Binding Caller.Complaints}" FontWeight="Bold" Foreground="{StaticResource Danger}" />
+              <TextBlock Text="{Binding Caller.Complaints}" FontWeight="Bold" Foreground="{DynamicResource Danger}" />
               <TextBlock Text="{Binding Localizer[caller.complaints]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
             </StackPanel>
           </Border>
 
           <Border Style="{StaticResource Pill}">
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="{Binding Caller.Cancellations}" FontWeight="Bold" Foreground="{StaticResource Warning}" />
+              <TextBlock Text="{Binding Caller.Cancellations}" FontWeight="Bold" Foreground="{DynamicResource Warning}" />
               <TextBlock Text="{Binding Localizer[caller.cancellations]}" Style="{StaticResource Subtle}" Margin="5,0,0,0" />
             </StackPanel>
           </Border>
@@ -211,7 +211,7 @@
         <TextBlock Text="{Binding Duration}"
                    FontFamily="{StaticResource MonoFont}"
                    FontSize="15"
-                   Foreground="{StaticResource TextMuted}"
+                   Foreground="{DynamicResource TextMuted}"
                    HorizontalAlignment="Center"
                    Margin="0,6,0,0"
                    Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}" />
@@ -219,7 +219,7 @@
         <!-- M-A02: the headset failed. Until 27 Sep the call simply had no
              sound, and nothing on screen or in the log said why. -->
         <local:SelectableText Value="{Binding AudioProblem}"
-                              Foreground="{StaticResource Danger}"
+                              Foreground="{DynamicResource Danger}"
                               FontWeight="SemiBold"
                               HorizontalAlignment="Center"
                               TextAlignment="Center"
@@ -253,18 +253,18 @@
             <!-- A matching name is a prompt to look, never an obstacle (A-63). -->
             <Border Margin="0,8,0,0"
                     Padding="10,8"
-                    Background="{StaticResource WarningDim}"
-                    BorderBrush="{StaticResource Warning}"
+                    Background="{DynamicResource WarningDim}"
+                    BorderBrush="{DynamicResource Warning}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource CornerSmall}"
                     Visibility="{Binding Caller.SameNameMessage, Converter={StaticResource NotNullToVisibility}}">
               <StackPanel>
-                <TextBlock Text="{Binding Caller.SameNameMessage}" FontSize="11" Foreground="{StaticResource WarningText}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Caller.SameNameMessage}" FontSize="11" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{Binding Caller.SameName}" Margin="0,6,0,0">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
                       <StackPanel Margin="0,0,0,6">
-                        <local:SelectableText FontSize="11" Value="{Binding Name}" Foreground="{StaticResource Text}" />
+                        <local:SelectableText FontSize="11" Value="{Binding Name}" Foreground="{DynamicResource Text}" />
                         <Button Content="{Binding DataContext.Localizer[contacts.addToThem],
                                           RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                 Style="{StaticResource SmallButton}"
@@ -304,7 +304,7 @@
             <!-- Why it was not saved: offline, a number already on someone. What
                  was typed stays, so the agent only presses Save again. -->
             <local:SelectableText Value="{Binding Caller.FormMessage}"
-                                  Foreground="{StaticResource Warning}"
+                                  Foreground="{DynamicResource Warning}"
                                   FontSize="11"
                                   Margin="0,6,0,0"
                                   TextWrapping="Wrap"
@@ -319,10 +319,10 @@
           <StackPanel Margin="0,18,0,0"
                       Visibility="{Binding Classification.IsOpen, Converter={StaticResource BoolToVisibility}}">
 
-            <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
+            <Border Background="{DynamicResource BorderSoft}" Height="1" Margin="0,0,0,14" />
 
             <TextBlock Text="{Binding Localizer[classification.heading]}"
-                       Foreground="{StaticResource Text}"
+                       Foreground="{DynamicResource Text}"
                        FontWeight="SemiBold"
                        Margin="0,0,0,12" />
 
@@ -353,7 +353,7 @@
             <!-- Why Save is greyed out. A dead button with no explanation is the
                  worst version of this: the agent has a customer on the line. -->
             <TextBlock Text="{Binding Classification.Missing}"
-                       Foreground="{StaticResource Warning}"
+                       Foreground="{DynamicResource Warning}"
                        FontSize="11"
                        Margin="0,8,0,0"
                        TextWrapping="Wrap" />
@@ -371,10 +371,10 @@
           <StackPanel Margin="0,18,0,0"
                       Visibility="{Binding IsNotesOpen, Converter={StaticResource BoolToVisibility}}">
 
-            <Border Background="{StaticResource BorderSoft}" Height="1" Margin="0,0,0,14" />
+            <Border Background="{DynamicResource BorderSoft}" Height="1" Margin="0,0,0,14" />
 
             <TextBlock Text="{Binding Localizer[call.notesHeading]}"
-                       Foreground="{StaticResource Text}"
+                       Foreground="{DynamicResource Text}"
                        FontWeight="SemiBold"
                        Margin="0,0,0,12" />
 
@@ -399,7 +399,7 @@
 
             <!-- M-A03: the note was neither queued nor sent; it is still here. -->
             <local:SelectableText Value="{Binding NotesMessage}"
-                                  Foreground="{StaticResource Warning}"
+                                  Foreground="{DynamicResource Warning}"
                                   FontSize="11"
                                   Margin="0,6,0,0"
                                   TextWrapping="Wrap" />

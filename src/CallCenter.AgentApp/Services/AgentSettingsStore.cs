@@ -6,8 +6,8 @@ namespace CallCenter.AgentApp.Services;
 
 /// <summary>
 /// The handful of choices that belong to the laptop rather than to the agent
-/// (A-05): the UI language, the phone's own switches, and the username to
-/// pre-fill. There is no audio device choice: A-03 was removed on 27 Sep 2026,
+/// (A-05): the UI language, light or dark (A-90), the phone's own switches, and
+/// the username to pre-fill. There is no audio device choice: A-03 was removed on 27 Sep 2026,
 /// and calls use the Windows defaults.
 /// </summary>
 /// <remarks>
@@ -45,6 +45,9 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
         /// beside it the room (Dia, 4 Oct 2026). Kept as it was left.
         /// </summary>
         public bool RailCollapsed { get; init; }
+
+        /// <summary>"dark" or "light" (A-90). Dark until an agent chooses.</summary>
+        public string Theme { get; init; } = ThemeService.Dark;
 
         /// <summary>
         /// A-88: each agent's Websites layout on this laptop, by the agent's

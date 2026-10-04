@@ -1,0 +1,50 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    The light palette (A-90, Dia, 4 Oct 2026): the same keys as Dark.xaml,
+    for an agent who would rather work on a light screen. White cards on a
+    pale grey canvas, the same layout, the same one accent.
+
+    The accent is the brand blue a shade darker, #2462D6, as the supervisor
+    app's light theme has it: #4F8CFF is 3.2:1 on white, under the 4.5 that
+    small text needs, and the accent is text here as often as it is a fill. The
+    status colours are darker for the same reason. Each text colour below is
+    at least 4.5:1 on the surfaces it sits on, except TextFaint, which marks
+    what is switched off and is as quiet as its dark counterpart.
+  -->
+
+  <Color x:Key="BgColor">#F4F5F7</Color>
+  <Color x:Key="AccentColor">#2462D6</Color>
+
+  <SolidColorBrush x:Key="Bg" Color="#F4F5F7" />
+  <SolidColorBrush x:Key="Surface" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="SurfaceAlt" Color="#EDEFF3" />
+  <SolidColorBrush x:Key="BorderSoft" Color="#D5D9E0" />
+
+  <SolidColorBrush x:Key="Text" Color="#1B1F27" />
+  <SolidColorBrush x:Key="TextMuted" Color="#555E70" />
+  <SolidColorBrush x:Key="TextFaint" Color="#8A91A2" />
+
+  <SolidColorBrush x:Key="Accent" Color="#2462D6" />
+  <SolidColorBrush x:Key="AccentHover" Color="#1D52B8" />
+  <SolidColorBrush x:Key="AccentDim" Color="#E8F0FF" />
+
+  <SolidColorBrush x:Key="Success" Color="#17742F" />
+  <SolidColorBrush x:Key="Warning" Color="#8A5C00" />
+  <SolidColorBrush x:Key="Danger" Color="#C21F2B" />
+
+  <SolidColorBrush x:Key="OnSuccess" Color="#FFFFFF" />
+
+  <SolidColorBrush x:Key="WarningDim" Color="#FFF5D6" />
+  <SolidColorBrush x:Key="WarningText" Color="#7A5200" />
+  <SolidColorBrush x:Key="OnWarning" Color="#FFFFFF" />
+
+  <SolidColorBrush x:Key="WarningChip" Color="#FCEBC0" />
+  <SolidColorBrush x:Key="DangerChip" Color="#FFE1E0" />
+  <SolidColorBrush x:Key="DangerDim" Color="#FFEBE9" />
+  <SolidColorBrush x:Key="DangerText" Color="#A40E26" />
+  <SolidColorBrush x:Key="SuccessDim" Color="#DDF4E4" />
+  <SolidColorBrush x:Key="BadgeBg" Color="#E3E8EF" />
+
+</ResourceDictionary>

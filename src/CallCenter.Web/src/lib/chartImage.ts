@@ -9,13 +9,13 @@
  * PNG, which every presentation program takes.
  */
 
-/** The card's surface (ink-900), behind the chart. */
+/** The card's surface (ink-900) in dark, behind the chart, unless told otherwise. */
 const BACKGROUND = '#171A21'
 
 /** Twice the screen size, so the picture stays sharp on a projector. */
 const SCALE = 2
 
-/** The legend's text, the chart's own ink (slate-200). */
+/** The legend's text in dark, the chart's own ink (slate-200), unless told otherwise. */
 const INK = '#e2e8f0'
 
 /** Room under the chart for the legend, when there is one. */
@@ -26,11 +26,14 @@ const LEGEND_HEIGHT = 32
  *   legend as HTML beside the SVG, so it is painted onto the picture here;
  *   without it a picture of two lines would tell them apart by colour alone.
  * @param rtl Arabic: the legend runs from the right, as it does on screen.
+ * @param chrome The card's colour and the legend's ink in the theme on screen
+ *   (S-69), so the picture looks as the chart did.
  */
 export async function chartToPng(
   svg: SVGSVGElement,
   legend: { label: string; colour: string }[] = [],
   rtl = false,
+  chrome: { background: string; ink: string } = { background: BACKGROUND, ink: INK },
 ): Promise<Blob> {
   const width = svg.width.baseVal.value || svg.getBoundingClientRect().width
   const chartHeight = svg.height.baseVal.value || svg.getBoundingClientRect().height
@@ -58,7 +61,7 @@ export async function chartToPng(
   canvas.height = Math.ceil(height * SCALE)
   const context = canvas.getContext('2d')
   if (!context) throw new Error('no canvas')
-  context.fillStyle = BACKGROUND
+  context.fillStyle = chrome.background
   context.fillRect(0, 0, canvas.width, canvas.height)
   context.scale(SCALE, SCALE)
   context.drawImage(image, 0, 0, width, chartHeight)
@@ -76,7 +79,7 @@ export async function chartToPng(
       // The swatch carries the colour; the words stay in the ink (dataviz).
       context.fillStyle = item.colour
       context.fillRect(rtl ? x + item.width - 14 : x, y - 5, 14, 10)
-      context.fillStyle = INK
+      context.fillStyle = chrome.ink
       context.textAlign = rtl ? 'right' : 'left'
       context.fillText(item.label, rtl ? x + item.width - 20 : x + 20, y)
       x += item.width + 16

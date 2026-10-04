@@ -3,7 +3,9 @@
     "title": "Call Center",
     "subtitle": "Smashed Burger",
     "loading": "Loading…",
-    "language": "Language"
+    "language": "Language",
+    "lightTheme": "Light mode",
+    "darkTheme": "Dark mode"
   },
   "nav": {
     "dashboard": "Dashboard",

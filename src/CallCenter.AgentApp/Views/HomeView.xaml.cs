@@ -128,25 +128,29 @@ public partial class HomeView : UserControl, IDisposable
 
     /// <summary>
     /// The label with a count after it, in the warning colour (F-08). On the
-    /// end edge of the label, so it follows the text in Arabic.
+    /// end edge of the label, so it follows the text in Arabic. Its colours
+    /// are references into the palette, so they follow a switch between light
+    /// and dark (A-90).
     /// </summary>
     private static StackPanel WithBadge(string label, int count)
     {
+        var number = new TextBlock
+        {
+            Text = count.ToString(),
+            FontSize = 11,
+            FontWeight = FontWeights.Bold,
+        };
+        number.SetResourceReference(TextBlock.ForegroundProperty, "OnWarning");
+
         var badge = new Border
         {
-            Background = (System.Windows.Media.Brush)Application.Current.FindResource("Warning"),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(6, 0, 6, 1),
             Margin = new Thickness(8, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
-            Child = new TextBlock
-            {
-                Text = count.ToString(),
-                FontSize = 11,
-                FontWeight = FontWeights.Bold,
-                Foreground = (System.Windows.Media.Brush)Application.Current.FindResource("OnWarning"),
-            },
+            Child = number,
         };
+        badge.SetResourceReference(Border.BackgroundProperty, "Warning");
 
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
         panel.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });

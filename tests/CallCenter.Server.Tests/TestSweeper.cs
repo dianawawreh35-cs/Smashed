@@ -22,7 +22,8 @@ namespace CallCenter.Server.Tests;
 /// <c>test-</c> or <c>rec-agent-</c>, calls whose SIP Call-ID ends <c>@test</c> or
 /// starts <c>rec-</c> and ends <c>@pbx</c> (the recording tests), branches named
 /// <c>Test branch</c> plus a suffix (and their delivery areas), types named <c>TestType</c> or
-/// <c>AccessType</c> plus a suffix, channels with an eight-hex-digit suffix,
+/// <c>AccessType</c> plus a suffix, channels with an eight-hex-digit suffix, websites named
+/// <c>Site</c> plus twelve,
 /// forms with a version at or above 100,000. Contacts are the one thing without
 /// a pattern: the tests give them real-looking names and numbers so matching
 /// is tested honestly. <see cref="TestData.CreateContactAsync"/> registers the
@@ -128,6 +129,7 @@ public static class TestSweeper
             DELETE FROM channels ch
              WHERE NOT ch.is_system AND ch.name ~ ' [0-9a-f]{{8}}( Business)?$'
                AND NOT EXISTS (SELECT 1 FROM communications m WHERE m.channel_id = ch.id);
+            DELETE FROM websites WHERE name_en ~ '^Site [0-9a-f]{{12}}$';
             DELETE FROM form_definitions f
              WHERE f.version >= 100000
                AND NOT f.is_current

@@ -22,6 +22,13 @@ public partial class HomeView : UserControl, IDisposable
     private readonly CallLogReporter _reporter;
     private readonly List<(TabItem Tab, string LabelKey, UserControl Pane)> _sections = [];
 
+    /// <summary>
+    /// A-88: the websites, kept in the window for the whole shift rather than
+    /// swapped in and out like the other sections, so the pages, their logins
+    /// and their sounds carry on while the agent is elsewhere.
+    /// </summary>
+    private readonly WebsitesView _websites;
+
     public HomeView(HomeViewModel viewModel, IServiceProvider services)
     {
         InitializeComponent();
@@ -33,6 +40,16 @@ public partial class HomeView : UserControl, IDisposable
         // The call log first: it is what an agent checks between calls, and
         // what they work through at the end of a shift (A-50, A-41).
         AddSection("nav.callLog", new CallLogView(services.GetRequiredService<CallLogViewModel>()));
+
+        // A-88: the POS and the other sites, as tabs inside the app. Loaded
+        // now, not when first opened: the sites that alert have to be running
+        // to be heard, and the POS has to be there for the first call's cart.
+        var websites = services.GetRequiredService<WebsitesViewModel>();
+        _websites = new WebsitesView(websites) { Visibility = Visibility.Collapsed };
+        Grid.SetColumn(_websites, 1);
+        ((Grid)Pane.Parent).Children.Add(_websites);
+        AddSection("nav.websites", _websites);
+        _ = websites.LoadAsync();
 
         // A-70: conversations that came on an app rather than by phone. Its own
         // section, next to the call log, which stays calls only. Recording one
@@ -85,7 +102,11 @@ public partial class HomeView : UserControl, IDisposable
     {
         if (Nav.SelectedIndex >= 0 && Nav.SelectedIndex < _sections.Count)
         {
-            Pane.Content = _sections[Nav.SelectedIndex].Pane;
+            var pane = _sections[Nav.SelectedIndex].Pane;
+            var websites = ReferenceEquals(pane, _websites);
+
+            _websites.Visibility = websites ? Visibility.Visible : Visibility.Collapsed;
+            Pane.Content = websites ? null : pane;
         }
     }
 

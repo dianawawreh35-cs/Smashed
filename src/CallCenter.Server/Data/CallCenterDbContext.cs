@@ -61,6 +61,9 @@ public partial class CallCenterDbContext(DbContextOptions<CallCenterDbContext> o
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
     public DbSet<OutboxSync> OutboxSync => Set<OutboxSync>();
 
+    // A-88
+    public DbSet<Website> Websites => Set<Website>();
+
     /// <summary>
     /// Every <see cref="DateTimeOffset"/> is converted to UTC on the way to the
     /// database.

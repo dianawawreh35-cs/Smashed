@@ -8942,6 +8942,147 @@ seen running, before and after.
 0.11.1** is on the Agent App page in place of 0.11.0 (uploaded 4 Oct), and
 the laptops offer Update now (A-82). The server stays on what it runs.
 
+## 2026-10-04 — The call banner, and the websites inside the Agent App (A-19, A-88, S-68)
+
+**In plain terms.** Dia asked whether the Agent App could hold a light browser,
+so the agents stop working in a separate one. They use four sites all day: the
+POS, and three others, one of which is open under **four accounts at once**.
+The design was agreed in conversation and is now A-88; nothing of it is built
+yet. The first piece, built today, is what makes "switch between the call and
+the websites" workable: **a banner across the top of the main window while
+there is a call**, with the call's buttons, which brings the pop-up back on a
+double-click (A-19). And when the call ends with its form still to do, the
+pop-up comes back on top by itself.
+
+**The banner (A-19), built.**
+
+- **Why it was needed.** Since M-A05 the pop-up stays on top only until the
+  agent turns to it; after that it is an ordinary window, and a click on the
+  main window or a browser puts it behind. Closing it only hides it. An agent
+  who did either had only the taskbar to find it again, and with the websites
+  inside the app that would be the usual case, not the odd one.
+- **What it shows.** `CallViewModel.IsOnScreen` is true from `CallArrived` to
+  `CallEnded`, which is exactly while the pop-up has a call: ringing, dialling,
+  connected, or over with the classification, new-customer form or note still
+  to do. Every place that raised `CallEnded` now goes through `LeaveScreen()`,
+  so the two cannot disagree. The line is `BannerStatus`: `StatusText` while
+  the call is up, and *Call ended. The form is waiting for you.* once it is
+  over, since `StatusText` falls back to "Incoming call" for a finished call
+  with its form open.
+- **Shown always, not only while the pop-up is hidden.** Telling "behind
+  another window" from "in front" needs the window manager's Z order; and one
+  place that is always there is easier to learn. Dia agreed.
+- **The buttons are the pop-up's own commands**, in the same states: Answer
+  and Reject while ringing, Cancel while dialling, Mute, Hold and Hang up once
+  connected. Hold was added to the four Dia listed, so the banner matches the
+  pop-up. **Open** is there too, for an agent who does not know about the
+  double-click. A double-click on a button is two presses of that button: the
+  button keeps its own clicks, and only the banner's background opens the
+  pop-up.
+- **Open takes the keyboard; coming back at hang-up does not.** Open is the
+  agent asking, from inside this app, so `OpenForAgent()` activates the
+  pop-up. At hang-up `FormWaiting` makes it `Resurface()`: Topmost until the
+  agent turns to it and the taskbar button flashing, as an arriving call does,
+  because the agent may still be typing the order into the POS. Neither
+  centres the window or scrolls it to the top, as `BringToFront()` does for a
+  new caller: this is the same caller's half-filled form, where they left it.
+- **Above the update bar and the notice line.** A call outranks both.
+
+**Checked:** Agent App tests 100 pass, none new: `CallService` cannot be built
+without SIPSorcery and a sound card, so `CallViewModel` has no tests (the open
+item on `CallService`'s state rules). The app was started from the real `bin`
+and the main window opened with the banner in it; **no call has been seen on
+it**. Checklist "The call banner".
+
+**The websites (A-88, S-68), built the same afternoon.** Dia: "do all, then
+we test all". What was decided in conversation, and how it is built:
+
+- **WebView2, not a browser of our own.** The Edge engine Windows 10 and 11
+  already carry: `Microsoft.Web.WebView2` 1.0.4258.31 adds a few MB to the
+  app, against about 150 MB for CefSharp's own Chromium. One environment for
+  the process (`WebsiteEngine`), its data in `%LOCALAPPDATA%\CallCenter\Browser`
+  beside the app's other data, so upgrades keep the logins. Each loaded tab
+  costs Edge processes of its own, tens of MB to a couple of hundred.
+- **One profile per agent and tab** (`WebsiteEngine.ProfileName`). A profile
+  is its own cookies, storage and saved passwords: the four accounts on one
+  site are four tabs of the same address, and the next agent on a shared
+  laptop opens none of the last one's. Ordinary Chrome or Edge tabs share one
+  login, which is why Dia had to sign out and in.
+- **The POS is each agent's own login**, remembered by Edge's own password
+  save for that profile. **The other sites log in with the supervisor's
+  credentials** (`AutoLogin`): the server keeps the password encrypted with
+  the SIP secrets' key and AES-GCM (`websites.password_secret`), the web app
+  is only told one is stored, and `GET /api/websites/mine` hands it to the
+  Agent App (`Cache-Control: no-store`), which keeps it in memory. The app
+  types it in only on the site's own host or its parent domain (checked in C#
+  and again in the page); finds the visible password box, the text box before
+  it and the form's submit button, or a button saying Log in or دخول; and
+  sets the values through the input's own setter with input and change
+  events, so React-style pages see them. The supervisor can give CSS selectors
+  for a page it cannot read. **A login page that comes back within a minute
+  of signing in stops the tries** (`AutoLogin.Gate`) until the agent presses
+  Reload, so a changed password does not lock the account. Developer tools
+  are off in the tabs: they would show the password. A determined agent could
+  still dig it out of the laptop; Dia was told.
+- **The supervisor's Websites page** (S-68): Arabic and English names, the
+  address, the login, "alerts with sound", shown or hidden, the order, and the
+  caller's cart address on one tab only (`cart_taken`). Every change is in the
+  audit log without the password. The migration `AddWebsites` inserts the POS
+  with `https://smashed-ps.com/app` and the cart address A-85 used; **the
+  POS's start address is a guess** for the supervisor to correct.
+- **Layout:** one, side by side or quarters; each place has a bar with its
+  tab, back, reload, start page, zoom and mute; the tab bar fills the place
+  last used. **The browsers are never moved between parents**: the Websites
+  view is one grid, and a place change only sets a browser's row and column,
+  because taking a WebView2 out of the tree can close it. For the same reason
+  the Websites section is not swapped in and out of the content area like the
+  others: `HomeView` keeps it in the window, collapsed, for the whole shift.
+- **Groups are the agent's own** (Dia, asked mid-build and chose "each agent"
+  and "open together" over a supervisor's grouping and a tidier tab bar): a
+  Groups window, a name and up to four tabs; a group's button shows its tabs
+  together, two side by side, three or four in quarters. Kept with the layout
+  in `settings.json`, per agent. The window is not modal, so a call can still
+  be answered while it is open.
+- **No pop-out window** (Dia). A page that opens a new window (a receipt to
+  print) gets a `WebsitePopupWindow` on the same profile.
+- **Sound:** every tab but the POS alerts, so those start at sign-in. The
+  environment turns off Chromium's background timer throttling
+  (`--disable-background-timer-throttling`, `IntensiveWakeUpThrottling` off
+  and the rest), so a hidden site that checks for orders on a timer is not
+  slowed to once a minute; a hidden tab that does not alert is asked to use
+  less memory instead. A speaker on the tab when it plays, a mute per tab, and
+  **all tabs silent from the first ring to the hang-up** (`CallViewModel.State`).
+- **A-85 changed:** answering opens the cart in the POS tab (`CartTab`, a
+  singleton the signed-in screen registers with), and puts the tab on screen
+  in the place last used; the agent stays on the pop-up. Without the runtime,
+  or with no tab carrying the cart, the default browser as before.
+- **A-12 changed:** WebView2 hands key presses with Ctrl to the app before the
+  page, so the call shortcuts should work while typing in a site. **Not yet
+  seen**: there was no call to press them on.
+
+**Checked:** server tests 642 pass against the test database, 8 new
+(`WebsitesTests`: the password encrypted and never back to the web app or the
+audit log, the tabs an Agent App gets, null keeps the password and empty
+removes it, bad names, addresses and logins refused, one cart, removal in the
+audit log, agents refused). They found the first audit row written with an
+empty id, fixed. Web: lint, types and 237 tests, 6 new (`WebsitesPage`). Agent
+App: 116 tests, 16 new (`AutoLoginTests`: the domains a login may go to, a
+password with quotes and `</script>` kept whole, the gate, the profile names;
+the cart to the tab). The page script was tried in jsdom on five login pages.
+**Seen running on this PC** against the dev server, signed in as a temporary
+agent with no extension (removed after, with a temporary supervisor and two
+test sites): the real POS login page in its tab; a public test login page
+signed in by itself while hidden; quarters with three sites. Fixed from what
+was seen: the place's list showed the class name, and the bar's icons were
+boxes (the theme's button sets its own font). **Not seen:** anything during a
+call (silence, the cart in the tab, the shortcuts, the banner), Arabic, the
+groups window, a site's sound, the receipt window.
+
+**To deploy:** a server release (the migration and the endpoint) and an Agent
+App release, the same day; the web app comes with the server. Then the
+supervisor corrects the POS address and adds the three sites and their logins
+on the Websites page.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -8963,6 +9104,8 @@ running**.
 
 | Next | Requirement | Depends on |
 |---|---|---|
+| **The call banner**: checklist "The call banner" on a laptop with the PBX, in both languages, with screenshots of the banner ringing, connected and with the form waiting | A-19 | **built 4 Oct, not yet seen on a call.** A release with the Agent App |
+| **Websites inside the Agent App**: checklist "Websites inside the Agent App" and "The Websites page", on a laptop with the PBX, in both languages: the four accounts signed in at once, the cart in the POS tab on answer, silence during a call, the shortcuts while typing in a site, a site's ding while the section is hidden, the groups. Then correct the POS start address on the Websites page | A-88, S-68, A-85, A-12 | **built 4 Oct, seen without a phone only.** A server and an Agent App release the same day; the three sites' addresses and logins |
 | **The Agent App's own fonts (N-10)**: 0.11.1 is on the Agent App page (uploaded 4 Oct, 10:32 UTC); once the laptops have updated, the checklist's "The fonts inside the app" on a laptop: every screen and the pop-up in both languages for anything cut off by Cairo's taller lines, at 1366 × 768 and 125 %, and a shift with no `FileNotFoundException` | N-10 | **released as `v0.11.1`, seen only on the sign-in screen.** Each laptop's agent pressing Update now (A-82) |
 | **Release the one-phone guards, with the Agent App on all three laptops the same day**, every running copy closed first (Task Manager → Details → `CallCenter.AgentApp.exe`), and no copy left in a second folder. Then the checklist's "One phone per agent", with the log line of one INVITE | N-05, A-05 | a tag; the server's `update.sh` with the manual database backup first, while there is no backup disk; the Agent App built after the tag and uploaded on the Agent App page. The log sender (N-12) and the install page (S-63) go in the same release |
 | **Switch on the nightly update** on the server: copy `auto-update.sh` and the two `callcenter-auto-update.*` files, run `./auto-update.sh --check`, enable the timer (runbook, *Updating by itself at night*). The one-phone release above needs the laptops the same day, so tag it `deploy: manual` | — | the first release built after 29 Sep (its image carries the deploy files); the server's `docker login` done as `smashed` |

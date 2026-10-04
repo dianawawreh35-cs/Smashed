@@ -58,6 +58,9 @@
          SIPSorcery upgrade cannot change or remove it underneath the player. -->
     <PackageVersion Include="NAudio.Core" Version="3.0.0" />
     <PackageVersion Include="NAudio.WinMM" Version="3.0.0" />
+    <!-- The website tabs inside the Agent App (A-88): the Edge engine that
+         Windows already has. The SDK is a few MB; the runtime is the laptop's. -->
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

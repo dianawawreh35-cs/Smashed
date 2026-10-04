@@ -427,6 +427,41 @@ CREATE INDEX ix_mistakes_occurred ON mistakes(occurred_on);
 
 ---
 
+## 4d. Websites
+
+The websites the agents work in, shown as tabs inside the Agent App (A-88), as
+the supervisor lists them on the Websites page. Added by migration
+`AddWebsites` (4 Oct 2026), which also inserts the POS.
+
+```sql
+CREATE TABLE websites (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name_ar            varchar(60) NOT NULL,           -- the tab's name in Arabic
+  name_en            varchar(60) NOT NULL,           -- and in English; the app shows the agent's language
+  url                varchar(500) NOT NULL,          -- where the tab opens; http or https (API)
+  login              varchar(10) NOT NULL,           -- 'own' (each agent's) or 'shared' (typed in by the app)
+  username           varchar(200),                   -- the shared login's; NULL for 'own'
+  password_secret    text,                           -- the shared login's password, AES-GCM like users.sip_secret
+  alerts_with_sound  boolean NOT NULL DEFAULT false, -- the tab is never put to sleep
+  cart_url           varchar(500),                   -- the caller's cart with {number} (A-85); one tab at most (API)
+  username_selector  varchar(300),                   -- CSS selectors for a login page the app cannot read itself
+  password_selector  varchar(300),
+  submit_selector    varchar(300),
+  sort_order         int NOT NULL DEFAULT 0,
+  is_active          boolean NOT NULL DEFAULT true,  -- hidden tabs are not sent to the Agent App
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_websites_login CHECK (login IN ('own','shared'))
+);
+```
+
+- **The password is never sent to the web app**, only whether there is one.
+  It goes to the Agent App (`GET /api/websites/mine`), which types it into the
+  site. Encrypted with `Security:SipSecretKey`.
+- **Hard-deleted** when the supervisor removes a tab; the `audit_log` row
+  (`entity = 'website'`) keeps what it was, never the password.
+
+---
+
 ## 5. Follow-up tasks
 
 ```sql

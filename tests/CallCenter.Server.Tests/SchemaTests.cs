@@ -48,6 +48,7 @@ public class SchemaTests
         "delivery_areas",
         "menu_categories", "menu_items",
         "mistakes",
+        "websites",
         "pbx_events_raw", "pbx_blacklist", "agent_sessions", "agent_breaks", "audit_log", "outbox_sync",
     ];
 

@@ -1539,6 +1539,101 @@ is where the echo is worst, so it shows whether the canceller works.
       again: no `Echo cancellation on` line, and the echo is back. Set it to
       `true` again.
 
+### The call banner (A-19) — built 4 Oct, needs the PBX
+
+A strip across the top of the main window while there is a call. It brings the
+pop-up back when it has gone behind something or been closed.
+
+- [ ] **Ringing.** Call the agent: the banner says *Incoming call*, the number
+      and, for a saved customer, the name, with **Answer** and **Reject**.
+      Answer from the banner: the call connects as from the pop-up.
+- [ ] **Connected.** The banner shows the timer and **Mute**, **Hold**,
+      **Hang up**. Mute and Hold from the banner: the banner and the pop-up
+      both say *Muted* / *On hold*, and the buttons say Unmute / Resume.
+- [ ] **Getting the pop-up back.** Click the main window so the pop-up goes
+      behind it, then double-click the banner (not a button): the pop-up comes
+      to the front with the cursor in it. Close the pop-up with its X, then
+      press **Open**: it comes back, form and all.
+- [ ] **A double-click on Mute** mutes and unmutes, and does not open the
+      pop-up.
+- [ ] **Hang up from a website or another program.** With the form not saved,
+      click into Chrome or Notepad and type; hang up from the customer's side.
+      The pop-up comes back **on top**, where it was, with what was typed in
+      the form still there; the typing in the other program carries on
+      without going into the pop-up. The banner says *Call ended. The form is
+      waiting for you.*
+- [ ] **The banner goes** once the form is saved or skipped, and does not come
+      back between calls.
+- [ ] **Outbound** (A-20): the banner says *Calling* with **Cancel**; an
+      unanswered call leaves the note waiting (A-41), and the banner with it.
+- [ ] **A customer on hold behind an internal call** (A-24): the banner shows
+      *On hold:* and their number.
+- [ ] **Both languages, at 1366 × 768 and 125 %**: the banner's text and
+      buttons fit on one line; in Arabic the buttons are on the left.
+      Screenshots ringing, connected and with the form waiting.
+
+### The Websites page (S-68) — built 4 Oct, no phone needed
+
+The supervisor's list of the tabs inside the Agent App: Websites, in the web
+app's menu after Settings.
+
+- [ ] **The POS is already there**, with "Opens the caller's cart". Its address
+      is a guess (`https://smashed-ps.com/app`): open Edit and put the POS's
+      real start page.
+- [ ] **Add the three sites.** For the one with four accounts, four websites
+      with the same address, each its own username and password, named for
+      example "الطلبات ١" / "Orders 1". Tick "This site alerts with a sound".
+- [ ] **The password is never shown again.** After Save the row says
+      "Password stored"; Edit shows an empty password box. Save without typing
+      in it, and the app still logs in (it kept the password).
+- [ ] **Refusals say why:** an address without `https://`; a cart address on a
+      second tab; a shared login with no username.
+- [ ] **Order and hiding:** move a tab with the arrows, hide one; at the next
+      sign-in the Agent App follows.
+- [ ] **Remove asks twice.**
+- [ ] **Both languages**, with screenshots of the list and of the form.
+
+### Websites inside the Agent App (A-88) — built 4 Oct, needs the PBX for the call half
+
+Sign out and in once the Websites page is filled, so the app fetches the tabs.
+
+- [ ] **The section is there**, second in the rail, with a button per tab.
+      Each opens its site.
+- [ ] **The four accounts at once.** Quarters, the four tabs of the same site:
+      each is signed in as its own account, by itself, with nobody typing.
+      *If one stays on its login page:* note which site; its login boxes need
+      the selectors under Advanced on the Websites page.
+- [ ] **A wrong password stops.** Change one account's password on the
+      Websites page to a wrong one, sign out and in: the tab tries once, then
+      says the site refused the login. It does not try again until Reload.
+- [ ] **The POS remembers each agent.** Sign in to the POS tab, let Edge save
+      the password. Sign out, sign in as a different agent: their POS tab is
+      not signed in. Back as the first agent: still signed in.
+- [ ] **Layouts:** One, Side by side, Quarters; a tab button fills the place
+      last clicked; choosing a tab already shown elsewhere swaps the two;
+      zoom and mute per place. Sign out and in: the same layout and zooms.
+- [ ] **Groups:** Groups → add a group with the four accounts → its button
+      shows them in quarters; a group of two shows side by side. A fifth tick
+      is refused. A call that rings while the Groups window is open can still
+      be answered.
+- [ ] **Sounds while hidden.** Leave the Websites section for the call log for
+      ten minutes; an order on a site that dings is heard at once, not a minute
+      later. The speaker mark is on its tab button.
+- [ ] **Silent during a call.** With a site playing a sound, take a call: it
+      stops from the first ring and comes back after hang-up. The customer
+      hears nothing of it, and the recording has none of it.
+- [ ] **The cart in the POS tab.** Answer a call from a mobile: the POS tab
+      loads `…/cart/05…` and is on screen in the Websites section; the pop-up
+      stays where the agent is. No browser window opens.
+- [ ] **Shortcuts while typing in a site.** Click into the POS's search box
+      during a call and press Ctrl+Shift+M: the call mutes, and nothing is
+      typed into the POS. Ctrl+Shift+E hangs up.
+- [ ] **A receipt or a link that opens a new window** opens in a small window
+      of the app, signed in.
+- [ ] **Memory.** Task Manager with all tabs loaded: note the app's and the
+      `msedgewebview2.exe` processes' total, on a 1366 × 768 laptop.
+- [ ] **Both languages**, with screenshots of the section in each layout.
+
 ### The fonts inside the app (N-10) — built 4 Oct, no phone needed for most
 
 What went wrong on 3 and 4 Oct: on two laptops the app closed by itself just as

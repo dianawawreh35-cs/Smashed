@@ -27,6 +27,7 @@ npm versions are the resolved versions in `src/CallCenter.Web/package-lock.json`
 | Microsoft.EntityFrameworkCore.Sqlite | 8.0.11 | MIT |
 | Microsoft.Extensions.Hosting | 8.0.1 | MIT |
 | Microsoft.Extensions.Http | 8.0.1 | MIT |
+| Microsoft.Web.WebView2 | 1.0.4258.31 | BSD-3-Clause (Microsoft); the Edge WebView2 Runtime it runs on is part of Windows |
 | Microsoft.NET.Test.Sdk | 17.11.1 | MIT |
 | Npgsql.EntityFrameworkCore.PostgreSQL | 8.0.11 | PostgreSQL License |
 | Serilog.AspNetCore | 8.0.3 | Apache-2.0 |

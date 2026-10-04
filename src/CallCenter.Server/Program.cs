@@ -81,6 +81,7 @@ try
     // A-70 to A-73: messages, the channels they arrive on, and their reports.
     builder.Services.AddScoped<CallCenter.Server.Features.Applications.ApplicationsService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Channels.ChannelsService>();
+    builder.Services.AddScoped<CallCenter.Server.Features.Websites.WebsitesService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Reports.ApplicationReportsService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Reports.CallReportsService>();
     builder.Services.AddScoped<CallCenter.Server.Features.Reports.ReportCube>();

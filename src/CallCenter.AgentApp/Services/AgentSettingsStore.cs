@@ -39,7 +39,27 @@ public class AgentSettingsStore(ILogger<AgentSettingsStore> logger)
         /// sign-in turns do not disturb off again.
         /// </summary>
         public bool BreakTurnedOnDoNotDisturb { get; init; }
+
+        /// <summary>
+        /// A-88: each agent's Websites layout on this laptop, by the agent's
+        /// id. Per agent, not per laptop, as their logins are.
+        /// </summary>
+        public Dictionary<string, WebsiteLayout> WebsiteLayouts { get; init; } = [];
     }
+
+    /// <summary>
+    /// How an agent left the Websites screen (A-88): one, two or four places,
+    /// the tab in each, and each tab's zoom.
+    /// </summary>
+    /// <param name="Places">1, 2 or 4.</param>
+    /// <param name="Tabs">The tab in each place, by website id; four entries, null for none.</param>
+    /// <param name="Zoom">Each tab's zoom, by website id, 1.0 being 100 %.</param>
+    /// <param name="Groups">The agent's own groups of tabs, opened together (A-88).</param>
+    public record WebsiteLayout(
+        int Places, Guid?[] Tabs, Dictionary<string, double> Zoom, WebsiteGroup[]? Groups = null);
+
+    /// <summary>A group of up to four tabs an agent opens together (A-88), named by them.</summary>
+    public record WebsiteGroup(string Name, Guid[] Tabs);
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 

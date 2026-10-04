@@ -12,6 +12,7 @@ using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Contracts.Contacts;
 using CallCenter.Shared.Contracts.Delivery;
 using CallCenter.Shared.Contracts.Menu;
+using CallCenter.Shared.Contracts.Websites;
 using Microsoft.Extensions.Logging;
 
 namespace CallCenter.AgentApp.Services;
@@ -256,6 +257,16 @@ public class ApiClient(
     public Task<Result<BlockedNumbersDto>> GetBlockedNumbersAsync(CancellationToken ct = default) =>
         SendAsync<BlockedNumbersDto>(
             () => new HttpRequestMessage(HttpMethod.Get, "api/contacts/blocked-numbers"),
+            authenticated: true,
+            ct);
+
+    /// <summary>
+    /// The website tabs, with the shared logins' passwords (A-88). Asked at
+    /// each sign-in; the answer is kept in memory only, never on disk.
+    /// </summary>
+    public Task<Result<IReadOnlyList<AgentWebsiteDto>>> GetMyWebsitesAsync(CancellationToken ct = default) =>
+        SendAsync<IReadOnlyList<AgentWebsiteDto>>(
+            () => new HttpRequestMessage(HttpMethod.Get, "api/websites/mine"),
             authenticated: true,
             ct);
 

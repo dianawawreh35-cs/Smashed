@@ -13,6 +13,7 @@ import MenuPage from './pages/MenuPage'
 import ClassificationPage from './pages/ClassificationPage'
 import AgentAppPage from './pages/AgentAppPage'
 import LogsPage from './pages/LogsPage'
+import WebsitesPage from './pages/WebsitesPage'
 import AppLayout from './components/AppLayout'
 import RequireAuth from './components/RequireAuth'
 import RequireSupervisor from './components/RequireSupervisor'
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="/classification" element={<ClassificationPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/websites" element={<WebsitesPage />} />
             <Route path="/logs" element={<LogsPage />} />
           </Route>
         </Route>

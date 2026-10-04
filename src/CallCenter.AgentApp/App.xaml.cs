@@ -412,6 +412,10 @@ public partial class App : Application
         // skipped. One instance between them meant an incoming call wiped out
         // what the agent was typing in the log.
         services.AddTransient<ClassificationFormViewModel>();
+        // A-88: the Edge engine the website tabs share, and the tab that takes
+        // the caller's cart while a signed-in screen holds one.
+        services.AddSingleton<Services.Websites.WebsiteEngine>();
+        services.AddSingleton<Services.Websites.CartTab>();
         services.AddSingleton<PosCart>();
         services.AddSingleton<CallViewModel>();
         services.AddSingleton<CallPopupWindow>();
@@ -434,6 +438,7 @@ public partial class App : Application
         // the message opened from the list, so the transient above matters.
         services.AddTransient<ApplicationsViewModel>();
         services.AddTransient<DeliveryViewModel>();
+        services.AddTransient<WebsitesViewModel>();
         // Singleton: the point of it is that a picture fetched on one visit to
         // the menu is still there on the next.
         services.AddSingleton<MenuImageCache>();

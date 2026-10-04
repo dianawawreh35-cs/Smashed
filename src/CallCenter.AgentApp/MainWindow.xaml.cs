@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using CallCenter.AgentApp.Services;
 using CallCenter.AgentApp.Services.Localization;
 using CallCenter.AgentApp.ViewModels;
@@ -22,6 +23,7 @@ public partial class MainWindow : Window
         _services = services;
         Localizer = localizer;
         Updater = services.GetRequiredService<AppUpdateViewModel>();
+        Call = services.GetRequiredService<CallViewModel>();
 
         DataContext = this;
 
@@ -45,7 +47,7 @@ public partial class MainWindow : Window
         localizer.LanguageChanged += (_, _) => ShowNotice(_noticeKey);
 
         // M-A05: the call's keys work from here as well as from the pop-up.
-        CallShortcuts.Attach(this, services.GetRequiredService<CallViewModel>());
+        CallShortcuts.Attach(this, Call);
 
         ShowLogin();
     }
@@ -90,6 +92,23 @@ public partial class MainWindow : Window
 
     /// <summary>The update bar across the top (A-82), shown on both screens.</summary>
     public AppUpdateViewModel Updater { get; }
+
+    /// <summary>The call banner across the top (A-19).</summary>
+    public CallViewModel Call { get; }
+
+    /// <summary>
+    /// A-19: a double-click anywhere on the call banner brings the pop-up
+    /// back. Not on its buttons: a button keeps its own clicks, so a quick
+    /// double press of Mute is two presses of Mute and nothing else.
+    /// </summary>
+    private void OnCallBannerMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2 && Call.OpenCommand.CanExecute(null))
+        {
+            Call.OpenCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
 
     /// <param name="reason">
     /// One of <see cref="LoginErrorCodes"/>, shown under the password box, when

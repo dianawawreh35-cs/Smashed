@@ -33,6 +33,8 @@ public partial class CallPopupWindow : Window
 
         viewModel.CallArrived += (_, _) => BringToFront();
         viewModel.CallEnded += (_, _) => Hide();
+        viewModel.FormWaiting += (_, _) => Resurface();
+        viewModel.OpenRequested += (_, _) => OpenForAgent();
 
         SizeChanged += KeepCentreWhenResized;
 
@@ -116,6 +118,47 @@ public partial class CallPopupWindow : Window
         }
 
         TaskbarFlash.UntilActivated(this);
+    }
+
+    /// <summary>
+    /// The call is over and its form or note is still to do: the pop-up comes
+    /// back over whatever the agent turned to, as when the call arrived, and
+    /// for the same reason without the keyboard. The agent may still be
+    /// typing the order into the POS.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="BringToFront"/>: that centres the window and scrolls to
+    /// the top for a new caller, and this is the same caller's half-filled
+    /// form, wherever the agent left it.
+    /// </remarks>
+    private void Resurface()
+    {
+        Topmost = true;
+        Show();
+
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        TaskbarFlash.UntilActivated(this);
+    }
+
+    /// <summary>
+    /// The agent double-clicked the call banner, or pressed its Open button.
+    /// They asked for it, in this app, so here the pop-up does take the
+    /// keyboard.
+    /// </summary>
+    private void OpenForAgent()
+    {
+        Show();
+
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
     }
 
     /// <summary>

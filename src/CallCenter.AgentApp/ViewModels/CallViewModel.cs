@@ -83,7 +83,7 @@ public partial class CallViewModel : ObservableObject
             {
                 Classification.Close();
                 Caller.Clear();
-                CallEnded?.Invoke(this, EventArgs.Empty);
+                LeaveScreen();
             }
         };
 
@@ -96,7 +96,7 @@ public partial class CallViewModel : ObservableObject
             {
                 Classification.Close();
                 Caller.Clear();
-                CallEnded?.Invoke(this, EventArgs.Empty);
+                LeaveScreen();
             }
         };
     }
@@ -121,6 +121,45 @@ public partial class CallViewModel : ObservableObject
     /// <summary>Raised when the call is over and the pop-up should go away.</summary>
     public event EventHandler? CallEnded;
 
+    /// <summary>
+    /// Raised when the call ends with its form or note still to do, so the
+    /// pop-up comes back to the front for it.
+    /// </summary>
+    public event EventHandler? FormWaiting;
+
+    /// <summary>Raised when the agent asks for the pop-up from the call banner.</summary>
+    public event EventHandler? OpenRequested;
+
+    // ---- the call banner across the main window -----------------------------
+
+    /// <summary>
+    /// The pop-up has a call on it: ringing, being dialled, connected, or over
+    /// with its form or note still to do. The banner across the main window
+    /// shows while this is true, whether the pop-up is in front, behind or
+    /// hidden: an agent who has turned to a website needs one place to look.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isOnScreen;
+
+    /// <summary>
+    /// The banner's line: the call's state while there is a call, and once it
+    /// is over, that its form or note is waiting. <see cref="StatusText"/>
+    /// has no word for a finished call with its form still open.
+    /// </summary>
+    public string BannerStatus => State.IsActive || IsNotesOpen
+        ? StatusText
+        : Localizer["call.formWaiting"];
+
+    /// <summary>Brings the pop-up back, from a double-click on the banner.</summary>
+    [RelayCommand]
+    private void Open() => OpenRequested?.Invoke(this, EventArgs.Empty);
+
+    private void LeaveScreen()
+    {
+        IsOnScreen = false;
+        CallEnded?.Invoke(this, EventArgs.Empty);
+    }
+
     // ---- the note on an outbound call nobody picked up (A-41) -------------
 
     /// <summary>
@@ -138,6 +177,7 @@ public partial class CallViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(Number))]
     [NotifyPropertyChangedFor(nameof(IsOutbound))]
+    [NotifyPropertyChangedFor(nameof(BannerStatus))]
     private FinishedCall? _notesFor;
 
     [ObservableProperty]
@@ -185,7 +225,7 @@ public partial class CallViewModel : ObservableObject
         if (!State.IsActive && !Caller.IsFormOpen)
         {
             Caller.Clear();
-            CallEnded?.Invoke(this, EventArgs.Empty);
+            LeaveScreen();
         }
     }
 
@@ -236,6 +276,7 @@ public partial class CallViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(DirectionBadge))]
     [NotifyPropertyChangedFor(nameof(HasHeldCall))]
     [NotifyPropertyChangedFor(nameof(HeldNumber))]
+    [NotifyPropertyChangedFor(nameof(BannerStatus))]
     private CallState _state = CallState.Idle;
 
     /// <summary>
@@ -376,6 +417,7 @@ public partial class CallViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(OffersAnswer))]
+    [NotifyPropertyChangedFor(nameof(BannerStatus))]
     private bool _isAnswering;
 
     /// <summary>Whether Answer and Reject are on screen: ringing, and not yet pressed.</summary>
@@ -486,13 +528,20 @@ public partial class CallViewModel : ObservableObject
                 // screen and the phone is ringing whatever the server does.
                 Caller.Begin(state.Number);
 
+                IsOnScreen = true;
                 CallArrived?.Invoke(this, EventArgs.Empty);
             }
             else if (!state.IsActive && wasActive && !Classification.IsUnfinished && !IsNotesOpen
                      && !Caller.IsFormOpen)
             {
                 Caller.Clear();
-                CallEnded?.Invoke(this, EventArgs.Empty);
+                LeaveScreen();
+            }
+            else if (!state.IsActive && wasActive)
+            {
+                // The call is over and the form or note is still to do: the
+                // pop-up comes back over whatever the agent turned to.
+                FormWaiting?.Invoke(this, EventArgs.Empty);
             }
         });
 
@@ -505,5 +554,6 @@ public partial class CallViewModel : ObservableObject
         OnPropertyChanged(nameof(DirectionBadge));
         OnPropertyChanged(nameof(HeldNumber));
         OnPropertyChanged(nameof(AudioProblem));
+        OnPropertyChanged(nameof(BannerStatus));
     }
 }

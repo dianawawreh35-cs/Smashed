@@ -9260,6 +9260,36 @@ clean, its 240 tests pass and `npm run build` succeeds. **Not seen running:**
 the Agent App could not be started from this session (Windows refused it),
 so the first run is Dia's. Checklist "Light mode".
 
+**Seen running (Dia, the same night), two faults in light, fixed after
+0.14.0:**
+
+- **Black words on the blue buttons, and on the green one.** Theme.xaml's
+  keyless TextBlock style (Cairo, 13 px, `Text`) is in the application's
+  resources, and a keyless style there reaches TextBlocks inside control
+  templates too, which one in a window's resources would not. So the words a
+  button's template draws took `Text` whatever colour the button asked for.
+  In dark `Text` is near-white and nothing showed; in light it is near-black.
+  Fixed with a style the templates hold nearer than the keyless one,
+  `TextOfItsControl`, which takes the colour from the control: in buttons, in
+  combo box items and in calendar days, the places that ask for a colour of
+  their own.
+- **Only the colour.** The same keyless style also overrides the size and
+  font of every button's words: the keypad's keys ask for 22 px in the
+  fixed-width font and the small buttons for 11 px, and all of them have
+  always drawn 13 px Cairo. Making the button's style win entirely would have
+  changed those sizes on screens nobody could check tonight, so the size and
+  font stay as they are; whether the keypad should have its big digits is a
+  question for another day. The ghost buttons' style asked for `TextMuted`
+  and has always shown `Text`, so it now says `Text`, and looks the same.
+- **The theme button was blank.** Its icon was drawn in Cairo, for the same
+  reason, which has no shape for it. The icon font is now on its TextBlock
+  directly, as on the rail's fold button.
+
+A test builds the blue, green and red buttons in light and checks their words
+are white; it cannot show the old fault (only an Application's styles cross
+into templates, and the tests have none), so the checklist's "Light mode"
+lines are the real check. The Agent App's tests: 126 pass.
+
 **To deploy:** it went out in **`v0.14.0`**, which another session tagged on
 top of this commit for the website groups and the POS login, so no tag of its
 own; Agent App 0.14.0 (built 20:02, after this commit) carries it: its program

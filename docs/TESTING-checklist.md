@@ -1683,9 +1683,11 @@ first item is the first time it has run.
 - [ ] **The Agent App starts** and shows the sign-in screen in dark, as
       before. *If it closes or shows an error at start:* a colour is looked
       up somewhere it cannot be; send App logs or the log file.
-- [ ] **Sign-in screen, Agent App:** beside the language button a sun. Press
+- [ ] **Sign-in screen, Agent App:** beside the language button a sun
+      (*in 0.14.0 the button was blank: fixed after it*). Press
       it: the whole screen turns light at once, and the button becomes a
-      moon. Its tooltip reads *Light mode* / *Dark mode* (Arabic: الوضع
+      moon. **Sign in is blue with white words**, not black (*black in
+      0.14.0*). Its tooltip reads *Light mode* / *Dark mode* (Arabic: الوضع
       الفاتح / الوضع الداكن). Close and reopen the app: still light.
 - [ ] **Every Agent App screen in light, in both languages:** the rail (open
       and folded), Dial, Call log (with a recording playing: the hold band
@@ -1701,8 +1703,15 @@ first item is the first time it has run.
       and a classification form open): everything changes at once, nothing
       stays in the old colours. The call log's count badge in the rail too.
 - [ ] **The ringing pop-up in light** (needs the PBX): the caller badges, the
-      green Answer button with white text, the red Reject; then the call
-      banner (A-19).
+      green Answer button with **white** words, the red Reject with white
+      words (*both black in 0.14.0*); then the call banner (A-19).
+- [ ] **Nothing else moved** with that fix, in dark as in light: the
+      keypad's digits, the small buttons' words, and the grey buttons (Sign
+      out, the language) are the size and colour they were in 0.14.0. A combo
+      box's chosen item and a calendar's chosen day have white words on
+      blue; the calendar's days from the months either side are fainter
+      than before. *If a keypad digit or a small button's words changed
+      size,* the fix reached further than meant: say which.
 - [ ] **Web app, sign-in page:** beside the language choice a sun; press it
       and the page turns light. Reload: still light, and no dark flash while
       it loads. The header has the same button after signing in.

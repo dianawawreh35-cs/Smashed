@@ -127,6 +127,62 @@ public class ThemeResourcesTests
         });
     }
 
+    /// <summary>
+    /// A filled button's words are in the button's own colour (A-90). Until
+    /// 4 Oct the keyless TextBlock style painted them Text, which in light is
+    /// near-black: black words on the blue and the green buttons.
+    /// </summary>
+    /// <remarks>
+    /// This checks the button's own style reaches its words and gives them its
+    /// colour. It cannot show the old fault: only a style in the
+    /// <em>application's</em> resources crosses into a template, and these
+    /// tests have no Application. That half is the checklist's to see.
+    /// </remarks>
+    [Theory]
+    [InlineData("PrimaryButton")]
+    [InlineData("SuccessButton")]
+    [InlineData("DangerButton")]
+    public void A_filled_buttons_words_are_white_in_light(string style)
+    {
+        UiThread.Run(_ =>
+        {
+            var resources = new ResourceDictionary();
+            resources.MergedDictionaries.Add(Palette("light"));
+            resources.MergedDictionaries.Add((ResourceDictionary)Application.LoadComponent(
+                new Uri("/CallCenter.AgentApp;component/Theme.xaml", UriKind.Relative)));
+
+            var button = new System.Windows.Controls.Button { Content = "Answer" };
+            var panel = new System.Windows.Controls.StackPanel { Resources = resources };
+            panel.Children.Add(button);
+            button.SetResourceReference(FrameworkElement.StyleProperty, style);
+
+            panel.Measure(new Size(400, 100));
+            panel.Arrange(new Rect(0, 0, 400, 100));
+            panel.UpdateLayout();
+
+            var words = Descendants(button).OfType<System.Windows.Controls.TextBlock>().Single();
+
+            // The template's own style reached it: the keyless style's size,
+            // not one inherited from somewhere else.
+            words.FontSize.Should().Be(13);
+            ((SolidColorBrush)words.Foreground).Color.Should().Be(Colors.White);
+            return Task.CompletedTask;
+        });
+    }
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (var deeper in Descendants(child))
+            {
+                yield return deeper;
+            }
+        }
+    }
+
     private static ResourceDictionary Palette(string theme) =>
         (ResourceDictionary)Application.LoadComponent(ThemeService.PaletteUri(theme));
 

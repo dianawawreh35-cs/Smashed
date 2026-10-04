@@ -53,6 +53,21 @@
     <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
   </Style>
 
+  <!-- Text a control's template draws for it (a button's words, a list
+       item, a calendar day) in the control's own colour (A-90).
+
+       The keyless TextBlock style above reaches TextBlocks inside templates
+       too, and set them all to Text, whatever colour the control asked for:
+       PrimaryButton's white, SuccessButton's OnSuccess, the selected list
+       item's white. In dark, Text is near-white, so nobody saw it; in light
+       it is near-black, and the blue buttons came out with black words.
+       Templates put this in their ContentPresenter's resources, nearer than
+       the keyless style. Only the colour changes: the font and size stay the
+       keyless style's, as every button has drawn them so far. -->
+  <Style x:Key="TextOfItsControl" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+    <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+  </Style>
+
   <Style x:Key="Heading" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
     <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -124,7 +139,11 @@
                   CornerRadius="{StaticResource CornerSmall}">
             <ContentPresenter HorizontalAlignment="Center"
                               VerticalAlignment="Center"
-                              Margin="{TemplateBinding Padding}" />
+                              Margin="{TemplateBinding Padding}">
+              <ContentPresenter.Resources>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource TextOfItsControl}" />
+              </ContentPresenter.Resources>
+            </ContentPresenter>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -167,21 +186,38 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
+  <!-- Its words in Text, not TextMuted as this said until A-90: the keyless
+       TextBlock style made them Text whatever was set here, so Text is how
+       every ghost button has looked, and stays. -->
   <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource Text}" />
     <Setter Property="Padding" Value="12,6" />
   </Style>
 
   <!-- Light or dark (A-90), beside the language button on the sign-in screen
        and in the rail. It shows what a press gives: the sun in dark, the moon
        in light. Its view model has Theme, Localizer and ToggleThemeCommand.
-       An icon rather than words, to fit three buttons across the rail. -->
+       An icon rather than words, to fit three buttons across the rail.
+
+       The icon font is set on the TextBlock in the template, not on the
+       button: the keyless TextBlock style above reaches TextBlocks inside
+       templates too, and its Cairo, inherited no further, has no shape for
+       the icon, which came out blank. A local value on the TextBlock wins,
+       as on the rail's fold button. -->
   <Style x:Key="ThemeToggleButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
     <Setter Property="Command" Value="{Binding ToggleThemeCommand}" />
-    <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
-    <Setter Property="FontSize" Value="14" />
     <Setter Property="Padding" Value="10,6" />
+    <Setter Property="ContentTemplate">
+      <Setter.Value>
+        <DataTemplate>
+          <TextBlock Text="{Binding}"
+                     FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                     FontSize="14"
+                     VerticalAlignment="Center" />
+        </DataTemplate>
+      </Setter.Value>
+    </Setter>
     <Setter Property="Content" Value="&#xE706;" />
     <Setter Property="ToolTip" Value="{Binding Localizer[app.lightTheme]}" />
     <Setter Property="AutomationProperties.Name" Value="{Binding Localizer[app.lightTheme]}" />
@@ -421,7 +457,11 @@
           <Border x:Name="Chrome"
                   Background="Transparent"
                   Padding="{TemplateBinding Padding}">
-            <ContentPresenter />
+            <ContentPresenter>
+              <ContentPresenter.Resources>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource TextOfItsControl}" />
+              </ContentPresenter.Resources>
+            </ContentPresenter>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
@@ -989,7 +1029,11 @@
           <Border x:Name="Chrome"
                   Background="{TemplateBinding Background}"
                   CornerRadius="{StaticResource CornerSmall}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center">
+              <ContentPresenter.Resources>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource TextOfItsControl}" />
+              </ContentPresenter.Resources>
+            </ContentPresenter>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -1029,7 +1073,11 @@
           <Border x:Name="Chrome"
                   Background="{TemplateBinding Background}"
                   CornerRadius="{StaticResource CornerSmall}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center">
+              <ContentPresenter.Resources>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource TextOfItsControl}" />
+              </ContentPresenter.Resources>
+            </ContentPresenter>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">

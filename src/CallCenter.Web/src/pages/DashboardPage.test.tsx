@@ -66,7 +66,7 @@ describe('dashboard', () => {
     renderPage()
 
     expect(await within(tile('Communications')).findByText('42')).toBeInTheDocument()
-    expect(within(tile('Communications')).getByText('Calls: 37 · messages: 5')).toBeInTheDocument()
+    expect(within(tile('Communications')).getByText('Incoming calls: 37 · applications: 5')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('20')).toBeInTheDocument()
     expect(within(tile('Orders')).getByText('worth 1,234.50')).toBeInTheDocument()
     // Calls in and out, each split by result (Dia, 2 Oct). The one incoming
@@ -78,10 +78,8 @@ describe('dashboard', () => {
     expect(line('Incoming calls', 'Answered').getByText('24')).toBeInTheDocument()
     expect(line('Incoming calls', 'Abandoned').getByText('5')).toBeInTheDocument()
     expect(line('Incoming calls', 'Blocked or still ringing').getByText('1')).toBeInTheDocument()
-    expect(within(tile('Outgoing calls')).getByText('7')).toBeInTheDocument()
-    expect(line('Outgoing calls', 'Answered').getByText('5')).toBeInTheDocument()
-    expect(line('Outgoing calls', 'Not answered').getByText('2')).toBeInTheDocument()
-    expect(within(tile('Outgoing calls')).queryByText('Still ringing')).not.toBeInTheDocument()
+    // One direction at a time (Dia, 6 Oct 2026): no outgoing block beside it.
+    expect(screen.queryByRole('group', { name: 'Outgoing calls' })).not.toBeInTheDocument()
     // A ring one agent missed is a call the queue passed on, not an unanswered
     // one: shown on its own, not counted in Communications (Dia, 26 Sep).
     expect(within(tile('Missed or rejected rings')).getByText('7')).toBeInTheDocument()
@@ -94,13 +92,26 @@ describe('dashboard', () => {
 
     // The four charts, once the period arrives.
     await waitFor(() => expect(screen.getAllByTestId('report-chart')).toHaveLength(4))
+
+    // Outgoing: its own block, and no rings, which are incoming by nature.
+    fireEvent.click(screen.getByRole('button', { name: 'Outgoing' }))
+    expect(await within(tile('Outgoing calls')).findByText('7')).toBeInTheDocument()
+    expect(line('Outgoing calls', 'Answered').getByText('5')).toBeInTheDocument()
+    expect(line('Outgoing calls', 'Not answered').getByText('2')).toBeInTheDocument()
+    expect(within(tile('Outgoing calls')).queryByText('Still ringing')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Incoming calls' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Missed or rejected rings' })).not.toBeInTheDocument()
   })
 
   it('sends the chosen period for the charts, and nothing else', async () => {
     const fetchMock = server()
     vi.stubGlobal('fetch', fetchMock)
     renderPage()
-    await screen.findByText('Calls: 37 · messages: 5')
+    await screen.findByText('Incoming calls: 37 · applications: 5')
+    // Incoming unless chosen otherwise, today and the charts alike (Dia, 6 Oct 2026).
+    const last = (path: string) => fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith(path)).at(-1)!
+    expect(last('/api/reports/dashboard/today')).toContain('direction=In')
+    expect(last('/api/reports/dashboard/period')).toContain('direction=In')
 
     // Period only: no agent, branch or type filter on the dashboard.
     expect(screen.queryByLabelText('Branch')).not.toBeInTheDocument()

@@ -27,12 +27,17 @@ namespace CallCenter.Shared.Contracts.Communications;
 /// </remarks>
 
 /// <summary>
-/// R-01: how many, in one period bucket. Communications = calls + messages.
-/// Inbound = answered + missed + abandoned + blocked (and any call still ringing).
+/// R-01: how many, in one period bucket. Communications = calls + applications.
+/// The screens ask for one direction at a time (Dia, 6 Oct 2026), so Calls is
+/// either Inbound or Outbound. Inbound = answered + missed + abandoned +
+/// blocked (and any call still ringing); Outbound = answered + not answered
+/// (and any still ringing).
 /// </summary>
-/// <param name="Answered">Inbound calls answered.</param>
+/// <param name="Messages">Communications through the applications (the screens call them applications).</param>
+/// <param name="Answered">Calls answered, in whichever direction the filter asked for.</param>
 /// <param name="Missed">Inbound calls Missed or Rejected.</param>
 /// <param name="Abandoned">Inbound calls that gave up in the queue (S-55).</param>
+/// <param name="NotAnswered">Outbound calls nobody picked up, or that could not be placed.</param>
 public record CallSummaryRowDto(
     string Bucket,
     int Communications,
@@ -43,7 +48,8 @@ public record CallSummaryRowDto(
     int Answered,
     int Missed,
     int Blocked,
-    int Abandoned);
+    int Abandoned,
+    int NotAnswered = 0);
 
 /// <summary>R-03: one type's calls and its share of the classified calls, as a percentage to one decimal.</summary>
 public record TypeShareRowDto(string TypeName, string LabelAr, string LabelEn, int Count, decimal Share);
@@ -53,6 +59,7 @@ public record TypeShareRowDto(string TypeName, string LabelAr, string LabelEn, i
 /// what they were about.
 /// </summary>
 /// <param name="Key">The id, or the bucket as the trend writes it, for a stable sort.</param>
+/// <param name="NotAnswered">Outbound calls nobody picked up, or that could not be placed.</param>
 public record CallBreakdownRowDto(
     string Key,
     string Label,
@@ -61,7 +68,8 @@ public record CallBreakdownRowDto(
     int Missed,
     int Orders,
     decimal OrderValue,
-    IReadOnlyList<TypeCountDto> ByType);
+    IReadOnlyList<TypeCountDto> ByType,
+    int NotAnswered = 0);
 
 /// <summary>
 /// One customer, ranked: R-04's recurring customers, R-05's repeat
@@ -98,8 +106,42 @@ public record ProblemRowDto(
     DateTimeOffset? ResolvedAt);
 
 /// <summary>
+/// One complaint (Dia, 6 Oct 2026): every call and application message
+/// classified Complaint from one customer on one working day (05:00 to 05:00),
+/// incoming and outgoing together, so a complaint and its call back are one.
+/// </summary>
+/// <param name="Id">The first row's id: stable while the complaint does not change.</param>
+/// <param name="Day">The working day, <c>yyyy-MM-dd</c>.</param>
+/// <param name="Agent">Who took the first of it.</param>
+/// <param name="Branch">The first row's branch.</param>
+/// <param name="Notes">Every row's notes, first to last, each once.</param>
+/// <param name="FollowUp">Any of it was ticked for a follow-up.</param>
+/// <param name="Resolved">A supervisor marked any of it resolved.</param>
+/// <param name="ResolvedAt">The latest resolution.</param>
+/// <param name="Communications">Its calls and messages, first to last, as the Calls page lists them, so a recording can be played.</param>
+public record ComplaintCaseDto(
+    Guid Id,
+    DateTimeOffset FirstAt,
+    DateTimeOffset LastAt,
+    string Day,
+    Guid? ContactId,
+    string? Customer,
+    string? Number,
+    string? Agent,
+    string? Branch,
+    int Calls,
+    int Applications,
+    string? Notes,
+    bool FollowUp,
+    bool Resolved,
+    DateTimeOffset? ResolvedAt,
+    IReadOnlyList<CallSearchRowDto> Communications);
+
+/// <summary>
 /// R-05 per branch or agent, and R-17: how many complaints, and how they were
-/// handled. Open is a complaint not yet marked resolved.
+/// handled. Open is a complaint not yet marked resolved. A complaint is a
+/// <see cref="ComplaintCaseDto"/>, not a call, under its first row's branch,
+/// agent and working day.
 /// </summary>
 /// <param name="AverageHoursToResolve">From the call to its resolution, over the resolved ones. Null when none were.</param>
 /// <param name="PerHundredOrders">Complaints per 100 orders under the same heading. Null when there were no orders.</param>

@@ -3,7 +3,8 @@ import type { KeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
-import type { OrdersReportRow, ReportFilters, TypeCount } from '../api/applicationReports'
+import type { CallDirection, OrdersReportRow, ReportFilters, TypeCount } from '../api/applicationReports'
+import type { CallRow } from '../api/calls'
 import { fetchAbandoned, getAbandonedImport } from '../api/pbx'
 import {
   abandonedCalls,
@@ -43,6 +44,7 @@ import type {
   CancellationRateRow,
   ChannelOrdersRow,
   ChannelOrdersTrendPoint,
+  ComplaintCase,
   ComplaintsGrouping,
   ComplaintsRow,
   CustomerBaseRow,
@@ -57,18 +59,28 @@ import type {
   TypeShareRow,
   UnknownNumberRow,
 } from '../api/callReports'
+import CallDetails from '../components/CallDetails'
 import ReportCard, { SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportColumn } from '../components/ReportCard'
 import { Grouping, PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
 import LoadError from '../components/LoadError'
+import RecordingPlayer from '../components/RecordingPlayer'
+import { formatClock } from '../lib/recordingWav'
 import { ltr } from '../lib/bidi'
 import { formatMoney } from '../lib/money'
 import { printPage } from '../lib/print'
 import { localDate, useReportFilters } from '../lib/reportFilters'
 
-/** The groups the reports are shown in (Dia, 25 Sep): one page, one filter bar, a tab each. */
-const TABS = ['overview', 'orders', 'customers', 'agents', 'problems', 'abandoned', 'quality'] as const
+/**
+ * The groups the reports are shown in (Dia, 25 Sep): one page, one filter bar,
+ * a tab each. Complaints have a tab of their own (Dia, 6 Oct 2026); the
+ * Problems tab kept the missed calls.
+ */
+const TABS = ['overview', 'orders', 'customers', 'agents', 'complaints', 'problems', 'abandoned', 'quality'] as const
 type Tab = (typeof TABS)[number]
+
+/** Tabs about incoming calls alone: with Outgoing chosen they say so instead of showing zeros. */
+const INCOMING_ONLY: readonly Tab[] = ['problems', 'abandoned']
 
 /** How many rows of a list report are drawn; the export holds them all. */
 const LIST_LIMIT = 200
@@ -94,11 +106,18 @@ export default function CallReportsPage() {
   const { t } = useTranslation()
   const [params, setParams] = useSearchParams()
   const tab: Tab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'overview'
-  const { draft, filters, set, choosePreset } = useReportFilters()
+  const { draft, filters: chosen, set, choosePreset } = useReportFilters()
+  // Incoming or outgoing, never both added together (Dia, 6 Oct 2026). The
+  // complaints are the exception, and the server knows it: a complaint and
+  // its call back are one complaint, whichever way each call went.
+  const [direction, setDirection] = useState<CallDirection>('In')
+  const filters: ReportFilters = { ...chosen, direction }
+  const incomingOnly = direction === 'Out' && INCOMING_ONLY.includes(tab)
 
   return (
     <div className="space-y-6">
-      <ReportPrintHeading title={t('callReports.heading')} section={t(`callReports.tabs.${tab}`)} draft={draft} />
+      <ReportPrintHeading title={t('callReports.heading')} section={t(`callReports.tabs.${tab}`)} draft={draft}
+        extra={tab === 'complaints' ? [] : [`${t('callReports.direction.label')}: ${t(`callReports.direction.${direction}`)}`]} />
       <div className="no-print flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">{t('callReports.heading')}</h1>
@@ -108,18 +127,31 @@ export default function CallReportsPage() {
         <PrintPageButton onPrint={printPage} />
       </div>
 
-      <ReportFilterBar draft={draft} set={set} choosePreset={choosePreset} includePhone />
+      <ReportFilterBar draft={draft} set={set} choosePreset={choosePreset} includePhone
+        direction={direction} onDirection={setDirection} />
 
       <ReportTabs tab={tab} onChoose={(name) => setParams(name === 'overview' ? {} : { tab: name }, { replace: true })} />
 
       <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)} tabIndex={0} className="space-y-6">
-        {tab === 'overview' && <Overview filters={filters} />}
-        {tab === 'orders' && <Orders filters={filters} />}
-        {tab === 'customers' && <Customers filters={filters} />}
-        {tab === 'agents' && <Agents filters={filters} />}
-        {tab === 'problems' && <Problems filters={filters} />}
-        {tab === 'abandoned' && <Abandoned filters={filters} />}
-        {tab === 'quality' && <Quality filters={filters} />}
+        {incomingOnly ? (
+          <section className="card card-body">
+            <p className="text-slate-300">{t('callReports.direction.incomingOnly')}</p>
+            <button type="button" className="btn-primary btn-sm mt-3 self-start" onClick={() => setDirection('In')}>
+              {t('callReports.direction.showIncoming')}
+            </button>
+          </section>
+        ) : (
+          <>
+            {tab === 'overview' && <Overview filters={filters} direction={direction} />}
+            {tab === 'orders' && <Orders filters={filters} />}
+            {tab === 'customers' && <Customers filters={filters} />}
+            {tab === 'agents' && <Agents filters={filters} direction={direction} />}
+            {tab === 'complaints' && <Complaints filters={filters} />}
+            {tab === 'problems' && <Missed filters={filters} />}
+            {tab === 'abandoned' && <Abandoned filters={filters} />}
+            {tab === 'quality' && <Quality filters={filters} />}
+          </>
+        )}
       </div>
     </div>
   )
@@ -226,29 +258,34 @@ const customerShown = (r: { name?: string | null; customer?: string | null; numb
 
 // ---- Overview: R-01, R-02, R-03, R-04 per day -----------------------------------
 
-function Overview({ filters }: { filters: ReportFilters }) {
+function Overview({ filters, direction }: { filters: ReportFilters; direction: CallDirection }) {
   const { t, c, typeLabel, percent } = useFormat()
   const [by, setBy] = useState<TimeGrouping>('day')
+  const incoming = direction === 'In'
 
   const summary = useQuery({ queryKey: ['reports', 'calls', 'summary', filters, by], queryFn: () => callSummary(filters, by) })
   const byType = useQuery({ queryKey: ['reports', 'calls', 'by-type', filters], queryFn: () => callsByType(filters) })
 
+  // One direction's calls, then how they ended in that direction's own words,
+  // then the applications, which have no direction (Dia, 6 Oct 2026).
   const summaryColumns: ReportColumn<CallSummaryRow>[] = [
     { key: 'bucket', label: c('period'), value: (r) => r.bucket },
     { key: 'communications', label: c('communications'), value: (r) => r.communications, numeric: true, total: true },
-    { key: 'calls', label: c('calls'), value: (r) => r.calls, numeric: true, total: true },
-    { key: 'messages', label: c('messages'), value: (r) => r.messages, numeric: true, total: true },
-    { key: 'inbound', label: c('inbound'), value: (r) => r.inbound, numeric: true, total: true },
-    { key: 'outbound', label: c('outbound'), value: (r) => r.outbound, numeric: true, total: true },
+    { key: 'calls', label: c(incoming ? 'incomingCalls' : 'outgoingCalls'), value: (r) => r.calls, numeric: true, total: true },
     { key: 'answered', label: c('answered'), value: (r) => r.answered, numeric: true, total: true },
-    { key: 'missed', label: c('missed'), value: (r) => r.missed, numeric: true, total: true },
-    { key: 'abandoned', label: c('abandoned'), value: (r) => r.abandoned, numeric: true, total: true },
-    { key: 'blocked', label: c('blocked'), value: (r) => r.blocked, numeric: true, total: true },
+    ...(incoming
+      ? [
+          { key: 'missed', label: c('missed'), value: (r: CallSummaryRow) => r.missed, numeric: true, total: true },
+          { key: 'abandoned', label: c('abandoned'), value: (r: CallSummaryRow) => r.abandoned, numeric: true, total: true },
+          { key: 'blocked', label: c('blocked'), value: (r: CallSummaryRow) => r.blocked, numeric: true, total: true },
+        ]
+      : [{ key: 'notAnswered', label: c('notAnswered'), value: (r: CallSummaryRow) => r.notAnswered, numeric: true, total: true }]),
+    { key: 'messages', label: c('messages'), value: (r) => r.messages, numeric: true, total: true },
   ]
 
   const typeColumnsR03: ReportColumn<TypeShareRow>[] = [
     { key: 'type', label: c('type'), value: (r) => typeLabel(r) },
-    { key: 'count', label: c('calls'), value: (r) => r.count, numeric: true, total: true },
+    { key: 'count', label: c(incoming ? 'incomingCalls' : 'outgoingCalls'), value: (r) => r.count, numeric: true, total: true },
     { key: 'share', label: c('share'), value: (r) => r.share, format: (r) => percent(r.share), numeric: true },
   ]
 
@@ -261,17 +298,23 @@ function Overview({ filters }: { filters: ReportFilters }) {
         rows={summary.data}
         loading={summary.isFetching}
         error={summary.isError}
-        exportName={`communications-by-${by}`}
+        exportName={`communications-${incoming ? 'incoming' : 'outgoing'}-by-${by}`}
         chart={{
           // A line needs two points; one day is a bar.
           kind: (summary.data?.length ?? 0) > 1 ? 'line' : 'bar',
           x: (r) => r.bucket,
-          series: [
-            { key: 'answered', label: c('answered'), colour: SERIES_COLOURS[0] },
-            { key: 'missed', label: c('missed'), colour: SERIES_COLOURS[1] },
-            { key: 'abandoned', label: c('abandoned'), colour: SERIES_COLOURS[3] },
-            { key: 'messages', label: c('messages'), colour: SERIES_COLOURS[2] },
-          ],
+          series: incoming
+            ? [
+                { key: 'answered', label: c('answered'), colour: SERIES_COLOURS[0] },
+                { key: 'missed', label: c('missed'), colour: SERIES_COLOURS[1] },
+                { key: 'abandoned', label: c('abandoned'), colour: SERIES_COLOURS[3] },
+                { key: 'messages', label: c('messages'), colour: SERIES_COLOURS[2] },
+              ]
+            : [
+                { key: 'answered', label: c('answered'), colour: SERIES_COLOURS[0] },
+                { key: 'notAnswered', label: c('notAnswered'), colour: SERIES_COLOURS[1] },
+                { key: 'messages', label: c('messages'), colour: SERIES_COLOURS[2] },
+              ],
         }}
       >
         <Grouping label={t('applicationReports.groupBy')} value={by} options={['day', 'week', 'month']} onChange={setBy} />
@@ -293,32 +336,42 @@ function Overview({ filters }: { filters: ReportFilters }) {
         rows={byType.data}
         loading={byType.isFetching}
         error={byType.isError}
-        exportName="calls-by-type"
+        exportName={`calls-${incoming ? 'incoming' : 'outgoing'}-by-type`}
         chart={{
           kind: 'bar',
           x: (r) => typeLabel(r),
-          series: [{ key: 'count', label: c('calls'), colour: SERIES_COLOURS[0] }],
+          series: [{ key: 'count', label: c(incoming ? 'incomingCalls' : 'outgoingCalls'), colour: SERIES_COLOURS[0] }],
         }}
       />
 
-      <Breakdown filters={filters} initial="day" name="breakdown" />
+      <Breakdown filters={filters} direction={direction} initial="day" name="breakdown" />
 
-      <PeakHours filters={filters} />
+      {/* Incoming calls are the demand; the calls agents make are not (R-10). */}
+      {incoming && <PeakHours filters={filters} />}
     </>
   )
 }
 
-/** R-04: per day, week, month, agent or branch, and per type within each. */
-function Breakdown({ filters, initial, name }: { filters: ReportFilters; initial: BreakdownGrouping; name: 'breakdown' | 'byAgent' }) {
+/** R-04: per day, week, month, agent or branch, and per type within each, for one direction. */
+function Breakdown({ filters, direction, initial, name }: {
+  filters: ReportFilters
+  direction: CallDirection
+  initial: BreakdownGrouping
+  name: 'breakdown' | 'byAgent'
+}) {
   const { t, c, arabic, money } = useFormat()
   const [by, setBy] = useState<BreakdownGrouping>(initial)
   const rows = useQuery({ queryKey: ['reports', 'calls', 'breakdown', filters, by], queryFn: () => callBreakdown(filters, by) })
+  const incoming = direction === 'In'
+  const unanswered: ReportColumn<CallBreakdownRow> = incoming
+    ? { key: 'missed', label: c('missed'), value: (r) => r.missed, numeric: true, total: true }
+    : { key: 'notAnswered', label: c('notAnswered'), value: (r) => r.notAnswered, numeric: true, total: true }
 
   const columns: ReportColumn<CallBreakdownRow>[] = [
     { key: 'label', label: t(`applicationReports.groups.${by}`), value: (r) => r.label },
-    { key: 'calls', label: c('calls'), value: (r) => r.calls, numeric: true, total: true },
+    { key: 'calls', label: c(incoming ? 'incomingCalls' : 'outgoingCalls'), value: (r) => r.calls, numeric: true, total: true },
     { key: 'answered', label: c('answered'), value: (r) => r.answered, numeric: true, total: true },
-    { key: 'missed', label: c('missed'), value: (r) => r.missed, numeric: true, total: true },
+    unanswered,
     ...typeColumns(rows.data, arabic),
     { key: 'orders', label: c('orders'), value: (r) => r.orders, numeric: true, total: true },
     { key: 'orderValue', label: c('orderValue'), value: (r) => r.orderValue, format: (r) => money(r.orderValue), numeric: true, total: true },
@@ -333,13 +386,15 @@ function Breakdown({ filters, initial, name }: { filters: ReportFilters; initial
       rows={rows.data}
       loading={rows.isFetching}
       error={rows.isError}
-      exportName={`calls-by-${by}`}
+      exportName={`calls-${incoming ? 'incoming' : 'outgoing'}-by-${by}`}
       chart={{
         kind: time && (rows.data?.length ?? 0) > 1 ? 'line' : 'bar',
         x: (r) => r.label,
         series: [
           { key: 'answered', label: c('answered'), colour: SERIES_COLOURS[0] },
-          { key: 'missed', label: c('missed'), colour: SERIES_COLOURS[1] },
+          incoming
+            ? { key: 'missed', label: c('missed'), colour: SERIES_COLOURS[1] }
+            : { key: 'notAnswered', label: c('notAnswered'), colour: SERIES_COLOURS[1] },
         ],
       }}
     >
@@ -391,39 +446,53 @@ function Customers({ filters }: { filters: ReportFilters }) {
   )
 }
 
-/** A complaint's or a cancellation's line (R-05, R-14). The channel shows only where apps are counted too. */
-function problemColumns(f: ReturnType<typeof useFormat>, withChannel: boolean): ReportColumn<ProblemRow>[] {
-  const { t, c, when, stamp } = f
-  const yes = (v: boolean) => (v ? t('common.yes') : t('common.no'))
+/** A cancellation's line (R-14), by phone or through an application. */
+function problemColumns(f: ReturnType<typeof useFormat>): ReportColumn<ProblemRow>[] {
+  const { c, when, stamp } = f
   return [
     { key: 'when', label: c('when'), value: (r) => stamp(r.startedAt), format: (r) => when(r.startedAt) },
-    ...(withChannel ? [{ key: 'channel', label: c('channel'), value: (r: ProblemRow) => r.channel }] : []),
+    { key: 'channel', label: c('channel'), value: (r) => r.channel },
     { key: 'customer', label: c('customer'), value: (r) => customer(r), format: (r) => customerShown(r) },
     { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
     { key: 'agent', label: c('agent'), value: (r) => r.agent },
     { key: 'branch', label: c('branch'), value: (r) => r.branch },
     { key: 'notes', label: c('notes'), value: (r) => r.notes },
-    ...(withChannel
-      ? []
-      : [
-          { key: 'followUp', label: c('followUp'), value: (r: ProblemRow) => yes(r.followUp) },
-          { key: 'status', label: c('status'), value: (r: ProblemRow) => (r.resolved ? t('callReports.resolved') : t('callReports.open')) },
-        ]),
   ]
 }
 
-// ---- Problems: R-05 --------------------------------------------------------------------
+// ---- Complaints: R-05, R-17 ------------------------------------------------------------
 
-function Problems({ filters }: { filters: ReportFilters }) {
+/**
+ * The complaints (Dia, 6 Oct 2026): each complaint once, however many calls
+ * and messages it took — the customer's call, the agent's call back, a
+ * message through an application — on one working day, 05:00 to 05:00 (the
+ * server's `ComplaintCases`). Not split by the Incoming / Outgoing switch,
+ * for the same reason. A complaint opens to its calls, each with its
+ * recording to play and its details to open, where a supervisor marks it
+ * resolved.
+ */
+function Complaints({ filters }: { filters: ReportFilters }) {
   const f = useFormat()
-  const { t, c, decimal } = f
+  const { t, c, decimal, when, stamp } = f
   const [by, setBy] = useState<ComplaintsGrouping>('branch')
 
   const list = useQuery({ queryKey: ['reports', 'calls', 'complaints', filters], queryFn: () => complaintsList(filters) })
   const grouped = useQuery({ queryKey: ['reports', 'calls', 'complaints-by', filters, by], queryFn: () => complaintsBy(filters, by) })
   const repeat = useQuery({ queryKey: ['reports', 'calls', 'repeat', filters], queryFn: () => repeatComplainers(filters) })
 
-  const listColumns = problemColumns(f, false)
+  const yes = (v: boolean) => (v ? t('common.yes') : t('common.no'))
+  const listColumns: ReportColumn<ComplaintCase>[] = [
+    { key: 'when', label: c('when'), value: (r) => stamp(r.firstAt), format: (r) => when(r.firstAt) },
+    { key: 'customer', label: c('customer'), value: (r) => customer(r), format: (r) => customerShown(r) },
+    { key: 'number', label: c('number'), value: (r) => r.number, ltr: true },
+    { key: 'calls', label: c('calls'), value: (r) => r.calls, numeric: true },
+    { key: 'applications', label: c('messages'), value: (r) => r.applications, numeric: true },
+    { key: 'agent', label: c('agent'), value: (r) => r.agent },
+    { key: 'branch', label: c('branch'), value: (r) => r.branch },
+    { key: 'notes', label: c('notes'), value: (r) => r.notes },
+    { key: 'followUp', label: c('followUp'), value: (r) => yes(r.followUp) },
+    { key: 'status', label: c('status'), value: (r) => (r.resolved ? t('callReports.resolved') : t('callReports.open')) },
+  ]
 
   const groupedColumns: ReportColumn<ComplaintsRow>[] = [
     { key: 'label', label: t(`applicationReports.groups.${by}`), value: (r) => r.label },
@@ -450,6 +519,7 @@ function Problems({ filters }: { filters: ReportFilters }) {
         error={list.isError}
         exportName="complaints"
         limit={LIST_LIMIT}
+        expand={(r) => <ComplaintCalls rows={r.communications} />}
       />
 
       <ReportCard
@@ -487,9 +557,43 @@ function Problems({ filters }: { filters: ReportFilters }) {
         exportName="repeat-complainers"
         limit={LIST_LIMIT}
       />
-
-      <Missed filters={filters} />
     </>
+  )
+}
+
+/**
+ * A complaint's calls and messages, first to last: when, which way, who, how
+ * long, the recording to play, and Details for the whole call (S-03), where a
+ * supervisor reads the classification and marks it resolved.
+ */
+function ComplaintCalls({ rows }: { rows: CallRow[] }) {
+  const { t, when } = useFormat()
+  const [open, setOpen] = useState<string | null>(null)
+  const how = (r: CallRow) =>
+    r.kind === 'App' ? r.channelName ?? '' : t(r.direction === 'Out' ? 'callReports.direction.Out' : 'callReports.direction.In')
+
+  return (
+    <ul className="space-y-3 py-2">
+      {rows.map((r) => (
+        <li key={r.id} className="space-y-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="text-slate-200">{when(r.startedAt)}</span>
+            <span className="badge">{how(r)}</span>
+            <span className="text-slate-400">{r.agentDisplayName ?? ''}</span>
+            {r.durationSec !== null && <span className="tabular text-slate-400" dir="ltr">{formatClock(r.durationSec)}</span>}
+            {r.notes && <span className="text-slate-300">{r.notes}</span>}
+            <button type="button" className="btn-ghost btn-sm" aria-expanded={open === r.id}
+              onClick={() => setOpen(open === r.id ? null : r.id)}>
+              {t('callReports.complaintDetails')}
+            </button>
+          </div>
+          {r.kind !== 'App' && (
+            <RecordingPlayer communicationId={r.id} hasRecording={r.hasRecording} expired={r.recordingExpired} />
+          )}
+          {open === r.id && <CallDetails row={r} onClose={() => setOpen(null)} />}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -611,7 +715,7 @@ function Orders({ filters }: { filters: ReportFilters }) {
       </ReportCard>
 
       <ReportCard title={t('callReports.sections.cancellationList.title')} hint={t('callReports.sections.cancellationList.hint')}
-        columns={problemColumns(f, true)} rows={list.data} loading={list.isFetching} error={list.isError}
+        columns={problemColumns(f)} rows={list.data} loading={list.isFetching} error={list.isError}
         exportName="cancellations" limit={LIST_LIMIT} />
     </>
   )
@@ -676,36 +780,48 @@ function CustomerBase({ filters }: { filters: ReportFilters }) {
 
 // ---- Agents: R-15, and R-04 per agent -------------------------------------------------
 
-function Agents({ filters }: { filters: ReportFilters }) {
+function Agents({ filters, direction }: { filters: ReportFilters; direction: CallDirection }) {
   const { t, c, money } = useFormat()
   const rows = useQuery({ queryKey: ['reports', 'calls', 'agents', filters], queryFn: () => agentProductivity(filters) })
+  const incoming = direction === 'In'
 
+  // Incoming: what they answered and what they let ring. Outgoing: what they
+  // dialled and how much of it was picked up. Never the two added together.
   const columns: ReportColumn<AgentProductivityRow>[] = [
     { key: 'agent', label: c('agent'), value: (r) => r.agent },
-    { key: 'handled', label: c('handled'), value: (r) => r.handled, numeric: true, total: true },
-    { key: 'inbound', label: c('inboundAnswered'), value: (r) => r.inbound, numeric: true, total: true },
-    { key: 'outbound', label: c('outboundMade'), value: (r) => r.outbound, numeric: true, total: true },
+    ...(incoming
+      ? []
+      : [{ key: 'outbound', label: c('outboundMade'), value: (r: AgentProductivityRow) => r.outbound, numeric: true, total: true }]),
+    { key: 'handled', label: c('answered'), value: (r) => r.handled, numeric: true, total: true },
     { key: 'duration', label: c('averageDuration'), value: (r) => r.averageDurationSec, format: (r) => clock(r.averageDurationSec), numeric: true },
     { key: 'orders', label: c('orders'), value: (r) => r.orders, numeric: true, total: true },
     { key: 'orderValue', label: c('orderValue'), value: (r) => r.orderValue, format: (r) => money(r.orderValue), numeric: true, total: true },
     { key: 'unclassified', label: c('unclassified'), value: (r) => r.unclassified, numeric: true, total: true },
-    { key: 'missed', label: c('missed'), value: (r) => r.missed, numeric: true, total: true },
+    ...(incoming
+      ? [{ key: 'missed', label: c('missed'), value: (r: AgentProductivityRow) => r.missed, numeric: true, total: true }]
+      : []),
   ]
 
   return (
     <>
-      <ReportCard title={t('callReports.sections.productivity.title')} hint={t('callReports.sections.productivity.hint')}
+      <ReportCard title={t('callReports.sections.productivity.title')}
+        hint={t(incoming ? 'callReports.sections.productivity.hint' : 'callReports.sections.productivity.hintOut')}
         columns={columns} rows={rows.data} loading={rows.isFetching} error={rows.isError}
-        exportName="agent-productivity"
+        exportName={`agent-productivity-${incoming ? 'incoming' : 'outgoing'}`}
         chart={{
           kind: 'bar',
           x: (r) => r.agent,
-          series: [
-            { key: 'handled', label: c('handled'), colour: SERIES_COLOURS[0] },
-            { key: 'missed', label: c('missed'), colour: SERIES_COLOURS[1] },
-          ],
+          series: incoming
+            ? [
+                { key: 'handled', label: c('answered'), colour: SERIES_COLOURS[0] },
+                { key: 'missed', label: c('missed'), colour: SERIES_COLOURS[1] },
+              ]
+            : [
+                { key: 'outbound', label: c('outboundMade'), colour: SERIES_COLOURS[1] },
+                { key: 'handled', label: c('answered'), colour: SERIES_COLOURS[0] },
+              ],
         }} />
-      <Breakdown filters={filters} initial="agent" name="byAgent" />
+      <Breakdown filters={filters} direction={direction} initial="agent" name="byAgent" />
     </>
   )
 }

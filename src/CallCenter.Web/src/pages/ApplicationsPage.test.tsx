@@ -121,7 +121,7 @@ describe('applications page', () => {
     expect(within(row).getByText('Order')).toBeInTheDocument()
     expect(within(row).getByText('Ramallah')).toBeInTheDocument()
     expect(within(row).getByText('62')).toBeInTheDocument()
-    expect(screen.getByText('2 messages')).toBeInTheDocument()
+    expect(screen.getByText('2 applications')).toBeInTheDocument()
     // Nothing a phone call has and a message does not.
     expect(screen.queryByText('Recording')).not.toBeInTheDocument()
     expect(screen.queryByText('Duration')).not.toBeInTheDocument()
@@ -177,11 +177,11 @@ describe('applications page', () => {
     const row = (await screen.findByText('Mahmoud')).closest('tr')!
     fireEvent.doubleClick(row)
 
-    const details = await screen.findByRole('region', { name: 'Message details' })
+    const details = await screen.findByRole('region', { name: 'Application details' })
     expect(row.nextElementSibling).toContainElement(details)
     // Facts a message has; none of a call's phone facts.
     expect(within(details).getAllByText('WhatsApp').length).toBeGreaterThan(0)
-    expect(within(details).getByText('Message')).toBeInTheDocument()
+    expect(within(details).getByText('Application')).toBeInTheDocument()
     expect(within(details).queryByText('Extension')).not.toBeInTheDocument()
     expect(within(details).queryByText('Queue')).not.toBeInTheDocument()
     expect(within(details).queryByText('Recording')).not.toBeInTheDocument()
@@ -198,7 +198,7 @@ describe('applications page', () => {
     const row = (await screen.findByText('Lina')).closest('tr')!
     fireEvent.click(within(row).getByRole('button', { name: 'Open' }))
 
-    const details = await screen.findByRole('region', { name: 'Message details' })
+    const details = await screen.findByRole('region', { name: 'Application details' })
     expect(within(details).getByText('Not classified')).toBeInTheDocument()
     fireEvent.click(within(details).getByRole('button', { name: 'Classify' }))
 
@@ -217,7 +217,7 @@ describe('applications page', () => {
 
     renderPage()
     fireEvent.doubleClick((await screen.findByText('Mahmoud')).closest('tr')!)
-    const details = await screen.findByRole('region', { name: 'Message details' })
+    const details = await screen.findByRole('region', { name: 'Application details' })
 
     fireEvent.click(within(details).getByRole('button', { name: 'Change' }))
     const select = await within(details).findByLabelText('Channel')
@@ -244,15 +244,15 @@ describe('applications page', () => {
 
     renderPage()
     fireEvent.doubleClick((await screen.findByText('Mahmoud')).closest('tr')!)
-    const details = await screen.findByRole('region', { name: 'Message details' })
+    const details = await screen.findByRole('region', { name: 'Application details' })
     const deletes = () => fetchMock.mock.calls.filter(([, init]) => (init as RequestInit)?.method === 'DELETE')
 
     // The first click only asks (M-W07).
-    fireEvent.click(within(details).getByRole('button', { name: 'Delete message' }))
+    fireEvent.click(within(details).getByRole('button', { name: 'Delete application' }))
     expect(deletes()).toHaveLength(0)
     fireEvent.click(within(details).getByRole('button', { name: 'Confirm remove' }))
 
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Message details' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Application details' })).not.toBeInTheDocument())
     expect(deletes().map(([url]) => url)).toEqual(['/api/communications/applications/m1'])
   })
 })

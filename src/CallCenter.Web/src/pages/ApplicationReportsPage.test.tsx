@@ -96,7 +96,7 @@ describe('application reports page', () => {
     vi.stubGlobal('fetch', server())
     renderPage()
 
-    const byChannel = card('Messages per channel')
+    const byChannel = card('Applications per channel')
     const wa = (await within(byChannel).findByText('WhatsApp')).closest('tr')!
     expect(within(wa).getByText('12')).toBeInTheDocument()
     // No "not classified" count: a message is always recorded with its type (25 Sep).
@@ -112,7 +112,7 @@ describe('application reports page', () => {
     expect(within(sara).getByText('540.50')).toBeInTheDocument()
     expect(within(agents).queryByRole('columnheader', { name: 'Not classified' })).not.toBeInTheDocument()
 
-    const trend = card('Messages over time')
+    const trend = card('Applications over time')
     expect(await within(trend).findByText('2026-09-25')).toBeInTheDocument()
 
     const issues = card('Cancellations and complaints')
@@ -173,7 +173,7 @@ describe('application reports page', () => {
     fireEvent.change(within(card('Orders and order value')).getByLabelText('Group by'), { target: { value: 'agent' } })
     await waitFor(() => expect(requests(fetchMock, 'orders').at(-1)).toContain('groupBy=agent'))
 
-    fireEvent.change(within(card('Messages over time')).getByLabelText('Group by'), { target: { value: 'hour' } })
+    fireEvent.change(within(card('Applications over time')).getByLabelText('Group by'), { target: { value: 'hour' } })
     await waitFor(() => expect(requests(fetchMock, 'trend').at(-1)).toContain('groupBy=hour'))
   })
 
@@ -188,7 +188,7 @@ describe('application reports page', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
     renderPage()
-    const byChannel = card('Messages per channel')
+    const byChannel = card('Applications per channel')
     await within(byChannel).findByText('WhatsApp')
 
     fireEvent.click(within(byChannel).getByRole('button', { name: 'Export CSV' }))
@@ -199,7 +199,7 @@ describe('application reports page', () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
     const text = await readBlob(saved!)
     const lines = text.trim().split('\r\n')
-    expect(lines[0]).toBe('Channel,Messages,Order,Complaint')
+    expect(lines[0]).toBe('Channel,Applications,Order,Complaint')
     expect(lines[1]).toBe('WhatsApp,12,9,1')
     expect(lines[2]).toBe('Instagram,5,5,0')
     expect(lines).toHaveLength(3)

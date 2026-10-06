@@ -22,7 +22,15 @@ export interface ReportFilters {
   branchId?: string[]
   channelId?: string[]
   typeId?: string[]
+  /**
+   * The call reports and the dashboard: incoming or outgoing calls, never
+   * both added together (Dia, 6 Oct 2026). Applications are counted either way.
+   */
+  direction?: CallDirection
 }
+
+/** Which calls a report counts: `In` incoming, `Out` outgoing. */
+export type CallDirection = 'In' | 'Out'
 
 export type OrdersGrouping = 'channel' | 'branch' | 'agent' | 'day'
 export type TrendGrouping = 'day' | 'week' | 'month' | 'hour'

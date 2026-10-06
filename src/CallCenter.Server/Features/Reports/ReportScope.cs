@@ -30,6 +30,13 @@ namespace CallCenter.Server.Features.Reports;
 /// answered or that was abandoned, and that row already counts it. The
 /// reports about missed calls and the agents (R-11, R-15) still count them.
 /// </param>
+/// <param name="Direction">
+/// <c>In</c> or <c>Out</c>: only the calls that way. Messages from the apps,
+/// which have no direction, are let through, so a report that compares the
+/// phone with the apps still has the apps. Null for both, which the screens
+/// never ask for: incoming and outgoing are never added together on them
+/// (Dia, 6 Oct 2026).
+/// </param>
 /// <remarks>
 /// The id lists match any of their ids; empty or null is no filter (several
 /// agents, branches, channels or types at once: Dia, 2 Oct 2026).
@@ -43,7 +50,8 @@ public record ReportFilter(
     IReadOnlyList<Guid>? TypeIds = null,
     string? Kind = CommunicationKinds.App,
     bool WithRings = false,
-    bool WithoutUntaken = false);
+    bool WithoutUntaken = false,
+    string? Direction = null);
 
 /// <summary>
 /// What every report agrees on, written once: which rows a filter means, which
@@ -66,6 +74,7 @@ public static class ReportScope
         IQueryable<Communication> q, ReportFilter f, IReadOnlyList<string>? internalNumbers = null)
     {
         if (f.Kind is { } kind) q = q.Where(c => c.Kind == kind);
+        if (f.Direction is { } direction) q = q.Where(c => c.Kind != CommunicationKinds.Call || c.Direction == direction);
         if (!f.WithRings) q = q.Where(c => c.AbandonedCallId == null);
         if (f.WithoutUntaken)
         {
@@ -121,6 +130,14 @@ public static class ReportScope
             q = q.Where(c => c.RemoteNormalised == null || !list.Contains(c.RemoteNormalised));
         }
 
+        // A call whose other party is an extension is internal without being
+        // listed (Dia, 6 Oct 2026): agent to agent, agent to branch, branch to
+        // agent. Customers never have a number that short; the list is still
+        // there for a branch reached on a full number.
+        q = q.Where(c => c.Kind != CommunicationKinds.Call
+                         || c.RemoteNormalised == null
+                         || c.RemoteNormalised.Length > PhoneNormalizer.MaxExtensionLength);
+
         return q;
     }
 
@@ -142,6 +159,14 @@ public static class ReportScope
             .Distinct()
             .ToList();
     }
+
+    /// <summary><c>in</c> or <c>out</c>, in any case, as <see cref="Directions"/> has them; anything else is null.</summary>
+    public static string? ParseDirection(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "in" => Directions.In,
+        "out" => Directions.Out,
+        _ => null,
+    };
 
     /// <summary>The instant in the restaurant's own time.</summary>
     public static DateTime Local(DateTimeOffset at) => at.ToLocalTime().DateTime;

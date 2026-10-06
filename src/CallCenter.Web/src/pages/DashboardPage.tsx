@@ -1,11 +1,12 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { dashboardPeriod, dashboardToday } from '../api/callReports'
 import type { Count } from '../api/callReports'
-import type { TypeCount } from '../api/applicationReports'
+import type { CallDirection, TypeCount } from '../api/applicationReports'
 import { ReportChart, SERIES_COLOURS } from '../components/ReportCard'
 import type { ReportChartSpec } from '../components/ReportCard'
-import { PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
+import { DirectionSwitch, PrintPageButton, ReportFilterBar, ReportPrintHeading } from '../components/ReportFilters'
 import LoadError from '../components/LoadError'
 import QueueSwitchCard from '../components/QueueSwitchCard'
 import { formatMoney } from '../lib/money'
@@ -37,16 +38,28 @@ const TODAY_REFRESH_MS = 60_000
  * Calls in and calls out have a block each, split by result (Dia, 2 Oct):
  * the PBX's call report counts incoming calls only, so the incoming block is
  * the figure to set beside it, and the outgoing one is what makes up the rest.
+ *
+ * **Incoming or outgoing, never both added together** (Dia, 6 Oct 2026): the
+ * switch at the top decides which calls every figure and chart counts, today
+ * and the period alike; the applications are counted either way. The
+ * complaints count each complaint once, its call back included, whichever
+ * way is chosen.
  */
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
   const { draft, filters, set, choosePreset } = useReportFilters()
+  const [direction, setDirection] = useState<CallDirection>('In')
+  const incoming = direction === 'In'
 
-  const today = useQuery({ queryKey: ['dashboard', 'today'], queryFn: dashboardToday, refetchInterval: TODAY_REFRESH_MS })
+  const today = useQuery({
+    queryKey: ['dashboard', 'today', direction],
+    queryFn: () => dashboardToday(direction),
+    refetchInterval: TODAY_REFRESH_MS,
+  })
   const period = useQuery({
-    queryKey: ['dashboard', 'period', filters.from, filters.to],
-    queryFn: () => dashboardPeriod(filters.from, filters.to),
+    queryKey: ['dashboard', 'period', filters.from, filters.to, direction],
+    queryFn: () => dashboardPeriod(filters.from, filters.to, direction),
   })
 
   const n = (v: number) => v.toLocaleString(i18n.language)
@@ -56,7 +69,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <ReportPrintHeading title={t('dashboard.heading')} draft={draft} periodOnly />
+      <ReportPrintHeading title={t('dashboard.heading')} draft={draft} periodOnly
+        extra={[`${t('callReports.direction.label')}: ${t(`callReports.direction.${direction}`)}`]} />
       <div className="no-print flex items-start justify-between gap-4">
         <div>
           <h1 className="page-title">{t('dashboard.heading')}</h1>
@@ -70,6 +84,10 @@ export default function DashboardPage() {
         <QueueSwitchCard />
       </div>
 
+      <div className="no-print card card-body">
+        <DirectionSwitch value={direction} onChange={setDirection} />
+      </div>
+
       <section className="space-y-3" aria-label={t('dashboard.today')}>
         <h3 className="font-semibold text-slate-100">{t('dashboard.today')}</h3>
         {/* Said when a refresh fails too: the figures below are then the last
@@ -81,12 +99,15 @@ export default function DashboardPage() {
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Tile hero label={t('dashboard.tiles.communications')} value={d ? n(d.communications) : undefined}
-                note={d ? t('dashboard.tiles.split', { calls: n(d.calls), messages: n(d.messages) }) : undefined} />
+                note={d ? t(incoming ? 'dashboard.tiles.splitIn' : 'dashboard.tiles.splitOut', { calls: n(d.calls), messages: n(d.messages) }) : undefined} />
               <Tile label={t('dashboard.tiles.orders')} value={d ? n(d.orders) : undefined}
                 note={d ? t('dashboard.tiles.worth', { value: money(d.orderValue) }) : undefined} />
               <Tile label={t('dashboard.tiles.complaints')} value={d ? n(d.complaints) : undefined} />
-              <Tile label={t('dashboard.tiles.untaken')} value={d ? n(d.missedRings + d.rejectedRings) : undefined}
-                note={d ? t('dashboard.tiles.untakenNote', { missed: n(d.missedRings), rejected: n(d.rejectedRings) }) : undefined} />
+              {/* Rings are incoming by nature. */}
+              {incoming && (
+                <Tile label={t('dashboard.tiles.untaken')} value={d ? n(d.missedRings + d.rejectedRings) : undefined}
+                  note={d ? t('dashboard.tiles.untakenNote', { missed: n(d.missedRings), rejected: n(d.rejectedRings) }) : undefined} />
+              )}
               <Tile label={t('dashboard.tiles.unclassified')} value={d ? n(d.unclassified) : undefined} note={t('dashboard.tiles.unclassifiedNote')} />
               <Tile label={t('dashboard.tiles.agentsOnline')} value={d ? n(d.agentsOnline) : undefined}
                 note={t(d?.fromPbx ? 'dashboard.tiles.agentsOnlinePbxNote' : 'dashboard.tiles.agentsOnlineNote')} />
@@ -97,18 +118,21 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <CallBlock label={t('dashboard.calls.incoming')} note={t('dashboard.calls.incomingNote')}
-                total={d?.incoming} lines={d ? [
-                  { label: t('dashboard.calls.answered'), count: d.incomingAnswered },
-                  { label: t('dashboard.calls.abandonedLine'), count: d.abandoned },
-                  { label: t('dashboard.calls.otherIncoming'), count: d.incoming - d.incomingAnswered - d.abandoned, onlyIfAny: true },
-                ] : []} />
-              <CallBlock label={t('dashboard.calls.outgoing')} note={t('dashboard.calls.outgoingNote')}
-                total={d?.outgoing} lines={d ? [
-                  { label: t('dashboard.calls.answered'), count: d.outgoingAnswered },
-                  { label: t('dashboard.calls.notAnswered'), count: d.outgoingNotAnswered },
-                  { label: t('dashboard.calls.otherOutgoing'), count: d.outgoing - d.outgoingAnswered - d.outgoingNotAnswered, onlyIfAny: true },
-                ] : []} />
+              {incoming ? (
+                <CallBlock label={t('dashboard.calls.incoming')} note={t('dashboard.calls.incomingNote')}
+                  total={d?.incoming} lines={d ? [
+                    { label: t('dashboard.calls.answered'), count: d.incomingAnswered },
+                    { label: t('dashboard.calls.abandonedLine'), count: d.abandoned },
+                    { label: t('dashboard.calls.otherIncoming'), count: d.incoming - d.incomingAnswered - d.abandoned, onlyIfAny: true },
+                  ] : []} />
+              ) : (
+                <CallBlock label={t('dashboard.calls.outgoing')} note={t('dashboard.calls.outgoingNote')}
+                  total={d?.outgoing} lines={d ? [
+                    { label: t('dashboard.calls.answered'), count: d.outgoingAnswered },
+                    { label: t('dashboard.calls.notAnswered'), count: d.outgoingNotAnswered },
+                    { label: t('dashboard.calls.otherOutgoing'), count: d.outgoing - d.outgoingAnswered - d.outgoingNotAnswered, onlyIfAny: true },
+                  ] : []} />
+              )}
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">

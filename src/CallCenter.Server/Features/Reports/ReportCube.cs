@@ -1,6 +1,7 @@
 using System.Text;
 using CallCenter.Server.Data;
 using CallCenter.Shared;
+using CallCenter.Shared.Phone;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -107,8 +108,8 @@ public sealed record ReportNames(
 /// reports call it, even in a year the clocks change on a date announced late.
 ///
 /// <b>The filters are <see cref="ReportScope.Narrow"/>'s, written in SQL</b>:
-/// the same set, the same meaning — kind, the half-open period, agent, branch,
-/// channel, type, S-48's internal numbers with a withheld number let through,
+/// the same set, the same meaning — kind, the calls' direction, the half-open period, agent, branch,
+/// channel, type, S-48's internal numbers and every extension's calls with a withheld number let through,
 /// and the rings of an abandoned call left out unless asked for (S-55). Change one, change both; the acceptance test compares a list
 /// (built by <c>Narrow</c>) with the figures (built here) over one known day.
 ///
@@ -330,6 +331,12 @@ public class ReportCube(CallCenterDbContext db)
     {
         var where = new List<string> { "true" };
         if (f.Kind is { } kind) { where.Add("c.kind = @kind"); parameters.Add(new("kind", kind)); }
+        if (f.Direction is { } direction)
+        {
+            where.Add("(c.kind <> @dir_kind OR c.direction = @direction)");
+            parameters.Add(new("dir_kind", CommunicationKinds.Call));
+            parameters.Add(new("direction", direction));
+        }
         if (!f.WithRings) where.Add("c.abandoned_call_id IS NULL");
         if (f.WithoutUntaken)
         {
@@ -350,6 +357,11 @@ public class ReportCube(CallCenterDbContext db)
             where.Add("(c.remote_normalised IS NULL OR NOT c.remote_normalised = ANY(@internal))");
             parameters.Add(new("internal", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = internalNumbers.ToArray() });
         }
+
+        // An extension on the other end is internal without being listed (Dia, 6 Oct 2026).
+        where.Add("(c.kind <> @call_kind OR c.remote_normalised IS NULL OR length(c.remote_normalised) > @ext_max)");
+        parameters.Add(new("call_kind", CommunicationKinds.Call));
+        parameters.Add(new("ext_max", PhoneNormalizer.MaxExtensionLength));
 
         return where;
 

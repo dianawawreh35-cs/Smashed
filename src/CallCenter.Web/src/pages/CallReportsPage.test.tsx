@@ -14,8 +14,8 @@ import { filterField, tick } from '../test/filters'
  */
 
 const SUMMARY = [
-  { bucket: '2026-09-24', communications: 14, calls: 12, messages: 2, inbound: 10, outbound: 2, answered: 7, missed: 2, blocked: 1, abandoned: 1 },
-  { bucket: '2026-09-25', communications: 9, calls: 8, messages: 1, inbound: 6, outbound: 2, answered: 5, missed: 1, blocked: 0, abandoned: 0 },
+  { bucket: '2026-09-24', communications: 12, calls: 10, messages: 2, inbound: 10, outbound: 0, answered: 7, missed: 2, blocked: 1, abandoned: 1, notAnswered: 0 },
+  { bucket: '2026-09-25', communications: 7, calls: 6, messages: 1, inbound: 6, outbound: 0, answered: 5, missed: 1, blocked: 0, abandoned: 0, notAnswered: 0 },
 ]
 const BY_TYPE = [
   { typeName: 'Order', labelAr: 'طلب', labelEn: 'Order', count: 6, share: 60 },
@@ -28,9 +28,19 @@ const BREAKDOWN = [
 const RECURRING = [
   { contactId: 'c1', name: 'Khaled', number: '0599000001', calls: 4, orders: 2, orderValue: 80, complaints: 0, lastAt: '2026-09-25T10:00:00Z' },
 ]
+/** One complaint's call, as the Calls page lists it. */
+const call = (id: string, startedAt: string, direction: string, hasRecording: boolean) => ({
+  id, kind: 'Call', startedAt, direction, status: 'Answered', agentId: 'a2', agentDisplayName: 'Omar',
+  contactId: 'c2', contactName: 'Yousef', remoteNumberRaw: '0599000002', branchId: 'b1', branchName: 'Rafat',
+  typeName: 'Complaint', typeLabelAr: 'شكوى', typeLabelEn: 'Complaint', orderValue: null, durationSec: 95,
+  notes: 'cold burger, again', isClassified: true, hasRecording, recordingExpired: false, channelId: 'ch-phone', channelName: 'Phone',
+})
+/** One complaint: the customer's call and the agent's call back, counted once (Dia, 6 Oct 2026). */
 const COMPLAINTS = [
-  { id: 'p1', startedAt: '2026-09-25T13:00:00Z', channel: 'Phone', contactId: 'c2', customer: 'Yousef', number: '0599000002',
-    agent: 'Omar', branch: 'Rafat', notes: 'cold burger, again', followUp: true, resolved: false, resolvedAt: null },
+  { id: 'k1', firstAt: '2026-09-25T13:00:00Z', lastAt: '2026-09-25T13:40:00Z', day: '2026-09-25', contactId: 'c2',
+    customer: 'Yousef', number: '0599000002', agent: 'Omar', branch: 'Rafat', calls: 2, applications: 0,
+    notes: 'cold burger, again', followUp: true, resolved: false, resolvedAt: null,
+    communications: [call('k1', '2026-09-25T13:00:00Z', 'In', true), call('k2', '2026-09-25T13:40:00Z', 'Out', false)] },
 ]
 const COMPLAINTS_BY = [
   { key: 'b1', label: 'Rafat', complaints: 2, followUp: 1, resolved: 1, open: 1, averageHoursToResolve: 2, orders: 4, perHundredOrders: 50 },
@@ -125,20 +135,23 @@ describe('call reports page', () => {
 
     const summary = card('Communications')
     const day = (await within(summary).findByText('2026-09-24')).closest('tr')!
-    expect(within(day).getByText('14')).toBeInTheDocument()
+    expect(within(day).getByText('12')).toBeInTheDocument()
     const total = within(summary).getByText('Total').closest('tr')!
-    expect(within(total).getByText('23')).toBeInTheDocument()
+    expect(within(total).getByText('19')).toBeInTheDocument()
     // A number column is centred, heading and figures alike, so each figure
     // sits under its heading; the table's own rule would put headings at the
     // start (26 Sep).
-    expect(within(summary).getByRole('columnheader', { name: 'Calls' })).toHaveClass('!text-center')
-    expect(within(day).getByText('14').closest('td')).toHaveClass('text-center')
+    expect(within(summary).getByRole('columnheader', { name: 'Incoming calls' })).toHaveClass('!text-center')
+    expect(within(day).getByText('12').closest('td')).toHaveClass('text-center')
     // Only the figure is held left-to-right.
-    const figure = within(day).getByText('14')
+    const figure = within(day).getByText('12')
     expect(figure.closest('td')).not.toHaveAttribute('dir')
     expect(figure).toHaveAttribute('dir', 'ltr')
+    // Incoming calls, then the applications: never the two directions together (Dia, 6 Oct 2026).
+    expect(within(summary).queryByRole('columnheader', { name: 'Outgoing calls' })).not.toBeInTheDocument()
+    expect(within(summary).getByRole('columnheader', { name: 'Applications' })).toBeInTheDocument()
     // What "missed" means is on the card, where a supervisor would wonder.
-    expect(within(summary).getByText(/never an outgoing call nobody picked up/)).toBeInTheDocument()
+    expect(within(summary).getByText(/missed \(missed and rejected\)/)).toBeInTheDocument()
 
     const byType = card('Calls per type')
     const order = (await within(byType).findByText('Order')).closest('tr')!
@@ -184,7 +197,7 @@ describe('call reports page', () => {
     await waitFor(() => expect(requests(fetchMock, 'summary').at(-1)).toContain('groupBy=week'))
 
     expect(requests(fetchMock, 'complaints')).toHaveLength(0)
-    fireEvent.click(screen.getByRole('tab', { name: 'Problems' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Complaints' }))
     expect(await within(card('Complaints')).findByText('cold burger, again')).toBeInTheDocument()
     expect(requests(fetchMock, 'complaints')).toHaveLength(1)
 
@@ -192,7 +205,37 @@ describe('call reports page', () => {
     await waitFor(() => expect(requests(fetchMock, 'complaints/by').at(-1)).toContain('groupBy=agent'))
   })
 
-  it('shows a complaint with its follow-up status, and exports the rows the table shows', async () => {
+  it('sends the chosen direction to every report, and never shows the two together', async () => {
+    const fetchMock = server()
+    vi.stubGlobal('fetch', fetchMock)
+    renderPage()
+    await screen.findByText('Sara')
+
+    // Incoming unless chosen otherwise (Dia, 6 Oct 2026).
+    for (const report of ['summary', 'by-type', 'breakdown', 'peak-hours']) {
+      expect(requests(fetchMock, report).at(-1)).toContain('direction=In')
+    }
+    expect(screen.getByRole('button', { name: 'Incoming' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Outgoing' }))
+    for (const report of ['summary', 'by-type', 'breakdown']) {
+      await waitFor(() => expect(requests(fetchMock, report).at(-1)).toContain('direction=Out'))
+    }
+    const summary = card('Communications')
+    expect(await within(summary).findByRole('columnheader', { name: 'Outgoing calls' })).toBeInTheDocument()
+    expect(within(summary).getByRole('columnheader', { name: 'Not answered' })).toBeInTheDocument()
+    expect(within(summary).queryByRole('columnheader', { name: 'Missed' })).not.toBeInTheDocument()
+    // The calls agents make are not demand: no peak hours for them.
+    expect(screen.queryByRole('region', { name: 'Peak hours' })).not.toBeInTheDocument()
+
+    // Missed calls are incoming by nature: the tab says so rather than showing zeros.
+    fireEvent.click(screen.getByRole('tab', { name: 'Missed calls' }))
+    expect(screen.getByText(/about incoming calls only/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show incoming calls' }))
+    expect(await within(card('Missed calls')).findByText('10%')).toBeInTheDocument()
+  })
+
+  it('shows each complaint once, opens it to play its calls, and exports the rows the table shows', async () => {
     vi.stubGlobal('fetch', server())
     let saved: Blob | null = null
     URL.createObjectURL = vi.fn((blob: Blob) => {
@@ -202,17 +245,31 @@ describe('call reports page', () => {
     URL.revokeObjectURL = vi.fn()
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
-    renderPage('/call-reports?tab=problems')
+    const fetchMock = server()
+    vi.stubGlobal('fetch', fetchMock)
+    renderPage('/call-reports?tab=complaints')
     const complaints = card('Complaints')
     const row = (await within(complaints).findByText('Yousef')).closest('tr')!
     expect(within(row).getByText('Yes')).toBeInTheDocument()
     expect(within(row).getByText('Open')).toBeInTheDocument()
+    // The call in and the call back: one complaint, two calls.
+    expect(within(complaints).getAllByText('Yousef')).toHaveLength(1)
+    expect(within(row).getByText('2')).toBeInTheDocument()
+    // Both directions, whatever the switch says.
+    expect(requests(fetchMock, 'complaints').at(-1)).toContain('direction=In')
+
+    // Opened, it lists its calls, each with its recording.
+    fireEvent.click(within(row).getByRole('button', { expanded: false }))
+    expect(await within(complaints).findByText('Incoming')).toBeInTheDocument()
+    expect(within(complaints).getByText('Outgoing')).toBeInTheDocument()
+    expect(within(complaints).getByText('This call has no recording.')).toBeInTheDocument()
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).startsWith('/api/recordings/k1'))).toBe(true))
 
     fireEvent.click(within(complaints).getByRole('button', { name: 'Export CSV' }))
     const lines = (await readBlob(saved!)).trim().split('\r\n')
-    expect(lines[0]).toBe('When,Customer,Number,Agent,Branch,Notes,Follow-up,Status')
+    expect(lines[0]).toBe('When,Customer,Number,Calls,Applications,Agent,Branch,Notes,Follow-up,Status')
     // The time as the restaurant reads it, which Excel takes as a date.
-    expect(lines[1]).toMatch(/^2026-09-2\d \d\d:00,Yousef,0599000002,Omar,Rafat,"cold burger, again",Yes,Open$/)
+    expect(lines[1]).toMatch(/^2026-09-2\d \d\d:00,Yousef,0599000002,2,0,Omar,Rafat,"cold burger, again",Yes,Open$/)
     expect(lines).toHaveLength(2)
   })
 
@@ -252,7 +309,7 @@ describe('call reports page', () => {
     const unknown = (await within(quality).findByText('Calls from numbers nobody saved')).closest('tr')!
     expect(within(unknown).getByText('31')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Problems' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Missed calls' }))
     const missed = card('Missed calls')
     expect(await within(missed).findByText('10%')).toBeInTheDocument()
     expect(within(missed).getByText(/An outgoing call nobody picked up is not a missed call/)).toBeInTheDocument()

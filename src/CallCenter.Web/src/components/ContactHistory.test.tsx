@@ -58,12 +58,12 @@ afterEach(() => {
 })
 
 describe('contact history', () => {
-  it('lists messages beside calls, each with its channel, and a message as "Message"', async () => {
+  it('lists messages beside calls, each with its channel, and a message as "Application"', async () => {
     vi.stubGlobal('fetch', server())
     renderHistory()
 
     expect(await screen.findByRole('columnheader', { name: 'Channel' })).toBeInTheDocument()
-    const message = screen.getByText('Message').closest('tr')!
+    const message = screen.getByText('Application').closest('tr')!
     expect(within(message).getByText('WhatsApp')).toBeInTheDocument()
     expect(within(message).getByText('Sara')).toBeInTheDocument()
     // A message recorded without its form is a debt; a missed call is not.
@@ -77,10 +77,10 @@ describe('contact history', () => {
     vi.stubGlobal('fetch', server())
     renderHistory()
 
-    const message = (await screen.findByText('Message')).closest('tr')!
+    const message = (await screen.findByText('Application')).closest('tr')!
     fireEvent.click(within(message).getByRole('button', { name: 'Open' }))
 
-    const details = await screen.findByRole('region', { name: 'Message details' })
+    const details = await screen.findByRole('region', { name: 'Application details' })
     expect(message.nextElementSibling).toContainElement(details)
     expect(within(details).getByRole('button', { name: 'Classify' })).toBeInTheDocument()
     expect(within(details).queryByText('Recording')).not.toBeInTheDocument()

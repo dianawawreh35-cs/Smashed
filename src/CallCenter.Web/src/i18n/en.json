@@ -105,12 +105,11 @@
   },
   "dashboard": {
     "heading": "Dashboard",
-    "intro": "Today at a glance, then the chosen period in four charts. Calls and application messages together.",
+    "intro": "Today at a glance, then the chosen period in four charts. Incoming or outgoing calls, as chosen, with the applications.",
     "today": "Today",
     "failed": "The figures could not be loaded. Check the server is running.",
     "tiles": {
       "communications": "Communications",
-      "split": "Calls: {{calls}} · messages: {{messages}}",
       "orders": "Orders",
       "worth": "worth {{value}}",
       "complaints": "Complaints",
@@ -122,7 +121,9 @@
       "agentsInCall": "In a call",
       "agentsInCallNote": "Agents talking right now, as the PBX reports it. Listen in from the Users page.",
       "untaken": "Missed or rejected rings",
-      "untakenNote": "Missed: {{missed}} · rejected: {{rejected}}. Times an agent's phone rang and they did not take it. Not counted in Communications: the queue passed the call to the next agent."
+      "untakenNote": "Missed: {{missed}} · rejected: {{rejected}}. Times an agent's phone rang and they did not take it. Not counted in Communications: the queue passed the call to the next agent.",
+      "splitIn": "Incoming calls: {{calls}} · applications: {{messages}}",
+      "splitOut": "Outgoing calls: {{calls}} · applications: {{messages}}"
     },
     "byType": "Today by type",
     "byChannel": "Today by channel",
@@ -315,7 +316,7 @@
       },
       "pos.lookup.interval_minutes": {
         "label": "POS customer lookup, every (minutes)",
-        "hint": "How often the server asks the POS about numbers that called or sent a message in the last two days and are not in the contacts, and adds the ones it knows. Each check asks again about every one of them, so a customer whose order is typed in after the call is found at the next check. 5 by default, 1 to 1440. Takes effect within half a minute."
+        "hint": "How often the server asks the POS about numbers that called or came through an application in the last two days and are not in the contacts, and adds the ones it knows. Each check asks again about every one of them, so a customer whose order is typed in after the call is found at the next check. 5 by default, 1 to 1440. Takes effect within half a minute."
       },
       "queue.auto_open_time": {
         "label": "Queue opens daily at",
@@ -353,7 +354,7 @@
     },
     "posLookup": {
       "heading": "POS customer lookup",
-      "intro": "Every {{minutes}} minutes the server asks the restaurant's POS about each number that called or sent a message in the last two days and is not in the contacts, and adds the ones the POS knows. Check now does the same straight away.",
+      "intro": "Every {{minutes}} minutes the server asks the restaurant's POS about each number that called or came through an application in the last two days and is not in the contacts, and adds the ones the POS knows. Check now does the same straight away.",
       "checkNow": "Check now",
       "checking": "Checking…",
       "none": "No check yet since the server started. The first one is about a minute after it starts.",
@@ -653,7 +654,7 @@
       "server_error": "The server had a problem.",
       "server_unreachable": "The server could not be reached."
     },
-    "fieldsApp": "Questions for messages (applications)",
+    "fieldsApp": "Questions for applications",
     "fieldsAppHint": "Asked when an agent records a conversation from WhatsApp, Facebook, Instagram or another app. Its questions, and which of the call types above it offers, are its own.",
     "typesOffered": "Types this form offers:",
     "typesOfferedHint": "Untick a type to take it off this form. A new type joins a form only when ticked here, unless every box is ticked.",
@@ -780,29 +781,29 @@
   "applications": {
     "heading": "Applications",
     "intro": "Every conversation that reached you through an app rather than by phone, from every agent. Filter, then open one to see what it was.",
-    "filters": "Search messages",
-    "failed": "The messages could not be loaded. Check the server is running.",
-    "empty": "No messages match.",
+    "filters": "Search applications",
+    "failed": "The applications could not be loaded. Check the server is running.",
+    "empty": "No applications match.",
     "emptyHint": "Widen the dates, or clear a filter.",
-    "count_one": "1 message",
-    "count_other": "{{count}} messages",
-    "message": "Message",
+    "count_one": "1 application",
+    "count_other": "{{count}} applications",
+    "message": "Application",
     "columns": {
       "channel": "Channel"
     },
     "details": {
-      "heading": "Message details",
+      "heading": "Application details",
       "changeChannel": "Change",
       "saveChannel": "Save",
       "cancel": "Cancel",
-      "delete": "Delete message",
+      "delete": "Delete application",
       "channelFailed": "The channel could not be changed. Check the server is running, and that the channel is still offered.",
-      "deleteFailed": "The message could not be deleted. Check the server is running."
+      "deleteFailed": "The application could not be deleted. Check the server is running."
     }
   },
   "applicationReports": {
     "heading": "Application reports",
-    "intro": "What arrived through the apps: how much, on which channel, from whom, and what it was worth. Messages only; calls have their own reports.",
+    "intro": "What arrived through the apps: how much, on which channel, from whom, and what it was worth. Applications only; calls have their own reports.",
     "filters": "Report filters",
     "period": "Period",
     "presets": {
@@ -829,7 +830,7 @@
     "total": "Total",
     "columns": {
       "channel": "Channel",
-      "messages": "Messages",
+      "messages": "Applications",
       "group": "Group",
       "orders": "Orders",
       "orderValue": "Order value",
@@ -841,7 +842,7 @@
     },
     "sections": {
       "byChannel": {
-        "title": "Messages per channel",
+        "title": "Applications per channel",
         "hint": "How many arrived on each app, and what they were about."
       },
       "orders": {
@@ -849,8 +850,8 @@
         "hint": "Orders taken through the apps and what they came to, grouped as you choose."
       },
       "trend": {
-        "title": "Messages over time",
-        "hint": "Messages and orders per day, week, month, or hour of the day."
+        "title": "Applications over time",
+        "hint": "Applications and orders per day, week, month, or hour of the day."
       },
       "byAgent": {
         "title": "Per agent",
@@ -858,13 +859,13 @@
       },
       "issues": {
         "title": "Cancellations and complaints",
-        "hint": "The messages that went wrong, per channel."
+        "hint": "The applications that went wrong, per channel."
       }
     }
   },
   "channels": {
     "heading": "Channels",
-    "intro": "The apps a customer can reach you on. Agents pick one when they record a message. Renaming is safe: messages keep the channel by its id.",
+    "intro": "The apps a customer can reach you on. Agents pick one when they record an application. Renaming is safe: applications keep the channel by its id.",
     "name": "Name",
     "order": "Order",
     "shown": "Status",
@@ -876,7 +877,7 @@
     "newName": "New channel",
     "inUse": "In use",
     "phoneHint": "Built in: every call is filed under Phone, so it cannot be renamed or hidden.",
-    "hiddenHint": "A hidden channel is not offered to agents, but its messages stay in the history and the reports.",
+    "hiddenHint": "A hidden channel is not offered to agents, but its applications stay in the history and the reports.",
     "errors": {
       "system_channel": "Phone is built in: every call is filed under it, so it cannot be renamed or hidden.",
       "bad_name": "The channel needs a name, and no other channel may already have it.",
@@ -889,7 +890,7 @@
   },
   "callReports": {
     "heading": "Call reports",
-    "intro": "The calls: how many, what they were about, who took them, and what went wrong. Calls only, except where a report compares the phone with the apps.",
+    "intro": "The calls: how many, what they were about, who took them, and what went wrong. Incoming or outgoing calls, as chosen above, never added together; applications only where a report compares the phone with the apps.",
     "limited": "Showing the first {{shown}} of {{total}}. Export CSV has them all.",
     "resolved": "Resolved",
     "open": "Open",
@@ -898,15 +899,16 @@
       "orders": "Orders and channels",
       "customers": "Customers",
       "agents": "Agents",
-      "problems": "Problems",
+      "problems": "Missed calls",
       "quality": "Data quality",
-      "abandoned": "Abandoned"
+      "abandoned": "Abandoned",
+      "complaints": "Complaints"
     },
     "columns": {
       "period": "Period",
       "communications": "Communications",
       "calls": "Calls",
-      "messages": "Messages",
+      "messages": "Applications",
       "inbound": "Incoming",
       "outbound": "Outgoing",
       "answered": "Answered",
@@ -946,7 +948,7 @@
       "lastOrder": "Last order",
       "handled": "Handled",
       "inboundAnswered": "Incoming answered",
-      "outboundMade": "Outgoing made",
+      "outboundMade": "Calls made",
       "averageDuration": "Average talk time",
       "unclassified": "Unclassified",
       "missedOnly": "Missed",
@@ -970,12 +972,15 @@
       "averageMinutesToCallBack": "Average minutes to call back",
       "rings": "Rings",
       "queue": "Queue",
-      "hungUp": "Hung up"
+      "hungUp": "Hung up",
+      "incomingCalls": "Incoming calls",
+      "outgoingCalls": "Outgoing calls",
+      "notAnswered": "Not answered"
     },
     "sections": {
       "summary": {
         "title": "Communications",
-        "hint": "Calls and application messages in each period. Answered, missed and abandoned are incoming calls; missed counts missed and rejected, never an outgoing call nobody picked up. Abandoned calls come from the PBX, and their rings are not counted again. Internal calls are left out."
+        "hint": "The chosen calls and the applications in each period. Incoming: answered, missed (missed and rejected), abandoned in the queue (from the PBX, their rings not counted again) and blocked. Outgoing: answered and not answered. Internal calls are left out."
       },
       "list": {
         "title": "Every call, with all its details",
@@ -1000,15 +1005,15 @@
       },
       "complaints": {
         "title": "Complaints",
-        "hint": "Every complaint call, newest first. Follow-up is the agent's tick; Resolved is set by a supervisor on the call."
+        "hint": "Each complaint once, newest first: every call and application about it from the same customer on the same working day (05:00 to 05:00), incoming and outgoing together, so a complaint and its call back are one. Not split by Incoming / Outgoing. Open a complaint to play its calls. Follow-up is the agent's tick; Resolved is set by a supervisor, in Details."
       },
       "complaintsBy": {
         "title": "Complaints per branch and agent",
-        "hint": "How many, how many needed a follow-up and how many are resolved, the hours from the call to its resolution, and complaints per 100 orders."
+        "hint": "Complaints counted once each, under the branch, agent and day of their first call: how many, how many needed a follow-up and how many are resolved, the hours from the first call to its resolution, and complaints per 100 orders."
       },
       "repeat": {
         "title": "Repeat complainers",
-        "hint": "Customers who complained more than once in the period."
+        "hint": "Customers with more than one complaint in the period, a complaint and its call back counted once."
       },
       "peakHours": {
         "title": "Peak hours",
@@ -1048,7 +1053,8 @@
       },
       "productivity": {
         "title": "Agent productivity",
-        "hint": "Per agent: calls handled (answered, in and out), average talk time over answered calls, orders and their value, answered calls left unclassified, and missed calls on their extension - every ring they did not take, the rings of abandoned calls included."
+        "hint": "Per agent, incoming calls: answered, average talk time over answered calls, orders and their value, answered calls left unclassified, and missed calls on their extension - every ring they did not take, the rings of abandoned calls included.",
+        "hintOut": "Per agent, outgoing calls: how many they made, how many were answered, average talk time over answered calls, orders and their value, and answered calls left unclassified."
       },
       "missed": {
         "title": "Missed calls",
@@ -1109,7 +1115,15 @@
     "print": "Print",
     "printPage": "Print page",
     "printAll": "all agents, branches, channels and types",
-    "printedAt": "Printed {{at}}"
+    "printedAt": "Printed {{at}}",
+    "direction": {
+      "label": "Calls",
+      "In": "Incoming",
+      "Out": "Outgoing",
+      "incomingOnly": "This tab is about incoming calls only: missed and abandoned calls are calls customers made. Choose Incoming to see it.",
+      "showIncoming": "Show incoming calls"
+    },
+    "complaintDetails": "Details"
   },
   "logs": {
     "heading": "Logs",

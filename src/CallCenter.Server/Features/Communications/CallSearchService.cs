@@ -246,8 +246,8 @@ public class CallSearchService(CallCenterDbContext db)
         return calls;
     }
 
-    /// <summary>The row, built in the query: one round trip for a page, however many joins.</summary>
-    private static IQueryable<CallSearchRowDto> Project(IQueryable<Communication> calls) =>
+    /// <summary>The row, built in the query: one round trip for a page, however many joins. The complaints report lists its rows the same way.</summary>
+    public static IQueryable<CallSearchRowDto> Project(IQueryable<Communication> calls) =>
         calls.Select(c => new CallSearchRowDto(
             c.Id,
             c.Kind,

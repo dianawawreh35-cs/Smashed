@@ -50,7 +50,7 @@ public class CallReportsTests(CallCenterApiFactory factory)
     {
         // ---- branch A ----
 
-        // R-01: 10 customer calls and 1 message; the internal call is left out (S-48).
+        // R-01: 10 customer calls and 1 message; the three internal calls are left out (S-48).
         var summary = await d.GetAsync<List<CallSummaryRowDto>>("calls/summary", d.BranchA);
         var day = summary.Should().ContainSingle().Subject;
         day.Bucket.Should().Be(d.DayKey);
@@ -59,9 +59,27 @@ public class CallReportsTests(CallCenterApiFactory factory)
         day.Messages.Should().Be(1);
         day.Inbound.Should().Be(8);
         day.Outbound.Should().Be(2);
-        day.Answered.Should().Be(5, "inbound answered: two orders, two complaints, one unclassified");
+        day.Answered.Should().Be(6, "asked for both directions, which the screens never do");
         day.Missed.Should().Be(2, "one Missed and one Rejected; the NoAnswer is an outbound call (A-21)");
         day.Blocked.Should().Be(1);
+
+        // One direction at a time, as the screens ask (Dia, 6 Oct 2026). The
+        // message has no direction and is counted either way.
+        var incoming = (await d.GetAsync<List<CallSummaryRowDto>>("calls/summary", d.BranchA, "direction=in")).Single();
+        (incoming.Communications, incoming.Calls, incoming.Messages, incoming.Inbound, incoming.Outbound)
+            .Should().Be((9, 8, 1, 8, 0));
+        (incoming.Answered, incoming.Missed, incoming.Blocked, incoming.NotAnswered)
+            .Should().Be((5, 2, 1, 0), "inbound answered: two orders, two complaints, one unclassified");
+        var outgoing = (await d.GetAsync<List<CallSummaryRowDto>>("calls/summary", d.BranchA, "direction=out")).Single();
+        (outgoing.Communications, outgoing.Calls, outgoing.Messages, outgoing.Inbound, outgoing.Outbound)
+            .Should().Be((3, 2, 1, 0, 2));
+        (outgoing.Answered, outgoing.Missed, outgoing.NotAnswered).Should().Be((1, 0, 1));
+        (await d.GetAsync<List<TypeShareRowDto>>("calls/by-type", d.BranchA, "direction=out"))
+            .Select(r => (r.TypeName, r.Count)).Should().Equal(("Inquiry", 1));
+        var outByAgent = await d.GetAsync<List<CallBreakdownRowDto>>("calls/breakdown", d.BranchA, "groupBy=agent&direction=out");
+        (outByAgent.Single().Calls, outByAgent.Single().Answered, outByAgent.Single().NotAnswered).Should().Be((2, 1, 1));
+        var outAgents = await d.GetAsync<List<AgentProductivityRowDto>>("calls/agents", d.BranchA, "direction=out");
+        outAgents.Single().Should().Match<AgentProductivityRowDto>(r => r.AgentId == d.AgentOne && r.Outbound == 2 && r.Handled == 1 && r.Missed == 0);
 
         // R-03: per type, over the five classified calls. The message is not a call.
         var byType = await d.GetAsync<List<TypeShareRowDto>>("calls/by-type", d.BranchA);
@@ -85,29 +103,35 @@ public class CallReportsTests(CallCenterApiFactory factory)
         recurring.Select(r => (r.ContactId, r.Calls, r.Orders, r.OrderValue)).Should().Equal(
             (d.CustomerY, 4, 0, 0m), (d.CustomerX, 3, 2, 80m));
 
-        // R-05: the complaints, newest first, with notes and follow-up status.
-        var complaints = await d.GetAsync<List<ProblemRowDto>>("calls/complaints", d.BranchA);
-        complaints.Should().HaveCount(2);
-        complaints[0].Resolved.Should().BeTrue();
-        complaints[0].ResolvedAt.Should().NotBeNull();
-        complaints[1].Notes.Should().Be("cold burger, again");
-        complaints[1].FollowUp.Should().BeTrue();
-        complaints[1].Resolved.Should().BeFalse();
-        complaints.Should().OnlyContain(c => c.ContactId == d.CustomerY && c.Agent == d.AgentTwoName);
+        // R-05: Y complained twice on the one working day (13:00 and 18:00),
+        // which is one complaint with two calls (Dia, 6 Oct 2026); the
+        // outgoing switch does not split it.
+        foreach (var direction in new[] { "direction=in", "direction=out" })
+        {
+            var complaints = await d.GetAsync<List<ComplaintCaseDto>>("calls/complaints", d.BranchA, direction);
+            var complaint = complaints.Should().ContainSingle().Subject;
+            (complaint.ContactId, complaint.Agent, complaint.Calls, complaint.Applications).Should().Be((d.CustomerY, d.AgentTwoName, 2, 0));
+            complaint.Day.Should().Be(d.DayKey);
+            complaint.FollowUp.Should().BeTrue("the first call was ticked for a follow-up");
+            complaint.Resolved.Should().BeTrue("a supervisor resolved the second call");
+            complaint.ResolvedAt.Should().NotBeNull();
+            complaint.Notes.Should().Be("cold burger, again");
+            complaint.Communications.Select(c => c.StartedAt).Should().Equal(d.At(13), d.At(18));
+        }
 
-        // R-05 per branch and per agent, with R-17's handling figures.
+        // R-05 per branch and per agent, with R-17's handling figures: one
+        // complaint, resolved seven hours after its first call (13:00 to
+        // 20:00), against three orders, the message's included.
         var perBranch = await d.GetAsync<List<ComplaintsRowDto>>("calls/complaints/by", d.BranchA, "groupBy=branch");
         var a = perBranch.Should().ContainSingle().Subject;
         (a.Complaints, a.FollowUp, a.Resolved, a.Open, a.AverageHoursToResolve, a.Orders, a.PerHundredOrders)
-            .Should().Be((2, 1, 1, 1, 2.0m, 2, 100.0m));
+            .Should().Be((1, 1, 1, 0, 7.0m, 3, 33.3m));
         var perAgent = await d.GetAsync<List<ComplaintsRowDto>>("calls/complaints/by", d.BranchA, "groupBy=agent");
         perAgent.Should().ContainSingle().Which.Key.Should().Be(d.AgentTwo.ToString());
         perAgent[0].PerHundredOrders.Should().BeNull("agent two took no orders");
 
-        // R-05: repeat complainers.
-        var repeat = await d.GetAsync<List<CustomerRankRowDto>>("calls/repeat-complainers", d.BranchA);
-        repeat.Should().ContainSingle().Which.ContactId.Should().Be(d.CustomerY);
-        repeat[0].Complaints.Should().Be(2);
+        // R-05: repeat complainers. One complaint is not a repeat.
+        (await d.GetAsync<List<CustomerRankRowDto>>("calls/repeat-complainers", d.BranchA)).Should().BeEmpty();
 
         // ---- branch B: the same reports, other figures ----
 
@@ -116,7 +140,7 @@ public class CallReportsTests(CallCenterApiFactory factory)
             .Should().Be((2, 2, 0, 1, 1));
         (await d.GetAsync<List<TypeShareRowDto>>("calls/by-type", d.BranchB))
             .Select(r => (r.TypeName, r.Count, r.Share)).Should().Equal(("Order", 1, 100.0m));
-        (await d.GetAsync<List<ProblemRowDto>>("calls/complaints", d.BranchB)).Should().BeEmpty();
+        (await d.GetAsync<List<ComplaintCaseDto>>("calls/complaints", d.BranchB)).Should().BeEmpty();
 
         // ---- both branches at once: either one matches (Dia, 2 Oct 2026) ----
 
@@ -137,7 +161,7 @@ public class CallReportsTests(CallCenterApiFactory factory)
 
         var search = await d.Supervisor.GetFromJsonAsync<CallSearchPageDto>(
             $"/api/communications/search?branchId={d.BranchA}&from={Instant(d.Day)}&to={Instant(d.Day.AddDays(1))}&pageSize=100");
-        search!.Total.Should().Be(11, "the list is every call, the internal one included: S-48 keeps it out of the figures, not the record");
+        search!.Total.Should().Be(13, "the list is every call, the three internal ones included: S-48 keeps them out of the figures, not the record");
 
         var export = await d.Supervisor.GetAsync(
             $"/api/communications/search/export?branchId={d.BranchA}&from={Instant(d.Day)}&to={Instant(d.Day.AddDays(1))}&lang=en");
@@ -147,7 +171,7 @@ public class CallReportsTests(CallCenterApiFactory factory)
         bytes.Take(3).Should().Equal(0xEF, 0xBB, 0xBF);
         var lines = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3).TrimEnd().Split("\r\n");
         lines[0].Should().Be("Date,Time,Direction,Result,Agent,Customer,Number,Branch,Channel,Type,Order value,Duration (seconds),Notes,Recording");
-        lines.Should().HaveCount(1 + 11);
+        lines.Should().HaveCount(1 + 13);
         var numbers = lines.Skip(1).Select(l => l.Split(',')[6]).ToList();
         // As ="0599…", quoted for CSV: Excel shows it as typed, leading 0 and all (M-S02).
         numbers.Should().BeEquivalentTo(search.Rows.Select(r => $"\"=\"\"{r.RemoteNumberRaw}\"\"\""));
@@ -653,6 +677,8 @@ public class CallReportsTests(CallCenterApiFactory factory)
     ///  21:00 in  answered  two  (unknown), unclassified
     ///  21:30 in  blocked   one  (unknown)
     ///  21:45 in  answered  one  internal number (S-48)
+    ///  21:50 out answered  two  extension 2001 (a branch), Order 999
+    ///  21:55 in  answered  one  extension 102 (an agent), Order 999
     ///  next day 10:00 in answered one X  Cancellation, value 30 (not revenue)
     /// X was saved by an agent a month before the day, Y by an agent since it,
     /// and Z by nobody here (as the old system's customers were).
@@ -760,8 +786,12 @@ public class CallReportsTests(CallCenterApiFactory factory)
         await day.CallAsync(a, day.At(21), In, Answered, two.Id, null);
         await day.CallAsync(a, day.At(21, 30), In, CommunicationStatuses.Blocked, one.Id, null);
 
-        // S-48: an internal number, added to the list for this test and put back.
-        var internalNumber = $"7{Random.Shared.Next(1000, 9999)}";
+        // Extensions are internal with no list: agent to branch, and agent to agent.
+        await day.CallAsync(a, day.At(21, 50), Out, Answered, two.Id, null, number: "2001", type: day.Order, value: 999m);
+        await day.CallAsync(a, day.At(21, 55), In, Answered, one.Id, null, number: "102", type: day.Order, value: 999m);
+
+        // S-48: a branch's full number, added to the list for this test and put back.
+        var internalNumber = $"0222{Random.Shared.Next(10000, 99999)}";
         var previous = await SetInternalNumbersAsync(n => string.IsNullOrWhiteSpace(n) ? internalNumber : $"{n},{internalNumber}");
         try
         {

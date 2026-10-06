@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -120,6 +120,7 @@ export default function ReportCard<T>({
   chart,
   exportName,
   limit,
+  expand,
   children,
 }: {
   title: string
@@ -137,6 +138,11 @@ export default function ReportCard<T>({
    * a year of complaints is a file to open, not a page to scroll.
    */
   limit?: number
+  /**
+   * What a row opens to, under it (the complaints: their calls, to listen to).
+   * The first cell becomes the button that opens and closes it.
+   */
+  expand?: (row: T) => React.ReactNode
   /** Controls that belong to this report alone, such as its grouping. */
   children?: React.ReactNode
 }) {
@@ -144,6 +150,7 @@ export default function ReportCard<T>({
   const theme = useTheme()
   const section = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
+  const [opened, setOpened] = useState<number | null>(null)
 
   // A card knows its rows, not the query behind them, so Retry asks again for
   // every report on the page that failed: when one fails, it is usually the
@@ -212,19 +219,34 @@ export default function ReportCard<T>({
                 </thead>
                 <tbody>
                   {shown!.map((row, i) => (
-                    <tr key={i}>
-                      {columns.map((c) => (
-                        // Centred under its heading; only the figure itself is
-                        // held left-to-right, so 1,587.74 reads the same in both.
-                        <td key={c.key}
-                          className={[c.numeric ? 'tabular text-center' : '', c.heat ? 'heat-cell' : ''].join(' ').trim() || undefined}
-                          style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax, theme) : undefined}>
-                          {c.numeric || c.ltr
+                    <Fragment key={i}>
+                      <tr>
+                        {columns.map((c, ci) => {
+                          // Centred under its heading; only the figure itself is
+                          // held left-to-right, so 1,587.74 reads the same in both.
+                          const text = c.numeric || c.ltr
                             ? <span dir="ltr">{c.format ? c.format(row) : number(c.value(row))}</span>
-                            : c.format ? c.format(row) : number(c.value(row))}
-                        </td>
-                      ))}
-                    </tr>
+                            : c.format ? c.format(row) : number(c.value(row))
+                          return (
+                            <td key={c.key}
+                              className={[c.numeric ? 'tabular text-center' : '', c.heat ? 'heat-cell' : ''].join(' ').trim() || undefined}
+                              style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax, theme) : undefined}>
+                              {expand && ci === 0 ? (
+                                <button type="button" className="text-start text-brand-500 underline" aria-expanded={opened === i}
+                                  onClick={() => setOpened(opened === i ? null : i)}>
+                                  <span aria-hidden="true">{opened === i ? '▾ ' : '▸ '}</span>{text}
+                                </button>
+                              ) : text}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                      {expand && opened === i && (
+                        <tr className="no-print">
+                          <td colSpan={columns.length} className="bg-ink-900/40">{expand(row)}</td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                   {totals && (
                     <tr className="font-semibold text-slate-100">

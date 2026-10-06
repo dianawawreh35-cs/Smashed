@@ -24,9 +24,12 @@ public class ReportQuery
     [FromQuery(Name = "channelId")] public Guid[] ChannelIds { get; set; } = [];
     [FromQuery(Name = "typeId")] public Guid[] TypeIds { get; set; } = [];
 
+    /// <summary><c>in</c> or <c>out</c>: the calls that way only (Dia, 6 Oct 2026). Anything else is both.</summary>
+    public string? Direction { get; set; }
+
     /// <param name="kind">Which communications the report counts; the call reports' own methods choose.</param>
     public ReportFilter ToFilter(string? kind = CommunicationKinds.App) =>
-        new(From, To, AgentIds, BranchIds, ChannelIds, TypeIds, kind);
+        new(From, To, AgentIds, BranchIds, ChannelIds, TypeIds, kind, Direction: ReportScope.ParseDirection(Direction));
 }
 
 /// <summary>
@@ -63,10 +66,13 @@ public class CallReportsController(CallReportsService reports, ApplicationReport
         [FromQuery] ReportQuery query, CancellationToken ct) =>
         Ok(await reports.RecurringCustomersAsync(query.ToFilter(), ct));
 
-    /// <summary>R-05: every complaint in the period, with notes and follow-up status.</summary>
+    /// <summary>
+    /// R-05: every complaint in the period, each once, with its calls and
+    /// messages (Dia, 6 Oct 2026). Both directions, whatever the switch says.
+    /// </summary>
     [HttpGet("complaints")]
-    public async Task<ActionResult<IReadOnlyList<ProblemRowDto>>> Complaints([FromQuery] ReportQuery query, CancellationToken ct) =>
-        Ok(await reports.ProblemsAsync(query.ToFilter(), "Complaint", allChannels: false, ct));
+    public async Task<ActionResult<IReadOnlyList<ComplaintCaseDto>>> Complaints([FromQuery] ReportQuery query, CancellationToken ct) =>
+        Ok(await reports.ComplaintCasesAsync(query.ToFilter(), ct));
 
     /// <summary>R-05 per branch or agent, and R-17's handling figures.</summary>
     /// <param name="groupBy"><c>branch</c> (the default), <c>agent</c>, <c>day</c>, <c>week</c> or <c>month</c>.</param>
@@ -189,13 +195,14 @@ public class CallReportsController(CallReportsService reports, ApplicationReport
 public class DashboardController(CallReportsService reports) : ControllerBase
 {
     /// <summary>Today's figures, today being the restaurant's.</summary>
+    /// <param name="direction"><c>in</c> or <c>out</c>: the calls that way only (Dia, 6 Oct 2026).</param>
     [HttpGet("today")]
-    public async Task<ActionResult<DashboardTodayDto>> Today(CancellationToken ct) =>
-        Ok(await reports.TodayAsync(ct));
+    public async Task<ActionResult<DashboardTodayDto>> Today([FromQuery] string? direction, CancellationToken ct) =>
+        Ok(await reports.TodayAsync(ReportScope.ParseDirection(direction), ct));
 
     /// <summary>The four charts for the chosen period.</summary>
     [HttpGet("period")]
     public async Task<ActionResult<DashboardPeriodDto>> Period(
-        [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, CancellationToken ct) =>
-        Ok(await reports.PeriodAsync(new ReportFilter(from, to), ct));
+        [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] string? direction, CancellationToken ct) =>
+        Ok(await reports.PeriodAsync(new ReportFilter(from, to, Direction: ReportScope.ParseDirection(direction)), ct));
 }

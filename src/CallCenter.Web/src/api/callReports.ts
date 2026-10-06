@@ -9,27 +9,34 @@
  * the rows are the report.
  */
 import { api } from './client'
-import type { OrdersReportRow, ReportFilters, TypeCount } from './applicationReports'
+import type { CallDirection, OrdersReportRow, ReportFilters, TypeCount } from './applicationReports'
+import type { CallRow } from './calls'
 
 export type TimeGrouping = 'day' | 'week' | 'month'
 export type BreakdownGrouping = TimeGrouping | 'agent' | 'branch'
 export type ComplaintsGrouping = TimeGrouping | 'branch' | 'agent'
 
-/** R-01. Inbound = answered + missed + abandoned + blocked. */
+/**
+ * R-01, for one direction at a time. Inbound = answered + missed + abandoned
+ * + blocked; outbound = answered + not answered.
+ */
 export interface CallSummaryRow {
   bucket: string
   communications: number
   calls: number
+  /** Through the applications. */
   messages: number
   inbound: number
   outbound: number
-  /** Inbound calls answered. */
+  /** Calls answered, in the direction asked for. */
   answered: number
   /** Inbound calls Missed or Rejected; never an outbound NoAnswer. */
   missed: number
   blocked: number
   /** Gave up in the PBX queue (S-55). Their rings are not counted again. */
   abandoned: number
+  /** Outbound calls nobody picked up, or that could not be placed. */
+  notAnswered: number
 }
 
 /** R-03: share is a percentage of the classified calls. */
@@ -51,6 +58,8 @@ export interface CallBreakdownRow {
   orders: number
   orderValue: number
   byType: TypeCount[]
+  /** Outbound calls nobody picked up, or that could not be placed. */
+  notAnswered: number
 }
 
 /** A customer, ranked (R-04, R-05, R-16). */
@@ -79,6 +88,33 @@ export interface ProblemRow {
   followUp: boolean
   resolved: boolean
   resolvedAt: string | null
+}
+
+/**
+ * One complaint (Dia, 6 Oct 2026): every call and application message
+ * classified Complaint from one customer on one working day (05:00 to 05:00),
+ * incoming and outgoing together.
+ */
+export interface ComplaintCase {
+  id: string
+  firstAt: string
+  lastAt: string
+  /** The working day, yyyy-mm-dd. */
+  day: string
+  contactId: string | null
+  customer: string | null
+  number: string | null
+  /** Who took the first of it. */
+  agent: string | null
+  branch: string | null
+  calls: number
+  applications: number
+  notes: string | null
+  followUp: boolean
+  resolved: boolean
+  resolvedAt: string | null
+  /** Its calls and messages, first to last, as the Calls page lists them. */
+  communications: CallRow[]
 }
 
 /** R-05 per branch or agent, and R-17. */
@@ -154,7 +190,8 @@ export const callBreakdown = (f: ReportFilters, groupBy: BreakdownGrouping) =>
 export const recurringCustomers = (f: ReportFilters) =>
   api.get<CustomerRankRow[]>(`${BASE}/recurring-customers`, q(f))
 
-export const complaintsList = (f: ReportFilters) => api.get<ProblemRow[]>(`${BASE}/complaints`, q(f))
+/** Each complaint once, with its calls and messages; both directions whatever `f.direction` says. */
+export const complaintsList = (f: ReportFilters) => api.get<ComplaintCase[]>(`${BASE}/complaints`, q(f))
 
 export const complaintsBy = (f: ReportFilters, groupBy: ComplaintsGrouping) =>
   api.get<ComplaintsRow[]>(`${BASE}/complaints/by`, q(f, { groupBy }))
@@ -166,10 +203,11 @@ export const repeatComplainers = (f: ReportFilters) =>
 export const orderValue = (f: ReportFilters, groupBy: 'channel' | 'branch' | 'agent' | 'day') =>
   api.get<OrdersReportRow[]>(`${BASE}/orders`, q(f, { groupBy }))
 
-export const dashboardToday = () => api.get<DashboardToday>('/reports/dashboard/today')
+export const dashboardToday = (direction: CallDirection) =>
+  api.get<DashboardToday>('/reports/dashboard/today', { query: { direction } })
 
-export const dashboardPeriod = (from?: string, to?: string) =>
-  api.get<DashboardPeriod>('/reports/dashboard/period', { query: { from, to } })
+export const dashboardPeriod = (from: string | undefined, to: string | undefined, direction: CallDirection) =>
+  api.get<DashboardPeriod>('/reports/dashboard/period', { query: { from, to, direction } })
 
 // ---- Phase 2 (R-10 to R-18) -----------------------------------------------------
 

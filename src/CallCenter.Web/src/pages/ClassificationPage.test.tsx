@@ -260,7 +260,7 @@ describe('classification form editor', () => {
     const fetchMock = stubApi()
     renderPage()
 
-    const messages = (await screen.findByText('Questions for messages (applications)')).closest(
+    const messages = (await screen.findByText('Questions for applications')).closest(
       '.card',
     )! as HTMLElement
     expect(within(messages).getByText('Version 1')).toBeInTheDocument()

@@ -1,5 +1,6 @@
 using CallCenter.Server.Data;
 using CallCenter.Server.Features.Auth;
+using CallCenter.Server.Features.Communications;
 using CallCenter.Server.Features.Pbx;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
@@ -50,6 +51,10 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
 
     private static bool IsAnswered(CubeCell c) => IsCall(c) && c.Status == CommunicationStatuses.Answered;
 
+    /// <summary>A call an agent made that nobody picked up, or that could not be placed (A-21).</summary>
+    private static bool IsNotAnswered(CubeCell c) =>
+        IsOutbound(c) && c.Status is CommunicationStatuses.NoAnswer or CommunicationStatuses.Failed;
+
     /// <summary>S-55: a customer rang and gave up in the queue before anybody took it. From the PBX, never an agent's.</summary>
     private static bool IsAbandoned(CubeCell c) => IsInbound(c) && c.Status == CommunicationStatuses.Abandoned;
 
@@ -79,10 +84,11 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
                 Count(g, IsMessage),
                 Count(g, IsInbound),
                 Count(g, IsOutbound),
-                Count(g, c => IsInbound(c) && IsAnswered(c)),
+                Count(g, IsAnswered),
                 Count(g, IsMissed),
                 Count(g, c => IsInbound(c) && c.Status == CommunicationStatuses.Blocked),
-                Count(g, IsAbandoned)))
+                Count(g, IsAbandoned),
+                Count(g, IsNotAnswered)))
             .OrderBy(r => r.Bucket)
             .ToList();
     }
@@ -124,7 +130,8 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
                 Count(g, IsMissed),
                 g.Sum(c => c.Orders),
                 g.Sum(c => c.OrderValue),
-                TypeCounts(g, names)));
+                TypeCounts(g, names),
+                Count(g, IsNotAnswered)));
 
         return (IsTime(by) ? grouped.OrderBy(r => r.Key) : grouped.OrderByDescending(r => r.Calls).ThenBy(r => r.Label)).ToList();
     }
@@ -172,50 +179,150 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
 
     // ---- R-05 per branch or agent, and R-17 ----------------------------------------
 
+    // ---- R-05 and R-17: complaints, each once -----------------------------------------
+
+    /// <summary>What a complaint row is grouped and counted by.</summary>
+    private sealed record ComplaintFact(
+        Guid Id, DateTimeOffset StartedAt, string Kind, Guid? ContactId, string? Number,
+        Guid? AgentId, Guid? BranchId, bool FollowUp, bool Resolved, DateTimeOffset? ResolvedAt);
+
+    /// <summary>
+    /// Calls and messages, both directions: a complaint, its call back and a
+    /// message about it are one complaint, so the Incoming / Outgoing switch
+    /// does not split them (Dia, 6 Oct 2026).
+    /// </summary>
+    private static ReportFilter ComplaintScope(ReportFilter f) => f with { Kind = null, Direction = null };
+
+    /// <summary>The period's complaints, as <see cref="ComplaintCases"/> groups them.</summary>
+    private async Task<List<List<ComplaintFact>>> ComplaintGroupsAsync(ReportFilter filter, CancellationToken ct)
+    {
+        var facts = await ReportScope.Narrow(db.Communications.AsNoTracking(), ComplaintScope(filter), await ReportScope.InternalNumbersAsync(db, ct))
+            .Where(c => c.Classification != null && c.Classification.Type.Name == "Complaint")
+            .Select(c => new ComplaintFact(
+                c.Id, c.StartedAt, c.Kind, c.ContactId, c.RemoteNormalised, c.AgentId, c.BranchId,
+                c.Classification!.FollowUp, c.Classification.Resolved == true, c.Classification.ResolvedAt))
+            .ToListAsync(ct);
+
+        return ComplaintCases.Group(facts, f => new ComplaintCases.Key(f.StartedAt, f.ContactId, f.Number));
+    }
+
+    /// <summary>
+    /// R-05's list: every complaint in the period, newest first, each with its
+    /// calls and messages as the Calls page lists them, so the recordings can
+    /// be played where the complaint is read.
+    /// </summary>
+    public async Task<IReadOnlyList<ComplaintCaseDto>> ComplaintCasesAsync(ReportFilter filter, CancellationToken ct = default)
+    {
+        var groups = await ComplaintGroupsAsync(filter, ct);
+        var ids = groups.SelectMany(g => g).Select(f => f.Id).ToList();
+        var rows = (await CallSearchService.Project(db.Communications.AsNoTracking().Where(c => ids.Contains(c.Id))).ToListAsync(ct))
+            .ToDictionary(r => r.Id);
+
+        return groups
+            .Select(g =>
+            {
+                var lines = g.Select(f => rows[f.Id]).ToList();
+                var first = lines[0];
+                var named = lines.FirstOrDefault(r => r.ContactName is not null);
+                var resolved = g.Where(f => f.Resolved).ToList();
+                var notes = lines.Select(r => r.Notes?.Trim()).Where(n => !string.IsNullOrEmpty(n)).Distinct().ToList();
+                return new ComplaintCaseDto(
+                    first.Id,
+                    first.StartedAt,
+                    lines[^1].StartedAt,
+                    ReportScope.Day(ComplaintCases.WorkingDay(first.StartedAt)),
+                    named?.ContactId ?? first.ContactId,
+                    named?.ContactName,
+                    lines.Select(r => r.RemoteNumberRaw).FirstOrDefault(n => !string.IsNullOrEmpty(n)),
+                    first.AgentDisplayName,
+                    first.BranchName,
+                    g.Count(f => f.Kind == CommunicationKinds.Call),
+                    g.Count(f => f.Kind == CommunicationKinds.App),
+                    notes.Count == 0 ? null : string.Join(" · ", notes),
+                    g.Any(f => f.FollowUp),
+                    resolved.Count > 0,
+                    resolved.Max(f => f.ResolvedAt),
+                    lines);
+            })
+            .OrderByDescending(c => c.LastAt).ThenBy(c => c.Id)
+            .ToList();
+    }
+
     /// <summary>
     /// R-05 per branch or agent, and R-17: complaints, how many needed a
     /// follow-up, how many are resolved and how long that took, and complaints
-    /// per 100 orders under the same heading.
+    /// per 100 orders under the same heading. A complaint counts once, under
+    /// its first row's branch, agent and working day; the orders are calls and
+    /// messages, both directions, as the complaints are.
     /// </summary>
     /// <param name="groupBy"><c>branch</c> (the default), <c>agent</c>, <c>day</c>, <c>week</c> or <c>month</c>.</param>
     public async Task<IReadOnlyList<ComplaintsRowDto>> ComplaintsByAsync(
         ReportFilter filter, string? groupBy, CancellationToken ct = default)
     {
-        var by = groupBy ?? "branch";
-        var cells = await cube.CountAsync(Calls(filter), Dimension(by), ct);
+        var by = (groupBy ?? "branch").ToLowerInvariant();
+        if (by is not ("agent" or "day" or "week" or "month")) by = "branch";
         var names = await cube.NamesAsync(ct);
-
-        var grouped = cells
+        var groups = await ComplaintGroupsAsync(filter, ct);
+        var orders = (await cube.CountAsync(ComplaintScope(filter), Dimension(by), ct))
             .GroupBy(Heading(by, names))
-            .Where(g => g.Sum(c => c.Complaints) > 0)
-            .Select(g =>
+            .ToDictionary(g => g.Key.Key, g => g.Sum(c => c.Orders));
+
+        Func<ComplaintFact, (string Key, string Label)> heading = by switch
+        {
+            "agent" => f => (f.AgentId?.ToString() ?? string.Empty, names.Agent(f.AgentId)),
+            "branch" => f => (f.BranchId?.ToString() ?? string.Empty, names.Branch(f.BranchId)),
+            _ => f =>
             {
-                var complaints = g.Sum(c => c.Complaints);
-                var resolved = g.Sum(c => c.Resolved);
-                var timed = g.Sum(c => c.ResolvedTimed);
-                var orders = g.Sum(c => c.Orders);
+                var bucket = ReportScope.Bucket(ComplaintCases.WorkingDay(f.StartedAt), by);
+                return (bucket, bucket);
+            },
+        };
+
+        var grouped = groups
+            .GroupBy(g => heading(g[0]))
+            .Select(x =>
+            {
+                var complaints = x.Count();
+                var resolved = x.Where(g => g.Any(f => f.Resolved)).ToList();
+                var hours = resolved
+                    .Select(g => g.Max(f => f.ResolvedAt) - g[0].StartedAt)
+                    .Where(t => t is not null)
+                    .Select(t => t!.Value.TotalHours)
+                    .ToList();
+                var o = orders.GetValueOrDefault(x.Key.Key);
                 return new ComplaintsRowDto(
-                    g.Key.Key,
-                    g.Key.Label,
+                    x.Key.Key,
+                    x.Key.Label,
                     complaints,
-                    g.Sum(c => c.FollowUp),
-                    resolved,
-                    complaints - resolved,
-                    timed == 0 ? null : Math.Round((decimal)(g.Sum(c => c.ResolveHours) / timed), 1),
-                    orders,
-                    orders == 0 ? null : Math.Round(complaints * 100m / orders, 1));
+                    x.Count(g => g.Any(f => f.FollowUp)),
+                    resolved.Count,
+                    complaints - resolved.Count,
+                    hours.Count == 0 ? null : Math.Round((decimal)hours.Average(), 1),
+                    o,
+                    o == 0 ? null : Math.Round(complaints * 100m / o, 1));
             });
 
         return (IsTime(by) ? grouped.OrderBy(r => r.Key) : grouped.OrderByDescending(r => r.Complaints).ThenBy(r => r.Label)).ToList();
     }
 
-    /// <summary>R-05: customers who complained more than once in the period.</summary>
+    /// <summary>R-05: customers with more than one complaint in the period, a complaint counted once (<see cref="ComplaintCases"/>).</summary>
     public async Task<IReadOnlyList<CustomerRankRowDto>> RepeatComplainersAsync(
-        ReportFilter filter, CancellationToken ct = default) =>
-        (await CustomersAsync(Calls(filter), ct))
-            .Where(c => c.Complaints > 1)
+        ReportFilter filter, CancellationToken ct = default)
+    {
+        var perCustomer = (await ComplaintGroupsAsync(filter, ct))
+            .Select(g => g.Select(f => f.ContactId).FirstOrDefault(c => c is not null))
+            .Where(c => c is not null)
+            .GroupBy(c => c!.Value)
+            .Where(g => g.Count() > 1)
+            .ToDictionary(g => g.Key, g => g.Count());
+        if (perCustomer.Count == 0) return [];
+
+        return (await CustomersAsync(ComplaintScope(filter), ct))
+            .Where(c => perCustomer.ContainsKey(c.ContactId))
+            .Select(c => c with { Complaints = perCustomer[c.ContactId] })
             .OrderByDescending(c => c.Complaints).ThenByDescending(c => c.LastAt)
             .ToList();
+    }
 
     // ---- R-10 -------------------------------------------------------------------------
 
@@ -600,10 +707,11 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
     /// answered by somebody or abandoned (<see cref="ReportFilter.WithoutUntaken"/>).
     /// They are shown beside the totals instead, for how efficient the agents are.
     /// </summary>
-    public async Task<DashboardTodayDto> TodayAsync(CancellationToken ct = default)
+    /// <param name="direction"><c>In</c> or <c>Out</c>: the calls that way only (Dia, 6 Oct 2026). Null for both.</param>
+    public async Task<DashboardTodayDto> TodayAsync(string? direction = null, CancellationToken ct = default)
     {
         var (start, end) = ReportScope.Today();
-        var today = new ReportFilter(start, end, Kind: null, WithoutUntaken: true);
+        var today = new ReportFilter(start, end, Kind: null, WithoutUntaken: true, Direction: direction);
         var cells = await cube.CountAsync(today, Outcome | CubeBy.Channel | CubeBy.Type, ct);
         var names = await cube.NamesAsync(ct);
 
@@ -645,7 +753,7 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
             ChannelCounts(cells, names),
             cells.Sum(c => c.Orders),
             cells.Sum(c => c.OrderValue),
-            cells.Sum(c => c.Complaints),
+            (await ComplaintGroupsAsync(new ReportFilter(start, end), ct)).Count,
             cells.Sum(Unclassified),
             online,
             Count(cells, IsAbandoned),
@@ -657,7 +765,7 @@ public class CallReportsService(CallCenterDbContext db, ReportCube cube, Extensi
             Count(cells, c => IsInbound(c) && IsAnswered(c)),
             Count(cells, IsOutbound),
             Count(cells, c => IsOutbound(c) && IsAnswered(c)),
-            Count(cells, c => IsOutbound(c) && c.Status is CommunicationStatuses.NoAnswer or CommunicationStatuses.Failed));
+            Count(cells, IsNotAnswered));
     }
 
     /// <summary>

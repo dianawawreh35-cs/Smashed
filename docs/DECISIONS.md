@@ -9349,6 +9349,96 @@ the same as `v0.14.1`). **Nothing is live yet:** upload **Agent App 0.15.0**
 tag) on the Agent App page in place of 0.14.1. It carries 0.14.1's light
 mode fix too.
 
+## 2026-10-06 — Incoming and outgoing apart, complaints counted once, messages are applications (R-01, R-05, S-20)
+
+**In plain terms.** Three things Dia asked for, the same morning as the
+extension calls above:
+
+- **Incoming and outgoing calls are never added together.** Call reports and
+  the dashboard have an **Incoming / Outgoing** switch at the top, Incoming by
+  default, with no "both". Every call figure, table and chart is for the one
+  chosen; the applications have no direction and are counted either way.
+- **A complaint is counted once.** A customer who calls in to complain, is
+  called back, and writes on WhatsApp the same evening has made one complaint,
+  not three. Complaints have their own tab, where each complaint opens to its
+  calls with their recordings to play.
+- **"Messages" are "Applications"** everywhere in the web app, in both
+  languages (التطبيقات), as the Applications page was already called.
+
+**How the switch works.** One filter, `direction=in|out` on every call report
+and on the dashboard's two requests (`ReportFilter.Direction`, applied in
+`ReportScope.Narrow` and the cube's SQL, which lets messages through). R-01
+and R-04 gained a **Not answered** count, the outgoing calls' word for what
+Missed is to incoming ones; R-01's Answered now means answered in the
+direction asked for (it was incoming only). With Outgoing chosen, the
+columns change to that direction's words (calls made, answered, not
+answered), Peak hours is hidden, and the Missed calls and Abandoned tabs say
+they are about incoming calls, with a button back, rather than showing zeros.
+Without the parameter the server still counts both, which only the tests do.
+
+**What is one complaint.** Rows classified Complaint, calls either way and
+applications alike, are one complaint when they share a **contact or a
+number** (directly, or through a third row) on the same **working day**,
+**05:00 to 05:00**. Dia: the restaurant works past midnight, until one or two
+and sometimes later. Her message was cut off there, so 05:00 is my choice:
+`ComplaintCases.WorkingDayStartsAtHour`, one constant to change. A withheld
+number nobody saved is a complaint of its own. Choices made here, Dia not
+asked, each easy to change:
+
+- A complaint is **resolved when any of its rows is** (a supervisor usually
+  resolves one call, not each), and its time to resolve runs from its first
+  row to the latest resolution.
+- It sits under its **first row's** branch, agent and working day.
+- **Complaints ignore the switch** (Dia chose this): the list and the counts
+  are the same with Incoming or Outgoing.
+- The per-100-orders figure now counts **application orders too**, since
+  complaints include applications.
+- The **per-type tables** (Calls per type, the breakdown's type columns, the
+  dashboard's by type) still count calls of the chosen direction, not
+  complaints: they are calls by what they were about.
+
+**Checked:** server 646 of 646 against `callcenter_test`, four of them new
+(`ComplaintCasesTests`: one day, past midnight to 05:00, contact or number,
+withheld). The known test day now finds Y's two complaint calls (13:00 and
+18:00) as one complaint, resolved, seven hours after the first call, and
+checks R-01, R-03, R-04 and R-15 for each direction. Shared 167 of 167. Web:
+type-check, lint, 241 of 241 (direction sent and columns swapped, the
+incoming-only tabs, a complaint opened to its two calls and a recording
+fetched, the new export columns, the dashboard's blocks). **Not seen running.**
+
+**To deploy:** the server and the web app, one release. Not released yet.
+
+## 2026-10-06 — Calls between agents and branches are in no report (S-48)
+
+**In plain terms.** Dia: calls between an agent and a branch, a branch and an
+agent, or two agents should not be in the reports or the overview, only kept
+as the app's recording. They were being counted, because a call was only
+treated as internal when its number was typed into the internal numbers
+setting (`reports.internal_numbers`), and that setting is empty. Now any call
+whose other party is an **extension** (five digits or fewer, as every agent
+and branch is on the PBX) is internal on its own, with nothing to set up.
+
+- **Where it applies:** every call report (all tabs, Overview included), the
+  dashboard's today and period figures, and the application reports' shared
+  filter. One rule, written in the two places the reports filter
+  (`ReportScope.Narrow` in LINQ and `ReportCube.Where` in SQL).
+- **What still shows them:** the Agent App's call log and its recording, the
+  contact history, and the supervisor's Calls page (search, playback,
+  export). The rule keeps them out of the figures, not out of the record.
+- **Calls only.** A message from another channel is never treated as an
+  extension.
+- **The settings list stays**, for a branch reached on a full number.
+- A withheld number is still a customer's and still counted.
+
+**Checked:** the call report and dashboard tests, 21 of 21 against
+`callcenter_test`. The known test day gained an agent-to-branch call (2001)
+and an agent-to-agent call (102), both with an Order of 999 on them, and every
+figure is unchanged, while the Calls page lists them (13 rows, not 11). The
+listed internal number in that test is now a full landline, so the list is
+still tested on its own. **Not seen running.**
+
+**To deploy:** the server only. Not released yet.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -9400,6 +9490,8 @@ running**.
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
 | Abandoned calls from the PBX's Calls Detail report | S-55, R-20 | **built 26 Sep and seen importing on the dev server**. Still to see: the Abandoned tab and the settings card, in both languages. Production needs a PBX user of its own (runbook 8.1), not Dia's |
 | POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
+| **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **built 6 Oct, not released, not yet seen running.** The same release as the row below |
+| **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **built 6 Oct, not released, not yet seen running.** A server release |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | The PBX's view of each phone: ringing (`early`) on the Users page | S-61 | built 26 Sep; offline, free and in a call seen, ringing not yet |
 | **Listen & speak (`*223`)**: checklist "Listen & speak"; above all, that the customer does not hear the supervisor | S-62 | **built 2 Oct, not yet heard on the PBX.** `*223` allowed on the server's extension; the microphone setting on a supervisor PC (runbook) |

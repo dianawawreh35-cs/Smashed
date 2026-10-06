@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import type { CallDirection } from '../api/applicationReports'
 import { listChannels } from '../api/channels'
 import { listClassificationTypes } from '../api/classifications'
 import { listBranches } from '../api/delivery'
@@ -17,8 +18,36 @@ import type { Preset, ReportDraft } from '../lib/reportFilters'
 
 const PRESETS: Preset[] = ['today', 'week', 'month', 'custom']
 
+const DIRECTIONS: CallDirection[] = ['In', 'Out']
+
+/**
+ * Incoming or outgoing calls (Dia, 6 Oct 2026): every call figure on the page
+ * is for the one chosen, and the two are never added together. There is no
+ * "both". Applications have no direction and are counted either way.
+ */
+export function DirectionSwitch({ value, onChange }: { value: CallDirection; onChange: (value: CallDirection) => void }) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('callReports.direction.label')}>
+      <span className="field-label me-2">{t('callReports.direction.label')}</span>
+      {DIRECTIONS.map((direction) => (
+        <button
+          key={direction}
+          type="button"
+          aria-pressed={value === direction}
+          className={value === direction ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'}
+          onClick={() => onChange(direction)}
+        >
+          {t(`callReports.direction.${direction}`)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function ReportFilterBar({
   draft, set, choosePreset, includePhone = false, channels: showChannels = true, periodOnly = false, agentOnly = false,
+  direction, onDirection,
 }: {
   draft: ReportDraft
   set: <K extends keyof ReportDraft>(key: K) => (value: ReportDraft[K]) => void
@@ -30,6 +59,9 @@ export function ReportFilterBar({
   periodOnly?: boolean
   /** The break report takes a period and an agent (R-22): breaks have no branch, channel or type. */
   agentOnly?: boolean
+  /** The call reports: incoming or outgoing calls (`DirectionSwitch`). Left out, there is no switch. */
+  direction?: CallDirection
+  onDirection?: (value: CallDirection) => void
 }) {
   const { t, i18n } = useTranslation()
   const arabic = i18n.language.startsWith('ar')
@@ -43,6 +75,7 @@ export function ReportFilterBar({
 
   return (
     <form className="card card-body space-y-4" aria-label={t('applicationReports.filters')} onSubmit={(e) => e.preventDefault()}>
+      {direction && onDirection && <DirectionSwitch value={direction} onChange={onDirection} />}
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('applicationReports.period')}>
         <span className="field-label me-2">{t('applicationReports.period')}</span>
         {PRESETS.map((preset) => (
@@ -166,10 +199,11 @@ export function ReportPrintHeading({
       return type && (arabic ? type.labelAr : type.labelEn)
     }],
   ]
-  const filters = chosen
+  const picked = chosen
     .filter(([, ids]) => ids.length > 0)
     .map(([label, ids, name]) => `${label}: ${ids.map((id) => name(id) ?? '…').join(arabic ? '، ' : ', ')}`)
-    .concat(extra)
+  // "All agents, branches…" when none of the bar's lists is narrowed, whatever the page adds.
+  const filters = (picked.length > 0 ? picked : [t('callReports.printAll')]).concat(extra)
 
   // aria-hidden: on screen it is hidden and the page's own heading says the
   // same, and a second heading of the same name confuses a screen reader.
@@ -178,7 +212,7 @@ export function ReportPrintHeading({
       <h1 className="text-xl font-semibold">{section ? `${title} — ${section}` : title}</h1>
       <p className="text-sm">
         {t('applicationReports.period')}: <span dir="ltr">{period}</span>
-        {filters.length > 0 ? ` · ${filters.join(' · ')}` : ` · ${t('callReports.printAll')}`}
+        {filters.length > 0 && ` · ${filters.join(' · ')}`}
       </p>
       <p className="text-xs">
         {t('callReports.printedAt', { at: new Date().toLocaleString(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }) })}

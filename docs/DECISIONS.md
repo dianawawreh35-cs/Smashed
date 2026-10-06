@@ -9406,7 +9406,9 @@ type-check, lint, 241 of 241 (direction sent and columns swapped, the
 incoming-only tabs, a complaint opened to its two calls and a recording
 fetched, the new export columns, the dashboard's blocks). **Not seen running.**
 
-**To deploy:** the server and the web app, one release. Not released yet.
+**To deploy:** released as **`v0.16.0`**, server and web together, with the
+extension calls below. **Nothing is live yet:** the server's `update.sh v0.16.0`.
+No migration, nothing new in `.env`, no Agent App to upload.
 
 ## 2026-10-06 — Calls between agents and branches are in no report (S-48)
 
@@ -9437,7 +9439,8 @@ figure is unchanged, while the Calls page lists them (13 rows, not 11). The
 listed internal number in that test is now a full landline, so the list is
 still tested on its own. **Not seen running.**
 
-**To deploy:** the server only. Not released yet.
+**To deploy:** released in **`v0.16.0`** (entry above). Applies to earlier
+calls too: the reports are worked out from the saved numbers each time.
 
 ## Where to pick up
 
@@ -9490,8 +9493,8 @@ running**.
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
 | Abandoned calls from the PBX's Calls Detail report | S-55, R-20 | **built 26 Sep and seen importing on the dev server**. Still to see: the Abandoned tab and the settings card, in both languages. Production needs a PBX user of its own (runbook 8.1), not Dia's |
 | POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
-| **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **built 6 Oct, not released, not yet seen running.** The same release as the row below |
-| **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **built 6 Oct, not released, not yet seen running.** A server release |
+| **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **released as `v0.16.0`, not deployed, not yet seen running.** The server's `update.sh v0.16.0` |
+| **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **released as `v0.16.0`, not deployed, not yet seen running.** The same deploy |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | The PBX's view of each phone: ringing (`early`) on the Users page | S-61 | built 26 Sep; offline, free and in a call seen, ringing not yet |
 | **Listen & speak (`*223`)**: checklist "Listen & speak"; above all, that the customer does not hear the supervisor | S-62 | **built 2 Oct, not yet heard on the PBX.** `*223` allowed on the server's extension; the microphone setting on a supervisor PC (runbook) |

@@ -39,14 +39,20 @@ function labels(strings: Record<string, string>): Map<string, Set<string>> {
   return result
 }
 
-/** The {{placeholders}} a label takes in any of its forms, except count (a form may spell the number out). */
-function placeholders(strings: Record<string, string>, base: string): string[] {
-  const found = new Set<string>()
+/**
+ * Label → the {{placeholders}} it takes in any of its forms, except count (a
+ * form may spell the number out). One pass over the file: searching the whole
+ * file once per label grew with the square of the labels, and at about 1,500
+ * it ran past the five-second limit under a full parallel run (9 Oct 2026).
+ */
+function placeholders(strings: Record<string, string>): Map<string, string[]> {
+  const found = new Map<string, Set<string>>()
   for (const [key, text] of Object.entries(strings)) {
-    if (key !== base && key.replace(SUFFIX, '') !== base) continue
-    for (const [, name] of text.matchAll(/\{\{(\w+)\}\}/g)) if (name !== 'count') found.add(name)
+    const base = key.replace(SUFFIX, '')
+    if (!found.has(base)) found.set(base, new Set())
+    for (const [, name] of text.matchAll(/\{\{(\w+)\}\}/g)) if (name !== 'count') found.get(base)!.add(name)
   }
-  return [...found].sort()
+  return new Map([...found].map(([base, names]) => [base, [...names].sort()]))
 }
 
 afterAll(async () => {
@@ -61,8 +67,10 @@ describe('the language files', () => {
   })
 
   it('give each label the same placeholders in both languages', () => {
+    const arabic = placeholders(files.ar)
+    const english = placeholders(files.en)
     for (const base of labels(files.en).keys()) {
-      expect({ base, ar: placeholders(files.ar, base) }).toEqual({ base, ar: placeholders(files.en, base) })
+      expect({ base, ar: arabic.get(base) ?? [] }).toEqual({ base, ar: english.get(base) ?? [] })
     }
   })
 

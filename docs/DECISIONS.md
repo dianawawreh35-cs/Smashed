@@ -9560,8 +9560,9 @@ moved the search box to a minimum width, which a narrow header had squeezed
 to 110 px. **Not seen against the server**, nor the Saved notice or a sorted
 report on screen: checklist 1.15.
 
-**To deploy:** web only, no migration, no Agent App. Goes out with the next
-release.
+**To deploy:** released as **`v0.18.0`**, web only. **Nothing is live yet:**
+the server's `update.sh v0.18.0`. No migration, nothing new in `.env`, no
+Agent App to upload.
 
 ## Where to pick up
 
@@ -9616,7 +9617,7 @@ running**.
 | POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
 | **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **`v0.16.0` is on the live server** (its API answered with the switch on 9 Oct); the screens not yet seen |
 | **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **live in `v0.16.0`**: on 9 Oct the live report left out October's 22 answered branch calls (9 Oct entry) |
-| **The web app's layout**: checklist 1.15 in both languages, with screenshots of the menu, the header's status, Saved, and a sorted report; and Dia's verdict on the lists scrolling inside their cards | S-70, S-71, S-72 | **built 9 Oct, not released; seen only with sample data.** The next release |
+| **The web app's layout**: checklist 1.15 in both languages, with screenshots of the menu, the header's status, Saved, and a sorted report; and Dia's verdict on the lists scrolling inside their cards | S-70, S-71, S-72 | **released as `v0.18.0`, not deployed; seen only with sample data.** The server's `update.sh v0.18.0` |
 | **Customer calls and Internal calls tabs on the Calls page**: October's Customer calls, Answered and Incoming, says the same as the Call reports' answered incoming (290 on 9 Oct); Internal calls lists the branches' calls with their recordings; both languages | S-02, S-48 | **released as `v0.17.0`, not deployed, not yet seen running.** The server's `update.sh v0.17.0` |
 | The Calls page lists each untaken ring of an abandoned call, and the reports do not: October's customer missed calls were 73 on the page and 64 in the report | S-55, R-01 | Dia's call: hide the rings on Customer calls, or keep them and say so on the page |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |

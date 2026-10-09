@@ -163,6 +163,18 @@ public class CallReportsTests(CallCenterApiFactory factory)
             $"/api/communications/search?branchId={d.BranchA}&from={Instant(d.Day)}&to={Instant(d.Day.AddDays(1))}&pageSize=100");
         search!.Total.Should().Be(13, "the list is every call, the three internal ones included: S-48 keeps them out of the figures, not the record");
 
+        // The Calls page's two tabs (Dia, 9 Oct 2026): Customer calls is what
+        // the report counts, answered and all, and Internal calls is the rest.
+        var range = $"branchId={d.BranchA}&from={Instant(d.Day)}&to={Instant(d.Day.AddDays(1))}&pageSize=100";
+        async Task<CallSearchPageDto> Tab(string query) =>
+            (await d.Supervisor.GetFromJsonAsync<CallSearchPageDto>($"/api/communications/search?{range}&{query}"))!;
+        (await Tab("internal=false")).Total.Should().Be(day.Calls);
+        (await Tab($"internal=false&status={CommunicationStatuses.Answered}&direction={Directions.In}")).Total
+            .Should().Be(incoming.Answered, "the 9 October question: answered incoming, the same on both screens");
+        var internalCalls = await Tab("internal=true");
+        internalCalls.Total.Should().Be(3, "the listed number and the two extensions");
+        internalCalls.Rows.Should().OnlyContain(r => r.RemoteNumberRaw != null);
+
         var export = await d.Supervisor.GetAsync(
             $"/api/communications/search/export?branchId={d.BranchA}&from={Instant(d.Day)}&to={Instant(d.Day.AddDays(1))}&lang=en");
         export.StatusCode.Should().Be(HttpStatusCode.OK);

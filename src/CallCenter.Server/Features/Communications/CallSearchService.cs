@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using CallCenter.Server.Data;
 using CallCenter.Server.Data.Entities;
+using CallCenter.Server.Features.Reports;
 using CallCenter.Shared;
 using CallCenter.Shared.Contracts.Communications;
 using CallCenter.Shared.Phone;
@@ -44,6 +46,11 @@ public class CallSearchService(CallCenterDbContext db)
     /// combined view later.
     /// </param>
     /// <param name="ChannelIds">Which apps, for messages (S-02's channel filter).</param>
+    /// <param name="Internal">
+    /// <c>false</c> for the customers' calls only, the ones the reports count;
+    /// <c>true</c> for the internal ones only, which the reports leave out
+    /// (S-48): the Calls page's two tabs (Dia, 9 Oct 2026). Null for both.
+    /// </param>
     /// <remarks>
     /// The lists match any of their values; empty or null is no filter. A
     /// supervisor can pick several agents, branches, types and so on at once
@@ -64,7 +71,8 @@ public class CallSearchService(CallCenterDbContext db)
         decimal? MinOrderValue = null,
         decimal? MaxOrderValue = null,
         bool? HasRecording = null,
-        bool? Classified = null);
+        bool? Classified = null,
+        bool? Internal = null);
 
     /// <summary>One page of the calls matching <paramref name="filter"/>, newest first.</summary>
     public async Task<CallSearchPageDto> SearchAsync(
@@ -73,7 +81,7 @@ public class CallSearchService(CallCenterDbContext db)
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var calls = Apply(db.Communications.AsNoTracking(), filter);
+        var calls = Apply(db.Communications.AsNoTracking(), filter, await InternalNumbersAsync(filter, ct));
 
         var total = await calls.CountAsync(ct);
 
@@ -92,11 +100,21 @@ public class CallSearchService(CallCenterDbContext db)
     /// "all calls with all details", exported in full (S-05). Streamed, so a
     /// year of calls is never held in memory at once.
     /// </summary>
-    public IAsyncEnumerable<CallSearchRowDto> ExportAsync(Filter filter) =>
-        Project(Apply(db.Communications.AsNoTracking(), filter)
+    public async IAsyncEnumerable<CallSearchRowDto> ExportAsync(
+        Filter filter, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var rows = Project(Apply(db.Communications.AsNoTracking(), filter, await InternalNumbersAsync(filter, ct))
                 .OrderByDescending(c => c.StartedAt)
                 .ThenBy(c => c.Id))
-            .AsAsyncEnumerable();
+            .AsAsyncEnumerable()
+            .WithCancellation(ct);
+
+        await foreach (var row in rows) yield return row;
+    }
+
+    /// <summary>S-48's list, read only when a tab asks for it.</summary>
+    private async Task<IReadOnlyList<string>> InternalNumbersAsync(Filter filter, CancellationToken ct) =>
+        filter.Internal is null ? [] : await ReportScope.InternalNumbersAsync(db, ct);
 
     /// <summary>One call in full, or null when there is no such call.</summary>
     public async Task<CallDetailsDto?> DetailsAsync(Guid id, CancellationToken ct = default)
@@ -128,7 +146,8 @@ public class CallSearchService(CallCenterDbContext db)
     private static string[] Words(IReadOnlyList<string>? values) =>
         values is null ? [] : values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim()).ToArray();
 
-    private static IQueryable<Communication> Apply(IQueryable<Communication> calls, Filter f)
+    private static IQueryable<Communication> Apply(
+        IQueryable<Communication> calls, Filter f, IReadOnlyList<string> internalNumbers)
     {
         // Calls-only screens must not start returning messages, and the
         // Applications page must not show calls (A-70).
@@ -155,6 +174,15 @@ public class CallSearchService(CallCenterDbContext db)
         {
             var types = f.TypeIds.ToArray();
             calls = calls.Where(c => c.Classification != null && types.Contains(c.Classification.TypeId));
+        }
+
+        // The reports' own rule, so the Customer calls tab and a report over the
+        // same filters give the same number (Dia, 9 Oct 2026).
+        if (f.Internal is { } only)
+        {
+            calls = only
+                ? ReportScope.OnlyInternal(calls, internalNumbers)
+                : ReportScope.WithoutInternal(calls, internalNumbers);
         }
 
         if (Words(f.Statuses) is { Length: > 0 } statuses) calls = calls.Where(c => statuses.Contains(c.Status));

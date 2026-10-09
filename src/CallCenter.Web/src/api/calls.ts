@@ -111,6 +111,12 @@ export interface CallFilters {
   maxOrder?: number
   hasRecording?: boolean
   classified?: boolean
+  /**
+   * False for the customers' calls, the ones the reports count; true for the
+   * internal ones, which they leave out (S-48). The Calls page's two tabs
+   * (Dia, 9 Oct 2026). Left off, both.
+   */
+  internal?: boolean
 }
 
 export const searchCalls = (filters: CallFilters, page: number, pageSize = 50) =>

@@ -663,6 +663,13 @@
   "calls": {
     "heading": "Calls",
     "intro": "Every call, from every agent. Filter, then open one to see and hear it.",
+    "tabs": {
+      "label": "Which calls",
+      "customers": "Customer calls",
+      "internal": "Internal calls",
+      "customersHint": "The calls the reports count.",
+      "internalHint": "Calls between agents and the branches, from an extension or a number on the internal numbers list. The reports leave them out."
+    },
     "filters": "Search calls",
     "search": "Search",
     "clear": "Clear",

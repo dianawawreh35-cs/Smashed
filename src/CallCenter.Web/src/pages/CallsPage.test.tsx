@@ -331,4 +331,32 @@ describe('calls page', () => {
     expect(localDate(from)).toBe(localDate(new Date()))
     expect(sent.searchParams.get('to')).toBeTruthy()
   })
+
+  it('opens on the customers\' calls, and keeps the internal ones on a tab of their own with the same filters (Dia, 9 Oct 2026)', async () => {
+    const fetchMock = server()
+    vi.stubGlobal('fetch', fetchMock)
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderPage()
+    await screen.findByText('Mahmoud')
+
+    const sent = () => new URL(searches(fetchMock).at(-1)!, 'http://x').searchParams
+    expect(screen.getByRole('tab', { name: 'Customer calls' })).toHaveAttribute('aria-selected', 'true')
+    expect(sent().get('internal')).toBe('false')
+
+    fireEvent.change(screen.getByLabelText('Number or name'), { target: { value: '0599' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(sent().get('q')).toBe('0599'))
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Internal calls' }))
+    await waitFor(() => expect(sent().get('internal')).toBe('true'))
+    expect(sent().get('q')).toBe('0599')
+    expect(sent().get('page')).toBe('1')
+    expect(screen.getByText(/The reports leave them out/)).toBeInTheDocument()
+
+    // The export is the tab on screen.
+    fireEvent.click(await screen.findByRole('button', { name: 'Export all 2 (CSV)' }))
+    await waitFor(() => expect(click).toHaveBeenCalled())
+    const exported = fetchMock.mock.calls.map(([url]) => String(url)).find((url) => url.startsWith('/api/communications/search/export'))!
+    expect(new URL(exported, 'http://x').searchParams.get('internal')).toBe('true')
+  })
 })

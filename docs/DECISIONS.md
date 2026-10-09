@@ -9442,6 +9442,46 @@ still tested on its own. **Not seen running.**
 **To deploy:** released in **`v0.16.0`** (entry above). Applies to earlier
 calls too: the reports are worked out from the saved numbers each time.
 
+## 2026-10-09 — The Calls page: customer calls and internal calls on two tabs (S-02, S-48)
+
+**In plain terms.** Dia: "numbers don't add up". For October the Call reports
+said 290 answered incoming calls, and the Calls page, filtered Answered and
+Incoming, said 312. Both were right by their own rule. The 22 calls between
+them all came from the branches' extensions (2001 to 2012, mostly 2002, بطن
+الهوى). Since 6 Oct the reports leave those out, and the Calls page listed
+everything. Read from the live server's API that day: customer calls 290
+answered, internal 22 answered, 7 missed, 2 rejected.
+
+Asked whether to hide them behind a filter or count them again, Dia asked for
+**a tab of their own**. The Calls page now opens on **Customer calls**, the
+same calls the reports count, and **Internal calls** sits beside it. The two
+tabs share the filters, and the export takes the tab on screen.
+
+- **One rule, the reports' own.** `ReportScope.Narrow`'s internal-call filter
+  became `ReportScope.WithoutInternal`, and its exact opposite is
+  `ReportScope.OnlyInternal`. The call search takes `internal=false|true`
+  (left off, both, which no screen asks for now). So the two tabs always add
+  up to every call, and Customer calls always matches a report over the same
+  days. `ReportCube.Where` still writes the same rule in SQL. The acceptance
+  test is what holds the two copies together.
+- **What it does not close.** Customer missed calls in October were 73 on the
+  Calls page and 64 in the report. The 9 extra rows are the Agent App's
+  untaken rings of a call that ended abandoned (S-55). The reports leave them
+  out because the abandoned call already counts that customer once. The Calls
+  page still lists each ring: who let it ring is worth seeing. Left as is
+  until Dia decides.
+- The contact history and the Agent App's log are unchanged.
+
+**Checked:** the known test day's search now asserts both tabs. Customer
+calls equals the summary's calls (10), Answered and Incoming on it equals the
+incoming summary's answered (5), and Internal calls is the three internal
+calls. Server: report, search, applications and dashboard tests, 42 of 42
+against `callcenter_test`. Web: type-check, lint, 242 of 242, including the
+tab's request, its filters carried across, and the export. **Not seen
+running.**
+
+**To deploy:** the server and the web app, one release. Not released yet.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -9493,8 +9533,10 @@ running**.
 | Call reports and dashboard | R-01 to R-18, S-20 | **built 26 Sep, not yet seen running** — checklist 1.9, screenshots in both languages |
 | Abandoned calls from the PBX's Calls Detail report | S-55, R-20 | **built 26 Sep and seen importing on the dev server**. Still to see: the Abandoned tab and the settings card, in both languages. Production needs a PBX user of its own (runbook 8.1), not Dia's |
 | POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
-| **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **released as `v0.16.0`, not deployed, not yet seen running.** The server's `update.sh v0.16.0` |
-| **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **released as `v0.16.0`, not deployed, not yet seen running.** The same deploy |
+| **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **`v0.16.0` is on the live server** (its API answered with the switch on 9 Oct); the screens not yet seen |
+| **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **live in `v0.16.0`**: on 9 Oct the live report left out October's 22 answered branch calls (9 Oct entry) |
+| **Customer calls and Internal calls tabs on the Calls page**: October's Customer calls, Answered and Incoming, says the same as the Call reports' answered incoming (290 on 9 Oct); Internal calls lists the branches' calls with their recordings; both languages | S-02, S-48 | **built 9 Oct, not released, not yet seen running.** A server and web release |
+| The Calls page lists each untaken ring of an abandoned call, and the reports do not: October's customer missed calls were 73 on the page and 64 in the report | S-55, R-01 | Dia's call: hide the rings on Customer calls, or keep them and say so on the page |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | The PBX's view of each phone: ringing (`early`) on the Users page | S-61 | built 26 Sep; offline, free and in a call seen, ringing not yet |
 | **Listen & speak (`*223`)**: checklist "Listen & speak"; above all, that the customer does not hear the supervisor | S-62 | **built 2 Oct, not yet heard on the PBX.** `*223` allowed on the server's extension; the microphone setting on a supervisor PC (runbook) |

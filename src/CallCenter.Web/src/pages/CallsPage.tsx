@@ -1,5 +1,5 @@
-import { Fragment, useState } from 'react'
-import type { FormEvent } from 'react'
+import { Fragment, useRef, useState } from 'react'
+import type { FormEvent, KeyboardEvent } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { exportCalls, searchCalls, startOfDay, startOfNextDay } from '../api/calls'
@@ -17,6 +17,14 @@ import { localDate } from '../lib/reportFilters'
 import { noSelectOnDoubleClick } from '../lib/rows'
 
 const PAGE_SIZE = 50
+
+/**
+ * The customers' calls, which the reports count, and the internal ones, which
+ * they leave out (S-48): apart, so the first tab and a report over the same
+ * days give the same number (Dia, 9 Oct 2026). The filters are shared.
+ */
+const TABS = ['customers', 'internal'] as const
+type Tab = (typeof TABS)[number]
 
 /** What the supervisor can pick a call's result from. Ringing and Logged never reach this list. */
 const STATUSES = ['Answered', 'Missed', 'Rejected', 'NoAnswer', 'Blocked', 'Failed', 'Abandoned']
@@ -92,6 +100,10 @@ function toFilters(d: Draft): CallFilters {
  * same as the menu, delivery and users lists (21 Sep, "The editors open where
  * you are"). It first opened above the table and scrolled up to it, which on
  * page 3 of a busy day is exactly the jump that decision was made to end.
+ *
+ * **Customer calls and internal calls are two tabs** (Dia, 9 Oct 2026). On one
+ * list the branches' calls to the agents made the answered calls 312 against
+ * the report's 290; the reports leave them out, by the server's one rule.
  */
 export default function CallsPage() {
   const { t, i18n } = useTranslation()
@@ -101,10 +113,12 @@ export default function CallsPage() {
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
   const [exporting, setExporting] = useState<'idle' | 'busy' | 'failed'>('idle')
+  const [tab, setTab] = useState<Tab>('customers')
+  const query: CallFilters = { ...filters, internal: tab === 'internal' }
 
   const results = useQuery({
-    queryKey: ['calls', 'search', filters, page],
-    queryFn: () => searchCalls(filters, page, PAGE_SIZE),
+    queryKey: ['calls', 'search', query, page],
+    queryFn: () => searchCalls(query, page, PAGE_SIZE),
     placeholderData: keepPreviousData,
   })
 
@@ -120,6 +134,12 @@ export default function CallsPage() {
     setPage(1)
   }
 
+  function onTab(next: Tab) {
+    setTab(next)
+    setPage(1)
+    setOpenId(null)
+  }
+
   function onClear() {
     const fresh = todayDraft()
     setDraft(fresh)
@@ -131,7 +151,7 @@ export default function CallsPage() {
   async function onExport() {
     setExporting('busy')
     try {
-      const blob = await exportCalls(filters, arabic ? 'ar' : 'en')
+      const blob = await exportCalls(query, arabic ? 'ar' : 'en')
       downloadBlob(`calls-${new Date().toISOString().slice(0, 10)}`, blob)
       setExporting('idle')
     } catch {
@@ -149,142 +169,201 @@ export default function CallsPage() {
         <p className="page-subtitle">{t('calls.intro')}</p>
       </div>
 
-      <form onSubmit={onSearch} className="card card-body space-y-4" aria-label={t('calls.filters')}>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <label className="field lg:col-span-2">
-            <span className="field-label">{t('calls.filter.q')}</span>
-            <input className="input" value={draft.q} dir={searchDir(draft.q)} onChange={(e) => set('q')(e.target.value)} />
-          </label>
-          <label className="field">
-            <span className="field-label">{t('calls.filter.from')}</span>
-            <input type="date" className="input" value={draft.from} onChange={(e) => set('from')(e.target.value)} />
-          </label>
-          <label className="field">
-            <span className="field-label">{t('calls.filter.to')}</span>
-            <input type="date" className="input" value={draft.to} onChange={(e) => set('to')(e.target.value)} />
-          </label>
+      <div className="space-y-2">
+        <CallTabs tab={tab} onChoose={onTab} />
+        <p className="field-hint">{t(`calls.tabs.${tab}Hint`)}</p>
+      </div>
 
-          <FilterMultiSelect label={t('calls.columns.agent')} values={draft.agentId} onChange={set('agentId')}
-            choices={agents}
-            options={(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => ({ value: u.id, label: u.displayName }))} />
-          <FilterMultiSelect label={t('calls.columns.branch')} values={draft.branchId} onChange={set('branchId')}
-            choices={branches}
-            options={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))} />
-          <FilterMultiSelect label={t('calls.columns.type')} values={draft.typeId} onChange={set('typeId')}
-            choices={types}
-            options={(types.data ?? []).map((ty) => ({ value: ty.id, label: arabic ? ty.labelAr : ty.labelEn }))} />
-          <FilterMultiSelect label={t('calls.columns.status')} values={draft.status} onChange={set('status')}
-            options={STATUSES.map((s) => ({ value: s, label: t(`history.statuses.${s}`, { defaultValue: s }) }))} />
-
-          <Select label={t('calls.columns.direction')} value={draft.direction} onChange={set('direction')}>
-            <option value="In">{t('calls.directions.In')}</option>
-            <option value="Out">{t('calls.directions.Out')}</option>
-          </Select>
-          <label className="field">
-            <span className="field-label">{t('calls.filter.notes')}</span>
-            <input className="input" value={draft.notes} onChange={(e) => set('notes')(e.target.value)} />
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="field">
-              <span className="field-label">{t('calls.filter.minOrder')}</span>
-              <input type="number" min={0} className="input" dir="ltr" value={draft.minOrder}
-                onChange={(e) => set('minOrder')(e.target.value)} />
+      <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)} className="space-y-6">
+        <form onSubmit={onSearch} className="card card-body space-y-4" aria-label={t('calls.filters')}>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <label className="field lg:col-span-2">
+              <span className="field-label">{t('calls.filter.q')}</span>
+              <input className="input" value={draft.q} dir={searchDir(draft.q)} onChange={(e) => set('q')(e.target.value)} />
             </label>
             <label className="field">
-              <span className="field-label">{t('calls.filter.maxOrder')}</span>
-              <input type="number" min={0} className="input" dir="ltr" value={draft.maxOrder}
-                onChange={(e) => set('maxOrder')(e.target.value)} />
+              <span className="field-label">{t('calls.filter.from')}</span>
+              <input type="date" className="input" value={draft.from} onChange={(e) => set('from')(e.target.value)} />
             </label>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Select label={t('calls.filter.recording')} value={draft.recording} onChange={set('recording')}>
-              <option value="yes">{t('common.yes')}</option>
-              <option value="no">{t('common.no')}</option>
-            </Select>
-            <Select label={t('calls.filter.classified')} value={draft.classified} onChange={set('classified')}>
-              <option value="yes">{t('common.yes')}</option>
-              <option value="no">{t('common.no')}</option>
-            </Select>
-          </div>
-        </div>
+            <label className="field">
+              <span className="field-label">{t('calls.filter.to')}</span>
+              <input type="date" className="input" value={draft.to} onChange={(e) => set('to')(e.target.value)} />
+            </label>
 
-        <div className="flex gap-2">
-          <button type="submit" className="btn-primary">{t('calls.search')}</button>
-          <button type="button" className="btn-ghost" onClick={onClear}>{t('calls.clear')}</button>
-        </div>
-      </form>
+            <FilterMultiSelect label={t('calls.columns.agent')} values={draft.agentId} onChange={set('agentId')}
+              choices={agents}
+              options={(agents.data ?? []).filter((u) => u.role === 'Agent').map((u) => ({ value: u.id, label: u.displayName }))} />
+            <FilterMultiSelect label={t('calls.columns.branch')} values={draft.branchId} onChange={set('branchId')}
+              choices={branches}
+              options={(branches.data ?? []).map((b) => ({ value: b.id, label: b.name }))} />
+            <FilterMultiSelect label={t('calls.columns.type')} values={draft.typeId} onChange={set('typeId')}
+              choices={types}
+              options={(types.data ?? []).map((ty) => ({ value: ty.id, label: arabic ? ty.labelAr : ty.labelEn }))} />
+            <FilterMultiSelect label={t('calls.columns.status')} values={draft.status} onChange={set('status')}
+              options={STATUSES.map((s) => ({ value: s, label: t(`history.statuses.${s}`, { defaultValue: s }) }))} />
 
-      {results.isLoading ? (
-        <p className="text-slate-400">{t('app.loading')}</p>
-      ) : results.isError ? (
-        <LoadError message={t('calls.failed')} onRetry={() => void results.refetch()} busy={results.isFetching} />
-      ) : total === 0 ? (
-        <div className="card card-body text-center">
-          <p className="text-slate-300">{t('calls.empty')}</p>
-          <p className="field-hint mt-1">{t('calls.emptyHint')}</p>
-        </div>
-      ) : (
-        <div
-          className={`card overflow-x-auto transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
-          aria-busy={results.isPlaceholderData}
-        >
-          <div className="flex items-center justify-between px-4 py-3 text-sm text-slate-400">
-            <span>{t('calls.count', { count: total })}</span>
-            <div className="flex items-center gap-3">
-              {exporting === 'failed' && <span className="text-red-300">{t('calls.exportFailed')}</span>}
-              <button type="button" className="btn-ghost btn-sm" onClick={onExport} disabled={exporting === 'busy'}
-                title={t('calls.exportHint')}>
-                {exporting === 'busy' ? t('calls.exporting') : t('calls.export', { count: total })}
-              </button>
-              <Pager page={page} pages={pages} onPage={setPage} />
+            <Select label={t('calls.columns.direction')} value={draft.direction} onChange={set('direction')}>
+              <option value="In">{t('calls.directions.In')}</option>
+              <option value="Out">{t('calls.directions.Out')}</option>
+            </Select>
+            <label className="field">
+              <span className="field-label">{t('calls.filter.notes')}</span>
+              <input className="input" value={draft.notes} onChange={(e) => set('notes')(e.target.value)} />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="field">
+                <span className="field-label">{t('calls.filter.minOrder')}</span>
+                <input type="number" min={0} className="input" dir="ltr" value={draft.minOrder}
+                  onChange={(e) => set('minOrder')(e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="field-label">{t('calls.filter.maxOrder')}</span>
+                <input type="number" min={0} className="input" dir="ltr" value={draft.maxOrder}
+                  onChange={(e) => set('maxOrder')(e.target.value)} />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Select label={t('calls.filter.recording')} value={draft.recording} onChange={set('recording')}>
+                <option value="yes">{t('common.yes')}</option>
+                <option value="no">{t('common.no')}</option>
+              </Select>
+              <Select label={t('calls.filter.classified')} value={draft.classified} onChange={set('classified')}>
+                <option value="yes">{t('common.yes')}</option>
+                <option value="no">{t('common.no')}</option>
+              </Select>
             </div>
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t('calls.columns.when')}</th>
-                <th>{t('calls.columns.direction')}</th>
-                <th>{t('calls.columns.customer')}</th>
-                <th>{t('calls.columns.agent')}</th>
-                <th>{t('calls.columns.status')}</th>
-                <th>{t('calls.columns.type')}</th>
-                <th>{t('calls.columns.branch')}</th>
-                <th>{t('calls.columns.orderValue')}</th>
-                <th>{t('calls.columns.duration')}</th>
-                <th>{t('calls.columns.recording')}</th>
-                <th>{t('calls.columns.classification')}</th>
-                <th>{t('calls.columns.notes')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {results.data!.rows.map((row) => (
-                <Fragment key={row.id}>
-                  <Row
-                    row={row}
-                    open={row.id === openId}
-                    onToggle={() => setOpenId(row.id === openId ? null : row.id)}
-                  />
-                  {/* Where the supervisor is already looking, not at the top of
-                      a list they have scrolled past. */}
-                  {row.id === openId && (
-                    <tr>
-                      <td colSpan={COLUMNS} className="row-panel">
-                        {/* w-0 min-w-full: as wide as the table, and never
-                            wider. Without it the panel's content widened the
-                            table as it opened, and every column jumped. */}
-                        <div className="w-0 min-w-full">
-                          <CallDetails row={row} onClose={() => setOpenId(null)} />
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+
+          <div className="flex gap-2">
+            <button type="submit" className="btn-primary">{t('calls.search')}</button>
+            <button type="button" className="btn-ghost" onClick={onClear}>{t('calls.clear')}</button>
+          </div>
+        </form>
+
+        {results.isLoading ? (
+          <p className="text-slate-400">{t('app.loading')}</p>
+        ) : results.isError ? (
+          <LoadError message={t('calls.failed')} onRetry={() => void results.refetch()} busy={results.isFetching} />
+        ) : total === 0 ? (
+          <div className="card card-body text-center">
+            <p className="text-slate-300">{t('calls.empty')}</p>
+            <p className="field-hint mt-1">{t('calls.emptyHint')}</p>
+          </div>
+        ) : (
+          <div
+            className={`card overflow-x-auto transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
+            aria-busy={results.isPlaceholderData}
+          >
+            <div className="flex items-center justify-between px-4 py-3 text-sm text-slate-400">
+              <span>{t('calls.count', { count: total })}</span>
+              <div className="flex items-center gap-3">
+                {exporting === 'failed' && <span className="text-red-300">{t('calls.exportFailed')}</span>}
+                <button type="button" className="btn-ghost btn-sm" onClick={onExport} disabled={exporting === 'busy'}
+                  title={t('calls.exportHint')}>
+                  {exporting === 'busy' ? t('calls.exporting') : t('calls.export', { count: total })}
+                </button>
+                <Pager page={page} pages={pages} onPage={setPage} />
+              </div>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('calls.columns.when')}</th>
+                  <th>{t('calls.columns.direction')}</th>
+                  <th>{t('calls.columns.customer')}</th>
+                  <th>{t('calls.columns.agent')}</th>
+                  <th>{t('calls.columns.status')}</th>
+                  <th>{t('calls.columns.type')}</th>
+                  <th>{t('calls.columns.branch')}</th>
+                  <th>{t('calls.columns.orderValue')}</th>
+                  <th>{t('calls.columns.duration')}</th>
+                  <th>{t('calls.columns.recording')}</th>
+                  <th>{t('calls.columns.classification')}</th>
+                  <th>{t('calls.columns.notes')}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {results.data!.rows.map((row) => (
+                  <Fragment key={row.id}>
+                    <Row
+                      row={row}
+                      open={row.id === openId}
+                      onToggle={() => setOpenId(row.id === openId ? null : row.id)}
+                    />
+                    {/* Where the supervisor is already looking, not at the top of
+                        a list they have scrolled past. */}
+                    {row.id === openId && (
+                      <tr>
+                        <td colSpan={COLUMNS} className="row-panel">
+                          {/* w-0 min-w-full: as wide as the table, and never
+                              wider. Without it the panel's content widened the
+                              table as it opened, and every column jumped. */}
+                          <div className="w-0 min-w-full">
+                            <CallDetails row={row} onClose={() => setOpenId(null)} />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const PANEL_ID = 'calls-panel'
+const tabId = (name: Tab) => `calls-tab-${name}`
+
+/**
+ * The report tabs' pattern (CallReportsPage): one tab in the Tab order, the
+ * arrow keys move between them and open the one they reach, and in Arabic the
+ * left arrow is the next tab.
+ */
+function CallTabs({ tab, onChoose }: { tab: Tab; onChoose: (name: Tab) => void }) {
+  const { t, i18n } = useTranslation()
+  const buttons = useRef<(HTMLButtonElement | null)[]>([])
+
+  function onKeyDown(event: KeyboardEvent, index: number) {
+    const forward = i18n.dir() === 'rtl' ? 'ArrowLeft' : 'ArrowRight'
+    const back = i18n.dir() === 'rtl' ? 'ArrowRight' : 'ArrowLeft'
+    const target =
+      event.key === forward ? (index + 1) % TABS.length
+        : event.key === back ? (index - 1 + TABS.length) % TABS.length
+          : event.key === 'Home' ? 0
+            : event.key === 'End' ? TABS.length - 1
+              : null
+    if (target === null) return
+    event.preventDefault()
+    onChoose(TABS[target])
+    buttons.current[target]?.focus()
+  }
+
+  return (
+    <div role="tablist" aria-label={t('calls.tabs.label')} className="flex flex-wrap gap-2 border-b border-ink-700 pb-2">
+      {TABS.map((name, index) => (
+        <button
+          key={name}
+          ref={(element) => {
+            buttons.current[index] = element
+          }}
+          id={tabId(name)}
+          type="button"
+          role="tab"
+          aria-selected={tab === name}
+          aria-controls={PANEL_ID}
+          tabIndex={tab === name ? 0 : -1}
+          className={tab === name ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'}
+          onClick={() => onChoose(name)}
+          onKeyDown={(event) => onKeyDown(event, index)}
+        >
+          {t(`calls.tabs.${name}`)}
+        </button>
+      ))}
     </div>
   )
 }

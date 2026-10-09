@@ -120,25 +120,50 @@ public static class ReportScope
             q = q.Where(c => c.Classification != null && types.Contains(c.Classification.TypeId));
         }
 
-        // S-48: internal calls are recorded and kept, and left out of the
-        // customer-facing reports. A row with no number is a customer's
-        // (withheld caller id), so the null has to be let through explicitly:
-        // NOT (NULL = ANY(...)) is NULL, which a WHERE drops.
+        return WithoutInternal(q, internalNumbers);
+    }
+
+    /// <summary>
+    /// The rows that are not internal: what every report counts, and the
+    /// Calls page's Customer calls tab (Dia, 9 Oct 2026).
+    /// </summary>
+    /// <remarks>
+    /// S-48: internal calls are recorded and kept, and left out of the
+    /// customer-facing reports. A row with no number is a customer's
+    /// (withheld caller id), so the null has to be let through explicitly:
+    /// NOT (NULL = ANY(...)) is NULL, which a WHERE drops.
+    ///
+    /// A call whose other party is an extension is internal without being
+    /// listed (Dia, 6 Oct 2026): agent to agent, agent to branch, branch to
+    /// agent. Customers never have a number that short; the list is still
+    /// there for a branch reached on a full number.
+    /// </remarks>
+    public static IQueryable<Communication> WithoutInternal(
+        IQueryable<Communication> q, IReadOnlyList<string>? internalNumbers)
+    {
         if (internalNumbers is { Count: > 0 })
         {
             var list = internalNumbers.ToList();
             q = q.Where(c => c.RemoteNormalised == null || !list.Contains(c.RemoteNormalised));
         }
 
-        // A call whose other party is an extension is internal without being
-        // listed (Dia, 6 Oct 2026): agent to agent, agent to branch, branch to
-        // agent. Customers never have a number that short; the list is still
-        // there for a branch reached on a full number.
-        q = q.Where(c => c.Kind != CommunicationKinds.Call
-                         || c.RemoteNormalised == null
-                         || c.RemoteNormalised.Length > PhoneNormalizer.MaxExtensionLength);
+        return q.Where(c => c.Kind != CommunicationKinds.Call
+                            || c.RemoteNormalised == null
+                            || c.RemoteNormalised.Length > PhoneNormalizer.MaxExtensionLength);
+    }
 
-        return q;
+    /// <summary>
+    /// The rows <see cref="WithoutInternal"/> leaves out, and only those: the
+    /// Calls page's Internal calls tab, so the two tabs add up to every call.
+    /// </summary>
+    public static IQueryable<Communication> OnlyInternal(
+        IQueryable<Communication> q, IReadOnlyList<string>? internalNumbers)
+    {
+        var list = (internalNumbers ?? []).ToList();
+        return q.Where(c => c.RemoteNormalised != null
+                            && ((c.Kind == CommunicationKinds.Call
+                                 && c.RemoteNormalised.Length <= PhoneNormalizer.MaxExtensionLength)
+                                || list.Contains(c.RemoteNormalised)));
     }
 
     /// <summary>

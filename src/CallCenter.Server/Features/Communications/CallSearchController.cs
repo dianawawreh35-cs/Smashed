@@ -52,7 +52,7 @@ public class CallSearchController(CallSearchService search) : ControllerBase
         var name = query.Kind == CommunicationKinds.App ? "applications" : "calls";
         Response.ContentType = CallExport.ContentType;
         Response.Headers.ContentDisposition = $"attachment; filename=\"{name}-{DateTime.Now:yyyy-MM-dd}.csv\"";
-        await CallExport.WriteAsync(Response.Body, search.ExportAsync(query.ToFilter()), lang ?? "ar", ct);
+        await CallExport.WriteAsync(Response.Body, search.ExportAsync(query.ToFilter(), ct), lang ?? "ar", ct);
     }
 
     /// <summary>
@@ -91,6 +91,10 @@ public class SearchQuery
     public decimal? MaxOrder { get; set; }
     public bool? HasRecording { get; set; }
     public bool? Classified { get; set; }
+
+    /// <summary><c>false</c>: the customers' calls, as the reports count them. <c>true</c>: the internal ones (S-48). Neither: both.</summary>
+    public bool? Internal { get; set; }
+
     [FromQuery(Name = "channelId")] public Guid[] ChannelIds { get; set; } = [];
 
     /// <summary><c>Call</c> (the default, so the Calls page never shows a message) or <c>App</c>.</summary>
@@ -98,5 +102,5 @@ public class SearchQuery
 
     public CallSearchService.Filter ToFilter() => new(
         Q, Kind, ChannelIds, AgentIds, BranchIds, TypeIds, Statuses, Directions, From, To, Notes,
-        MinOrder, MaxOrder, HasRecording, Classified);
+        MinOrder, MaxOrder, HasRecording, Classified, Internal);
 }

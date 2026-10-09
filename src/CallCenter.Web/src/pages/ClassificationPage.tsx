@@ -130,6 +130,7 @@ function TypesCard({
   const fail = (e: unknown) => setError(t(`classification.errors.${errorCodeOf(e)}`))
 
   const add = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () =>
       createClassificationType({
         labelAr: newAr.trim(),
@@ -146,6 +147,7 @@ function TypesCard({
   })
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: (type: ClassificationType) =>
       updateClassificationType(type.id, {
         labelAr: type.labelAr,
@@ -159,6 +161,7 @@ function TypesCard({
   })
 
   const remove = useMutation({
+    meta: { toast: 'deleted' },
     mutationFn: deleteClassificationType,
     onSuccess: onChanged,
     onError: fail,
@@ -310,6 +313,7 @@ function FieldsCard({
   useEffect(() => setDraft(fields), [fields])
 
   const publish = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => publishClassificationForm({ fields: draft }, direction),
     onSuccess: onPublished,
     onError: (e) => setError(t(`classification.errors.${errorCodeOf(e)}`)),

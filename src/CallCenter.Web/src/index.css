@@ -293,6 +293,25 @@
     @apply border-b border-ink-700 px-4 py-3 align-middle text-slate-300;
   }
 
+  /* A long list scrolls inside its card, so its column headings stay in sight
+     (S-70). The headings stick to the top of the box; a border would scroll
+     away with the collapsed table borders, so the line under them is a shadow.
+     Only for the lists, which are a page of rows at a time: a report card
+     grows with its rows and the page scrolls. */
+  .table-scroll {
+    @apply max-h-[calc(100vh-8rem)] overflow-auto;
+  }
+
+  .table-scroll .table thead th {
+    @apply sticky top-0 z-10 border-b-0 bg-ink-900 shadow-[inset_0_-1px_0_rgb(var(--ink-700))];
+  }
+
+  /* A report column's heading sorts its table (S-70). */
+  .th-sort {
+    @apply inline-flex items-center gap-1 font-semibold uppercase tracking-wide text-slate-400
+           hover:text-slate-200 rtl:tracking-normal;
+  }
+
   .table tbody tr:hover td {
     @apply bg-ink-800/60;
   }
@@ -309,8 +328,48 @@
      The selected section carries a bar on its start edge, so it moves to the
      right in Arabic with the rest of the layout. */
   .nav-link {
-    @apply relative flex items-center gap-2 rounded-md px-3.5 py-2.5 text-sm
-           text-slate-400 transition hover:bg-ink-900 hover:text-slate-200;
+    @apply relative flex items-center gap-2.5 rounded-md px-3.5 py-2 text-sm
+           text-slate-400 transition hover:bg-ink-800/60 hover:text-slate-200;
+  }
+
+  /* The heading over a group of sections (S-70). Wide screens only: on a
+     narrow one the menu is a single strip and the groups simply run on. */
+  .nav-group {
+    @apply px-3.5 pb-1 pt-4 text-xs font-semibold text-slate-500;
+  }
+
+  /* --- Header status (S-71) ---------------------------------------------- */
+  .status-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-700 bg-ink-800
+           px-2.5 py-1 text-slate-300 transition hover:text-slate-100;
+  }
+
+  .status-dot {
+    @apply h-2 w-2 rounded-full bg-slate-500;
+  }
+
+  .status-pill-ok {
+    @apply border-emerald-500/50 text-emerald-300;
+  }
+
+  .status-pill-ok .status-dot {
+    @apply bg-emerald-400;
+  }
+
+  .status-pill-off {
+    @apply border-red-500/50 text-red-300;
+  }
+
+  .status-pill-off .status-dot {
+    @apply bg-red-400;
+  }
+
+  .status-pill-call {
+    @apply border-brand-500/50 text-brand-800;
+  }
+
+  .status-pill-warn {
+    @apply border-amber-500/50 text-amber-300;
   }
 
   .nav-link-active {
@@ -344,7 +403,9 @@
   aside,
   header,
   form,
-  button,
+  /* A button that is also a table's text, a sorting heading or a row's
+     opener, stays: hiding it took the heading or the cell with it. */
+  button:not(.print-keep),
   [role='tablist'],
   .no-print {
     display: none !important;
@@ -397,8 +458,10 @@
      scroll box would print only the columns it showed, scrollbar and all.
      On paper every column is printed: the box lets the table out, and the
      table, set tighter than on screen, fits the page's width. */
-  .overflow-x-auto {
+  .overflow-x-auto,
+  .table-scroll {
     overflow: visible !important;
+    max-height: none !important;
   }
 
   .table {

@@ -1,6 +1,7 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   addPhoneToContact,
@@ -49,7 +50,17 @@ import LoadError from '../components/LoadError'
  */
 export default function ContactsPage() {
   const { t } = useTranslation()
-  const [query, setQuery] = useState('')
+  // A search typed in the header arrives as ?q= (S-71).
+  const [params] = useSearchParams()
+  const location = useLocation()
+  const asked = params.get('q')
+  const [query, setQuery] = useState(asked ?? '')
+
+  // Each search from the header is a new navigation, so the same number asked
+  // twice, with the box changed by hand in between, still fills it again.
+  useEffect(() => {
+    if (asked !== null) setQuery(asked)
+  }, [asked, location.key])
   const [filter, setFilter] = useState<ContactFilter>('all')
   const [adding, setAdding] = useState(false)
   const [flagging, setFlagging] = useState<FlagTarget | null>(null)
@@ -172,7 +183,7 @@ function ContactTable({ contacts }: { contacts: ContactSummary[] }) {
   const close = () => setOpened(null)
 
   return (
-    <div className="card overflow-x-auto">
+    <div className="card table-scroll">
       <table className="table">
         <thead>
           <tr>
@@ -345,6 +356,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
   const firstNumber = phones.map((p) => p.trim()).find(Boolean) ?? ''
 
   const addNumber = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: (contactId: string) => addPhoneToContact(contactId, firstNumber),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['contacts'] })
@@ -357,6 +369,7 @@ function ContactForm({ contact, onClose }: { contact: Contact | null; onClose: (
   })
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => {
       const request = {
         name: name.trim() || null,

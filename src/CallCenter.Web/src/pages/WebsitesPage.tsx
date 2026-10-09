@@ -328,6 +328,7 @@ function WebsiteForm({
       setDraft((d) => ({ ...d, [key]: value }))
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () =>
       website ? updateWebsite(website.id, toRequest(draft, sortOrder)) : createWebsite(toRequest(draft, sortOrder)),
     onSuccess: onDone,
@@ -335,6 +336,7 @@ function WebsiteForm({
   })
 
   const remove = useMutation({
+    meta: { toast: 'deleted' },
     mutationFn: () => deleteWebsite(website!.id),
     onSuccess: onDone,
     onError: (e) => setError(t(`websites.errors.${errorCodeOf(e)}`)),

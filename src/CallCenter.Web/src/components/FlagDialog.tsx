@@ -64,6 +64,7 @@ export default function FlagDialog({
   const isFlagged = target.kind === 'contact' && (target.isVip || target.isBlocked)
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => {
       const flags = {
         isVip: choice === 'vip',

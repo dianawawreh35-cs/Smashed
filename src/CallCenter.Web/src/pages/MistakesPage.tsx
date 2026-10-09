@@ -194,7 +194,7 @@ export default function MistakesPage() {
         </div>
       ) : (
         <div
-          className={`card overflow-x-auto transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
+          className={`card table-scroll transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
           aria-busy={results.isPlaceholderData}
         >
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm text-slate-400">
@@ -237,6 +237,7 @@ function MistakeTable({
   const [error, setError] = useState<string | null>(null)
 
   const remove = useMutation({
+    meta: { toast: 'deleted' },
     mutationFn: deleteMistake,
     onMutate: () => setError(null),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['mistakes'] }),
@@ -374,6 +375,7 @@ function MistakeForm({ mistake, onClose }: { mistake: Mistake | null; onClose: (
   const typedName = number.trim() !== '' && !looksLikeNumber(number)
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => {
       const request = {
         occurredOn,

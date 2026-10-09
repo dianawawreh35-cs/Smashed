@@ -51,8 +51,9 @@ export default function UsersPage() {
   }
   const onError = (e: unknown) => setError(t(`users.errors.${errorCodeOf(e)}`))
 
-  const create = useMutation({ mutationFn: createUser, onSuccess: refresh, onError })
+  const create = useMutation({ meta: { toast: 'saved' }, mutationFn: createUser, onSuccess: refresh, onError })
   const toggle = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: (user: User) => updateUser(user.id, user.displayName, !user.isActive),
     onSuccess: refresh,
     onError,
@@ -350,6 +351,7 @@ function ExtensionForm({
   const [secret, setSecret] = useState('')
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => setExtension(user.id, { extension, secret }),
     onSuccess: onDone,
     onError,
@@ -407,6 +409,7 @@ function PasswordForm({
   const [currentPassword, setCurrentPassword] = useState('')
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => resetPassword(user.id, newPassword, isSelf ? currentPassword : undefined),
     onSuccess: onDone,
     onError,

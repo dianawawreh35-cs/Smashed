@@ -329,7 +329,7 @@ function BreakList({ filters }: { filters: BreakFilters }) {
         ) : total === 0 ? (
           <p className="text-center text-slate-400">{t('breaks.list.empty')}</p>
         ) : (
-          <div className={`overflow-x-auto transition ${list.isPlaceholderData ? 'opacity-60' : ''}`}>
+          <div className={`table-scroll transition ${list.isPlaceholderData ? 'opacity-60' : ''}`}>
             <table className="table">
               <thead>
                 <tr>

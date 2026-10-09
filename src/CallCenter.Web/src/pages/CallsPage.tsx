@@ -251,7 +251,7 @@ export default function CallsPage() {
           </div>
         ) : (
           <div
-            className={`card overflow-x-auto transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
+            className={`card table-scroll transition ${results.isPlaceholderData ? 'opacity-60' : ''}`}
             aria-busy={results.isPlaceholderData}
           >
             <div className="flex items-center justify-between px-4 py-3 text-sm text-slate-400">

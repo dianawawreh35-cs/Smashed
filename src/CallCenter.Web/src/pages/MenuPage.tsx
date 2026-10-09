@@ -191,6 +191,7 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
   const fail = (e: unknown) => setError(t(`menu.errors.${errorCodeOf(e)}`))
 
   const add = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () =>
       createMenuCategory({
         name: newName.trim(),
@@ -207,6 +208,7 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
   })
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: ({ id, ...request }: MenuCategory & { name: string }) =>
       updateMenuCategory(id, {
         name: request.name,
@@ -218,6 +220,7 @@ function CategoryManager({ onClose }: { onClose: () => void }) {
   })
 
   const remove = useMutation({
+    meta: { toast: 'deleted' },
     mutationFn: deleteMenuCategory,
     onMutate: () => setError(null),
     onSuccess: refresh,
@@ -380,6 +383,7 @@ function ItemTable({
   // Asked twice, and a refusal shown (M-W07): Remove used to delete on the
   // first click and say nothing when the server refused.
   const remove = useMutation({
+    meta: { toast: 'deleted' },
     mutationFn: deleteMenuItem,
     onMutate: () => setError(null),
     onSuccess: () => {
@@ -390,7 +394,7 @@ function ItemTable({
   })
 
   return (
-    <div className="card overflow-x-auto">
+    <div className="card table-scroll">
       {error && (
         <div role="alert" className="notice-error m-3">
           {error}
@@ -520,6 +524,7 @@ function ItemForm({
   }
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: async () => {
       const request = {
         categoryId,

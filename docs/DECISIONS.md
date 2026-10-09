@@ -9484,6 +9484,85 @@ running.**
 is live yet:** the server's `update.sh v0.17.0`. No migration, nothing new in
 `.env`, no Agent App to upload.
 
+## 2026-10-09 — The web app's layout: menu groups, header search and status, Saved, the sign-in warning (S-70, S-71, S-72)
+
+**In plain terms.** Dia asked how the web app's screens could be better, and
+then for the suggestions to be built. The side menu had grown to seventeen
+links in one column; it is now five headed groups with an icon each, under the
+restaurant's logo. The header finds a customer from any page and shows whether
+the queue is open and how many agents are on a call or a break. Pages use the
+width of a large screen. Long lists keep their column headings in sight, and
+report tables sort by their headings. A save says *Saved.*; and ten minutes
+before the 12-hour sign-in ends, a warning says when.
+
+**Decided without asking:**
+
+- **The groups**, *Day to day*, *Reports*, *Quality*, *Setup*, *System*,
+  bring the three reports together, where they used to sit each under its
+  page (Dia, 25 Sep). Within a group, the old order.
+- **The logo is the tab icon's picture** (`public/apple-touch-icon.png`, from
+  `tools/icons/make_icons.py`), served by the app itself, so the reason for
+  the letter "S" (no internet on the server) no longer holds.
+- **Up to 1536 px wide** (`max-w-screen-2xl`), not the full width: on a very
+  wide screen a row read across 2,500 px is harder, not easier. Settings,
+  the Agent App page and the forms already had their own narrower widths.
+- **Headings that stay in sight need the list to scroll inside its card.** A
+  sticky heading sticks to the nearest box that scrolls, and the lists'
+  boxes scroll sideways for wide tables, which makes them that box. So the
+  long lists (calls, applications, mistakes, contacts, menu, delivery areas,
+  the breaks list) scroll inside, at most the window's height less the
+  header. The trade-off: two scrolls on one page. **Dia to judge on screen**;
+  undoing it is the class `table-scroll` back to `overflow-x-auto` on one page.
+  The short lists (users, websites) are left alone.
+- **Only the reports sort in the browser.** A report holds all its rows
+  (S-05), so sorting them is honest; the lists come a page at a time, and
+  sorting one page would look like an answer for all of them (house rule,
+  20 Sep "filtering a page lies"). Sorting the lists on the server is not
+  done. The chart keeps the report's order, which for a line over time is
+  the only one that reads; the CSV follows the table.
+- **The header's figures reuse the pages' own queries** (`['pbx','queue']`,
+  `['agentPhones']`, `['breaks','monitor']`), every 30 s, so the header and
+  the page never disagree, and a queue switch on the dashboard shows in the
+  header at once. The calls figure is left out while the server is not
+  hearing from the PBX; any figure whose answer is missing or the wrong shape
+  is left out rather than drawn, because the header is outside the page's
+  error boundary and an exception there would blank every page.
+- **The header search opens the Contacts page** (`/contacts?q=`) rather than
+  searching on its own: one search, with A-61's rules, and the list there
+  already opens a customer to their calls.
+- **Saved and Deleted come from the mutation's `meta`**, read once by the
+  query client's `MutationCache`, so each editor adds one line and no state.
+  Settings cards that already say *saved* in place are left as they are.
+  Failures stay in the form, beside what was typed.
+- **The warning reads the token's own `exp`**, because after a reload the
+  token is all the browser has (`expiresAt` from the login response is gone).
+  It does not extend the sign-in; the refresh stays in Open items.
+- **Print:** buttons are hidden on paper, which would have taken the sorting
+  headings with them. They carry `print-keep`. So does the Complaints
+  report's row opener, whose cell had been printing empty since it was built.
+
+**Left out of the suggestions:** a page title in the header, offered in the
+suggestions, was not built: every page already opens with its own `<h1>`, and
+the header would repeat it a few pixels above. Paging the report lists
+(M-S04) stays the next server task, as Open items says.
+
+**Tested.** Web: type check, lint, the production build, and 255 of 255 tests,
+13 of them new: the menu's groups and an agent's single section, the header's
+figures and their links, the calls figure left out with no PBX, a search from
+the header landing on Contacts, `/` and a field being typed in, the token's
+end read and the warning shown only in the last ten minutes, Saved shown once
+for a save that asks and going by itself, and report sorting in all three
+states with the total last. The Contacts test now draws the page inside a
+router, as the app does. **Seen** in headless Chrome against the built app
+with every request answered by a script (sample data, not the server), at
+1366 × 768 in English and Arabic, dark and light, and at 800 px; that look
+moved the search box to a minimum width, which a narrow header had squeezed
+to 110 px. **Not seen against the server**, nor the Saved notice or a sorted
+report on screen: checklist 1.15.
+
+**To deploy:** web only, no migration, no Agent App. Goes out with the next
+release.
+
 ## Where to pick up
 
 **Where things stand.** The system runs on the restaurant's server as
@@ -9520,7 +9599,7 @@ running**.
 | **See Update now work on an agent laptop** (A-82, built 29 Sep): with 0.5.3 installed by hand, upload the next version and look for the bar within a minute (15 on a version before the change), the button off during a call, and the app back on the new version after pressing it, with no Windows prompt. Screenshots of the bar in both languages | A-82 | 0.5.3 on the laptops, then any later version uploaded || **Paging the report lists** (review M-S04): `ProblemsAsync`, `MissedListAsync`, `InactiveCustomersAsync`, `UnknownNumbersAsync`, `AbandonedListAsync` return every row, and a year breaks N-02's five seconds | N-02, R-05, R-11, R-16, R-18, R-20 | **both halves at once**: the server's response shape and `CallReportsPage` in the web app change together. Left out of the 27 Sep fixes for that reason. The next server task |
 | The report cards' own CSV export (`src/lib/csv.ts`) neutralises formula cells and writes numbers as `="0599…"`, as the server's call-search export has since 27 Sep | R-02, S-05 | nothing: the web half only |
 | **The web app's sign-out ends its token**, as the Agent App's has since 27 Sep (M-S01) | N-05 | a session row for web sign-ins, which changes what the dashboard's *agents online* counts. Then decide whether 12 hours is still right for the web token |
-| The supervisor's sign-in: warn before the 12 h token runs out, and refresh it | N-05 | a refresh needs a server endpoint that does not exist yet |
+| The supervisor's sign-in: refresh the 12 h token. The warning ten minutes before it ends is built (S-72, 9 Oct) | N-05 | a refresh needs a server endpoint that does not exist yet |
 | **A container that is not root** (M-D02) and **HTTPS on the LAN** (M-D06) | N-05 | changes the production server and, for HTTPS, a new Agent App build on the laptops. What each takes is in the 27 Sep part 4 entry. Until then the runbook says plainly that it is HTTP |
 | The review's Agent App items **left out of prompt 17**: a crash mid-call loses the call record and leaves raw audio in the scratch folder; the WAV is rebuilt on the UI thread at hang-up; user agents are closed but not disposed, and a 403 from a restarting PBX stops registration until the next sign-in, with no Retry; the pop-up centres on the primary monitor only; no token refresh, so the 12 h token ends a shift; `Server:HubPath` is configured and comments mention SignalR, but there is no SignalR client, so an app signed out because its agent signed in elsewhere finds out at its next request, about 30 s, not at once (27 Sep evening) | A-02, A-10, A-31, N-05 | nothing |
 | The upload queue's set-aside items: a way to clear one, or pass it to a supervisor. Today Try again is the only action, and a call refused as `extension_not_yours` is refused again | A-04 | Dia's call |
@@ -9537,6 +9616,7 @@ running**.
 | POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
 | **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **`v0.16.0` is on the live server** (its API answered with the switch on 9 Oct); the screens not yet seen |
 | **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **live in `v0.16.0`**: on 9 Oct the live report left out October's 22 answered branch calls (9 Oct entry) |
+| **The web app's layout**: checklist 1.15 in both languages, with screenshots of the menu, the header's status, Saved, and a sorted report; and Dia's verdict on the lists scrolling inside their cards | S-70, S-71, S-72 | **built 9 Oct, not released; seen only with sample data.** The next release |
 | **Customer calls and Internal calls tabs on the Calls page**: October's Customer calls, Answered and Incoming, says the same as the Call reports' answered incoming (290 on 9 Oct); Internal calls lists the branches' calls with their recordings; both languages | S-02, S-48 | **released as `v0.17.0`, not deployed, not yet seen running.** The server's `update.sh v0.17.0` |
 | The Calls page lists each untaken ring of an abandoned call, and the reports do not: October's customer missed calls were 73 on the page and 64 in the report | S-55, R-01 | Dia's call: hide the rings on Customer calls, or keep them and say so on the page |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |

@@ -92,6 +92,7 @@ export default function ClassificationEditor({
   const notOfferedType = selectedType !== undefined && selectedType.isActive && !onThisForm(selectedType.name)
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => saveClassification(callId, toRequest(form, answers, applies, resolved, isComplaint, existing)),
     onSuccess: onSaved,
     onError: (e) => setError(t(`calls.edit.errors.${errorCode(e)}`, { defaultValue: t('calls.edit.errors.save_failed') })),

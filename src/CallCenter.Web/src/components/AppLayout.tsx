@@ -4,6 +4,11 @@ import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeSwitcher from './ThemeSwitcher'
 import PageBoundary from './PageBoundary'
+import NavIcon from './NavIcon'
+import CustomerSearch from './CustomerSearch'
+import LiveStatus from './LiveStatus'
+import SessionExpiryNotice from './SessionExpiryNotice'
+import Toaster from './Toaster'
 import { UserRoles } from '../api/auth'
 import { useAuth } from '../auth/context'
 
@@ -26,7 +31,8 @@ function storedMenuHidden(): boolean {
  * supervisor app seven areas (S-02 search, reports R-01 to R-21, contacts,
  * users, settings…), and a row of header links stops working somewhere around
  * five. A sidebar also keeps the current section visible, which a row of links
- * only manages with an underline nobody notices.
+ * only manages with an underline nobody notices. Its sections are in headed
+ * groups, each with an icon (S-70).
  *
  * It collapses to a horizontal strip on a narrow screen rather than hiding
  * behind a menu button: there are few enough sections to fit, and a supervisor
@@ -35,6 +41,10 @@ function storedMenuHidden(): boolean {
  * On a wide screen the supervisor can hide it, for a report or the dashboard
  * that wants the whole width, with the button at the start of the header. The
  * choice is remembered in this browser, as the language is.
+ *
+ * The header finds a customer and shows the queue, calls and breaks right
+ * now (S-71); the page area warns before the sign-in runs out and the corner
+ * says when a change was saved (S-72).
  */
 export default function AppLayout() {
   const { t } = useTranslation()
@@ -58,40 +68,69 @@ export default function AppLayout() {
     navigate('/login', { replace: true })
   }
 
-  // An agent signed in here has one page, the Agent App download (S-63).
-  const agentSections = [{ to: '/agent-app', label: t('nav.agentApp') }]
+  const isSupervisor = user?.role === UserRoles.Supervisor
 
-  const supervisorSections = [
-    { to: '/dashboard', label: t('nav.dashboard') },
-    { to: '/calls', label: t('nav.calls') },
-    // The call reports right under Calls, as the application reports sit
-    // under Applications (Dia, 25 Sep).
-    { to: '/call-reports', label: t('nav.callReports') },
-    // Applications, and their reports, beside Calls: the same conversations by
-    // another route (A-70). Their own pages, so Calls stays calls only.
-    { to: '/applications', label: t('nav.applications') },
-    { to: '/application-reports', label: t('nav.applicationReports') },
-    { to: '/contacts', label: t('nav.contacts') },
-    // What went wrong at a branch or with an agent, and who is responsible (S-65).
-    { to: '/mistakes', label: t('nav.mistakes') },
-    // Their report right under them, as the call reports sit under Calls (R-23).
-    { to: '/mistake-reports', label: t('nav.mistakeReports') },
-    // Who is on break now, and the agents' breaks on any day (A-86, S-66, R-22).
-    { to: '/breaks', label: t('nav.breaks') },
-    { to: '/delivery', label: t('nav.delivery') },
-    { to: '/menu', label: t('nav.menu') },
-    { to: '/classification', label: t('nav.classification') },
-    { to: '/users', label: t('nav.users') },
-    { to: '/settings', label: t('nav.settings') },
-    // The tabs inside the Agent App, and their logins (A-88).
-    { to: '/websites', label: t('nav.websites') },
-    // What each Agent App laptop logged, errors first (N-12).
-    { to: '/logs', label: t('nav.logs') },
-    // Where a supervisor uploads a new version for the laptops (S-63).
-    { to: '/agent-app', label: t('nav.agentApp') },
+  // An agent signed in here has one page, the Agent App download (S-63).
+  const agentGroups: NavGroup[] = [
+    { sections: [{ to: '/agent-app', label: t('nav.agentApp'), icon: 'agentApp' }] },
   ]
 
-  const sections = user?.role === UserRoles.Supervisor ? supervisorSections : agentSections
+  // In groups by what the supervisor is doing (S-70): seventeen sections in
+  // one column had grown past what the eye takes in. Each list keeps the
+  // order it had, so a section is where it was within its group.
+  const supervisorGroups: NavGroup[] = [
+    {
+      heading: t('nav.groups.today'),
+      sections: [
+        { to: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' },
+        { to: '/calls', label: t('nav.calls'), icon: 'calls' },
+        // Applications beside Calls: the same conversations by another route
+        // (A-70). Their own page, so Calls stays calls only.
+        { to: '/applications', label: t('nav.applications'), icon: 'applications' },
+        { to: '/contacts', label: t('nav.contacts'), icon: 'contacts' },
+        // Who is on break now, and the agents' breaks on any day (A-86, S-66, R-22).
+        { to: '/breaks', label: t('nav.breaks'), icon: 'breaks' },
+      ],
+    },
+    {
+      // The three reports together, in the order of the pages they report on
+      // (they used to sit under those pages, Dia 25 Sep).
+      heading: t('nav.groups.reports'),
+      sections: [
+        { to: '/call-reports', label: t('nav.callReports'), icon: 'callReports' },
+        { to: '/application-reports', label: t('nav.applicationReports'), icon: 'applicationReports' },
+        { to: '/mistake-reports', label: t('nav.mistakeReports'), icon: 'mistakeReports' },
+      ],
+    },
+    {
+      // What went wrong at a branch or with an agent, and who is responsible (S-65).
+      heading: t('nav.groups.quality'),
+      sections: [{ to: '/mistakes', label: t('nav.mistakes'), icon: 'mistakes' }],
+    },
+    {
+      heading: t('nav.groups.setup'),
+      sections: [
+        { to: '/delivery', label: t('nav.delivery'), icon: 'delivery' },
+        { to: '/menu', label: t('nav.menu'), icon: 'menu' },
+        { to: '/classification', label: t('nav.classification'), icon: 'classification' },
+        // The tabs inside the Agent App, and their logins (A-88).
+        { to: '/websites', label: t('nav.websites'), icon: 'websites' },
+        { to: '/users', label: t('nav.users'), icon: 'users' },
+        { to: '/settings', label: t('nav.settings'), icon: 'settings' },
+      ],
+    },
+    {
+      heading: t('nav.groups.system'),
+      sections: [
+        // What each Agent App laptop logged, errors first (N-12).
+        { to: '/logs', label: t('nav.logs'), icon: 'logs' },
+        // Where a supervisor uploads a new version for the laptops (S-63).
+        { to: '/agent-app', label: t('nav.agentApp'), icon: 'agentApp' },
+      ],
+    },
+  ]
+
+  const groups = isSupervisor ? supervisorGroups : agentGroups
 
   return (
     <div className="min-h-screen lg:flex">
@@ -101,38 +140,44 @@ export default function AppLayout() {
                     lg:border-e border-b lg:border-b-0 ${menuHidden ? 'lg:hidden' : ''}`}
       >
         <div className="flex items-center gap-3 px-5 py-4">
-          {/* The restaurant's mark. A letter rather than an image keeps the app
-              working on a server with no internet and nothing to fetch. */}
-          <span
-            className="grid h-9 w-9 place-items-center rounded-lg bg-brand-50
-                       font-bold text-brand-500"
-            aria-hidden="true"
-          >
-            S
-          </span>
+          {/* The restaurant's logo (S-70), the same picture as the browser
+              tab's icon (tools/icons/make_icons.py), served by the app itself,
+              so it shows with no internet. */}
+          <img src="/apple-touch-icon.png" alt="" width={36} height={36} className="h-9 w-9 rounded-full" />
           <div className="leading-tight">
             <p className="text-sm font-semibold text-slate-100">{t('app.title')}</p>
             <p className="text-xs text-slate-500">{t('app.subtitle')}</p>
           </div>
         </div>
 
-        <nav aria-label={t('nav.label')} className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible">
-          {sections.map((section) => (
-            <NavLink
-              key={section.to}
-              to={section.to}
-              className={({ isActive }) =>
-                `nav-link whitespace-nowrap ${isActive ? 'nav-link-active' : ''}`
-              }
-            >
-              {section.label}
-            </NavLink>
+        <nav aria-label={t('nav.label')} className="flex gap-1 overflow-x-auto px-3 pb-3 lg:block lg:overflow-visible">
+          {groups.map((group, i) => (
+            // `contents` on a narrow screen, so every section runs on in the
+            // one strip; a block with its heading on a wide one.
+            <div key={i} role={group.heading ? 'group' : undefined} aria-labelledby={group.heading ? `nav-group-${i}` : undefined}
+                 className="contents lg:block lg:space-y-0.5">
+              {group.heading && (
+                <p id={`nav-group-${i}`} className="nav-group hidden lg:block">{group.heading}</p>
+              )}
+              {group.sections.map((section) => (
+                <NavLink
+                  key={section.to}
+                  to={section.to}
+                  className={({ isActive }) =>
+                    `nav-link whitespace-nowrap ${isActive ? 'nav-link-active' : ''}`
+                  }
+                >
+                  <NavIcon name={section.icon} />
+                  {section.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end gap-3 border-b border-ink-700 bg-ink-900 px-6 py-3">
+        <header className="flex flex-wrap items-center gap-3 border-b border-ink-700 bg-ink-900 px-6 py-3">
           {/* Wide screens only: on a narrow one the menu is a strip above the
               page and takes no width to give back. */}
           <button
@@ -141,7 +186,7 @@ export default function AppLayout() {
             aria-controls="app-menu"
             aria-expanded={!menuHidden}
             title={menuHidden ? t('nav.showMenu') : t('nav.hideMenu')}
-            className="btn-quiet btn-sm me-auto hidden lg:inline-flex"
+            className="btn-quiet btn-sm hidden lg:inline-flex"
           >
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75"
                  strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
@@ -150,9 +195,15 @@ export default function AppLayout() {
             <span className="sr-only">{menuHidden ? t('nav.showMenu') : t('nav.hideMenu')}</span>
           </button>
 
+          {/* Find a customer, and the queue, calls and breaks at a glance
+              (S-71). A supervisor's alone: an agent's account may ask for none
+              of it. */}
+          {isSupervisor && <CustomerSearch />}
+          {isSupervisor && <LiveStatus />}
+
           {/* Who is signed in, so a shared browser never leaves it in doubt. */}
           {user && (
-            <span className="flex items-center gap-2 text-sm">
+            <span className="ms-auto flex items-center gap-2 text-sm">
               <span
                 className="grid h-7 w-7 place-items-center rounded-full bg-brand-50
                            text-xs font-semibold text-brand-500"
@@ -172,8 +223,12 @@ export default function AppLayout() {
           </button>
         </header>
 
+        {/* As wide as a large screen allows (S-70): the lists and reports
+            had wrapped and scrolled sideways at 1152 px with the screen's
+            edges empty. The forms keep their own narrower widths. */}
         <main className="flex-1 px-6 py-6">
-          <div className="mx-auto w-full max-w-6xl">
+          <div className="mx-auto w-full max-w-screen-2xl">
+            <SessionExpiryNotice />
             {/* Keyed on the page, so a page that failed to load does not
                 stay failed when the supervisor goes to another. */}
             <PageBoundary key={location.pathname}>
@@ -182,6 +237,14 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
+
+      <Toaster />
     </div>
   )
+}
+
+interface NavGroup {
+  /** None for an agent's one section. */
+  heading?: string
+  sections: { to: string; label: string; icon: string }[]
 }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import ContactsPage from './ContactsPage'
 import { setToken } from '../auth/token'
 import i18n from '../i18n'
@@ -32,7 +33,10 @@ function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <ContactsPage />
+      {/* The page reads a search sent from the header, ?q= (S-71). */}
+      <MemoryRouter>
+        <ContactsPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }

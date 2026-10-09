@@ -32,6 +32,7 @@ export default function ChannelsCard() {
   const fail = (e: unknown) => setError(t(`channels.errors.${errorCodeOf(e)}`))
 
   const add = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () =>
       createChannel({ name: newName.trim(), sortOrder: (channels?.length ?? 0) * 10, isActive: true }),
     onSuccess: () => {
@@ -42,6 +43,7 @@ export default function ChannelsCard() {
   })
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: (channel: Channel) =>
       updateChannel(channel.id, { name: channel.name, sortOrder: channel.sortOrder, isActive: channel.isActive }),
     onSuccess: refresh,

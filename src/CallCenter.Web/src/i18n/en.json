@@ -30,7 +30,14 @@
     "mistakes": "Mistakes",
     "breaks": "Breaks",
     "mistakeReports": "Mistakes report",
-    "websites": "Websites"
+    "websites": "Websites",
+    "groups": {
+      "today": "Day to day",
+      "reports": "Reports",
+      "quality": "Quality",
+      "setup": "Setup",
+      "system": "System"
+    }
   },
   "login": {
     "heading": "Sign in",
@@ -1442,5 +1449,25 @@
       "server_error": "The server reported an error. Please try again.",
       "server_unreachable": "The server could not be reached."
     }
+  },
+  "header": {
+    "find": "Find a customer",
+    "findPlaceholder": "Number or name…",
+    "findHint": "Press / to search from any page",
+    "status": "Right now",
+    "queueOpen": "Queue open",
+    "queueClosed": "Queue closed",
+    "queueUnknown": "Queue: not known",
+    "onCall": "On a call",
+    "onBreak": "On break"
+  },
+  "toast": {
+    "saved": "Saved.",
+    "deleted": "Deleted.",
+    "dismiss": "Dismiss"
+  },
+  "session": {
+    "endsSoon": "Your sign-in ends at {{time}}. Save what you are working on: after that the next action will send you to the sign-in page.",
+    "signInAgain": "Sign in again now"
   }
 }

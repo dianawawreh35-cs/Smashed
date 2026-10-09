@@ -1,4 +1,4 @@
-import { Fragment, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
@@ -159,13 +159,42 @@ export default function ReportCard<T>({
     void queryClient.refetchQueries({ type: 'active', predicate: (query) => query.state.status === 'error' })
 
   function onExport() {
-    if (!rows) return
-    downloadCsv(exportName, toCsv(columns.map((c) => c.label), rows.map((r) => columns.map((c) => c.value(r)))))
+    if (!sorted) return
+    // In the table's order, as it is on screen.
+    downloadCsv(exportName, toCsv(columns.map((c) => c.label), sorted.map((r) => columns.map((c) => c.value(r)))))
+  }
+
+  // The table's order, chosen by its headings (S-70): the report's own until
+  // a heading is pressed. The chart keeps the report's order, which for a
+  // line over time is the only one that reads.
+  const [sort, setSort] = useState<{ key: string; descending: boolean } | null>(null)
+  const sorted = useMemo(() => {
+    const column = sort && columns.find((c) => c.key === sort.key)
+    if (!rows || !column) return rows
+    const collator = new Intl.Collator(i18n.language, { numeric: true, sensitivity: 'base' })
+    const compare = (a: CsvCell, b: CsvCell) => {
+      // A blank goes last whichever way the column runs.
+      const blankA = a === null || a === undefined || a === ''
+      const blankB = b === null || b === undefined || b === ''
+      if (blankA || blankB) return blankA === blankB ? 0 : blankA ? 1 : -1
+      const order = typeof a === 'number' && typeof b === 'number' ? a - b : collator.compare(String(a), String(b))
+      return sort!.descending ? -order : order
+    }
+    return [...rows].sort((a, b) => compare(column.value(a), column.value(b)))
+  }, [rows, columns, sort, i18n.language])
+
+  /** First press: most first for a figure, A to Z for text; then the other way; then the report's own order. */
+  function sortBy(column: ReportColumn<T>) {
+    setOpened(null)
+    const first = Boolean(column.numeric)
+    if (sort?.key !== column.key) setSort({ key: column.key, descending: first })
+    else if (sort.descending === first) setSort({ key: column.key, descending: !first })
+    else setSort(null)
   }
 
   const number = (v: CsvCell) => (typeof v === 'number' ? v.toLocaleString(i18n.language) : (v ?? ''))
   const totals = columns.some((c) => c.total)
-  const shown = rows && limit !== undefined && rows.length > limit ? rows.slice(0, limit) : rows
+  const shown = sorted && limit !== undefined && sorted.length > limit ? sorted.slice(0, limit) : sorted
   const heatColumns = columns.filter((c) => c.heat)
   const heatMax = rows && heatColumns.length > 0
     ? Math.max(0, ...rows.flatMap((r) => heatColumns.map((c) => Number(c.value(r)) || 0)))
@@ -212,9 +241,20 @@ export default function ReportCard<T>({
                         each figure sits under its heading in either language
                         (Dia, 26 Sep). `!` because `.table thead th` sets
                         text-start and outranks a plain utility. */}
-                    {columns.map((c) => (
-                      <th key={c.key} className={c.numeric ? '!text-center' : undefined}>{c.label}</th>
-                    ))}
+                    {columns.map((c) => {
+                      const by = sort?.key === c.key ? sort : null
+                      return (
+                        <th key={c.key} className={c.numeric ? '!text-center' : undefined}
+                            aria-sort={by ? (by.descending ? 'descending' : 'ascending') : undefined}>
+                          <button type="button" className="th-sort print-keep" onClick={() => sortBy(c)}>
+                            {c.label}
+                            <span aria-hidden="true" className={`print:hidden ${by ? '' : 'opacity-0'}`}>
+                              {by?.descending ? '↓' : '↑'}
+                            </span>
+                          </button>
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -232,9 +272,9 @@ export default function ReportCard<T>({
                               className={[c.numeric ? 'tabular text-center' : '', c.heat ? 'heat-cell' : ''].join(' ').trim() || undefined}
                               style={c.heat ? heatStyle(Number(c.value(row)) || 0, heatMax, theme) : undefined}>
                               {expand && ci === 0 ? (
-                                <button type="button" className="text-start text-brand-500 underline" aria-expanded={opened === i}
+                                <button type="button" className="print-keep text-start text-brand-500 underline" aria-expanded={opened === i}
                                   onClick={() => setOpened(opened === i ? null : i)}>
-                                  <span aria-hidden="true">{opened === i ? '▾ ' : '▸ '}</span>{text}
+                                  <span aria-hidden="true" className="print:hidden">{opened === i ? '▾ ' : '▸ '}</span>{text}
                                 </button>
                               ) : text}
                             </td>

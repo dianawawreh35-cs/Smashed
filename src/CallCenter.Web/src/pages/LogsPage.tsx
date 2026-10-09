@@ -384,6 +384,7 @@ function Nickname({ laptop }: { laptop: AgentLogLaptop }) {
   const [name, setName] = useState('')
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => setLaptopNickname(laptop.laptop, name),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['agent-logs'] })

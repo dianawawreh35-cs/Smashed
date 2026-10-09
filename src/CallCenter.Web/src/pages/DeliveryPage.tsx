@@ -147,6 +147,7 @@ function AreaTable({
   // Asked twice, and a refusal shown (M-W07): Remove used to delete on the
   // first click and say nothing when the server refused.
   const remove = useMutation({
+    meta: { toast: 'deleted' },
     mutationFn: deleteDeliveryArea,
     onMutate: () => setError(null),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['delivery-areas'] }),
@@ -154,7 +155,7 @@ function AreaTable({
   })
 
   return (
-    <div className="card overflow-x-auto">
+    <div className="card table-scroll">
       {error && (
         <div role="alert" className="notice-error m-3">
           {error}
@@ -235,6 +236,7 @@ function AreaForm({ area, onClose }: { area: DeliveryArea | null; onClose: () =>
   const [error, setError] = useState<string | null>(null)
 
   const save = useMutation({
+    meta: { toast: 'saved' },
     mutationFn: () => {
       const request = { name: name.trim(), branchId, price: Number(price), isActive }
       return area ? updateDeliveryArea(area.id, request) : createDeliveryArea(request)

@@ -701,6 +701,58 @@ side by side.
       in Excel: Arabic headings (English when the page is in English), the
       names readable, the minutes as numbers, and every break in the period.
 
+### 1.15 The layout: menu groups, header search and status, Saved, the sign-in warning (S-70, S-71, S-72) — built 9 Oct, seen only with sample data
+
+No phone needed. Seen on 9 Oct in headless Chrome with every request answered
+by a script (sample data, not the server): the menu, the header, the warning
+and the Contacts list's headings, in both languages and both themes. Not yet
+seen against the server, nor the Saved notice or a report's sorting.
+
+- [ ] **The menu.** As a supervisor, the side menu has the restaurant's round
+      logo at the top, then five headings: **Day to day** (العمل اليومي:
+      Dashboard, Calls, Applications, Contacts, Breaks), **Reports** (the three
+      reports), **Quality** (Mistakes), **Setup** (Delivery, Menu,
+      Classification, Websites, Users, Settings), **System** (Logs, Agent App).
+      Every section has an icon. **At 1366 × 768 and 125 %, scroll down: is
+      Agent App reachable?** *If the logo is a broken picture:* the server is
+      not serving `apple-touch-icon.png` from `wwwroot`.
+- [ ] **Narrow window** (under 1024 px wide): no headings, every section in
+      one strip that scrolls sideways, and the header wraps onto two lines
+      rather than squeezing the search box.
+- [ ] **Agent account.** Sign in as an agent: the menu has Agent App alone, and
+      the header has no search box and no status.
+- [ ] **Status.** The header shows **Queue open** (green) or **Queue closed**
+      (red), **On a call N** and **On break N**. Each one opens its page: the
+      dashboard, Users, Breaks. Switch the queue on the dashboard: the header
+      changes at once. Put an agent on a break in the Agent App: within 30
+      seconds On break goes up. *If On a call is missing:* the server is not
+      hearing from the PBX (the Users page says why); it is left out rather
+      than shown as 0.
+- [ ] **Find a customer.** From any page, press **/**: the cursor is in the
+      header's box. Type a number you know and press Enter: the Contacts page
+      opens with that number in its own search box and the customer listed.
+      Press / while typing in another field: it types a slash instead.
+- [ ] **Lists keep their headings.** Calls, Applications, Mistakes, Contacts,
+      Menu, Delivery and the Breaks list: scroll a long list and the column
+      headings stay in sight; the list scrolls inside its card. **Judge this
+      one:** if scrolling inside the card feels worse than the page scrolling,
+      say so; it is one class per page to undo. Print a Calls page: every row
+      prints, not just the part in the box.
+- [ ] **Reports sort.** On Call reports, press a figure column's heading: most
+      first, an arrow shows; again, least first; a third time, the report's
+      own order. A name column sorts A to Z first. The chart does not change,
+      the total row stays last, and **Export CSV** saves the rows in the
+      order shown. Print a report: the headings print. On the Complaints tab,
+      the first column prints too (it used to print empty).
+- [ ] **Saved.** Edit a contact and save: **Saved.** appears in the bottom
+      corner (bottom left in Arabic) and goes after four seconds. Delete a
+      delivery area: **Deleted.** A save the server refuses shows its error
+      in the form as before, and no Saved.
+- [ ] **The sign-in warning.** Sign in, then wait until 10 minutes before 12
+      hours have passed (or ask for a build with a shorter token): an amber line
+      above the page says when the sign-in ends, with **Sign in again now**,
+      which signs out to the login page.
+
 ## Round 2 — the Agent App, without a phone
 
 Sign in as `dia20`. None of this needs a call.

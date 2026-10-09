@@ -1,5 +1,6 @@
-import { QueryClient } from '@tanstack/react-query'
+import { MutationCache, QueryClient } from '@tanstack/react-query'
 import { ApiError } from '../api/client'
+import { showToast } from './toast'
 
 /**
  * Whether a failed request is worth one more try: once for a dropped
@@ -12,9 +13,17 @@ export function shouldRetry(failures: number, error: unknown): boolean {
   return failures < 1 && !(error instanceof ApiError && error.status < 500)
 }
 
-/** The app's one query cache. */
+/**
+ * The app's one query cache. A save that names a notice in its `meta` gets
+ * it once the server has accepted it (S-72, lib/toast).
+ */
 export function createQueryClient(): QueryClient {
   return new QueryClient({
+    mutationCache: new MutationCache({
+      onSuccess: (_data, _variables, _context, mutation) => {
+        if (mutation.meta?.toast) showToast(mutation.meta.toast)
+      },
+    }),
     defaultOptions: {
       queries: {
         staleTime: 30_000,

@@ -9480,7 +9480,9 @@ against `callcenter_test`. Web: type-check, lint, 242 of 242, including the
 tab's request, its filters carried across, and the export. **Not seen
 running.**
 
-**To deploy:** the server and the web app, one release. Not released yet.
+**To deploy:** released as **`v0.17.0`**, server and web together. **Nothing
+is live yet:** the server's `update.sh v0.17.0`. No migration, nothing new in
+`.env`, no Agent App to upload.
 
 ## Where to pick up
 
@@ -9535,7 +9537,7 @@ running**.
 | POS customer lookup | A-67 | **built 26 Sep and seen creating a contact on the dev server**; **running on the live server** (token set, log seen 1 Oct). Asking again at every run, and Check now on the Settings page (1 Oct), not yet seen. Still to see: that contact and its calls in the Contacts tab |
 | **Incoming / Outgoing switch and the Complaints tab**: on Call reports and the dashboard, both directions in both languages; a customer's complaint call and its call back shown as one complaint, its recording played from the tab; Applications in place of Messages | R-01, R-05, S-20 | **`v0.16.0` is on the live server** (its API answered with the switch on 9 Oct); the screens not yet seen |
 | **Calls to and from extensions out of the reports**: on the Call reports and dashboard, a day with an agent-to-branch call shows the same figures as without it, and the Calls page still lists it with its recording | S-48 | **live in `v0.16.0`**: on 9 Oct the live report left out October's 22 answered branch calls (9 Oct entry) |
-| **Customer calls and Internal calls tabs on the Calls page**: October's Customer calls, Answered and Incoming, says the same as the Call reports' answered incoming (290 on 9 Oct); Internal calls lists the branches' calls with their recordings; both languages | S-02, S-48 | **built 9 Oct, not released, not yet seen running.** A server and web release |
+| **Customer calls and Internal calls tabs on the Calls page**: October's Customer calls, Answered and Incoming, says the same as the Call reports' answered incoming (290 on 9 Oct); Internal calls lists the branches' calls with their recordings; both languages | S-02, S-48 | **released as `v0.17.0`, not deployed, not yet seen running.** The server's `update.sh v0.17.0` |
 | The Calls page lists each untaken ring of an abandoned call, and the reports do not: October's customer missed calls were 73 on the page and 64 in the report | S-55, R-01 | Dia's call: hide the rings on Customer calls, or keep them and say so on the page |
 | Internal-call switch; a second call while one is on hold | A-23, A-24 | **built 26 Sep, not yet tried on the PBX.** Test: an internal call to a branch; then hold a customer, call a branch, hang up, and Resume. If the second call fails, check the extension's call limit on Issabel |
 | The PBX's view of each phone: ringing (`early`) on the Users page | S-61 | built 26 Sep; offline, free and in a call seen, ringing not yet |
